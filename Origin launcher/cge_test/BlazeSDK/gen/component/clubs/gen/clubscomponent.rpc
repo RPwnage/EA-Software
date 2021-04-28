@@ -1,0 +1,1226 @@
+// We assume that all request and response types are valid and just use them
+// directly in the code generation.
+//
+// The compiler should ensure that all commands within a component have a unique ID.
+// The compiler should ensure that all components within a file have a unique ID.
+// Zero is not a valid component or command ID
+// Enforce that method names must start with lowercase letter.
+// Enforce C++ rules for method names and TDF type names.
+// Allow C++ style comments.
+
+[ headername="clubs/tdf/clubs.h" ]
+#include "clubs/gen/clubs.tdf"
+
+[
+   client_include = false,
+   headername="clubs/tdf/clubs_server.h"
+]
+#include "clubs/gen/clubs_server.tdf"
+
+namespace Blaze
+{
+namespace Clubs
+{
+
+class ClubOnlineStatus;
+
+class CachedClubDataType;
+class CachedMemberOnlineStatusType;
+class CachedMemberInfoType;
+
+[
+    id = core/11,
+    description = "Implementation of the Online Clubs 2.0 feature.",
+    details = "Provides functionality to create and manage a club, and keep its statistics.",
+    configurationType = ClubsConfig
+]
+component Clubs
+{
+
+    types
+    {
+        [ name = "club" ]
+        ENTITY_TYPE_CLUB = 1;
+        [ name = "clubNews" ]
+        ENTITY_TYPE_CLUBNEWS = 2;
+    }
+
+    permissions
+    {
+        PERMISSION_CLUB_ADMINISTRATOR = 1;
+        PERMISSION_CLUB_ADMINISTRATOR_VIEW = 2;
+        PERMISSION_CLUB_LOG_EVENT = 3;
+    }
+
+    errors
+    {
+        [ description = "Invalid request argument." ]
+        CLUBS_ERR_INVALID_ARGUMENT = 1002;
+        [ description = "The user has reached his/her club membership limit." ]
+        CLUBS_ERR_MAX_CLUBS = 1003;
+        [ description = "The name is already in use by another club." ]
+        CLUBS_ERR_CLUB_NAME_IN_USE = 1004;
+        [ description = "The name is not appropriate." ]
+        CLUBS_ERR_PROFANITY_FILTER = 1005;
+        [ description = "Required privilege for the operation is missing." ]
+        CLUBS_ERR_NO_PRIVILEGE = 1007;
+        [ description = "The user with this blaze Id does not exist." ]
+        CLUBS_ERR_INVALID_USER_ID = 1008;
+        [ description = "The club Id is invalid." ]
+        CLUBS_ERR_INVALID_CLUB_ID = 1009;
+        [ description = "Number of items per fetch limit is exceeded." ]
+        CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED = 1010;
+        [ description = "Club name is shorter or longer than allowed." ]
+        CLUBS_ERR_INVALID_CLUBNAME_SIZE = 1011;
+        [ description = "Club non-unique name is shorter or longer than allowed." ]
+        CLUBS_ERR_INVALID_NON_UNIQUE_NAME_SIZE = 1012;
+        [ description = "The domain Id is invalid." ]
+        CLUBS_ERR_INVALID_DOMAIN_ID = 1013;
+
+        [ description = "Clubname cannot be empty." ]
+        CLUBS_ERR_INVALID_CLUBNAME_EMPTY = 1201;
+        [ description = "Non-unique name cannot be empty." ]
+        CLUBS_ERR_INVALID_NON_UNIQUE_NAME_EMPTY = 1202;
+
+        [ description = "User with the specified Id is not member of this club." ]
+        CLUBS_ERR_USER_NOT_MEMBER = 1301;
+        [ description = "User is the last GM but there are more members in the club.  Club cannot have no GMs so user must promote another user to GM first." ]
+        CLUBS_ERR_LAST_GM_CANNOT_LEAVE = 1302;
+        [ description = "Owner can only leave voluntarily, cannot be kicked." ]
+        CLUBS_ERR_CANNOT_KICK_OWNER = 1303;
+
+        [ description = "Cannot promote this user to GM since he/she is already a GM." ]
+        CLUBS_ERR_ALREADY_GM = 1304;
+        [ description = "Cannot send more invites as the club has reached max invites sent.  Need to revoke some invites before sending more." ]
+        CLUBS_ERR_MAX_INVITES_SENT = 1305;
+        [ description = "User cannot receive more invites as the user has reached max invites received." ]
+        CLUBS_ERR_MAX_INVITES_RECEIVED = 1306;
+        [ description = "Cannot send more petitions as the user has reached max petitions sent.  Need to revoke some petitions before sending more." ]
+        CLUBS_ERR_MAX_PETITIONS_SENT = 1307;
+        [ description = "Club cannot receive more petitions as the club has reached max petitions received." ]
+        CLUBS_ERR_MAX_PETITIONS_RECEIVED = 1308;
+        [ description = "Cannot send more messages as the max number of messages has been reached for this message type for this entity." ]
+        CLUBS_ERR_MAX_MESSAGES_SENT = 1309;
+        [ description = "Cannot receive more messages as the max number of messages of this type for this entity has been received." ]
+        CLUBS_ERR_MAX_MESSAGES_RECEIVED = 1310;
+        [ description = "User cannot join this club as this club is already full." ]
+        CLUBS_ERR_CLUB_FULL = 1311;
+        [ description = "User cannot be promoted to GM as the club has maxed out its GM count." ]
+        CLUBS_ERR_TOO_MANY_GMS = 1312;
+        [ description = "This user has already been invited to join the club." ]
+        CLUBS_ERR_INVITATION_ALREADY_SENT = 1313;
+
+        [ description = "Cannot demote this user to member since he/she is already a member." ]
+        CLUBS_ERR_DEMOTE_MEMBER = 1350;
+        [ description = "Cannot demote this user to member since he/she is an owner of the club." ]
+        CLUBS_ERR_DEMOTE_OWNER = 1351;
+        [ description = "Cannot demote this user to member since he/she is the last GM." ]
+        CLUBS_ERR_DEMOTE_LAST_GM = 1352;
+
+        [ description = "Cannot transfer ownership to this user since he/she is already a ownner." ]
+        CLUBS_ERR_TRANSFER_OWNERSHIP_TO_OWNER = 1361;
+
+
+        [ description = "User cannot be member of two clubs, so this error is returned when attempt is made to insert user as member of another club." ]
+        CLUBS_ERR_ALREADY_MEMBER = 1401;
+        [ description = "Club is not accepting petitions at this time." ]
+        CLUBS_ERR_PETITION_DISABLED = 1402;
+        [ description = "Petition to this club has been already sent." ]
+        CLUBS_ERR_PETITION_ALREADY_SENT = 1403;
+        [ description = "Club is not accepting joins at this time, must send petition and be invited in order to join club." ]
+        CLUBS_ERR_JOIN_DISABLED = 1404;
+        [ description = "Requester is not allowed to join or petition by this club." ]
+        CLUBS_ERR_JOIN_AND_PETITION_NOT_ALLOWED = 1405;
+        [ description = "Requester can not jump from one club to another too frequently." ]
+        CLUBS_ERR_JUMP_TOO_FREQUENTLY = 1406;
+
+        [ description = "Filter type list must not be empty." ]
+        CLUBS_ERR_MISSING_NEWS_TYPE_FILTER = 1501;
+        [ description = "Too many parameters in the news parameter list." ]
+        CLUBS_ERR_TOO_MANY_PARAMETERS = 1502;
+        [ description = "Only one of the two can be non-empty string, either news text or string id." ]
+        CLUBS_ERR_NEWS_TEXT_OR_STRINGID_MUST_BE_EMPTY = 1503;
+        [ description = "When publishing non-associate news, associate club id must be 0." ]
+        CLUBS_ERR_ASSOCIATE_CLUB_ID_MUST_BE_ZERO = 1504;
+        [ description = "News item has not been found." ]
+        CLUBS_ERR_NEWS_ITEM_NOT_FOUND = 1505;
+
+        [ description = "Duplicate rivals definition." ]
+        CLUBS_ERR_DUPLICATE_RIVALS = 1601;
+
+        [ description = "The user is banned from the club he/she is trying to join."]
+        CLUBS_ERR_USER_BANNED = 1701;
+        [ description = "The user cannot ban themself from the club." ]
+        CLUBS_ERR_USER_CANNOT_BAN_SELF = 1702;
+
+        [ description = "The tag text is empty." ]
+        CLUBS_ERR_INVALID_TAG_TEXT_EMPTY = 1801;
+        [ description = "The tag text is too long." ]
+        CLUBS_ERR_INVALID_TAG_TEXT_SIZE = 1802;
+        [ description = "The tag text is not found." ]
+        CLUBS_ERR_TAG_TEXT_NOT_FOUND = 1803;
+
+        [ description = "Requester's password is wrong." ]
+        CLUBS_ERR_WRONG_PASSWORD = 1901;
+        [ description = "The club password contains profanity words." ]
+        CLUBS_ERR_INVALID_PASSWORD_PROFANITY = 1902;
+
+        [ description = "Feature is not enabled in server configuration."]
+        CLUBS_ERR_FEATURE_NOT_ENABLED = 1903;
+
+        [ description = "WipeSet is not found in server configuration."]
+        CLUBS_ERR_WIPE_SET_UNKNOWN = 1904;
+
+        [ description = "Requester need to supply password when joining club." ]
+        CLUBS_ERR_PASSWORD_REQUIRED = 1905;
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+                id = 1100,
+                description = "Create a new club using the specified club arguments",
+                details = "Check that the user has not exceeded the maximum number of clubs allowed per user (configurable value).  Return ERR_CLUBS_LIMIT_EXCEEDED if the limit is exceeded.",
+                errors = {
+                    CLUBS_ERR_INVALID_DOMAIN_ID,
+                    CLUBS_ERR_INVALID_CLUBNAME_EMPTY,
+                    CLUBS_ERR_INVALID_NON_UNIQUE_NAME_EMPTY,
+                    CLUBS_ERR_MAX_CLUBS,
+                    CLUBS_ERR_CLUB_NAME_IN_USE,
+                    CLUBS_ERR_PROFANITY_FILTER,
+                    CLUBS_ERR_INVALID_CLUBNAME_SIZE,
+                    CLUBS_ERR_INVALID_NON_UNIQUE_NAME_SIZE,
+                    CLUBS_ERR_ALREADY_MEMBER,
+                    CLUBS_ERR_INVALID_TAG_TEXT_EMPTY,
+                    CLUBS_ERR_INVALID_TAG_TEXT_SIZE,
+                    CLUBS_ERR_INVALID_PASSWORD_PROFANITY,
+                    CLUBS_ERR_CLUB_FULL
+                }
+            ]
+            CreateClubResponse createClub(CreateClubRequest);
+
+            [
+                id = 1200,
+                description = "Get club list based on request arguments.",
+                details = "Returns at most maximum count of clubs as specified by the argument and starts the reutrned list with member at the offset place in the complete result. If you need complete club list call this function as many times as required to get all the clubs.",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED
+                }
+            ]
+            GetClubsResponse getClubs(GetClubsRequest);
+
+            [
+                id = 1300,
+                description = "Find clubs based on search criteria",
+                details = "Returns at most maximum count of clubs as specified in the request, starting at specified offset. All the idems returned satisfy the search criteria.",
+                errors = {
+                    CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED,
+                    CLUBS_ERR_INVALID_TAG_TEXT_EMPTY,
+                    CLUBS_ERR_INVALID_TAG_TEXT_SIZE,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            FindClubsResponse findClubs(FindClubsRequest);
+
+            [
+                id = 1310,
+                description = "Find clubs based on search criteria",
+                details = "Functionality is the same as for findClubs with additional option to filter by summary of member online status.",
+                errors = {
+                    CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED,
+                    CLUBS_ERR_INVALID_TAG_TEXT_EMPTY,
+                    CLUBS_ERR_INVALID_TAG_TEXT_SIZE,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            FindClubsResponse findClubs2(FindClubs2Request);
+
+            [
+                id = 1400,
+                description = "Removes member from the club.",
+                details = "Removes member with specified Id from the club. Note that the last GM must promote another user to GM to be able to leave. Owners cannot be kicked, they must leave voluntarily.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_INVALID_USER_ID,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_CANNOT_KICK_OWNER,
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_LAST_GM_CANNOT_LEAVE
+                }
+            ]
+            void removeMember(RemoveMemberRequest);
+
+            [
+                id = 1500,
+                description = "Sends invitation to user.",
+                details = "Sends invitation to user to join the club.",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_ALREADY_MEMBER,
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_MAX_INVITES_SENT,
+                    CLUBS_ERR_MAX_INVITES_RECEIVED,
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_INVITATION_ALREADY_SENT,
+                    CLUBS_ERR_PETITION_ALREADY_SENT,
+                    CLUBS_ERR_INVALID_USER_ID,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void sendInvitation(SendInvitationRequest);
+
+            [
+                id = 1600,
+                description = "Gets invitations for user.",
+                details = "Gets invitation to user to join the club.",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            GetInvitationsResponse getInvitations(GetInvitationsRequest);
+
+            [
+                id = 1700,
+                description = "Revoke invitation request.",
+                details = "Revoke invitation request. ",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void revokeInvitation(ProcessInvitationRequest);
+
+            [
+                id = 1800,
+                description = "Accept invitation request.",
+                details = "Accept invitation request. ",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_ALREADY_MEMBER,
+                    CLUBS_ERR_MAX_CLUBS,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_CLUB_FULL,
+                    CLUBS_ERR_USER_BANNED,
+                    CLUBS_ERR_JOIN_DISABLED,
+                    CLUBS_ERR_PASSWORD_REQUIRED,
+                    CLUBS_ERR_PETITION_ALREADY_SENT,
+                    CLUBS_ERR_MAX_PETITIONS_SENT,
+                    CLUBS_ERR_MAX_PETITIONS_RECEIVED,
+                    CLUBS_ERR_WRONG_PASSWORD,
+                    CLUBS_ERR_DUPLICATE_RIVALS
+                }
+            ]
+            void acceptInvitation(ProcessInvitationRequest);
+
+            [
+                id = 1900,
+                description = "Decline invitation request.",
+                details = "Decline invitation request. ",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_NO_PRIVILEGE
+                }
+            ]
+            void declineInvitation(ProcessInvitationRequest);
+
+            [
+                id = 2000,
+                description = "Get members of the club.",
+                details = "Returns the list of members of the club.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_FEATURE_NOT_ENABLED
+                }
+            ]
+            GetMembersResponse getMembers(GetMembersRequest);
+
+            [
+                id = 2100,
+                description = "Promote a member to GM.",
+                details = "Promotes a member of club to GM. Only GMs can do this.",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_ALREADY_GM,
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_TOO_MANY_GMS,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void promoteToGM(PromoteToGMRequest);
+
+            [
+                id = 2150,
+                description = "Demotes a GM to member.",
+                details = "Demotes a GM of club to member. Only GMs and Admin can do this.",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_DEMOTE_MEMBER,
+                    CLUBS_ERR_DEMOTE_OWNER,
+                    CLUBS_ERR_DEMOTE_LAST_GM,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void demoteToMember(DemoteToMemberRequest);
+
+            [
+                id = 2200,
+                description = "Update club settings",
+                details = "Replace club settings with new settings. Only GMs can do this.",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_PROFANITY_FILTER,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_INVALID_NON_UNIQUE_NAME_EMPTY,
+                    CLUBS_ERR_INVALID_NON_UNIQUE_NAME_SIZE,
+                    CLUBS_ERR_INVALID_TAG_TEXT_EMPTY,
+                    CLUBS_ERR_INVALID_TAG_TEXT_SIZE,
+                    CLUBS_ERR_INVALID_PASSWORD_PROFANITY
+                }
+            ]
+            void updateClubSettings(UpdateClubSettingsRequest);
+
+            [
+                id = 2300,
+                description = "Posts news for club.",
+                details = "Posts news for the club. Only GMs can post news.",
+                requiresUserSession = false,
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NEWS_TEXT_OR_STRINGID_MUST_BE_EMPTY,
+                    CLUBS_ERR_PROFANITY_FILTER,
+                    CLUBS_ERR_ASSOCIATE_CLUB_ID_MUST_BE_ZERO
+                }
+            ]
+            void postNews(PostNewsRequest);
+
+            [
+                id = 2400,
+                description = "Gets news for club(deprecated, use getNewsForClubs instead).",
+                details = "Gets news for the club.",
+                errors = {
+                    CLUBS_ERR_TOO_MANY_PARAMETERS,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_MISSING_NEWS_TYPE_FILTER
+                }
+            ]
+            GetNewsResponse getNews(GetNewsRequest);
+
+            [
+                id = 2450,
+                description = "Hides news published by club members",
+                details = "When invoked inside GM session this RPC will hide news published by a club member",
+                errors = {
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NEWS_ITEM_NOT_FOUND
+                }
+            ]
+            void setNewsItemHidden(SetNewsItemHiddenRequest);
+
+            [
+                id = 2500,
+                description = "Set metadata for club.",
+                details = "Sets metadata for club.",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE
+                }
+            ]
+            void setMetadata(SetMetadataRequest);
+
+            [
+                id = 2510,
+                description = "Set metadata2 for club.",
+                details = "Sets metadata2 for club.",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE
+                }
+            ]
+            void setMetadata2(SetMetadataRequest);
+
+            [
+                id = 2600,
+                description = "Club Components Settings",
+                details = "Gets settings for club components."
+            ]
+            ClubsComponentSettings getClubsComponentSettings();
+
+            [
+                id = 2650,
+                description = "Transfer ownership of a club.",
+                details = "Transfer ownership of a club. Only owner and Admin can do this.",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_TRANSFER_OWNERSHIP_TO_OWNER,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_TOO_MANY_GMS,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            void transferOwnership(TransferOwnershipRequest);
+
+            [
+                id = 2700,
+                description = "Gets membership information for the list of users",
+                details = "Gets membership information for the list of users",
+                requiresUserSession = false,
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT
+                }
+            ]
+            GetClubMembershipForUsersResponse getClubMembershipForUsers(GetClubMembershipForUsersRequest);
+
+            [
+                id = 2800,
+                description = "Sends petition to specified club(deprecated, use joinOrPetitionClub instead)",
+                details = "Sends petition to specified club",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_ALREADY_MEMBER,
+                    CLUBS_ERR_PETITION_DISABLED,
+                    CLUBS_ERR_MAX_PETITIONS_SENT,
+                    CLUBS_ERR_MAX_PETITIONS_RECEIVED,
+                    CLUBS_ERR_PETITION_ALREADY_SENT,
+                    CLUBS_ERR_INVITATION_ALREADY_SENT,
+                    CLUBS_ERR_WRONG_PASSWORD
+                }
+            ]
+            void sendPetition(SendPetitionRequest);
+
+            [
+                id = 2900,
+                description = "Gets a list of club petitions(deprecated, use getPetitionsForClubs instead)",
+                details = "Gets a list of club petitions",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            GetPetitionsResponse getPetitions(GetPetitionsRequest);
+
+            [
+                id = 3000,
+                description = "Accepts a specific petition",
+                details = "Accepts a specific petition",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_ALREADY_MEMBER,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_CLUB_FULL,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_MAX_CLUBS,
+                    CLUBS_ERR_USER_BANNED,
+                    CLUBS_ERR_INVALID_USER_ID
+                }
+            ]
+            void acceptPetition(ProcessPetitionRequest);
+
+            [
+                id = 3100,
+                description = "Declines a specific petition",
+                details = "Declines a specific petition",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void declinePetition(ProcessPetitionRequest);
+
+            [
+                id = 3200,
+                description = "Revokes a specific petition",
+                details = "Revokes a specific petition",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_NO_PRIVILEGE
+                }
+            ]
+            void revokePetition(ProcessPetitionRequest);
+
+            [
+                id = 3300,
+                description = "Joins the specified club(deprecated, use joinOrPetitionClub instead)",
+                details = "Joins the specified club",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_ALREADY_MEMBER,
+                    CLUBS_ERR_MAX_CLUBS,
+                    CLUBS_ERR_JOIN_DISABLED,
+                    CLUBS_ERR_CLUB_FULL,
+                    CLUBS_ERR_USER_BANNED,
+                    CLUBS_ERR_WRONG_PASSWORD,
+                    CLUBS_ERR_PETITION_ALREADY_SENT,
+                    CLUBS_ERR_INVALID_USER_ID
+                }
+            ]
+            void joinClub(JoinClubRequest);
+
+            [
+                id = 3310,
+                description = "Joins or sends petition to a club.",
+                details = "Joins a club, or sends petition to this club if join fails.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_JUMP_TOO_FREQUENTLY,
+                    CLUBS_ERR_ALREADY_MEMBER,
+                    CLUBS_ERR_MAX_CLUBS,
+                    CLUBS_ERR_CLUB_FULL,
+                    CLUBS_ERR_USER_BANNED,
+                    CLUBS_ERR_WRONG_PASSWORD,
+                    CLUBS_ERR_PASSWORD_REQUIRED,
+                    CLUBS_ERR_JOIN_AND_PETITION_NOT_ALLOWED,
+                    CLUBS_ERR_MAX_PETITIONS_SENT,
+                    CLUBS_ERR_MAX_PETITIONS_RECEIVED,
+                    CLUBS_ERR_PETITION_ALREADY_SENT,
+                    CLUBS_ERR_INVALID_USER_ID
+                }
+            ]
+            JoinOrPetitionClubResponse joinOrPetitionClub(JoinOrPetitionClubRequest);
+
+            [
+                id = 3400,
+                description = "Retrieve the list of club record holders",
+                details = "Retrieve the list of club record holders",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            GetClubRecordbookResponse getClubRecordbook(GetClubRecordbookRequest);
+
+            [
+                id = 3410,
+                description = "Reset club records",
+                details = "For the given list of record Ids resets the records",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NO_PRIVILEGE
+                }
+            ]
+            void resetClubRecords(ResetClubRecordsRequest);
+
+            [
+                id = 3500,
+                description = "Updates the member online status",
+                details = "Updates member online status for this member",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void updateMemberOnlineStatus(UpdateMemberOnlineStatusRequest);
+
+            [
+                id = 3600,
+                description = "Retrieve the list of club awards",
+                details = "Retrieve the list of club awards",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            GetClubAwardsResponse getClubAwards(GetClubAwardsRequest);
+
+            [
+                id = 3700,
+                description = "Update member metadata",
+                details = "Update member metadata",
+                errors = {
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void updateMemberMetadata(UpdateMemberMetadataRequest);
+
+            [
+                id = 3800,
+                description = "Search for clubs and return results asynchronously",
+                details = "Results are returned in FindClubsAsyncNotification.  To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED,
+                    CLUBS_ERR_INVALID_TAG_TEXT_EMPTY,
+                    CLUBS_ERR_INVALID_TAG_TEXT_SIZE
+                }
+            ]
+            FindClubsAsyncResponse findClubsAsync(FindClubsRequest);
+
+            [
+                id = 3801,
+                description = "Same as findClubsAsync but used by grpc endpoint due to name collision. Search for clubs and return results asynchronously",
+                details = "Results are returned in FindClubsAsyncNotification.  To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                errors = {
+                    CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED,
+                    CLUBS_ERR_INVALID_TAG_TEXT_EMPTY,
+                    CLUBS_ERR_INVALID_TAG_TEXT_SIZE
+                }
+            ]
+            FindClubsAsyncResponse findClubsAsync2(FindClubsRequest);
+
+            [
+                id = 3810,
+                description = "Search for clubs and return results asynchronously",
+                details = "Functionality is the same as for findClubsAsync with additional option to filter by summary of member online status.  To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED,
+                    CLUBS_ERR_INVALID_TAG_TEXT_EMPTY,
+                    CLUBS_ERR_INVALID_TAG_TEXT_SIZE
+                }
+            ]
+            FindClubsAsyncResponse findClubs2Async(FindClubs2Request);
+
+            [
+                id = 3811,
+                description = "Same as findClubs2Async but used by grpc endpoint due to name collision. Search for clubs and return results asynchronously",
+                details = "Functionality is the same as for findClubsAsync with additional option to filter by summary of member online status.  To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                errors = {
+                    CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED,
+                    CLUBS_ERR_INVALID_TAG_TEXT_EMPTY,
+                    CLUBS_ERR_INVALID_TAG_TEXT_SIZE
+                }
+            ]
+            FindClubsAsyncResponse findClubs2Async2(FindClubs2Request);
+
+            [
+                id = 3900,
+                description = "Returns list of club's rivals",
+                details = "Returns list of club's rivals",
+                errors = {
+                    CLUBS_ERR_TOO_MANY_ITEMS_PER_FETCH_REQUESTED
+                }
+            ]
+            ListRivalsResponse listRivals(ListRivalsRequest);
+
+            [
+                id = 4000,
+                description = "Returns list of club's ticker messages(deprecated, use getClubTickerMessagesForClubs instead).",
+                details = "Returns list of club's ticker messages",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            GetClubTickerMessagesResponse getClubTickerMessages(GetClubTickerMessagesRequest);
+
+            [
+                id = 4100,
+                description = "Changes subscription settings for club ticker messages",
+                details = "Changes subscription settings for club ticker messages",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NO_PRIVILEGE
+                }
+            ]
+            void setClubTickerMessagesSubscription(SetClubTickerMessagesSubscriptionRequest);
+
+            [
+                id = 4200,
+                description = "Changes the name and non-unique name of Club after creation",
+                details = "Changes the name and non-unique name of Club after creation",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_CLUB_NAME_IN_USE,
+                    CLUBS_ERR_PROFANITY_FILTER,
+                    CLUBS_ERR_INVALID_CLUBNAME_EMPTY,
+                    CLUBS_ERR_INVALID_CLUBNAME_SIZE,
+                    CLUBS_ERR_INVALID_NON_UNIQUE_NAME_EMPTY,
+                    CLUBS_ERR_INVALID_NON_UNIQUE_NAME_SIZE
+                }
+            ]
+            void changeClubStrings(ChangeClubStringsRequest);
+
+            [
+                id = 4300,
+                description = "Counts petitions/invitations associated with a club(deprecated, use countMessagesForClubs instead).",
+                details = "Counts petitions/invitations associated with a club.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            CountMessagesResponse countMessages(CountMessagesRequest);
+
+            [
+                id = 4400,
+                description = "Get members of the club and return results asynchronously.",
+                details = "Results are returned in GetMembersAsyncNotification.  To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_FEATURE_NOT_ENABLED
+                }
+            ]
+            GetMembersAsyncResponse getMembersAsync(GetMembersRequest);
+
+            [
+                id = 4401,
+                description = "Same as getMembersAsync but used by grpc endpoint due to name collision. Get members of the club and return results asynchronously.",
+                details = "Results are returned in GetMembersAsyncNotification.  To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_FEATURE_NOT_ENABLED
+                }
+            ]
+            GetMembersAsyncResponse getMembersAsync2(GetMembersRequest);
+
+            [
+                id = 4500,
+                description = "Gets ban statuses for all ex-members of a club that are currently banned from it.",
+                details = "Ban status conveys the authority type that banned the member. Non-banned users still in the club are filtered out.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            GetClubBansResponse getClubBans(GetClubBansRequest);
+
+            // This one requires admin privilege (GMs cannot execute it)
+            [
+                id = 4600,
+                description = "Gets all club bans for a specified user.",
+                details = "Gets a list of clubs from which the user is banned, together with ban status (banning authority type) for each club.",
+                errors = {
+                    CLUBS_ERR_INVALID_USER_ID,
+                    CLUBS_ERR_NO_PRIVILEGE
+                }
+            ]
+            GetUserBansResponse getUserBans(GetUserBansRequest);
+
+            [
+                id = 4700,
+                description = "Bans a member from the specified club.",
+                details = "The user gets automatically removed from the club.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_INVALID_USER_ID,
+                    CLUBS_ERR_USER_BANNED,
+                    CLUBS_ERR_LAST_GM_CANNOT_LEAVE,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_CANNOT_BAN_SELF,
+                    CLUBS_ERR_CANNOT_KICK_OWNER
+                }
+            ]
+            void banMember(BanUnbanMemberRequest);
+
+            [
+                id = 4800,
+                description = "Removes the member's ban for the specified club.",
+                details = "The user does not automatically get re-added to the club.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_INVALID_USER_ID,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_CANNOT_BAN_SELF
+                }
+            ]
+            void unbanMember(BanUnbanMemberRequest);
+
+            [
+                id = 4900,
+                description = "Gets info about Clubs component.",
+                details = "Gets info about clubs component such as total number of clubs.",
+                requires_authentication = false
+            ]
+            GetClubsComponentInfoResponse GetClubsComponentInfo();
+
+            [
+                id = 5000,
+                description = "Disbands the specified club.",
+                details = "All the members in the club will be removed.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void disbandClub(DisbandClubRequest);
+
+            [
+                id = 5100,
+                description = "Gets news for clubs.",
+                details = "Gets news for the clubs.",
+                errors = {
+                    CLUBS_ERR_TOO_MANY_PARAMETERS,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_MISSING_NEWS_TYPE_FILTER
+                }
+            ]
+            GetNewsForClubsResponse getNewsForClubs(GetNewsForClubsRequest);
+
+            [
+                id = 5200,
+                description = "Gets petitions for clubs",
+                details = "Gets petitions for clubs",
+                errors = {
+                    CLUBS_ERR_INVALID_ARGUMENT,
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            GetPetitionsForClubsResponse getPetitionsForClubs(GetPetitionsForClubsRequest);
+
+            [
+                id = 5300,
+                description = "Returns a list of ticker messages for each of the specified clubs in the request.",
+                details = "Returns a list of ticker messages for each of the specified clubs in the request.",
+                errors = {
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            GetClubTickerMessagesForClubsResponse getClubTickerMessagesForClubs(GetClubTickerMessagesForClubsRequest);
+
+            [
+                id = 5400,
+                description = "Counts petitions/invitations associated with each club specified in the request.",
+                details = "Counts petitions/invitations associated with each club specified in the request.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            CountMessagesForClubsResponse countMessagesForClubs(CountMessagesForClubsRequest);
+
+            [
+                id = 5500,
+                description = "Gets the online status of users in the given club.",
+                details = "Gets the online status of users in the given club."
+            ]
+            GetMemberOnlineStatusResponse getMemberOnlineStatus(GetMemberOnlineStatusRequest);
+
+            [
+                id = 5600,
+                description = "Gets the membership status of users in the given club.",
+                details = "Gets the membership status of users in the given club.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            GetMemberStatusInClubResponse getMemberStatusInClub(GetMemberStatusInClubRequest);
+
+            [
+                id = 5700,
+                description = "Generates log event for the given club.",
+                details = "Generates log event for the given club.",
+                client_export = false,
+                requiresUserSession = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void logEvent(LogEventRequest);
+
+            [
+                id = 5800,
+                description = "Wipe Stats.",
+                details = "Wipes Club's stats. GM or Administrator privilege is required.",
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_NO_PRIVILEGE,
+                    CLUBS_ERR_USER_NOT_MEMBER,
+                    CLUBS_ERR_WIPE_SET_UNKNOWN
+                }
+            ]
+            void wipeStats(WipeStatsRequest);
+
+            [
+                id = 5900,
+                description = "Awards a club.",
+                details = "Utility function used by game reporting to give a club an award.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void awardClubInternal(AwardClubRequest);
+
+            [
+                id = 6000,
+                description = "Locks clubs.",
+                details = "Utility function used by game reporting to lock clubs.",
+                client_export = false,
+                requires_authentication = false,
+                internal = true,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void lockClubsInternal(LockClubsRequest);
+
+            [
+                id = 6100,
+                description = "Reports results.",
+                details = "Utility function used by game reporting to report results.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false
+            ]
+            void reportResultsInternal(ReportResultsRequest);
+
+            [
+                id = 6200,
+                description = "Fetch Club Records.",
+                details = "Utility function used by game reporting to fetch club records.",
+                client_export = false,
+                requires_authentication = false,
+                internal = true,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            GetClubRecordsResponse getClubRecordsInternal(GetClubRecordsRequest);
+
+            [
+                id = 6300,
+                description = "Update Club Record.",
+                details = "Utility function used by game reporting to update club record.",
+                client_export = false,
+                requires_authentication = false,
+                internal = true,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void updateClubRecordInternal(UpdateClubRecordRequest);
+
+           [
+                id = 6400,
+                description = "Update Club Rival.",
+                details = "Utility function used by game reporting to update club rival.",
+                client_export = false,
+                requires_authentication = false,
+                internal = true,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void updateClubRivalInternal(UpdateClubRivalRequest);
+
+           [
+                id = 6500,
+                description = "Check membership.",
+                details = "Utility function used by game reporting to check membership.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            void checkMembershipInternal(CheckMembershipRequest);
+
+            [
+                id = 6600,
+                description = "Check club id.",
+                details = "Utility function used by game reporting to check club id.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            void checkClubIdInternal(CheckClubIdRequest);
+
+            [
+                id = 6700,
+                description = "Check user if is in a club.",
+                details = "Utility function used by game reporting to check if user is club member.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_USER_ID,
+                    CLUBS_ERR_USER_NOT_MEMBER
+                }
+            ]
+            void checkUserInClubInternal(CheckUserInClubRequest);
+
+            [
+                id = 6800,
+                description = "Get club settings.",
+                details = "Utility function used by game reporting to get club settings.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID
+                }
+            ]
+            GetClubSettingsResponse getClubSettingsInternal(GetClubSettingsRequest);
+
+            [
+                id = 6900,
+                description = "List clubs rivals.",
+                details = "Utility function used by game reporting to list clubs rivals.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false, 
+                generateProto = false
+            ]
+            ListRivalsResponse listRivalsInternal(ListRivalsInternalRequest);
+
+            [
+                id = 7000,
+                description = "Get members of the club.",
+                details = "Utility function used by game reporting to return the list of members of the club.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false,
+                errors = {
+                    CLUBS_ERR_INVALID_CLUB_ID,
+                    CLUBS_ERR_FEATURE_NOT_ENABLED
+                }
+            ]
+            GetMembersResponse getMembersInternal(GetMembersInternalRequest);
+
+            [
+                id = 7100,
+                description = "Updates a club's last active time",
+                details = "A lightweight utility to allow a game to update a club's last active time",
+                client_export = false,
+                internal = true,
+                requires_authentication = false
+            ]
+            void updateClubLastActiveTimeInternal(UpdateClubLastActiveTimeRequest);
+            
+            [
+                id = 7200,
+                description = "Club Components Settings",
+                details = "Gets settings for club components.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false
+            ]
+            ClubsComponentSettings getClubsComponentSettingsInternal();
+        }
+
+        notifications
+        {
+            [
+                id = 0,
+                description = "Sends one club to client",
+                details = "Sends one club to client"
+            ]
+            FindClubsAsyncNotification(FindClubsAsyncResult);
+
+            [
+                id = 1,
+                description = "Sends ticker message down to club",
+                details = "Sends one club to client"
+            ]
+            NewClubTickerMessageNotification(ClubTickerMessage);
+
+            [
+                id = 2,
+                description = "Sends one member to client",
+                details = "Sends one member to client"
+            ]
+            GetMembersAsyncNotification(GetMembersAsyncResult);
+
+            [
+                id = 3,
+                description = "Cache invalidation notification",
+                details = "A slave-to-slave notification used to invalidate member info cache entries",
+                client_export = false,
+                generateProto = false
+            ]
+            InvalidateCacheNotification(InvalidateCacheRequest);
+
+            [
+                id = 4,
+                description = "Cache update notification",
+                details = "A slave-to-slave notification used to update club data cache entries",
+                client_export = false,
+                generateProto = false
+            ]
+            UpdateCacheNotification(UpdateCacheRequest);
+
+            [
+                id = 5,
+                description = "Publish club ticker message notification",
+                details = "A slave-to-slave notification used to notify all slaves that new ticker message is to be broadcast",
+                client_export = false
+            ]
+            PublishClubTickerMessageNotification(PublishClubTickerMessageRequest);
+
+            [
+                id = 6,
+                description = "Clubs component info notification",
+                details = "A slave-to-slave notification used to broadcast the the club component info fetched from database",
+                client_export = false
+            ]
+            UpdateClubsComponentInfo(ClubsComponentInfo);
+
+            [
+                id = 7,
+                description = "Online status cache update notification",
+                details = "A slave-to-slave notification of a club member's online status change.",
+                client_export = false,
+                generateProto = false
+            ]
+            UpdateOnlineStatusNotification(NotifyUpdateMemberOnlineStatus);
+        }
+
+        events
+        {
+            [ id = 1000 ]
+            PlayerPromotedToGMEvent(PlayerPromotedToGM);
+
+            [ id = 1001 ]
+            GMDemotedtoMemberEvent(GMDemotedtoMember);
+
+            [ id = 1002 ]
+            PetitionSentEvent(PetitionSent);
+
+            [ id = 1003 ]
+            UserJoinedClubEvent(UserJoinedClub);
+
+            [ id = 1004 ]
+            MemberRemovedFromClubEvent(MemberRemovedFromClub);
+
+            [ id = 1005 ]
+            ClubOwnershipTransferredEvent(ClubOwnershipTransferred);
+
+            [ id = 1006 ]
+            NewClubCreatedEvent(NewClubCreated);
+
+            [ id = 1007 ]
+            ClubSettingsUpdatedEvent(ClubSettingsUpdated);
+
+            [ id = 1008 ]
+            ClubInvitationSentEvent (ClubInvitationSent);
+        }
+    }
+
+}
+}
+}

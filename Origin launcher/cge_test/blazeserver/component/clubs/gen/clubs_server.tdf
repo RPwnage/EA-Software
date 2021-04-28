@@ -1,0 +1,555 @@
+[headername="framework/tdf/transaction_server.h"]
+#include "framework/gen/transaction_server.tdf"
+
+[headername="framework/tdf/frameworkconfigtypes_server.h"]
+#include "framework/gen/frameworkconfigtypes_server.tdf"
+
+[headername="clubs.h"]
+#include "clubs.tdf"
+
+namespace Blaze
+{
+
+namespace Clubs
+{
+
+typedef uint32_t NewsId;
+typedef map<ClubId, uint16_t> NewsTotalCountForClub;
+
+class ClubServerNews
+{
+    [tag="nwcc", description="Id of user who created the content."]
+    BlazeId mContentCreator;
+    
+    [tag="pers", description="Persona name of user who created the content."]
+    string(MAX_PERSONA_LENGTH) mPersona;
+    
+    [tag="nwty", description="News type."]
+    NewsType mType;
+
+    [tag="nwfl", description="News flags."]
+    ClubNewsFlags mFlags;
+
+    [tag="nwid", description="News Id"]
+    NewsId mNewsId;
+    
+    [tag="ntxt", description="News text."]
+    string(256) mText;
+
+    [tag="nsis", description="String Id describing the news."]
+    string(64) mStringId;
+
+    [tag="nprl", description="Parameter list."]
+    string(256) mParamList;
+
+    [tag="clid", description="Club Id related to the news."]
+    ClubId mAssociateClubId;
+
+    [tag="tmst", description="Timestamp of news"]
+    uint32_t mTimestamp;
+    
+    [tag="cuid", description="Club Id."]
+    ClubId mClubId;
+};
+
+class RecordSettingItem
+{
+    [tag="id", default=-1, description="Unique record Id."]
+    int32_t mId;
+
+    [tag="name", default="", description="Record name."]
+    string(64) mName;
+    
+    [tag="desc", default="", description="Record description."]
+    string(64) mDescription;
+
+    [tag="stty", default="", description="Record holding statistic type."]
+    string(18) mStatType;
+    
+    [tag="form", default="", description="Record string format."]
+    string(8) mFormat;
+};
+
+typedef list<string(64)> StatsList;
+class ClubStatsCategory
+{
+    [tag="name", default="", description="The name of clubs stats."]
+    string(64) mName;
+
+    [tag="cksv", default="", description="Keyscope name for club id in club member stat category. It's optional. If not omitted the set specifies club member stats to wipe or reset."]
+    string(32) mClubKeyscopeName;
+    
+    [tag="colu", description="The list of column names of stats for this category. If has value, would reset clubs members stats in list."]
+    StatsList mStats;
+    
+};
+
+typedef list<ClubStatsCategory> ClubStatsCategoryList;
+class StatsUpdates
+{
+    [tag="woc", description="Operation code defining which stats to wipe."]
+    string(64) mWipeSet;
+    
+    [tag="cat", description="The list of club stats categories."]
+    ClubStatsCategoryList mCategories;
+};
+
+typedef list<RecordSettingItem> RecordSettingItemList;
+typedef list<AwardSettings> AwardSettingList;
+typedef map<string(64), string(64), ignorecase> EventStringsMap;
+typedef list<StatsUpdates> ClubStatsUpdates;
+
+class RolloverItem
+{
+    [tag="minu", default=-1]
+    int32_t mMinute;
+
+    [tag="hour", default=-1]
+    int32_t mHour;
+    
+    [tag="day", default=-1, description="monthlyDay 1..31; weeklyDay - 0..6 - Sunday - 0"]
+    int32_t mDay;
+
+    [tag="peri", default=-1, description="0:Daily, 1:Weekly, 2:Monthly."]
+    int32_t mPeriod;
+    
+    [tag="tiou", default=-1, description="timeout in minutes to wait for end of season processing to finish."]
+    int32_t mTimeout;
+
+    [tag="mare", default=-1, description="max number of retries to call end of season processing before giving up."]
+    int32_t mMaxRetry;
+};
+
+class SeasonSettingItem
+{
+    [tag="roll", description="time when current season ends and end of season processing is called."]
+    RolloverItem mRollover;
+
+    [tag="stca", default="", description=" Stat category."]
+    string(64) mStatCategory;
+};
+
+class FindClubsSettingsItem
+{
+    [tag="atmp", description="Number of attempts to make against the DB to find non-cached clubs.", default=5]
+    uint32_t mDbAttempts;
+    
+    [tag="size", description="Number of clubs to fetch in each attempt.", default=100]
+    uint32_t mFetchSize;
+};
+
+class RemoveClubNameFromIdentityCacheRequest
+{
+    [tag="clid", description="Club Id for which to update settings."]
+    ClubId mClubId;
+};
+
+class ClubsConfig
+{
+    [tag="dbnp", reconfigurable="no", description="Database names per platform."]
+    DbNameByPlatformTypeMap mDbNamesByPlatform;
+
+    [tag="disi", default=-1, reconfigurable="no", description="Club division size."]
+    int16_t mDivisionSize;
+    
+    [tag="maev", default=-1, reconfigurable="no", description="Max count of events per club."]
+    int16_t mMaxEvents;
+
+    [tag="puch", default=-1, reconfigurable="no", description="Hour of the day that the purge for inactive clubs should occur."]
+    int32_t mPurgeClubHour;
+
+    [tag="rcci", default="5m", reconfigurable="no", description="Time interval to refresh club census data."]
+    TimeValue mRefreshCensusInterval;
+
+    [tag="mrpc", default=-1, reconfigurable="no", description="Max count of rivals per club."]
+    int16_t mMaxRivalsPerClub;
+
+    [tag="tmed", default=-1, reconfigurable="no", description="Ticker message expiry day."]
+    int32_t mTickerMessageExpiryDay;
+    
+    [tag="cach", default=false, reconfigurable="yes", description="DEPRECATED (unused)"]
+    bool mDisableClubMemberInfoCache;
+
+    [tag="dabr", default=false, reconfigurable="yes", description="Disable abuse reporting RPCs and code"]
+    bool mDisableAbuseReporting;
+
+	[tag="mcnr", default=3, reconfigurable="yes", description="The maximum number that a user is allowed to change the club name"]
+    int16_t mMaxClubNameResets;
+    
+    [tag="cksw", default=false, reconfigurable="yes", description="Disable automatic wipe of all stats using club keyscope when player leaves or is kicked from a club"]
+    bool mDisableClubKeyscopeStatsWipeOnLeave;
+
+    [tag="doma", reconfigurable="no", description="Club domain list."]
+    ClubDomainList mDomains;
+
+    [tag="rese", reconfigurable="no", description="Record settings."]
+    RecordSettingItemList mRecordSettings;
+    
+    [tag="awse", reconfigurable="no", description="Award settings."]
+    AwardSettingList mAwardSettings;
+    
+    [tag="evst", reconfigurable="no", description="Event settings."]
+    EventStringsMap mEventStrings;
+    
+    [tag="sese", reconfigurable="no", description="season settings."]
+    SeasonSettingItem mSeasonSettings;
+
+    [tag="esbp", default=false, reconfigure="yes", description="Enable search by personaName"]
+    bool mEnableSearchByPersonaName;
+
+    [tag="ammd", default=false, reconfigure="yes", description="Allow any club member to set the club's metadata (rather than just the GM)."]
+    bool mAllowClubMemberToSetMetaData;
+
+    [tag="clsu", reconfigurable="yes", description="Wipe ClubStats operations settings."]
+    ClubStatsUpdates mClubStatsUpdates;
+
+    [tag="fcsi", reconfigurable="yes", description="Settings for fetching clubs from the DB."]
+    FindClubsSettingsItem mFindClubsSettings;
+
+    [tag="cust", reconfigurable="yes", description="Container for customized settings."]
+    variable mCustomSettings;
+
+    [tag="eprc", default=1000, reconfigurable="no", description="The number of MemberOnlineStatus maps to fetch at a time on startup."]
+    uint32_t mFetchMemberOnlineStatusPageSize;
+
+    [tag="mock", default=false, description="For testing only. Indicates if club calls will use the mock service instead of calling the real external service."]
+    bool mUseMock;
+};
+
+class AwardClubRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Id of club to award"] ClubId mClubId;
+    [tag="awid", description="Id of the award"] ClubAwardId mAwardId;
+};
+
+class LockClubsRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Id of clubs to lock"] ClubIdList mClubIds;
+};
+
+class ReportResultsRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="upid", description="Id of upper club"] ClubId mUpperClubId;
+    [tag="gruc", description="Game results for upper club"] string(32) mGameResultForUpperClub;
+    [tag="lwid", description="Id of lower club"] ClubId mLowerClubId;
+    [tag="grlc", description="Game results for lower club"] string(32) mGameResultForLowerClub;
+};
+
+class ClubRecordbook
+{
+    [tag="clid", description="Club Id"]
+    ClubId clubId;
+    
+    [tag="crid", description="Club Record Id"]
+    ClubRecordId recordId;
+    
+    [tag="rsty", description="Record Stat Type"]
+    RecordStatType statType;
+    
+    [tag="svit", description="Int Value Of Stat"]
+    int64_t statValueInt;
+    
+    [tag="svft", description="Floar Value Of Stat"]
+    float statValueFloat;
+    
+    [tag="lsup", description="Last update"]
+    uint32_t lastUpdate;
+
+    [tag="user", description="Core user info."]
+    CoreIdentification mUser;  
+};
+
+typedef map<ClubRecordId, ClubRecordbook> ClubRecordbookMap;
+
+typedef list<ClubAwardId> ClubAwardIdList;
+
+class GetClubRecordsRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Id of club to get"] ClubId mClubId;
+};
+
+class GetClubRecordsResponse
+{
+    [tag="crbm", description="Map of club record book record"] ClubRecordbookMap mClubRecordbooks;
+};
+
+class UpdateClubRecordRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="crbr", description="Record book record"] ClubRecordbook  mClubRecordbook;
+};
+
+class UpdateClubRivalRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Id of club to update"] ClubId mClubId;
+    [tag="clrl", description="Rival of club"] ClubRival mClubRival;
+};
+
+class CheckMembershipRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Id of club"] ClubId mClubId;
+    [tag="urid", description="Id of user"] BlazeId mBlazeId;
+};
+
+class CheckClubIdRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Id of club"] ClubId mClubId;
+};
+
+class CheckUserInClubRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="urid", description="Id of user"] BlazeId mBlazeId;
+};
+
+class GetClubSettingsRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Id of club"] ClubId mClubId;
+};
+
+class GetClubSettingsResponse
+{
+    [tag="clst", description="Club settings"] ClubSettings mClubSettings;
+};
+
+class ListRivalsInternalRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Club to fetch rivals for"] ClubId mClubId;
+};
+
+class GetMembersInternalRequest
+{
+    [tag="trid", description="Id of transaction"] TransactionContextId mTransactionContextId;
+    [tag="clid", description="Club Id for which to get members."] ClubId mClubId;
+    [tag="mxrc", default=UINT32_MAX, description="Maximum count of results to return."] uint32_t mMaxResultCount;
+    [tag="ofrc", default=0, description="Offset into results array to begin response array with."] uint32_t mOffset;
+    [tag="ordt", description="order type for sorting members."] MemberOrder mOrderType;
+    [tag= "ordm", description="Order Mode for ascending/descending."] OrderMode mOrderMode;   
+    [tag="film", description="filter for GM and non-GM members."] MemberTypeFilter mMemberType;
+    [tag="skct", default=false, description="Skip calc db rows."] bool mSkipCalcDbRows;    
+    [tag="perp", description="partial gamertag."] string(128) mPersonaNamePattern;     
+};
+
+class CachedClubData
+{
+    [tag="name", description="Club's name."]
+    ClubName mName;
+
+    [tag="dmid", description="Domain Id this club belongs to"]
+    ClubDomainId mClubDomainId;
+ 
+    [tag="clst", description="Cached club settings"]
+    ClubSettings mClubSettings; 
+    
+    [tag="vers", description="Current cache version"]
+    uint64_t mVersion;
+};
+ 
+class CachedMemberInfo
+{
+    [tag="msta", description="Membership status in club"]
+    MembershipStatus mMembershipStatus;
+
+    [tag="sntd", description="Datetime when membership was established"]
+    uint32_t mMembershipSinceTime;
+
+    [tag="mmda", description="Member's metadata"]
+    MemberMetaData mMetaData;
+};
+ 
+enum CacheId
+{
+    CLUB_DATA,
+    CLUB_MEMBER_DATA
+};
+ 
+class InvalidateCacheRequest
+{
+    [tag="cid", description="Specifies which local cache to update"] CacheId mCacheId;
+    [tag="clid", description="The clubId to invalidate"] ClubId mClubId;
+    [tag="bid", description="The blazeId to invalidate. Only used when invalidating club member data"] BlazeId mBlazeId;
+    [tag="ridp", description="Indicates whether the entry should also be removed from the Clubs IdentityProvider cache"] bool mRemoveFromIdentityProviderCache;
+};
+
+class UpdateCacheRequest
+{
+    [tag="clid", description="The clubId to invalidate"] ClubId mClubId;
+    [tag="club", description="The updated cached club data"] CachedClubData mUpdatedClubData;
+};
+
+[
+    tdfid = "hash",
+    description = "Player petitioned to join a club.",
+    details = "Event information, used when a player petitions to join a Club.",
+    generateProto=true
+]
+class PetitionSent
+{   
+    [tag="clid", description="Club Id."] 
+    ClubId mClubId;
+    
+    [tag="pid", description="Persona Id of the petitioning player."]
+    BlazeId mPetitionerPersonaId;
+};
+
+[
+    tdfid = "hash",
+    description = "Player joind a club.",
+    details = "Event information, used when a player joins a Club.",
+    generateProto=true
+]
+class UserJoinedClub
+{   
+    [tag="clid", description="Club Id."] 
+    ClubId mClubId;
+    
+    [tag="pid", description="Persona Id of the joining player."]
+    BlazeId mJoiningPersonaId;
+};
+
+[
+    tdfid = "hash",
+    description = "Player removed from club.",
+    details = "Event information, used when a player is removed from a Club.",
+    generateProto=true
+]
+class MemberRemovedFromClub
+{   
+    [tag="clid", description="Club Id."] 
+    ClubId mClubId;
+    
+    [tag="pid", description="Persona of the player being removed."]
+    BlazeId mRemovedPersonaId;
+    
+    [tag="rpid", description="Persona of the removing player."]
+    BlazeId mRemoverPersonaId;
+};
+
+[
+    tdfid = "hash",
+    description = "Player was promoted to GM for a club.",
+    details = "Event information, used when a player is promoted to GM for a Club.",
+    generateProto=true
+]
+class PlayerPromotedToGM
+{   
+    [tag="clid", description="Club Id."] 
+    ClubId mClubId;
+    
+    [tag="pid", description="Persona of the promoted player."]
+    BlazeId mPromotedPersonaId;
+    
+    [tag="ppid", description="Persona of the GM promoting the player."]
+    BlazeId mPromotingPersonaId;
+};
+
+[
+    tdfid = "hash",
+    description = "GM was demoted to member for a club.",
+    details = "Event information, used when a GM is demoted to member for a Club.",
+    generateProto=true
+]
+class GMDemotedtoMember
+{   
+    [tag="clid", description="Club Id."] 
+    ClubId mClubId;
+    
+    [tag="pid", description="Persona of the demoted player."]
+    BlazeId mDemotedPersonaId;
+    
+    [tag="dpid", description="Persona of the GM demoting the player."]
+    BlazeId mDemotingPersonaId;
+};
+
+[
+    tdfid = "hash",
+    description = "Ownership of club was trasfered.",
+    details = "Event information, used when ownership of club is trasfered.",
+    generateProto=true
+]
+class ClubOwnershipTransferred
+{   
+    [tag="clid", description="Club Id."] 
+    ClubId mClubId;
+    
+    [tag="opid", description="Persona of the old owner."]
+    BlazeId mOldOwnerPersonaId;
+    
+    [tag="npid", description="Persona of the new owner."]
+    BlazeId mNewOwnerPersonaId;
+    
+    [tag="tpid", description="Persona of the transferrer."]
+    BlazeId mTransferrerPersonaId;
+};
+
+[
+    tdfid = "hash",
+    description = "New club was created.",
+    details = "Event information, used when a new club is created.",
+    generateProto=true
+]
+class NewClubCreated
+{   
+    [tag="clid", description="Club Id."] 
+    ClubId mClubId;
+    
+    [tag="pid", description="Persona of the creator."]
+    BlazeId mCreatorPersonaId;
+};
+
+[
+    tdfid = "hash",
+    description = "Settings for a club was updated.",
+    details = "Event information, used when settings for a club is updated.",
+    generateProto=true
+]
+class ClubSettingsUpdated
+{   
+    [tag="clid", description="Club Id."] 
+    ClubId mClubId;
+    
+    [tag="pid", description="Persona of the updater."]
+    BlazeId mUpdaterPersonaId;
+};
+
+[
+    tdfid = "hash",
+    description = "Invitation to a club was sent.",
+    details = "Event information, used when a user is invited to join a club.",
+    generateProto=true
+]
+class ClubInvitationSent
+{
+    [tag="clid", description="Club Id."]
+    ClubId mClubId;
+    
+    [tag="rpid", description="Persona of the inviter."]
+    BlazeId mInviterPersonaId;
+    
+    [tag="epid", description="Persona of the invitee."]
+    BlazeId mInviteePersonaId;
+};
+
+class NotifyUpdateMemberOnlineStatus
+{
+    [tag="clid", description="Ids of the clubs whose status is to be updated"]
+    ClubIdList mClubIds;
+    
+    [tag="blid", description="Id of the user whose status is to be updated"]
+    BlazeId mBlazeId;
+
+    [tag="ulo", default=false, description="Whether the user whose status is to be updated has logged off. This determines whether we invalidate the ClubMemberInfo cache for each of his clubs"]
+    bool mUserLoggedOff;
+};
+
+}
+}

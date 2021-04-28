@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package eadp.stats;
+
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+import "eadp/stats/categories.proto";
+
+option java_package = "com.ea.gs.stats.grpc";
+option java_outer_classname = "ViewsProto";
+option java_multiple_files = true;
+
+message StatDescription {
+    string stat_id = 1;
+    string description = 2;
+    string category_id = 3;
+    string localization_key = 4;
+
+    // If this stat is dimensioned, this map of dimensions will be used as a filter.
+    // Any stats entry which doesn't have all the dimension values from this map won't be returned in get/list stats by view request.
+    map<string, string> provided_dimensions = 5;
+
+    // If this stat is dimensioned, the client will have to provide values for the dimension names from this list in the request.
+    // For more information see GetStatsByViewRequest.ViewDimensionsFilter
+    repeated string required_dimensions = 6;
+}
+
+message ViewRequest {
+    string description = 1;
+    repeated StatDescription stat_descriptions = 2;
+    string view_metadata = 3;
+
+    /**
+    Currently only ENTITY_TYPE_PLAYER and ENTITY_TYPE_CUSTOM are supported.
+    entity_description is only required if ENTITY_TYPE_CUSTOM is provided.
+    */
+    EntityType entity_type = 7;
+    string entity_description = 8;
+}
+
+message ViewResponse {
+    string view_id = 1;
+    string description = 2;
+    string context_id = 3;
+
+    string version = 4;
+
+    google.protobuf.Timestamp created_timestamp = 5;
+    google.protobuf.Timestamp updated_timestamp = 6;
+
+    repeated StatDescription stat_descriptions = 8;
+    string view_metadata = 9;
+
+
+    /**
+    Currently only ENTITY_TYPE_PLAYER and ENTITY_TYPE_CUSTOM are supported.
+    */
+    EntityType entity_type = 11;
+    string entity_description = 12;
+}
+
+message ListViewsRequest {
+    //Partial ID to prefix search by. Case-insensitive and min character length of three.
+    string view_id = 1;
+    // Continuation key returned on previous call. The first element returned will be the one directly after this identifier. Note that sort order can change between calls and the use of continuation key does not necessarily mean that all entities will be fetched.
+    string continuation_key = 2;
+    // the maximum number of results to be returned. Max value for parameter is 50.
+    int32 max_result_count = 3;
+    string context_id = 4;
+    bool include_metadata = 5;
+    bool include_localization = 6;
+
+    /**
+    If entity_type is not provided than all views will be returned.  If entity_type is CUSTOM, then the entity_description is required
+    and the result set will be further filtered.
+    **/
+    EntityType entity_type = 7;
+    string entity_description = 8;
+}
+
+message ListViewsResponse {
+    google.rpc.Status status = 1;
+    oneof response {
+        ViewResponse view = 2;
+        string continuation_key = 3;
+    }
+}
+
+message GetViewRequest {
+    // ID of the view
+    string view_id = 1;
+    string context_id = 2;
+    bool include_metadata = 3;
+    bool include_localization = 4;
+}
+
+message GetViewResponse {
+    google.rpc.Status status = 1;
+    ViewResponse result = 2;
+}

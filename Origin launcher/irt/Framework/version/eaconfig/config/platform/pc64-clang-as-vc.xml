@@ -1,0 +1,51 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+    <dependent name="PCClang"/>
+
+  <include file="pc-vc-common.xml"/>
+
+  <property name="eaconfig.build-MP" value="false" if="${eaconfig.clang-on-pc-hack??false}"/>
+  <property name="eaconfig.warningsaserrors" value="off" if="${eaconfig.clang-on-pc-hack??false}"/>
+
+	<property name="cc.useresponsefile" value="true"/>
+	
+    <!-- 
+    The pc-vc-common.xml have cleared cc.options setting, so PCClang package's cc.options property setting
+    didn't get applied.  We're going to reapply it here.
+    -->
+    <optionset name="config-options-common">
+        <option name="buildset.cc.options">
+            ${cc.common-options}
+            -mcx16  <!-- required to use the builtin 128bit atomic intrinsics without this you will be missing __sync_val_compare_and_swap16 symbols when linking -->
+            ${option.value}
+        </option>
+    </optionset>
+
+  <property name="eaconfig.build-MP" value="false"/>
+  <property name="eaconfig.warningsaserrors" value="off"/>  
+
+  <!-- For 64 bit configs need to put \VC\bin directory in path to have access to cvtres.exe file from linker-->
+  <property name="build.env.PATH" value="${package.VisualStudio.appdir}\VC\BIN;${property.value}"/>
+
+  <optionset name="config-options-common">
+        <option name="preprocess"/>
+        <option name="postprocess">
+          pc64-vc-postprocess
+        </option>
+        <option name="buildset.link.options">
+            ${option.value}
+            -machine:x64    <!-- specify target platform to ix86 -->
+        </option>
+        <option name="buildset.link.libraries">
+          ${option.value}
+          ${eaconfig.PlatformSDK.dir.lib}/WinMM.lib
+          ${eaconfig.PlatformSDK.dir.lib}/Gdi32.lib
+          ${eaconfig.PlatformSDK.dir.lib}/User32.lib
+          ${eaconfig.PlatformSDK.dir.lib}/advapi32.lib
+        </option>
+		<option name="linkoutputpdbname" value="%outputdir%\%outputname%.pdb"/> <!-- Framework sets this automatically in C# but only for vc compiler -->
+    </optionset>
+</project>

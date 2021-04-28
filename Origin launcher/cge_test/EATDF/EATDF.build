@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build" xmlns="schemas/ea/framework3.xsd">
+    <optionset name="config.targetoverrides">
+        <option name="test-build" value="include" />
+        <option name="test-buildall" value="include" />
+        <option name="test-run" value="include" />
+        <option name="test-runall" value="include" />
+    </optionset>
+    
+    <package name="EATDF" initializeself="true"/>
+
+    <!-- ************************ -->
+    <!--   Runtime configuration  -->
+    <!-- ************************ -->
+
+    <property name="buildtype" local="true" value="Library"/>
+    <property name="buildtype" local="true" value="DynamicLibrary" if="${Dll??false}"/>
+
+    <Library name="EATDF" buildtype="${buildtype}">
+        <includedirs>
+            ${package.dir}/cpp/include
+        </includedirs>
+
+        <sourcefiles>
+            <includes name="cpp/source/*.cpp"/>
+        </sourcefiles>
+
+        <headerfiles>
+            <includes name="${package.dir}/cpp/include/**.h"/>
+        </headerfiles>
+
+        <bulkbuild enable="true"/>
+
+        <dependencies>
+            <auto>
+                coreallocator
+                EAAssert
+                EABase
+                EAIO
+                EAJson
+                EASTL
+                EAStdC
+                EAThread
+                UTFXml
+            </auto>
+        </dependencies>
+
+        <config>
+            <warningsuppression>
+                <do if="${config-compiler} == 'vc'">
+                    -wd4005
+                    -wd4013
+                    -wd4047
+                    -wd4057
+                    -wd4100
+                    -wd4127
+                    -wd4191
+                    -wd4242
+                    -wd4245
+                    -wd4255
+                    -wd4263
+                    -wd4264
+                    -wd4266
+                    -wd4295
+                    -wd4296
+                    -wd4365
+                    -wd4503
+                    -wd4530
+                    -wd4541
+                    -wd4548
+                    -wd4625
+                    -wd4626
+                    -wd4701
+                    -wd4917
+                    -wd4946
+
+                    <do if="${Dll??false}">
+                       -wd4251   <!-- suppresses warning: "class 'X' needs to have dll-interface to be used by clients of class 'Y'" -->
+                    </do>
+                </do>
+
+                <do if="${config-compiler} == 'gcc'">
+                    -Wno-unused-parameter
+                </do>
+
+                <do if="${config-compiler} == 'clang'">
+                    -Wno-multichar
+                    -Wno-reserved-user-defined-literal  <!-- suppresses warning about ""PRI* usage -->
+                    -Wno-unused-private-field
+                </do>
+            </warningsuppression>
+
+            <buildoptions>
+                <option name="buildset.cc.options" if="${config-compiler} == 'gcc'">
+                    ${option.value}
+                    -Wstrict-aliasing=3
+                    -Wextra
+                </option>
+                <option name="buildset.cc.options" if="${config-compiler} == 'clang'">
+                    ${option.value}
+                    -Wall
+                </option>
+            </buildoptions>
+
+            <defines>
+                EA_TDF_INTERNAL_BUILD=1
+
+                <do if="${Dll??false} and ${config-compiler} == 'vc'">
+                    EATDF_API=__declspec(dllexport)
+                    EATDF_API_LOCAL
+                </do>
+
+                <do if="${Dll??false} and ${config-system} == 'cyg'">
+                    EATDF_API=__attribute__((dllexport))
+                    EATDF_API_LOCAL
+                </do>
+
+                <do if="${Dll??false} and ${config-compiler} == 'gcc' and ${config-system} != 'cyg'">
+                    EATDF_API=__attribute__ ((visibility("default")))
+                    EATDF_API_LOCAL=__attribute__ ((visibility("hidden")))
+                </do>
+            </defines>
+        </config>
+    </Library>
+
+    <!-- Java -->
+    <dependent name="jdk"/>
+    <property name="java.exe" value="${package.jdk.home}/bin/java${exe-suffix}" unless="@{PropertyExists('java.exe')}"/>
+    <property name="java.compiler" value="${package.jdk.home}/bin/javac${exe-suffix}" unless="@{PropertyExists('java.compiler')}"/>
+    <property name="java.archiver" value="${package.jdk.home}/bin/jar${exe-suffix}" unless="@{PropertyExists('java.archiver')}"/>
+    <property name="java.doc" value="${package.jdk.home}/bin/javadoc${exe-suffix}" unless="@{PropertyExists('java.doc')}"/>
+    
+    <include file="scripts/make_typecomp.xml"/>
+    <include file="scripts/typecomp_task.xml"/>
+    <include file="scripts/package-targets.xml"/>
+   
+    <!-- ********************* -->
+    <!-- Test configuration    -->
+    <!-- ********************* -->
+
+    <tests>
+        <target name="preprocess">
+            <fileset name="test.EATDFTest.testfiles" basedir="${package.dir}/test/gen">    
+                <includes name="**.tdf" />
+            </fileset>
+
+            <!-- generate TDF code -->
+            <task name="package.EATDF.typecomp.task"
+                  basedir="${package.dir}"
+                  outdir="${package.builddir}/gen"
+                  inputs="test.EATDFTest.testfiles"
+                  includedirs=""
+                  templatedirs="${package.dir}/tool/templates/cpp ${package.dir}/tool/templates/protobuf"
+                  templates="tdfheaderfile={RelativeDirNoGen}/tdf/{FileBase}.h tdfsource={RelativeDirNoGen}/tdf/{FileBase}.cpp"
+                  dep="${package.builddir}/gen/testtdfs.d"/>
+        </target>
+
+        <Program name="EATDFTest">
+            <includedirs>
+                ${package.dir}/cpp/include
+                ${package.dir}/test/include
+                ${package.builddir}/gen
+            </includedirs>
+
+            <sourcefiles>
+                <includes name="${package.dir}/test/source/*.cpp" />
+                <includes name="${package.builddir}/gen/**.cpp" />
+            </sourcefiles>
+
+            <headerfiles>
+                <includes name="${package.dir}/test/**.h" />
+                <includes name="${package.builddir}/gen/**.h" />
+            </headerfiles>
+
+            <dependencies>
+                <auto>
+                    coreallocator
+                    EABase
+                    EASTL
+                    EAStdC
+                    MemoryMan
+                    PPMalloc
+                    EAAssert
+                    EAThread
+                    EAJson
+                    EAIO
+                    UTFXml
+                    EATDF/EATDF
+                    gtest
+                </auto>
+            </dependencies>
+
+            <config>
+                <defines>
+                    UTF_USE_EAASSERT=1
+                    EA_MEMORY_LEAK_TRACE_ENABLED=1
+                </defines>
+
+                <preprocess value="preprocess"/>
+
+                <buildoptions>
+                    <option name="buildset.cc.options" if="${config-system} == 'pc64'">
+                        ${option.value}
+                        /bigobj
+                    </option>
+                </buildoptions>
+            </config>
+
+            <!-- Make sure runtime DLLs are available in the tests local folder-->
+            <copylocal value="true"/>
+
+            <visualstudio>
+                <excludedbuildfiles>
+                    <includes name="${package.dir}/test/gen/**.tdf"/>
+                </excludedbuildfiles>
+            </visualstudio>
+        </Program>
+    </tests>
+</project>

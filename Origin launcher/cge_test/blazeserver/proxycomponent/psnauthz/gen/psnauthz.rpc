@@ -1,0 +1,82 @@
+
+[ headername="psnauthz/tdf/psnauthz.h" ]
+#include "psnauthz/gen/psnauthz.tdf"
+
+namespace Blaze
+{
+namespace PsnAuthZ
+{
+
+[
+    id = core/3004,
+    description = "PS5 App Server Authentication Service",
+    details = "Allows specifying Auth key for fetching PS5 App Server Client Credentials.",
+    proxyOnly = true,
+    http = {
+        payloadEncoderSubType = "NORMAL"
+    }
+]
+component PsnAuthZ
+{
+    errors
+    {
+        [ description = "External session authentication error, possibly due to invalid/expired token." ]
+        PSNAUTHZ_AUTHENTICATION_REQUIRED = 1; //http 401
+        [ description = "The specified resource does not exist." ]
+        PSNAUTHZ_RESOURCE_NOT_FOUND = 2; //http 404
+        [ description = "Request to the resource or operation was refused. This may be due to the client or Blaze Server configuration not using the correct title id, the title not having its PSN DevNet service for the ClientId properly configured, or, the client being currently signed out from PSN." ]
+        PSNAUTHZ_ACCESS_FORBIDDEN = 3; //http 403
+        [ description = "Invalid or malformed request parameters." ]
+        PSNAUTHZ_BAD_REQUEST = 4; //http 400
+        [ description = "The external service's rate limit was exceeded." ]
+        PSNAUTHZ_TOO_MANY_REQUESTS = 5; //http 429
+        [ description = "The external session service is currently unavailable, possibly due to momentary downtime, updates or service maintenance." ]
+        PSNAUTHZ_SERVICE_UNAVAILABLE = 6; //http 503
+        [ description = "The external session service had an unspecified internal error. Check with Sony for potential issues." ]
+        PSNAUTHZ_SERVICE_INTERNAL_ERROR = 7; //http 500
+        [ description = "The external session service gateway or proxy received an invalid response upon executing request. Check with Network or Sony for potential issues." ]
+        PSNAUTHZ_SERVICE_BAD_GATEWAY = 8; //http 502
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+              id = 1,
+              description = "Gets client credential PS5 token",
+              details = "Gets App Server Client Credential grant type PS5 token.",
+              requires_authentication = false,
+              client_export = false,
+              errortype = PsnClientCredentialTokenError,
+              errors = { PSNAUTHZ_AUTHENTICATION_REQUIRED, PSNAUTHZ_RESOURCE_NOT_FOUND, PSNAUTHZ_ACCESS_FORBIDDEN, PSNAUTHZ_BAD_REQUEST, PSNAUTHZ_TOO_MANY_REQUESTS, PSNAUTHZ_SERVICE_UNAVAILABLE, PSNAUTHZ_SERVICE_INTERNAL_ERROR, PSNAUTHZ_SERVICE_BAD_GATEWAY },
+              http = {
+                resource = "v3/oauth/token",
+                method = "POST",
+                custom_request_headers = {
+                  "Authorization" = "authorization"
+                },
+                url_params = {
+                  "grant_type" = "grantType",
+                  "scope" = "scope"
+                },
+                status_code_errors = {
+                    400 = PSNAUTHZ_BAD_REQUEST,
+                    401 = PSNAUTHZ_AUTHENTICATION_REQUIRED,
+                    403 = PSNAUTHZ_ACCESS_FORBIDDEN,
+                    404 = PSNAUTHZ_RESOURCE_NOT_FOUND,
+                    429 = PSNAUTHZ_TOO_MANY_REQUESTS,
+                    500 = PSNAUTHZ_SERVICE_INTERNAL_ERROR,
+                    502 = PSNAUTHZ_SERVICE_BAD_GATEWAY,
+                    503 = PSNAUTHZ_SERVICE_UNAVAILABLE
+                },
+                addEncodedPayload = false
+              }
+            ]
+            PsnClientCredentialTokenResponse getPsnClientCredentialToken(PsnClientCredentialTokenRequest);
+        }
+    }
+}
+
+} // namespace PsnAuthZ
+} // namespace Blaze

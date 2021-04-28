@@ -1,0 +1,200 @@
+syntax = "proto3";
+
+package eadp.stats;
+
+import "google/api/annotations.proto";
+import "google/rpc/status.proto";
+
+import "eadp/annotations.proto";
+
+import "eadp/stats/contexts.proto";
+import "eadp/stats/categories.proto";
+import "eadp/stats/views.proto";
+import "eadp/stats/entity_stats.proto";
+
+option java_package = "com.ea.gs.stats.grpc";
+option java_outer_classname = "StatsCorePublicProto";
+option java_multiple_files = true;
+
+/*
+* Service to read configuration for Stats Contexts, Categories, and Views
+*/
+service ConfigurationReader {
+    option (eadp.grpc.service_mapping) = {
+        ports: [ S2S, S2S_ADMIN]
+        scopes: {
+            key: "S2S"
+            value: "gs_stats_enduser"
+        }
+        scopes : {
+            key : "S2S_ADMIN"
+            value : "gs_stats_limited_admin gs_stats_admin"
+        }
+    };
+
+    // CONTEXTS
+
+    /*
+     * List contexts and filter by context id prefix-only, case insensitive and have a minimum length of 3 characters
+     */
+    rpc ListContexts (ListContextsRequest) returns (stream ListContextsResponse ) {
+        option (google.api.http) = {
+            get: "/v2/contexts"
+        };
+    };
+
+    /*
+     * Get a specific context by context id. Does not include full category information.
+    */
+    rpc GetContext (GetContextRequest) returns (GetContextResponse) {
+        option (google.api.http) = {
+            get: "/v2/contexts/{context_id}"
+        };
+    };
+
+    // CATEGORIES
+
+    /*
+     * List categories and filter by category id prefix-only, case insensitive and have a minimum length of 3 characters
+    */
+    rpc ListCategories (ListCategoriesRequest) returns (stream ListCategoriesResponse) {
+        option (google.api.http) = {
+            get: "/v2/contexts/{context_id}/categories"
+        };
+    };
+
+    /*
+     * Get a specific category by context and category id.
+    */
+    rpc GetCategory (GetCategoryRequest) returns (GetCategoryResponse) {
+        option (google.api.http) = {
+            get: "/v2/contexts/{context_id}/categories/{category_id}"
+        };
+    };
+
+    // VIEWS
+
+    /*
+     * Fetch info related to a specific view. Gets user-friendly description of stats in view
+    */
+    rpc GetView (GetViewRequest) returns (GetViewResponse) {
+        option (google.api.http) = {
+            get: "/v2/contexts/{context_id}/views/{view_id}"
+        };
+    };
+
+    /*
+     * List views in a context and filter by view id prefix-only, case insensitive and have a minimum length of 3 characters
+    */
+    rpc ListViews (ListViewsRequest) returns (stream ListViewsResponse) {
+        option (google.api.http) = {
+            get: "/v2/contexts/{context_id}/views"
+        };
+    };
+}
+
+/*
+ * The service that most clients will be using - this is used to update and fetch statistics.
+ */
+service EntityStatistics {
+    option (eadp.grpc.service_mapping) = {
+        ports: [ PUBLIC, S2S, S2S_ADMIN ]
+        scopes: {
+            key: "S2S"
+            value: "gs_stats_enduser"
+        }
+        scopes : {
+            key : "S2S_ADMIN"
+            value : "gs_stats_limited_admin gs_stats_admin"
+        }
+    };
+
+    /*
+     * Get stats data - bidirectional streaming. Level of consistency can be optionally supplied,
+     * defaults to EVENTUAL consistency which should be good enough for most use cases. Strong
+     * consistency has significant load and performance implications - do not use without first
+     * discussing with GS team! Can optionally provide a list of statIds to filter by,
+     * otherwise all statIds are returned.
+    */
+    rpc GetStats (stream GetEntityStatsRequest) returns (stream GetEntityStatsResponse);
+
+    /*
+     * Get stats data - unary version. Level of consistency can be optionally supplied,
+     * defaults to EVENTUAL consistency which should be good enough for most use cases. Strong
+     * consistency has significant load and performance implications - do not use without first
+     * discussing with GS team! Can optionally provide a list of statIds to filter by,
+     * otherwise all statIds are returned.
+    */
+    rpc GetStatsUnary (GetEntityStatsRequest) returns (GetEntityStatsResponse) {
+        option (google.api.http) = {
+            get: "/v2/contexts/{context_id}/categories/{category_id}/entities/{entity_id}/stats"
+        };
+    };
+
+    /*
+     * Update stats data. Features idempotency based on required updateId such that the same request
+     * (identified by the same unique updateId) can be sent multiple times but the actual updates are
+     * guaranteed to be applied at most once. Recommended error handling is retry with exponential back-off.
+     *
+     * This can be used to update an individual or a community/group entity.
+     * Note that updating a community/group entity using this method will write to database directly without any batching.
+     * This should only be used if write frequency is low (eg. you have implemented your own batching/grouping).
+     * Please contact the GS team if this is something you want to do because it requires special permission.
+     * In most cases, UpdateStatsAsync should be used for updating a community/group entity.
+    */
+    rpc UpdateStats (UpdateEntityStatsRequest) returns (UpdateEntityStatsResponse) {
+        option (google.api.http) = {
+            post: "/v2/contexts/{context_id}/categories/{category_id}/entities/{entity_id}/stats"
+            body: "*"
+        };
+    };
+
+    /*
+     * Update stats asynchronously. This can only be used to update community/group entity but not individual entity.
+     * Multiple updates are batched together before flushing to the database to reduce the frequency of write.
+    */
+    rpc UpdateStatsAsync (UpdateEntityStatsRequest) returns (UpdateEntityStatsResponse);
+
+    /*
+     * Delete stats asynchronously. This can only be used to delete community/group entity but not individual entity.
+     * This will cause previous updates still being batched to be cancelled before the delete is written to the database.
+    */
+    rpc DeleteStatsAsync (DeleteEntityStatsRequest) returns (DeleteEntityStatsResponse);
+
+    /*
+     * Delete stats data. Features idempotency based on required updateId such that the same request
+     * (identified by the same unique updateId) can be sent multiple times but the actual updates are
+     * guaranteed to be applied at most once. Recommended error handling is retry with exponential back-off.
+    */
+    rpc DeleteStats (DeleteEntityStatsRequest) returns (DeleteEntityStatsResponse) {
+        option (google.api.http) = {
+            delete: "/v2/contexts/{context_id}/categories/{category_id}/entities/{entity_id}/stats"
+            body: "*"
+        };
+    };
+
+    /*
+     * Get single entity stats data as defined by view. Level of consistency can be optionally supplied,
+     * defaults to EVENTUAL consistency which should be good enough for most use cases. Strong
+     * consistency has significant load and performance implications - do not use without first
+     * discussing with GS team!
+    */
+    rpc GetStatsByView (GetStatsByViewRequest) returns (GetStatsByViewResponse) {
+        option (google.api.http) = {
+            get: "/v2/contexts/{context_id}/views/{view_id}/entities/{entity_id}/stats"
+        };
+    };
+
+    /*
+     * List multiple entities' stats data as defined by view. Level of consistency can be optionally supplied,
+     * defaults to EVENTUAL consistency which should be good enough for most use cases. Strong
+     * consistency has significant load and performance implications - do not use without first
+     * discussing with GS team!
+    */
+    rpc ListStatsByView (ListStatsByViewRequest) returns (stream GetStatsByViewResponse) {
+        option (google.api.http) = {
+            get: "/v2/contexts/{context_id}/views/{view_id}/entities/stats"
+        };
+    };
+}
+

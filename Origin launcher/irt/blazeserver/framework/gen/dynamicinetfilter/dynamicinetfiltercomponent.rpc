@@ -1,0 +1,128 @@
+/*
+    The DynamicInetFilter interface is intended to be set up for access via WAL only, and from addresses which also have
+    PERMISSION_SERVER_MAINTENANCE. It is accessed as follows:
+
+    Adding an entry to the DB -  
+        http://<blazeslave>/dynamicinetfilter/add?grp=<group>&ownr=<owner>&snet|ip=<a.b.c.d>&snet.plen=<e>&comm=<comment>
+        If successful, returns the rowId of the new entry
+
+    Modifying the contents of a specific row -
+        http://<blazeslave>/dynamicinetfilter/update?rid=<rowid>&grp=<group>&ownr=<owner>&snet|ip=<a.b.c.d>&snet.plen=<e>&comm=<comment>
+
+    Removing a specific row -
+        http://<blazeslave>/dynamicinetfilter/remove?rid=<rowid>
+
+    Retrieving all entries in DynamicInetFilter -
+        http://<blazeslave>/dynamicinetfilter/list
+
+    Retrieving all DynamicInetFilter entries for a group, owner, subnet range -
+        http://<blazeslave>/dynamicinetfilter/list?grp=<group>&ownr=<owner>&snet|ip=<a.b.c.d>&snet.plen=<e>
+        NOTE: grp, ownr, snet tags are optional
+*/
+
+[ headername="framework/dynamicinetfilter/tdf/dynamicinetfilter.h" ]
+#include "framework/gen/dynamicinetfilter/dynamicinetfilter.tdf"
+
+[ 
+  client_include = false,
+  headername="framework/dynamicinetfilter/tdf/dynamicinetfilter_server.h" 
+]
+#include "framework/gen/dynamicinetfilter/dynamicinetfilter_server.tdf"
+
+namespace Blaze
+{
+namespace DynamicInetFilter
+{
+[
+  id = framework/12,
+  description = "Dynamic IP subnet management component.",
+  details = "The component fetches a set of IP subnets from the DB, replicates it between master and slaves, and allows for modification of the set on-the-fly.
+    The Blaze server's cfg files can then refer to groups within the set of subnets using 'DynamicInetFilterGroup:(group)' syntax.
+    Changes to the set take effect immediately.",
+  configurationType = DynamicinetfilterConfig
+]
+component DynamicInetFilter
+{
+    errors
+    {
+        [description = "Attempting to update/remove a row which doesn't exist in DynamicInetFilter"]
+        DYNAMICINETFILTER_ERR_ROW_NOT_FOUND = 1;
+       
+        [description = "Invalid Group argument"]
+        DYNAMICINETFILTER_ERR_INVALID_GROUP = 2;
+
+        [description = "Invalid Owner argument"]
+        DYNAMICINETFILTER_ERR_INVALID_OWNER = 3;
+
+        [description = "Invalid SubNet argument"]
+        DYNAMICINETFILTER_ERR_INVALID_SUBNET = 4;
+        
+        [description = "Invalid Comment argument"]
+        DYNAMICINETFILTER_ERR_INVALID_COMMENT = 5;
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+              id = 1,
+              errors = { DYNAMICINETFILTER_ERR_INVALID_GROUP,
+                         DYNAMICINETFILTER_ERR_INVALID_OWNER,
+                         DYNAMICINETFILTER_ERR_INVALID_SUBNET,
+                         DYNAMICINETFILTER_ERR_INVALID_COMMENT } ,
+              description = "Adds a new entry to DynamicInetFilter."
+            ]
+            AddResponse add(AddRequest);
+
+            [
+               id = 2,
+               errors = { DYNAMICINETFILTER_ERR_ROW_NOT_FOUND,
+                          DYNAMICINETFILTER_ERR_INVALID_GROUP,
+                          DYNAMICINETFILTER_ERR_INVALID_OWNER,
+                          DYNAMICINETFILTER_ERR_INVALID_SUBNET,
+                          DYNAMICINETFILTER_ERR_INVALID_COMMENT } ,
+               description = "Changes the contents of an entry in DynamicInetFilter."
+            ]
+            void update(UpdateRequest);
+
+            [
+               id = 3,
+               errors = { DYNAMICINETFILTER_ERR_ROW_NOT_FOUND }, 
+               description = "Removes an entry from DynamicInetFilter."
+            ]
+            void remove(RemoveRequest);
+
+            [  
+               id = 4,
+               errors = { DYNAMICINETFILTER_ERR_INVALID_GROUP,
+                          DYNAMICINETFILTER_ERR_INVALID_OWNER,
+                          DYNAMICINETFILTER_ERR_INVALID_SUBNET },
+               description = "Retrieves some or all entries in DynamicInetFilter."
+            ]
+            ListResponse listInfo(ListRequest);
+        }
+        
+        notifications
+        {
+            [
+               id = 1,
+               description = "Asks slaves to add or update a entry to DynamicInetFilter.",
+               requires_authentication = false,
+               client_export = false
+            ]
+            AddOrUpdateNotification(Entry);         
+
+            [ 
+               id = 2,
+               description = "Asks slaves to remove an entry from DynamicInetFilter.",
+               requires_authentication = false,
+               client_export = false
+            ]
+            RemoveNotification(RemoveRequest);
+        }
+
+    } // slave
+}
+}//DynamicInetFilter
+}//Blaze

@@ -1,0 +1,91 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-build')}' == 'exclude'">
+        <target name="test-build" style="build" description="Build the tests for a specific configuration" allowoverride="true">
+
+          <property name="eaconfig.build.group" value="test" />
+          <call target="eaconfig-build-graph" force="true" />
+          <GenerateBuildLayout/>
+          <nant-build configs="${config}"/>
+
+          <!-- If the test has dependant data files, copy them over to the working directory -->
+            <!-- Eventually, this might be better to roll into the core eaconfig build call -->
+            <do if="@{FileSetExists('test.${package.name}.test-data-fileset')}">
+                <copy todir="${package.configbindir}">
+                    <fileset fromfileset="test.${package.name}.test-data-fileset" basedir="@{FileSetGetBaseDir('test.${package.name}.test-data-fileset')}"/>
+                </copy>
+            </do>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-buildall')}' == 'exclude'">
+        <target name="test-buildall" description="Build the test program for each configuration" allowoverride="true">
+          <property name="eaconfig.build.group" value="test" />
+          <call target="eaconfig-build-graph-all" force="true" />
+          <GenerateBuildLayout/>
+          <nant-build configs="${eaconfig.build.configs}"/>
+        </target>
+    </do>
+
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-runall')}' == 'exclude'">
+        <target name="test-runall" description="Run the test program for each configuration" allowoverride="true">
+            <property name="eaconfig.buildall.target" value="test-run" />
+            <call target="eaconfig-buildall-caller" force="true" />
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-run')}' == 'exclude'">
+        <target name="test-run" description="Runs the tests for a specific configuration" depends="test-build" allowoverride="true">
+            <call target="test-run-fast" force="true" />
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-runall-fast')}' == 'exclude'">
+        <target name="test-runall-fast" description="Run the test program for each configuration" allowoverride="true">
+            <property name="eaconfig.buildall.target" value="test-run-fast" />
+            <call target="eaconfig-buildall-caller" force="true" />
+        </target>
+    </do>
+  
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-run-fast')}' == 'exclude'">
+        <target name="test-run-fast" description="Runs the tests for a specific configuration" allowoverride="true">
+            <property name="eaconfig.build.group" value="test" />
+            <property name="eaconfig.isrunningtests" value="true" />
+            <call target="eaconfig-run-caller" force="true" />
+        </target>
+    </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-group-runall-fast')}' == 'exclude' OR '@{OptionSetGetValue('config.targetoverrides', 'test-runall-fast')}' == 'exclude'">
+    <target name="test-group-runall-fast" description="Run the test program for each configuration" allowoverride="true">
+      <property name="eaconfig.build.split-by-group-names" value="false"/>
+      <call target="test-runall-fast" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-group-run-fast')}' == 'exclude' OR '@{OptionSetGetValue('config.targetoverrides', 'test-run-fast')}' == 'exclude'">
+    <target name="test-group-run-fast" description="Runs the tests for a specific configuration" allowoverride="true">
+      <property name="eaconfig.build.split-by-group-names" value="false"/>
+      <call target="test-run-fast" force="true" />
+    </target>
+  </do>
+
+	<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+	<do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-run-fast-coverage')}' == 'exclude' OR '@{OptionSetGetValue('config.targetoverrides', 'test-run-fast')}' == 'exclude'">
+		<target name="test-run-fast-coverage" description="Runs the tests for a specific configuration with coverage" allowoverride="true">
+			<property name="coverage" value="true"/>
+			<call target="test-run-fast" force="true" />
+		</target>
+	</do>
+
+</project>

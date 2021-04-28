@@ -1,0 +1,324 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+==============================================================================
+
+targets.xml
+
+API Information
+
+All targets
+  ${package.configs}                           Property containing the list of configurations for the project
+  ${package.usedependencies}                   Property containing the list of any use dependent packages by name (must be placed before the package command)
+  ${package.usedependencies.${config-system}}  Property containing the list of any system specific use dependent packages by name (must be placed before the package command)
+
+All build style targets
+  ${package.buildtype}                          Property to define the type of build to do (Program, Library, DynamicLibrary, WindowsProgram, ManagedCppProgram, ManagedCppWindowsProgram, ManagedCppLibrary)
+  ${package.builddependencies}                  Property containing the list of any build dependent packages by name (not required)
+  ${package.builddependencies.${config-system}} System specific packages for build dependencies
+  ${package.headerfiles}                        Fileset containing the header files for the project (default provided)
+  ${package.headerfiles.${config-system}}       System specific header files
+  ${package.sourcefiles}                        Fileset containing the source files for the project (default provided)
+  ${package.sourcefiles.${config-system}}       System specific source files, if necessary
+  ${package.defines}                            Property containing the list of any build defines needed for the builds (not required)
+  ${package.defines.${config-system}}           System specific defines (May not need this long term)
+
+  ${package.includedirs}                        Property containing the list of any include directories needed for the builds (not required)
+                                                Includedirs from dependent packages will be automatically appended (if defined in the dependent package initialize.xml script)
+  ${package.includedirs.${config-system}}       System specific includedirs, if necessary
+  ${package.libs}                               Property containing the list of any build defines needed for the builds (not required)
+                                                Libraries from dependent packages will be automatically appended (if defined in the dependent package initialize.xml script)
+  ${package.libs.${config-system}}              System specific libraries, if necessary
+
+  ${pacakge.buildmodules}
+  ${package.${module}.buildtype}                     Property to define the type of build to do (Program, Library, DynamicLibrary, WindowsProgram, ManagedCppProgram, ManagedCppWindowsProgram, ManagedCppLibrary)
+  ${package.${module}.builddependencies}             Property containing the list of any build dependent packages by name (not required)
+  ${package.${module}.builddependencies.${config-system}} System specific packages for build dependencies
+  ${package.${module}.headerfiles}                   Fileset containing the header files for the project (default provided)
+  ${package.${module}.headerfiles.${config-system}}  System specific header files
+  ${package.${module}.sourcefiles}                   Fileset containing the source files for the project (default provided)
+  ${package.${module}.sourcefiles.${config-system}}  System specific source files, if necessary
+  ${package.${module}.defines}                       Property containing the list of any build defines needed for the builds (not required)
+  ${package.${module}.defines.${config-system}}      System specific defines (May not need this long term)
+
+  ${package.${module}.includedirs}                   Property containing the list of any include directories needed for the builds (not required)
+                                                     Includedirs from dependent packages will be automatically appended (if defined in the dependent package initialize.xml script)
+  ${package.${module}.includedirs.${config-system}}  System specific includedirs, if necessary
+  ${package.${module}.libs}                          Property containing the list of any build defines needed for the builds (not required)
+                                                     Libraries from dependent packages will be automatically appended (if defined in the dependent package initialize.xml script)
+  ${package.${module}.libs.${config-system}}         System specific libraries, if necessary
+
+
+doxygen target
+  ${package.doxygenfiles}            Fileset containing the doxygen files for the project (default provided)
+
+==============================================================================
+-->
+
+<project xmlns="schemas/ea/framework3.xsd">
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-build-caller" hidden="true" >
+    <call target="eaconfig-single-package-build-graph"/>
+    <eaconfig-build-caller build-target-name="${eaconfig.build.target}"/>
+    <!-- reset build graph in case we are chaining other targets-->
+    <init-build-graph
+				build-group-names="${eaconfig.build.group.names??${eaconfig.build.group}}"
+				build-configurations="dummy"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-buildall-caller" hidden="true" >
+
+    <foreach item="String" in="${package.configs}" property="build-config-name">
+      <nant buildfile="${package.dir}/${package.name}.build"
+					target="${eaconfig.buildall.target}"
+					global-properties-action="initialize">
+        <property name="config" value="${build-config-name}"/>
+        <property name="package.configs" value="${package.configs}"/>
+        <property name="eaconfig.build.group" value="${eaconfig.build.group}" if="@{PropertyExists('eaconfig.build.group')}"/>
+        <property name="eaconfig.build.target" value="${eaconfig.buildall.target}"/>
+      </nant>
+    </foreach>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-build-graph" hidden="true" style="build">
+    <property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>
+    <init-build-graph
+				build-group-names="${eaconfig.build.group.names}"
+				build-configurations="${config}"/>
+    <load-package
+				build-group-names="${eaconfig.build.group.names}"
+				autobuild-target="${eaconfig.build.autobuild-target??load-package}"
+				process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+    <create-build-graph
+				build-group-names="${eaconfig.build.group.names}"
+				build-configurations="${config}"
+				process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+  </target>
+
+  <target name="eaconfig-single-package-build-graph" hidden="true" style="use">
+    <property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>
+    <init-build-graph
+				build-group-names="${eaconfig.build.group.names}"
+				build-configurations="${config}"/>
+    <load-package
+				build-group-names="${eaconfig.build.group.names}"
+				autobuild-target="${eaconfig.build.autobuild-target??load-package}"
+				process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+    <create-build-graph
+				build-group-names="${eaconfig.build.group.names}"
+				build-configurations="${config}"
+				process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+  </target>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-build-graph-all" hidden="true" style="build">
+    <!-- always add config into the list of all configurations include ${config} -->
+    <property name="eaconfig.build.configs" value ="@{DistinctItems('${config} ${eaconfig.build.configs??${package.configs}}')}"/>
+    <property name="eaconfig.build.autobuild-target" value="${eaconfig.build.autobuild-target??load-package}"/>
+    <property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}"/>
+
+    <property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>
+
+    <init-build-graph build-group-names="${eaconfig.build.group.names}"
+				build-configurations="${eaconfig.build.configs}"/>
+
+    <property name="eaconfig.cmdline_prop_optionset_name" value="nant.commandline.properties"/>
+    <do if="!@{OptionSetExists('nant.commandline.properties')} and @{OptionSetExists('nant.commadline.properties')}">
+      <!-- 
+			TODO: nant.commadline.properties cleanup 
+			We had a typo with nant.commandline.properties in older version of Framework and  
+			this optionset was named nant.commadline.properties.  So if the new optionset name  
+			doesn't exists, we must be using an old Framework.  Switch back to the old name. 
+			-->
+      <property name="eaconfig.cmdline_prop_optionset_name" value="nant.commadline.properties"/>
+    </do>
+
+    <parallel.foreach item="String" in="${eaconfig.build.configs}" property="build-config-name">
+      <choose>
+        <do if="${build-config-name} == ${config}">
+          <call target="${eaconfig.buildall.target??load-package}" force="true" />
+        </do>
+        <do>
+          <nant buildfile="${nant.project.buildfile}"
+							target="${eaconfig.buildall.target??load-package}"
+							optionset="${eaconfig.cmdline_prop_optionset_name}"
+							global-properties-action="initialize"
+							start-new-build="false">
+            <property name="config" value="${build-config-name}"/>
+            <property name="package.configs" value="${eaconfig.build.configs}"/>
+            <property name="eaconfig.build.autobuild-target" value="${eaconfig.build.autobuild-target}"/>
+            <property name="eaconfig.build.group" value="${eaconfig.build.group}"/>
+            <property name="eaconfig.build.group.names" value="${eaconfig.build.group.names}"/>
+          </nant>
+        </do>
+      </choose>
+    </parallel.foreach>
+
+    <create-build-graph build-group-names="${eaconfig.build.group.names}"
+				build-configurations="${eaconfig.build.configs}"
+				process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="load-package" style="build" hidden="true">
+    <load-package build-group-names="${eaconfig.build.group.names??runtime}" autobuild-target="load-package"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="load-package-generate" style="build" hidden="true">
+    <property name="eaconfig.build.process-generation-data" value="true" readonly="true" />
+    <fail unless="${eaconfig.build.process-generation-data}" message="'load-package-generate' target unable to set property 'eaconfig.build.process-generation-data' to true"/>
+    <load-package build-group-names="${eaconfig.build.group.names??runtime}" autobuild-target="load-package-generate" process-generation-data="${eaconfig.build.process-generation-data}"/>
+  </target>
+
+
+
+  <optionset name="config-options-gameconfigoptions">
+    <option name="manifest.filename" value="MicrosoftGame.config"/>
+    <option name="identity.name" value="${package.name}"/>
+    <option name="identity.publisher" value="Electronic Arts Inc."/>
+    <option name="identity.version" value="1.0.0.0"/>
+    <option name="executable.id" value="${package.name}"/>
+    <option name="executable.targetDeviceFamily" value="XboxOne" if="${config-system}==capilano"/>
+    <option name="executable.targetDeviceFamily" value="Scarlett" if="${config-system}==xbsx"/>
+    <option name="virtualmachine.titlememory.anaconda" value="Advanced"/>
+    <option name="virtualmachine.titlememory.xb1x" value="Advanced"/>
+    <option name="shellvisuals.storelogo" value="StoreLogo.png"/>
+    <option name="shellvisuals.square150x150logo" value="Square150x150Logo.png"/>
+    <option name="shellvisuals.square44x44logo" value="Square44x44Logo.png"/>
+    <option name="shellvisuals.splashscreen" value="SplashScreen.png"/>
+    <option name="shellvisuals.description" value="${package.name}"/>
+    <option name="shellvisuals.displayname" value="${package.name}"/>
+    <option name="shellvisuals.foregroundtext" value="${gameconfig.shellvisuals.foregroundtext}" if="@{PropertyExists('gameconfig.shellvisuals.foregroundtext')}"/>
+    <option name="shellvisuals.backgroundcolor" value="${gameconfig.shellvisuals.backgroundcolor}" if="@{PropertyExists('gameconfig.shellvisuals.backgroundcolor')}"/>
+  </optionset>
+
+  <do if="${config-system}==capilano">
+    <optionset name="config-options-appxmanifestoptions">
+      <option name="manifest.filename" value="package.appxmanifest"/>
+      <option name="identity.name" value="${package.name}"/>
+      <option name="identity.publisher" value="Electronic Arts Inc."/>
+      <option name="identity.version" value="1.0.0.0"/>
+      <option name="properties.displayname" value="${package.name}"/>
+      <option name="properties.publisherdisplayname" value="Electronic Arts Inc."/>
+      <option name="properties.logo" value="StoreLogo.png"/>
+      <option name="properties.description" value="${package.name}"/>
+      <option name="application.id" value="${package.name}"/>
+      <option name="visualelements.logo" value="Logo.png"/>
+      <option name="visualelements.widelogo" value="WideLogo.png"/>
+      <option name="visualelements.smalllogo" value="SmallLogo.png"/>
+      <option name="visualelements.splashscreen" value="SplashScreen.png"/>
+      <option name="visualelements.description" value="${package.name}"/>
+      <option name="visualelements.displayname" value="${package.name}"/>
+      <option name="visualelements.foregroundtext" value="${appxmanifest.visualelements.foregroundtext}" if="@{PropertyExists('appxmanifest.visualelements.foregroundtext')}"/>
+      <option name="visualelements.backgroundcolor" value="${appxmanifest.visualelements.backgroundcolor}" if="@{PropertyExists('appxmanifest.visualelements.backgroundcolor')}"/>
+      <option name="capabilities" value="internetClientServer"/>
+      <option name="devicecapabilities" value=""/>
+      <option name="mx.capability.list">
+        contentRestrictions
+        kinectVision
+        kinectAudio
+        kinectFace
+        kinectExpressions
+        kinectGamechat
+        kinectRequired
+      </option>
+    </optionset>
+  </do>
+
+  <optionset name="config-options-xboxdeploymentcontent">
+    <option name="name" value="winrtdeploymentcontent"/>
+    <option name="description" value="Copying file '%filename%%fileext%' for deployment..."/>
+    <option name="build.tasks" value="copy"/>
+    <option name="copy.command" value="${nant.copy} -a5 %filepath% $(ProjectDir)$(LayoutDir)Image\Loose\%filereldir%\%filename%%fileext%"/>
+    <option name="outputs">
+      $(ProjectDir)$(LayoutDir)Image\Loose\%filereldir%\%filename%%fileext%
+    </option>
+  </optionset>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <!-- Do some common set up for all targets -->
+  <property name="package.configbuilddir" value="${package.configbuilddir ?? ${package.builddir}/${config}/build}"/>
+  <property name="package.configbindir" value="${package.configbindir ?? ${package.builddir}/${config}/bin}"/>
+  <property name="package.configlibdir" value="${package.configlibdir ?? ${package.builddir}/${config}/lib}"/>
+
+  <property name="package.buildtype" value="none" unless="@{PropertyExists('package.buildtype')}"/>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <include file="target-clean.xml" />
+  <!-- clean target is a recursive call down the dependencies so we need to define clean even if not top level -->
+  <include file="target-build.xml" />
+  <!-- if a package as a target assigned with "build" style, doing a "dependent" task will trigger a build target for dependent package. -->
+  <include file="target-create-app-package.xml" />
+  <!-- The app packaging copy asset targets need to be accessable by all projects.  Not just top level. -->
+  <include file="target-iphone.xml"/>
+  <include file="target-osx.xml"/>
+
+  <parallel.do if="${nant.project.istoplevel??true}">
+    <include file="target-additional.xml" />
+    <include file="target-build-custom.xml" />
+    <include file="target-create-prebuilt-package.xml"/>
+    <include file="target-distributed-build.xml"/>
+    <include file="target-doc.xml" />
+    <include file="target-example.xml" />
+    <include file="target-frostbite.xml" />
+    <include file="target-make.xml" />
+    <include file="target-msbuild.xml"/>
+    <include file="target-sndbs.xml"/>
+    <include file="target-package.xml" />
+    <include file="target-remotebuild.xml" />
+    <include file="target-run.xml" />
+    <include file="target-shorthands.xml"/>
+    <include file="target-standard.xml" />
+    <include file="target-test.xml" />
+    <include file="target-tool.xml" />
+    <include file="target-vcproj.xml" />
+    <include file="target-verify-includes.xml" />
+    <include file="target-viewbuildinfo.xml" />
+    <include file="target-visualstudio.xml" />
+    <include file="target-projectize.xml" />
+  </parallel.do>
+
+  <!-- eaconfig target override defined by user -->
+  <do if="@{PropertyExists('eaconfig.target-override.file')}">
+
+    <!-- expand input property-->
+    <eval type="Property" code="${eaconfig.target-override.file}" property="__target-override.expanded-path"/>
+
+    <!-- relative path is combined with masterconfig file directory -->
+    <property name="__target-override.masterconfig-dir" value="@{PathGetDirectoryName('${nant.project.masterconfigfile}')}" local="true"/>
+    <property name="__target-override.expanded-path" value="@{PathCombine('${__target-override.masterconfig-dir}', '${__target-override.expanded-path}')}"/>
+    <property name="__target-override.expanded-path" value="@{PathGetFullPath('${__target-override.expanded-path}')}" />
+
+    <property name="__target-override.path"  value="@{PathGetDirectoryName('${__target-override.expanded-path}')}"              local="true"/>
+    <property name="__target-override.file"  value="@{PathGetFileNameWithoutExtension('${__target-override.expanded-path}')}"   local="true"/>
+    <property name="__target-override.ext"   value="@{PathGetExtension('${__target-override.expanded-path}')}"                  local="true"/>
+
+    <property name="__target-override.file.1"   value="@{PathCombine('${__target-override.path}', '${__target-override.file}.${config-platform}${__target-override.ext}')}"  local="true"/>
+    <property name="__target-override.file.2"   value="@{PathCombine('${__target-override.path}', '${__target-override.file}.${config-system}${__target-override.ext}')}"  local="true"/>
+    <property name="__target-override.file.3"   value="@{PathCombine('${__target-override.path}', '${__target-override.file}${__target-override.ext}')}"  local="true"/>
+
+    <choose>
+      <do if="@{FileExists('${__target-override.file.1}')}">
+        <include file="${__target-override.file.1}" />
+      </do>
+      <do if="@{FileExists('${__target-override.file.2}')}">
+        <include file="${__target-override.file.2}" />
+      </do>
+      <do if="@{FileExists('${__target-override.file.3}')}">
+        <include file="${__target-override.file.3}" />
+      </do>
+      <do>
+        <warn message="Property eaconfig.target-override.file='${eaconfig.target-override.file}' but none of the files: '${__target-override.file.1}' or '${__target-override.file.2}' or '${__target-override.file.3}' exists."/>
+      </do>
+    </choose>
+  </do>
+  
+  
+  
+  
+</project>

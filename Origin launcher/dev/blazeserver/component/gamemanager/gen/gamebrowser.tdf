@@ -1,0 +1,308 @@
+/*! ************************************************************************************************/
+/*!
+    \file gamebrowser.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/entity.h"]
+#include "framework/gen/entity.tdf"
+
+[headername="gamemanager/tdf/gamemanager_types.h"]
+#include "gamemanager/gen/gamemanager_types.tdf"
+
+[headername="gamemanager/tdf/gamemanager.h", includeProto=false]   // Only included for ListGameData, a non-proto class.
+#include "gamemanager/gen/gamemanager.tdf"
+
+[headername="gamemanager/tdf/matchmaker.h"]
+#include "gamemanager/gen/matchmaker.tdf" // for matchmaking criteria TDF
+
+[headername="framework/tdf/network.h"]
+#include "framework/gen/network.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/networkaddress.h"]
+#include "framework/gen/networkaddress.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+    [description="Each GameBrowser GameList is uniquely identified by an id (assigned by the server).  Note: Zero is invalid, and indicates failure."]
+    typedef uint64_t GameBrowserListId;
+
+    [description="Indicates that a GameBrowserList should contain all matching games (list's size is not capped)."]
+    const uint32_t GAME_LIST_CAPACITY_UNLIMITED = UINT32_MAX;
+    
+    [description="The name of a GameBrowserList data configuration.  Each list can specify a subset of game/player data to download by default."]
+    typedef string(16) GameBrowserListConfigName;
+
+    
+    class GameBrowserTeamInfo
+    {
+        [tag="tid"] TeamId mTeamId;
+        [tag="tsze"] uint16_t mTeamSize;
+        [tag="rmap"] RoleMap mRoleSizeMap;
+    };
+
+    typedef list<GameBrowserTeamInfo> GameBrowserTeamInfoVector;
+    
+    [ description = "Request to create a new GameBrowser GameList on the server." ]
+    class GetGameListRequest
+    {
+        // Game Browser-only Values:
+        [tag="lcap", default=GAME_LIST_CAPACITY_UNLIMITED, description="The max number of games to return in the list.  If calling getGameListSnapshotSync, the return list size is restricted to maxGameListSyncSize config setting and will error when exceeded. For other calls, no max list size is enforced.  Use GAME_LIST_CAPACITY_UNLIMITED to get all games."] 
+            uint32_t mListCapacity;
+
+        [tag="dnam", default="default", description="The name the list data config to use for this list (defined in the game manager config file).  Each list can specify a (named) subset of game/player data to download by default."]
+            GameBrowserListConfigName mListConfigName;
+            
+        [tag="igno", default=false, description="If true, ignore the game entry criteria for matching games (returns games you can't join due to the game entry criteria). Default value is false."]
+            bool mIgnoreGameEntryCriteria;
+
+        [tag="prop", description="List of Properties to be returned from the request, rather than returning the full GamebrowserData."]
+            PropertyNameList mPropertyNameList;
+
+
+        // Common Values:
+        [tag="mmlc", description="The Matchmaking criteria to use for this game list.  List is populated with matching games."]
+            MatchmakingCriteriaData mListCriteria;
+
+        [tag="pljd", description="Info on the players that may join the GB request. Includes Team choice, Roles, etc."]
+            PlayerJoinData mPlayerJoinData;
+
+        [tag="cmgd", description="Comon data used in Matchmaking, Join Game, and GB Requests. Includes game protocol version string."]
+            CommonGameRequestData mCommonGameData;
+    };
+
+    
+    [ description = "Request to create a new GameBrowser for a list of games that the users belongs to" ]
+    class GetUserSetGameListSubscriptionRequest 
+    {
+        [tag="usid", description="UserSetId of the users"]
+        ObjectId mUserSetId;
+    };
+
+    [ 
+    description = "Response to a getGameList request (either snapshot or subscribed)." 
+    ]
+    class GetGameListResponse
+    {
+        [tag="glid", description="The GameBrowser list's id"]
+            GameBrowserListId mListId;
+            
+        [tag="maxf", description="The max possible fit score for the game browser criteria. (Used to determine a fit percentage. NOTE: can be zero.)"]
+            FitScore mMaxPossibleFitScore;
+            
+        [tag="ngd", default=0, description="The total number of games to be downloaded (summation of all chunks)."]
+            uint32_t mNumberOfGamesToBeDownloaded;
+
+        [tag="upin", description="The frequency with which empty update notifications will be sent even if no game updates have occurred"]
+            TimeValue mMaxUpdateInterval;
+                
+        [tag="lcap", default=GAME_LIST_CAPACITY_UNLIMITED, description="The max number of games to return in the list."] 
+            uint32_t mListCapacity;
+
+        [tag="gmlt", description="List that was returned. True if snapshot and false if subscription"] 
+            bool mIsSnapshotList;
+    };
+
+    [ description = "Contains the GameBrowserList id for the list to destroy." ]
+    class DestroyGameListRequest
+    {
+        [tag="glid", description="The GameBrowserList id to destroy."]
+            GameBrowserListId mListId;
+    };
+
+    [ description = "Retrieve the full game data (game settings/attribs), and the full roster info for game(s), either based on a list of game id or based on a list of game persisted id(bookmark)." ]
+    class GetFullGameDataRequest
+    {
+        [tag="gidl", description="the list of game id(s) to retrieve full data for, can't be used together with PersistedGameIdList, if the list is not empty, data will be retrieved based on game id, the PersitedGameIdList will be ignored."]
+            GameIdList mGameIdList;
+            
+        [tag="pidl", description="the list of game persisted id(s) to retrieve full data for, can't be used together with GameIdList, game data based on game persisted id will be retrieved when game id list is empty."]
+            PersistedGameIdList mPersistedGameIdList;
+    };
+
+    // TODO: Proto generation is disabled for ListGameData
+    [ description = "Contains the full game data for the requested games.", generateProto=false ]
+    class GetFullGameDataResponse
+    {
+        [tag="lgam", description="A list of the ListGameData for the requested games."]
+            list< ListGameData > mGames;
+    };
+    
+    [ description = "A subset of the ReplicatedGamePlayer object." ]
+    class GameBrowserPlayerData
+    {
+        [tag="pid"] PlayerId mPlayerId;
+        [tag="name"] string(MAX_PERSONA_LENGTH) mPlayerName;
+        [tag="nasp"] PersonaNamespace mPlayerNamespace;
+        [tag="aids", description="Contains platform ids and current client platform."] PlatformInfo mPlatformInfo;
+        [tag="exid"] ExternalId mExternalId;  // DEPRECATED (Use PlatformInfo)
+        [tag="loc"]  Locale mAccountLocale;
+        [tag="cnty"] uint32_t mAccountCountry;
+        [tag="patt"] Collections::AttributeMap mPlayerAttribs;
+        [tag="tidx"] TeamIndex mTeamIndex;
+        [tag="role", description="The Role this player is assigned to."]
+            RoleName mRoleName;
+        [tag="styp", default=SLOT_PUBLIC_PARTICIPANT] SlotType mSlotType;
+        [tag="stat"] PlayerState mPlayerState;
+        [tag="jgts"] TimeValue mJoinedGameTimestamp;
+        [tag="rcts"] TimeValue mReservationCreationTimestamp;
+        [tag="enid"] EncryptedBlazeId mEncryptedBlazeId;
+    };
+    
+    [ description = "A subset of a game's ReplicatedGameData object." ]
+    class GameBrowserGameData
+    {
+        // game identifiers
+        [tag="gid"] GameId mGameId;
+        [tag="sid"] uint64_t mExternalSessionId;
+        [tag="gnam"] GameName mGameName;
+
+        // Packer Properties - TODO: Revise. 
+        [tag="prop"] PropertyNameMap mPropertyNameMap;
+
+        // game settings 
+
+        [tag="vstr"] GameProtocolVersionString mGameProtocolVersionString;
+        [tag="cap"]  SlotCapacitiesVector mSlotCapacities;
+        [tag="pcnt"] SlotCapacitiesVector mPlayerCounts;
+        [tag="tinf"] GameBrowserTeamInfoVector mGameBrowserTeamInfoVector;
+        [tag="tcap", default=0] uint16_t mTeamCapacity;
+        [tag="gsta"] GameState mGameState;
+        [tag="gset"] GameSettings mGameSettings;
+        [tag="gmrg"] GameModRegister mGameModRegister;
+        [tag="attr"] Collections::AttributeMap mGameAttribs;
+        [tag="dstr"] Collections::AttributeMap mDedicatedServerAttribs;
+        // the game mode duplicates an existing attribute, but copying it here makes for easier access for HTTP/gRPC and other non-SDK users
+        [tag="mode"] Collections::AttributeValue mGameMode;
+        [tag="host"] BlazeId mHostId;
+        [tag="hnet"] NetworkAddressList mHostNetworkAddressList;
+        [tag="voip"] VoipTopology mVoipTopology;
+        [tag="pres"] PresenceMode mPresenceMode;
+        [tag="prdl"] ClientPlatformTypeList mPresenceDisabledList;
+
+        [tag="gtyp"] GameType mGameType;
+        [tag="ntop"] GameNetworkTopology mNetworkTopology;
+        [tag="psas"] PingSiteAlias mPingSiteAlias;
+        
+        [tag="rnfo", description="The roles and capacities, and criteria, supported in this game session."]
+            RoleInformation mRoleInformation;
+    
+        [tag="crit", description="Players must pass these entry criteria to join this game."]
+            EntryCriteriaMap mEntryCriteriaMap;
+    
+        [tag="cpov", description="The list of currently supported client platforms.  May be dynamically updated as new players enter."] 
+            ClientPlatformTypeList mClientPlatformList;
+        [tag="cply", description="True if mBaseGameClientPlatformList was populated with a non-crossplay platform set, meaning this game should be treated as non-crossplay, regardless of the number of platforms permitted to join."] 
+            bool mIsCrossplayEnabled;
+
+        // player roster
+        [tag="rost"] list<GameBrowserPlayerData> mGameRoster;
+
+        // admin list
+        [tag="admn"] PlayerIdList mAdminPlayerList;
+        
+        // persisted game id
+        [tag="psid"] PersistedGameId mPersistedGameId;
+        
+        // player queue
+        [tag="qcap", description="Max queue capacity."] uint16_t mQueueCapacity;
+        [tag="qcnt", description="Current number of player in the queue."] uint16_t mQueueCount;
+        [tag="gurl", default=""] GameStatusURL mGameStatusUrl;
+        
+        [tag="hses"] UserSessionId mTopologyHostSessionId;
+    };
+    
+    [ description="A game browser game update notification which includes the matches fit score." ]
+    class GameBrowserMatchData
+    {
+        [tag="gam", allowref=true] GameBrowserGameData mGameData;
+        [tag="fit", description="This game's fitScore against the list's criteria."]
+            FitScore mFitScore;
+    };
+        
+    [ description = "Returns a list of GameBrowserGameData for the game IDs specified." ]
+    class GetGameDataFromIdRequest
+    {
+        [tag="glst", description="GameIds of games to retrieve. Cannot be combined with list of PersistedGameIds."] 
+            GameIdList mGameIds;
+        [tag="pidl", description="PersistedGameIds of games to retrieve. Cannot be combined with list of GameIds"] 
+            PersistedGameIdList mPersistedGameIdList;        
+        [tag="dnam", default="default", description="GameBrowserListConfig to use for completing GameBrowserGameData returned by request."]
+            GameBrowserListConfigName mListConfigName;
+    };
+ 
+    [ description = "Get a list of game data for games containing the specified user." ]
+    class GetGameDataByUserRequest
+    {
+        [tag="user", description="The user to do a game lookup on."]
+        UserIdentification mUser;   
+        
+        [tag="grp", description="A Blaze object id representing a user set to do the game lookup on."]
+        ObjectId mUserSetId;
+            
+        [tag="dnam", default="default", description="GameBrowserListConfig to use for completing GameBrowserGameData returned by request."]
+        GameBrowserListConfigName mListConfigName;
+    };
+    
+    // NOTE: This TDF is exposed on the SDK API.
+    [ description = "A list of GameBrowserGameData containing detailed information for a list of games." ]
+    class GameBrowserDataList
+    {
+        [tag="gdat", description="List of games returned by request."] list<GameBrowserGameData> mGameData;
+    };
+
+    //////////////////////////////////
+    ///  Async Notification TDFs for GameBrowser
+    //////////////////////////////////
+
+    typedef list<GameBrowserMatchData> GameBrowserMatchDataList;
+    
+    [ description = "async update for a single game list." ]
+    class NotifyGameListUpdate
+    {
+        [tag="glid", description="The GameBrowserList id that's being updated."]
+            GameBrowserListId mListId;
+            
+        [tag="done", default=0, description="Is this the final async update for this list."]
+            uint8_t mIsFinalUpdate;
+            
+        [tag="remv", description="The list of games that have been removed from this list.  Either the game was destroyed, no longer matches, or was bumped off the list by a better match."]
+            GameIdList mRemovedGameList;
+            
+        [tag="updt", description="A list of games that have been added (or updated) in this list."]
+            GameBrowserMatchDataList mUpdatedGames;
+    };
+
+    [ description = "sync update for a single game list." ]
+    class GetGameListSyncResponse
+    {
+        [tag="maxf", description="The max possible fit score for the game browser criteria. (Used to determine a fit percentage. NOTE: can be zero.)"]
+            FitScore mMaxPossibleFitScore;
+            
+        [tag="ngd", default=0, description="The total number of games to be downloaded."]  
+            uint32_t mNumberOfGamesToBeDownloaded;  
+                 
+        [tag="updt", description="A list of games meeting the criteria requested with the highest fit score, with a max size set based on config's maxGameListSyncSize"]  
+            GameBrowserMatchDataList mGameList;           
+    };
+
+    [description="Get (player/game state) status for a given tournament game. (Minimal )"]
+    class GetTournamentGameStatusResult
+    {
+        [tag="gid"] GameId mGameId;
+        [tag="gnam"] GameName mGameName;
+
+        [tag="gsta"] GameState mGameState;
+        [tag="rost"] list<GameBrowserPlayerData> mGameRoster;
+    };
+
+} // namespace GameManager
+} // namespace Blaze

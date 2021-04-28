@@ -1,0 +1,2 @@
+This is the lib compared written by Staffan Gustafsson (staffangu@outlook.com) downloaded from https://powercode.visualstudio.com/
+It's used to compare two outputted libraries in a timestamp insensitive maner to determine if we can fake that a import library is actually not changed shortcurciting msbuild rebuild of dependent dlls.

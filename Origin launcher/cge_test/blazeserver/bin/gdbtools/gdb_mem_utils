@@ -1,0 +1,44 @@
+
+define dump_mem_alloc
+    set $MIN_ALLOC_COUNT = 100
+    set $MIN_ALLOC_SIZE = 100000
+    printf "%10s %10s %10s %10s %10s %s\n", "MemGroup", "Count", "Size", "TotalCount", "TotalSize", "Location"
+  
+    set $tree = &(AllocatorManager::msInstance->mGlobalMemTracker->mAllocInfoMap)
+    set $i = 0
+    set $node = $tree->mAnchor->mpNodeLeft
+    set $end = &$tree->mAnchor
+    while ($node != $end)
+        set $i++
+        set $value = ((eastl::rbtree_node<eastl::pair<unsigned long const, GAllocInfo> > *) $node)->mValue
+        set $allocInfo = $value.second
+        set $allocCount = $allocInfo.mAllocCount.mValue-$allocInfo.mFreeCount.mValue
+        set $allocSize = $allocInfo.mAllocSize.mValue-$allocInfo.mFreeSize.mValue
+
+        if ($allocCount > 0 && $allocSize > 0 && ($allocCount > $MIN_ALLOC_COUNT || $allocSize > $MIN_ALLOC_SIZE))
+            set $mgId = ($value.first >> 48)
+            printf "  0x%06x %10llu %10llu %10llu %10llu %s\n", $mgId, $allocCount, $allocSize, $allocInfo.mAllocCount.mValue, $allocInfo.mAllocSize.mValue, $allocInfo.mContext
+        end
+
+        if ($node->mpNodeRight != 0) 
+          set $node = $node->mpNodeRight
+            while ($node->mpNodeLeft != 0)
+              set $node = $node->mpNodeLeft
+            end
+        else 
+          set $tmp_node = $node->mpNodeParent
+            while ($node == $tmp_node->mpNodeRight) 
+              set $node = $tmp_node
+              set $tmp_node = $tmp_node->mpNodeParent
+            end
+            if ($node->mpNodeRight != $tmp_node)
+              set $node = $tmp_node
+            end
+        end
+    end
+end
+
+document dump_mem_alloc
+dump_mem_alloc: dump the contents of the Blaze tracking allocator. Used to output all outstanding and cumulative allocation sizes and counts.
+end
+

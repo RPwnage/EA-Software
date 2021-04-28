@@ -1,0 +1,150 @@
+# Documentation - https://docs.docker.com/compose/compose-file/
+# (make sure to read the documentation of the version number specified below - currently 3.8)
+# We try and use the known versions of following containers currently to keep things stable.
+
+version: "3.8"
+services:
+
+  # Reads the blaze endpoint info from the redis-cluster.
+  # Each envoy-blaze-ingress makes a gRPC call to retrieve the endpoints.
+  # The address (e.g. blaze-control-plane) and port number used for the gRPC listener (e.g. 9003) is configured in blaze_controlplane.yaml
+  blaze-control-plane:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/blazecontrolplane:0.6
+    restart: "no"
+    ports:
+      - 9090:9090
+    command:
+      - -port=9003
+      # Metrics page: http://localhost:9090/metrics
+      - -prometheusPort=9090
+    environment:
+      REDIS_CLUSTERS: main=redis-cluster:30000,redis-cluster:30001,redis-cluster:30002
+
+  # Listens for gRPC requests from the edge mesh.
+  envoy-blaze-ingress-1:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/envoy-blaze-ingress:0.7
+    restart: "no"
+    ports:
+      - 10002:10002
+      - 9901:9901
+    depends_on:
+      - blaze-control-plane
+    volumes:
+      # CA Cert to validate the ENVOY_CLIENT_CERT_PUBLIC_KEY from each mesh client.
+      - ./certs/ea.ca.crt:/tmp/server.ca.crt
+      # Server certificate must be listed in the inline_string for the eadp.xds.TlsPublicKey
+      # in https://src.ent.ea.com/gs-envoy-mesh/configuration/eadp.edge/-/blob/gs-prod/int/resources/eadp.blaze.yaml
+      - ./../../../etc/ssl/key.pem:/tmp/server.key
+      - ./../../../etc/ssl/cert.pem:/tmp/server.crt
+    labels:
+      - 'eadp.mesh.endpoints={"namespaces":{ "eadp.edge": {"registrations": [{"service":"eadp.blaze", "port_spec":"10002/tcp", "tags":{ "x-eadp-servergroup":"dev-${BLAZE_SERVICE_NAME}" } }] } }}'
+    environment:
+      # Common Container Configuration
+      # Admin page: http://localhost:9901/
+      # Metrics page: http://localhost:9901/stats/prometheus
+      ENVOY_ADMIN_LISTENER_PORT: 9901
+      ENVOY_LOG_LEVEL: info
+      #
+      # TLS Configuration
+      ENVOY_SERVER_CERT_CA: /tmp/server.ca.crt
+      ENVOY_SERVER_CERT_PRIVATE_KEY: /tmp/server.key
+      ENVOY_SERVER_CERT_PUBLIC_KEY: /tmp/server.crt
+      #
+      # Blaze Provider specific Container Configuration
+      ENVOY_INGRESS_LISTENER_PORT: 10002
+      BLAZE_CONTROL_PLANE_ADDRESS: blaze-control-plane
+      BLAZE_CONTROL_PLANE_PORT: 9003
+
+  envoy-blaze-ingress-2:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/envoy-blaze-ingress:0.7
+    restart: "no"
+    ports:
+      - 10005:10005
+      - 9902:9902
+    depends_on:
+      - blaze-control-plane
+    volumes:
+      # CA Cert to validate the ENVOY_CLIENT_CERT_PUBLIC_KEY from each mesh client.
+      - ./certs/ea.ca.crt:/tmp/server.ca.crt
+      # Server certificate must be listed in the inline_string for the eadp.xds.TlsPublicKey
+      # in https://src.ent.ea.com/gs-envoy-mesh/configuration/eadp.edge/-/blob/gs-prod/int/resources/eadp.blaze.yaml
+      - ./../../../etc/ssl/key.pem:/tmp/server.key
+      - ./../../../etc/ssl/cert.pem:/tmp/server.crt
+    labels:
+      - 'eadp.mesh.endpoints={"namespaces":{ "eadp.edge": {"registrations": [{"service":"eadp.blaze", "port_spec":"10005/tcp", "tags":{ "x-eadp-servergroup":"dev-${BLAZE_SERVICE_NAME}" } }] } }}'
+    environment:
+      # Common Container Configuration
+      # Admin page: http://localhost:9902/
+      # Metrics page: http://localhost:9902/stats/prometheus
+      ENVOY_ADMIN_LISTENER_PORT: 9902
+      ENVOY_LOG_LEVEL: info
+      #
+      # TLS Configuration
+      ENVOY_SERVER_CERT_CA: /tmp/server.ca.crt
+      ENVOY_SERVER_CERT_PRIVATE_KEY: /tmp/server.key
+      ENVOY_SERVER_CERT_PUBLIC_KEY: /tmp/server.crt
+      #
+      # Blaze Provider specific Container Configuration
+      ENVOY_INGRESS_LISTENER_PORT: 10005
+      BLAZE_CONTROL_PLANE_ADDRESS: blaze-control-plane
+      BLAZE_CONTROL_PLANE_PORT: 9003
+
+  # Used by the xds-agent to register each envoy-blaze-ingress node
+  # with the S2S service edge Mesh Control Plane.
+  envoy-blaze-egress:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/envoy-mesh-node:3.0.0
+    restart: "no"
+    ports:
+      - 8002:8002
+    volumes:
+      # Registration Agent's certificate must be listed in the allowed_certificate_subjects for the eadp.xds.RegistrationPermissionSet
+      # in https://src.ent.ea.com/gs-envoy-mesh/configuration/eadp.edge/-/blob/gs-prod/int/resources/eadp.blaze.yaml
+      - ./../../../etc/ssl/nucleus/integration-key-decrypt.pem:/tmp/registration-agent.key
+      - ./../../../etc/ssl/nucleus/integration-cert.crt:/tmp/registration-agent.crt
+    environment:
+      # Common Container Configuration
+      MESH_SERVICE: eadp.blaze.egress
+      MESH_NAMESPACE: eadp.edge
+      JAEGER_ENABLED: 0
+      # Admin page: http://localhost:8002/
+      # Metrics page: http://localhost:8002/stats/prometheus
+      ENVOY_ADMIN_LISTENER_PORT: 8002
+      ENVOY_XDS_HOST: servicemesh.int.gameservices.ea.com
+      ENVOY_XDS_PORT: 443
+      ENVOY_LOG_LEVEL: info
+      #
+      # TLS Configuration
+      ENVOY_CLIENT_TLS_ENABLED: 1
+      ENVOY_CLIENT_CERT_PRIVATE_KEY: /tmp/registration-agent.key
+      ENVOY_CLIENT_CERT_PUBLIC_KEY: /tmp/registration-agent.crt
+      #
+      # Consumer specific Container Configuration
+      EGRESS_CLIENTSPACE: unused
+      EGRESS_SERVERSPACE: unused
+      EGRESS_MESH_ID: INT
+
+  # Scans for the eadp.mesh.endpoints container label to register each envoy-blaze-ingress
+  # with the S2S service edge Mesh Control Plane.
+  xds-agent:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/kubernetes-registration-agent:0.3
+    restart: "no"
+    ports:
+      - 7001:7001
+    depends_on:
+      - envoy-blaze-egress
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      ENVOY_XDS_ENDPOINTS: '{"eadp.edge": "envoy-blaze-egress:9001"}'
+      ENVOY_XDS_INTERVAL: 60
+      ENVOY_XDS_JITTER: 0.5
+      ENVOY_XDS_TTL: 120s
+      # Ingress's node IP address must be in one of the allowed_cidr_ranges for the eadp.xds.RegistrationPermissionSet
+      # in https://src.ent.ea.com/gs-envoy-mesh/configuration/eadp.edge/-/blob/gs-prod/int/resources/eadp.blaze.yaml
+      NODE_ADDRESS: ${LOCAL_IP_ADDRESS}
+      NODE_REGION: local
+      NODE_ZONE: local
+      # Metrics page: http://localhost:7001/metrics
+      PROMETHEUS_PORT: 7001
+      # Use Docker socket instead of Kubernetes API
+      DOCKER_SOCK_ENABLED: 1

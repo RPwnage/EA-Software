@@ -1,0 +1,434 @@
+group componentinterfacesource : servercommon;
+
+
+printSendGrpcResponse(command) ::=<<
+    <if(command.generateProto)><if(command.ResponseType)>&::Blaze::Command::sendGrpcResponse_ResponseTdf\<<printGrpcResponseType(command)>, <printTypeRefFullScope(command.ResponseType)>\>,<\n>nullptr,<\n><else>nullptr, <\n>&::Blaze::Command::sendGrpcResponse_NoResponseTdf\<<command.Name; format="pascal">GrpcResponse\>,<endif> <else>nullptr,<\n>nullptr,<endif>
+    <if(command.generateProto)><if(command.errortype)>&::Blaze::Command::sendGrpcResponse_ErrorResponseTdf\<<printGrpcResponseType(command)>, <printTypeRefFullScope(command.errortype)>\>,<\n>nullptr,<\n><else>nullptr, <\n>&::Blaze::Command::sendGrpcResponse_NoErrorResponseTdf\<<command.Name; format="pascal">GrpcResponse\>,<endif><else>nullptr,<\n>nullptr,<endif>
+>>
+
+printGrpcServiceCreator(component) ::=<<
+[]() {return ::eastl::unique_ptr\<<printGrpcServiceType(component)>::AsyncService\>(BLAZE_NEW <printGrpcServiceType(component)>::AsyncService());}
+>>
+
+component(fileNode, component) ::= <<
+<standardFileHeader()>
+/*** Include Files ********************************************************************************/
+#include "framework/blaze.h"
+
+<if(component.generateProto)>
+#include "framework/grpc/inboundgrpcjobhandlers.h"
+#include \<grpc/grpc.h\>
+#include \<grpc++/server.h\>
+#include \<grpc++/impl/codegen/service_type.h\>
+#include \<google/protobuf/empty.pb.h\>
+<endif>
+
+
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="toLower">.h"
+<if(!component.proxyOnly)>#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="tl">_stub.h"<endif>
+<if(component.IsMaster)><if(component.Notifications)>#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl">slave.h"<endif><endif>
+
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+
+<if(component.Master)>
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Master.Name;format="tl"><component.Master.Type;format="toLower">.h"
+<endif>
+
+<if(!component.proxyOnly)>
+<component.Commands:{command | #include "<component.Name;format="toLower"><component.Type;format="tl">/<command.Name;format="toLower">_stub.h"<\n>}>
+<endif>
+
+
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+
+<component.Name><component.Type>::<component.Name><component.Type>(::Blaze::RpcProxyResolver& resolver, const ::Blaze::InetAddress& externalAddress) : 
+    Component(COMPONENT_INFO, resolver, externalAddress)
+{
+}
+
+
+<if(component.isSharded)>
+bool <component.Name><component.Type>::getShardKeyFromRequest(uint16_t commandId, const EA::TDF::Tdf& request, ObjectId& shardKey) const
+{
+<if(!component.ignoreShardingKey)>
+    switch(commandId)
+    {
+<component.Commands:{
+        case CMD_<it.Name;format="toUpper">:
+<if(it.RequestType)><if(!it.ignoreShardingKey)><if(it.shardingKey)>
+        {
+            const <printTypeRefFullScope(it.RequestType)>& reqTdf = (const <printTypeRefFullScope(it.RequestType)>&) request;
+            shardKey = reqTdf.<it.DOT.shardingKey:{ n | get<n; format="pascal">()}; separator=".">;
+            return true;
+        }
+<elseif(component.shardingKey)>
+        {
+            const <printTypeRefFullScope(it.RequestType)>& reqTdf = (const <printTypeRefFullScope(it.RequestType)>&) request;
+            shardKey = reqTdf.<component.DOT.shardingKey:{ n | get<n; format="pascal">()}; separator=".">;
+            return true;
+        }
+<else>
+        return false;
+<endif>        
+<else>
+        return false;
+<endif>
+<else>
+        return false;
+<endif>          
+}>
+        default:
+            return false;
+    }
+<else>
+    return false;
+<endif>
+
+}
+
+<endif>
+
+
+/********************************************************************************
+  Command Info Section
+    The remainder of this file spells out the component information structures.
+********************************************************************************/
+<component.Commands: httpStaticDefines(component=component, command=it); separator="\n\n" >
+
+<component.Commands:{command|const ::Blaze::CommandInfo <component.Name><component.Type>::CMD_INFO_<command.Name; format="toUpper"> = {
+    &<component.Name><component.Type>::COMPONENT_INFO,
+    <component.Name><component.Type>::CMD_<command.Name; format="toUpper">, //Command Id
+    <i0>, //index
+    "<command.Name>",  //name
+    "<component.Name>::<command.Name>",  //context
+    "<command.Name>(<command.id;format="@0x%04x">)", //logging name
+    "<command.description;format="stripnl">", //description
+    <if(command.passthrough)><component.Master.Name><component.Master.Type>::COMPONENT_ID<else>    ::Blaze::Component::INVALID_COMPONENT_ID<endif>, //passthrough component id
+    <if(command.passthrough)><component.Master.Name><component.Master.Type>::CMD_<command.passthrough.Symbol.Name; format="toUpper"><else>    ::Blaze::Component::INVALID_COMMAND_ID<endif>, //passthrough command id
+    <if(command.generate_command_class)>    true<elseif(command.passthrough)>    true<elseif(command.blocking)>    true<else>    false<endif>, //isBlocking
+    <if(command.passthrough)>    ::Blaze::Fiber::STACK_MEDIUM<else>    <fiberStackSize(command)><endif>, //fiber stack size
+    <fiberTimeoutOverride(command)>, // fiber timeout override
+    <if(command.requires_authentication)>    true<else>    false<endif>, //requires authentication
+    <if(command.requiresUserSession)><if(command.requires_authentication)>    true<else>    false<endif><else>    false<endif>, //requires user session
+    <if(command.setCurrentUserSession)><if(command.requiresUserSession)><if(command.requires_authentication)>    true<else>    false<endif><else>    false<endif><else>    false<endif>, //set current user session
+    <if(command.allowGuestCall)>    true<else>    false<endif>, //allow guest call
+    <command.internal>, //is internal only
+<if(!component.ignoreShardingKey)>
+<if(command.RequestType)><if(!command.ignoreShardingKey)><if(command.shardingKey)>
+    true, //has shard key
+<elseif(component.shardingKey)>        
+    true, //has shard key
+<else>
+    false, //has shard key
+<endif>        
+<else>
+    false, //has shard key
+<endif>
+<else>
+    false, //has shard key
+<endif>
+<else>
+    false, //has shard key
+<endif>
+
+    <command.obfuscate_platform_info>, // obfuscate platform info
+
+<if(command.IsBidirectionalStreaming)>
+    ::Blaze::Grpc::RPC_TYPE_BIDI_STREAMING,
+<elseif(command.IsServerStreaming)>
+    ::Blaze::Grpc::RPC_TYPE_SERVER_STREAMING,
+<elseif(command.IsClientStreaming)>
+    ::Blaze::Grpc::RPC_TYPE_CLIENT_STREAMING,
+<else>
+    ::Blaze::Grpc::RPC_TYPE_UNARY,
+<endif>
+
+    <printTdfTypeDescOrNull(command.RequestType)>,  //Request TDF constructor
+    <printTdfTypeDescOrNull(command.ResponseType)>,  //Response TDF constructor
+    <printTdfTypeDescOrNull(command.errortype)>,  //Error TDF constructor
+    <if(!component.proxyOnly)><if(!component.grpcOnly)><if(command.RequestType)>    &::Blaze::Command::createCommand\<<component.Name><component.Type>, <command.Name;format="pascal">CommandStub, <printTypeOrVoid(command.RequestType)>\><else>    &::Blaze::Command::createCommandNoRequest\<<component.Name><component.Type>, <command.Name;format="pascal">CommandStub\><endif><else>    nullptr<endif><else>    nullptr<endif>,  //Local command constructor
+    <if(command.generateProto)>    &<printGrpcCommandCreatorName(command)><else>    nullptr<endif>,  //Grpc command constructor
+    <if(command.generateProto)><if(command.RequestType)>    &::Blaze::Command::protobufToTdfCast\<<printTypeRefFullScope(command.RequestType)>\><else>nullptr<endif><else>   nullptr<endif>,  //Grpc Message (protobuf) to Tdf typecasting func
+    <printSendGrpcResponse(command); separator="\n">
+    <if(command.http)>    (const ::Blaze::RestResourceInfo*) &s<component.Name><component.Type>_<command.Name>RestInfo<else>    nullptr<endif> // REST resource
+  };}; separator="\n\n"  >
+  
+
+::Blaze::CommandInfo s<component.Name><component.Type>NotificationSubscribeCommandInfo = {
+    &<component.Name><component.Type>::COMPONENT_INFO,
+    ::Blaze::Component::NOTIFICATION_SUBSCRIBE_CMD, 
+    <length(component.Commands)>, //index  
+    "NotifictionSubscribeCmd",  //name
+    "<component.Name>::NotificationSubscribeCmd",  //context
+    "NOTIFICATION_SUBSCRIBE_CMD", //logging name
+    "<component.Name> Notification Subscribe Command", //description
+    ::Blaze::Component::INVALID_COMPONENT_ID, //passthrough component id
+    ::Blaze::Component::INVALID_COMMAND_ID,  //passthrough command idf
+    false, //isBlocking
+    ::Blaze::Fiber::STACK_HUGE,  //fiber stack size
+    ::EA::TDF::TimeValue(), // fiber timeout override
+    false,  //requires authentication
+    false,  //requires user session
+    false,  //set current user session
+    false, //allow guest call
+    true, //is internal only
+    false, //has shard key
+    false, //obfuscate platform info
+    ::Blaze::Grpc::RPC_TYPE_UNARY,
+    nullptr,  //Request TDF constructor
+    nullptr,  //Response TDF constructor
+    nullptr,  //Error TDF constructor
+    <if(!component.proxyOnly)>    &::Blaze::Command::createCommandNoRequest\<<component.Name><component.Type>Stub, ::Blaze::NotificationSubscribeCommand\<<component.Name><component.Type>Stub, s<component.Name><component.Type>NotificationSubscribeCommandInfo\> \><else>    nullptr<endif>,  //Local command constructor
+    nullptr,
+    nullptr,
+    
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+};
+
+<if(component.generateProto)>
+<if(component.Notifications)>
+static void create<component.Name><component.Type>NotificationSubscribeGrpc(grpc::Service* service, grpc::ServerCompletionQueue* cq, ::Blaze::Grpc::GrpcEndpoint* endpoint);
+<endif>
+<endif>
+
+::Blaze::CommandInfo s<component.Name><component.Type>NotificationSubscribeGrpcCommandInfo = {
+    &<component.Name><component.Type>::COMPONENT_INFO,
+    ::Blaze::Component::NOTIFICATION_SUBSCRIBE_GRPC_CMD, 
+    <length(component.Commands)> + 1, //index  
+    "NotifictionSubscribeGrpcCmd",  //name
+    "<component.Name>::NotificationSubscribeGrpcCmd",  //context
+    "NOTIFICATION_SUBSCRIBE_GRPC_CMD", //logging name
+    "<component.Name> Notification Subscribe Grpc Command", //description
+    ::Blaze::Component::INVALID_COMPONENT_ID, //passthrough component id
+    ::Blaze::Component::INVALID_COMMAND_ID,  //passthrough command idf
+    false, //isBlocking
+    ::Blaze::Fiber::STACK_HUGE,  //fiber stack size
+    ::EA::TDF::TimeValue(), // fiber timeout override
+    true,  //requires authentication
+    true,  //requires user session
+    false,  //set current user session
+    false, //allow guest call
+    false, //is internal only
+    false, //has shard key
+    false, //obfuscate platform info
+    ::Blaze::Grpc::RPC_TYPE_SERVER_STREAMING,
+    nullptr,  //Request TDF constructor
+    nullptr,  //Response TDF constructor 
+    nullptr,  //Error TDF constructor
+    <if(!component.proxyOnly)>    &::Blaze::Command::createCommandNoRequest\<<component.Name><component.Type>Stub, ::Blaze::NotificationSubscribeGrpcCommand\<<component.Name><component.Type>Stub, s<component.Name><component.Type>NotificationSubscribeGrpcCommandInfo\> \><else>    nullptr<endif>,  //Local command constructor
+    <if(component.generateProto)><if(component.Notifications)>    &create<component.Name><component.Type>NotificationSubscribeGrpc<else>    nullptr<endif><else>    nullptr<endif>,
+    nullptr,
+    
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+};
+  
+<if(component.generateProto)>
+<if(component.Notifications)>
+static void create<component.Name><component.Type>NotificationSubscribeGrpc(grpc::Service* service, grpc::ServerCompletionQueue* cq, ::Blaze::Grpc::GrpcEndpoint* endpoint)
+{
+    BLAZE_NEW_NAMED("<component.Name;format="pascal"><component.Type;format="pascal">NotificationSubscribeGrpc") ::Blaze::Grpc::NotificationSubscriptionRpc\<<printGrpcServiceType(component)>::AsyncService, google::protobuf::Empty, <component.Name><component.Type>NotificationMsg\>(static_cast\<<printGrpcServiceType(component)>::AsyncService*\>(service), cq, &create<component.Name><component.Type>NotificationSubscribeGrpc, &::Blaze::Grpc::processIncomingRequestHandler, &<printGrpcServiceType(component)>::AsyncService::RequestsubscribeNotifications, s<component.Name><component.Type>NotificationSubscribeGrpcCommandInfo, endpoint);
+}
+
+<endif>
+<endif>
+
+<if(component.ReplMaps)>   
+::Blaze::CommandInfo s<component.Name><component.Type>ReplicationSubscribeCommandInfo = {
+    &<component.Name><component.Type>::COMPONENT_INFO,
+    ::Blaze::Component::REPLICATION_SUBSCRIBE_CMD, 
+    <length(component.Commands)> + 2, //index (first value is number of user defined commands)
+    "ReplictionSubscribeCmd",  //name
+    "<component.Name>::ReplicationSubscribeCmd",  //context
+    "REPLICATION_SUBSCRIBE_CMD", //logging name
+    "<component.Name> Replication Subscribe Command", //description
+    ::Blaze::Component::INVALID_COMPONENT_ID, //passthrough component id
+    ::Blaze::Component::INVALID_COMMAND_ID,  //passthrough command idf
+    false, //isBlocking
+    ::Blaze::Fiber::STACK_HUGE,  //fiber stack size
+    ::EA::TDF::TimeValue(), // fiber timeout override
+    false,  //requires authentication
+    false,  //requires user session
+    false,  //set current user session
+    false, //allow guest call
+    true, //is internal only
+    false, //has shard key
+    false, //obfuscate platform info
+    ::Blaze::Grpc::RPC_TYPE_UNARY,
+    &EA::TDF::TypeDescriptionSelector\<Blaze::ReplicationSubscribeRequest\>::get(),  //Request TDF description
+    nullptr,  //Response TDF constructor
+    nullptr,  //Error TDF constructor
+    <if(!component.proxyOnly)>&::Blaze::Command::createCommand\<<component.Name><component.Type>Stub, ReplicationSubscribeCommand\<<component.Name><component.Type>Stub, s<component.Name><component.Type>ReplicationSubscribeCommandInfo \>, Blaze::ReplicationSubscribeRequest\><else>    nullptr<endif>  //Local command constructor
+  };
+  
+::Blaze::CommandInfo s<component.Name><component.Type>ReplicationUnsubscribeCommandInfo = {
+    &<component.Name><component.Type>::COMPONENT_INFO,
+    ::Blaze::Component::REPLICATION_UNSUBSCRIBE_CMD, 
+    <length(component.Commands)> + 3, //index (first value is number of user defined commands)
+    "ReplictionUnsubscribeCmd",  //name
+    "<component.Name>::ReplicationUnsubscribeCmd",  //context
+    "REPLICATION_UNSUBSCRIBE_CMD", //logging name
+    "<component.Name> Replication Unsubscribe Command", //description
+    ::Blaze::Component::INVALID_COMPONENT_ID, //passthrough component id
+    ::Blaze::Component::INVALID_COMMAND_ID,  //passthrough command idf
+    false, //isBlocking
+    ::Blaze::Fiber::STACK_HUGE,  //fiber stack size
+    ::EA::TDF::TimeValue(), // fiber timeout override
+    false,  //requires authentication
+    false,  //requires user session
+    false,  //set current user session
+    false, //allow guest call
+    true, //is internal only
+    false, //has shard key
+    false, //obfuscate platform info
+    ::Blaze::Grpc::RPC_TYPE_UNARY,
+    nullptr,  //Request TDF constructor
+    nullptr,  //Response TDF constructor
+    nullptr,  //Error TDF constructor
+    <if(!component.proxyOnly)>&::Blaze::Command::createCommandNoRequest\<<component.Name><component.Type>Stub, ReplicationUnsubscribeCommand\<<component.Name><component.Type>Stub, s<component.Name><component.Type>ReplicationUnsubscribeCommandInfo \> \><else>    nullptr<endif>  //Local command constructor
+  };  
+<endif>  
+  
+static const ::Blaze::CommandInfo* s<component.Name><component.Type>CommandInfo[] =
+{
+  <component.Commands:{command|&<component.Name><component.Type>::CMD_INFO_<command.Name; format="toUpper">,}; separator="\n"  >
+  &s<component.Name><component.Type>NotificationSubscribeCommandInfo,
+  &s<component.Name><component.Type>NotificationSubscribeGrpcCommandInfo,
+<if(component.ReplMaps)>   
+  &s<component.Name><component.Type>ReplicationSubscribeCommandInfo,
+  &s<component.Name><component.Type>ReplicationUnsubscribeCommandInfo,
+<endif>
+};
+
+<if(component.Notifications)>
+
+<component.Notifications:{notification|const ::Blaze::NotificationInfo <component.Name><component.Type>::NOTIFICATION_INFO_<notification.Name; format="toUpper"> = {
+    <component.Name><component.Type>::COMPONENT_ID,  //Component Id
+    <component.Name><component.Type>::NOTIFY_<notification.Name; format="toUpper">, //Notification Id
+    <i0>, //index
+    "<notification.Name>",  //name
+    "<component.Name>::<notification.Name>",  //context
+    "<notification.Name>(<notification.id;format="@0x%04x">)", //logging name
+    "<notification.description;format="stripnl">", //description
+    <notification.client_export>, //isClientExport
+    <notification.obfuscate_platform_info>, // obfuscate platform info
+    <if(notification.passthrough)><component.Name>Slave::COMPONENT_ID<else>    ::Blaze::Component::INVALID_COMPONENT_ID<endif>, //Passthrough component
+    <if(notification.passthrough)><component.Name>Slave::NOTIFY_<notification.passthrough.Symbol.Name; format="toUpper"><else>    ::Blaze::Component::INVALID_NOTIFICATION_ID<endif>,  //passthrough notification id
+    <printTdfTypeDescOrNull(notification.NotificationType)>, //payload create func
+    <if(!notification.passthrough)>
+    <if(notification.NotificationType)>
+    &::Blaze::Component::dispatchNotification\<<component.Name><component.Type>, <component.Name><component.Type>Listener, <printTypeOrVoid(notification.NotificationType)>, &<component.Name><component.Type>Listener::on<notification.Name>\>,
+    <else>
+    &::Blaze::Component::dispatchNotificationNoPayload\<<component.Name><component.Type>, <component.Name><component.Type>Listener, &<component.Name><component.Type>Listener::on<notification.Name>\>,
+    <endif>
+    <else>
+    nullptr,
+    <endif>
+    <if(component.generateProto)><if(component.Notifications)>    &::Blaze::Component::sendNotificationGrpc\<<component.Name><component.Type>NotificationMsg\><else>    nullptr<endif><else>    nullptr<endif>
+};}; separator="\n"  >
+
+static const ::Blaze::NotificationInfo* s<component.Name><component.Type>NotificationInfo[] =
+{
+    <component.Notifications:{notification|&<component.Name><component.Type>::NOTIFICATION_INFO_<notification.Name; format="toUpper">}; separator=",\n"  >
+};
+<endif>
+
+<if(component.Events)>
+static const ::Blaze::EventInfo s<component.Name><component.Type>EventInfo[] =
+{
+<component.Events:{event|   {
+    <component.Name><component.Type>::COMPONENT_ID,  //Component Id
+    <event.id>, //Event Id
+    <i0>, //index
+    "<event.Name>",  //name
+    <printTdfTypeDescOrNull(event.EventType)> //payload create func
+  }}; separator=",\n"  >
+};
+<endif>
+
+<if(component.ReplMaps)>
+<component.StaticMaps:{map | const CollectionIdRange <component.Name><component.Type>::<map.Name;format="toUpper">_MAP_ID_RANGE(COMPONENT_ID, <map.id>, <map.id><if(map.collection_type)>, <map.collection_type><endif>);}; separator="\n">
+<component.DynamicMaps:{map | const CollectionIdRange <component.Name><component.Type>::<map.Name;format="toUpper">_MAP_ID_RANGE(COMPONENT_ID, <if(map.start_id)><map.start_id><else>0<endif>, <if(map.end_id)><map.end_id><else>UINT64_MAX<endif><if(map.collection_type)>, <map.collection_type><endif>);}; separator="\n">
+
+static const ::Blaze::ReplicationInfo s<component.Name><component.Type>ReplicationInfo[] =
+{
+<component.ReplMaps:{map|   {
+    &<component.Name><component.Type>::COMPONENT_INFO,
+    "<map.Name>",
+    &<component.Name><component.Type>::<map.Name;format="toUpper">_MAP_ID_RANGE,
+    <printTdfTypeDescOrNull(map.tdf_type)>, //item create func
+    <printTdfTypeDescOrNull(map.context_type)> //context create func
+  }}; separator=",\n"  >
+};
+<endif>
+
+
+const ::Blaze::ComponentData <component.Name><component.Type>::COMPONENT_INFO(
+    <component.Name; format="toUpper">_COMPONENT_BASE_INFO,
+    <component.Name><component.Type>::COMPONENT_ID,
+    "<component.Name; format="toLower"><if(component.IsMaster)>_master<endif>",  //name
+    "<component.Name>(<component.SubComponentId; format="@0x%04X">)", //logging name
+    "<component.description;format="stripnl">", //description
+    <if(!component.IsMaster)><if(component.Master)>    true<else>    false<endif><else>    false<endif>, //has a master component
+    <if(!component.IsMaster)><if(component.Master)><if(component.requiresMaster)>    true<else>    false<endif><else>    false<endif><else>    false<endif>, //requires an active master component to activate
+    <if(!component.IsMaster)>    true<elseif(component.isSharded)>    true<else>    false<endif>,  //can have multiple instances
+    <if(component.ReplMaps)>    true<else>    false<endif>, //has replication
+    <if(component.shouldAutoRegisterForMasterReplication)>    true<else>    false<endif>, //should auto register for master replication    
+    <if(component.Notifications)>    true<else>    false<endif>, //has notifications,
+    <if(component.shouldAutoRegisterForMasterNotifications)>    true<else>    false<endif>, //should auto register for master notifications
+    s<component.Name><component.Type>CommandInfo, EAArrayCount(s<component.Name><component.Type>CommandInfo),
+    <if(component.Notifications)>    s<component.Name><component.Type>NotificationInfo, EAArrayCount(s<component.Name><component.Type>NotificationInfo),<else>    nullptr, 0,<endif>
+    <if(component.Events)>    s<component.Name><component.Type>EventInfo, EAArrayCount(s<component.Name><component.Type>EventInfo)<else>    nullptr, 0<endif>,
+    <if(component.ReplMaps)>    s<component.Name><component.Type>ReplicationInfo, EAArrayCount(s<component.Name><component.Type>ReplicationInfo)<else>    nullptr, 0<endif>,
+    <if(!component.proxyOnly)>    (::Blaze::ComponentData::LocalComponentFactoryFunc) &<component.Name><component.Type>::createImpl<else>    nullptr<endif>,
+    &::Blaze::Component::createFunc\<<component.Name><component.Type>\>,
+    <if(component.generateProto)>    <if(component.Commands)><printGrpcServiceCreator(component)><elseif(component.Notifications)><printGrpcServiceCreator(component)><else>[]() {return nullptr;}<endif><else>[]() {return nullptr;}<endif>,
+    <if(component.proxyOnly)>    true <else>    false <endif>
+);
+
+const uint16_t <component.Name><component.Type>::COMPONENT_ID = <subcompId(component=component)>;
+const size_t <component.Name><component.Type>::COMPONENT_IDX = <component.Name><component.Type>::COMPONENT_INFO.index;
+const size_t& <component.Name><component.Type>::COMPONENT_TYPE_IDX = <component.Name><component.Type>::COMPONENT_INFO.baseInfo.index;
+const size_t& <component.Name><component.Type>::LOGGING_CATEGORY = <component.Name><component.Type>::COMPONENT_INFO.baseInfo.index;
+const ::Blaze::MemoryGroupId& <component.Name><component.Type>::COMPONENT_MEMORY_GROUP = <component.Name><component.Type>::COMPONENT_INFO.baseInfo.memgroup;
+
+
+
+<component.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+<standardFileFooter()>
+>>
+
+
+fiberStackSize(command) ::= <<
+<if(command.fiber_stack_size)>
+<({fiberStackSize<command.fiber_stack_size>})()>
+<else>
+<if(command.generate_command_class)>
+::Blaze::Fiber::STACK_MEDIUM
+<else>
+::Blaze::Fiber::STACK_HUGE
+<endif>
+<endif>
+>>
+
+fiberStackSizesmall() ::= "::Blaze::Fiber::STACK_SMALL"
+fiberStackSizemedium() ::= "::Blaze::Fiber::STACK_MEDIUM"
+fiberStackSizelarge() ::= "::Blaze::Fiber::STACK_LARGE"
+
+
+fiberTimeoutOverride(command) ::= <<
+<if(command.fiber_timeout_override)>
+::EA::TDF::TimeValue("<command.fiber_timeout_override>", ::EA::TDF::TimeValue::TIME_FORMAT_INTERVAL)
+<else>
+::EA::TDF::TimeValue()
+<endif>
+>>
+
+
+printTypeOrVoid(type) ::=  "<if(type)><printTypeRefFullScope(type)><else>void<endif>"
+printTdfTypeDescOrNull(type) ::= "<if(type)>&EA::TDF::TypeDescriptionSelector\<<printTypeRefFullScope(type)>\>::get()<else>nullptr<endif>"

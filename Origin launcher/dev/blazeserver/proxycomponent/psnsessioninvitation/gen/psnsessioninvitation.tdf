@@ -1,0 +1,352 @@
+/*! ************************************************************************************************/
+/*!
+    \file psnsessioninvitation.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[ headername="framework/tdf/userdefines.h" ]
+#include "framework/gen/userdefines.tdf"
+
+[ headername="psnbaseurl/tdf/psnbaseurl.h" ]//for PsnOnlineId in Member
+#include "psnbaseurl/gen/psnbaseurl.tdf"
+
+namespace Blaze
+{
+
+namespace PSNServices
+{
+
+[description="Maximum length of language code."]
+const uint16_t MAX_NPSESSION_LANGUAGE_CODE_LEN = 5;
+
+[description="NP session's sessionName max string len. 64 UTF-8 chars or 256 bytes"]
+const uint16_t MAX_NPSESSION_NAME_LEN = 256;
+
+[description="NP session's sessionType max string len. owner-bind or owner-migration"]
+const uint16_t MAX_NPSESSION_TYPE_LEN = 15;
+
+[description="NP session's sessionCreator max string len. 16 ASCII chars"]
+const uint16_t MAX_NPSESSION_CREATOR_LEN = 16;
+
+[description="NP session's sessionPrivacy max string len. 'public' or 'private' (7 chars)"]
+const uint16_t MAX_NPSESSION_PRIVACY_LEN = 7;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get Np Session Ids Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+class NpSessionIdContainer
+{
+    [tag="ssid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+};
+typedef list<NpSessionIdContainer> NpSessionIdList;
+
+class GetNpSessionIdsRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="acid", description="The PSN SCE Account Id."]
+    ExternalPsnAccountId mAccountId;
+    
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+};
+
+class GetNpSessionIdsResponse
+{
+    [tag="ssls", description="The NP Sessions."]
+    NpSessionIdList mSessions;
+
+    [tag="rtna", description="The time when the next call to the rpc could be made (per title per user). In UNIX epoch seconds."]
+    float mRateLimitNextAvailable;
+
+    [tag="rttp", description="The rate limit time period. Populated if request specified header X-NP-RateLimit: GetDetail."]
+    string(-1) mRateLimitTimePeriod;
+
+    [tag="rtli", description="The Sony enforced limit on number of the rpc's calls, over the rate limit time period (per title per user). Populated if request specified header X-NP-RateLimit: GetDetail."]
+    uint16_t mRateLimitLimit;
+
+    [tag="rtre", description="Number of calls to the rpc remaining until the limit is reached. Populated if request specified header X-NP-RateLimit: GetDetail"]
+    uint16_t mRateLimitRemaining;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get Session Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+class Member
+{
+    [tag="psid", description="The PSN SCE Online Id."]
+    PsnOnlineId mOnlineId;
+
+    [tag="acid", description="The PSN SCE Account Id."]
+    PsnAccountId mAccountId;
+};
+
+class GetNpSessionRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="psid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+
+    [tag="lang", description="The language code to retrieve multilingual results for."]
+    string(MAX_NPSESSION_LANGUAGE_CODE_LEN) mLanguage;
+
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+};
+
+class GetNpSessionResponseItem
+{
+    [tag="tim", description="time of session's creation in epoch milliseconds."]
+    uint64_t mSessionCreateTimestamp;
+
+    [tag="crt", description="session creator"]
+    Member mSessionCreator;
+
+    [tag="lock", description="session lock"]
+    bool mSessionLockFlag;
+
+    [tag="mau", description="max users for display"]
+    uint16_t mSessionMaxUser;
+
+    [tag="nam", description="session name"]
+    string(MAX_NPSESSION_NAME_LEN) mSessionName;
+
+    [tag="pri", description="public or private"]
+    string(MAX_NPSESSION_PRIVACY_LEN) mSessionPrivacy;
+
+    [tag="sta", description="session status"]
+    Ps4NpSessionStatusString mSessionStatus;
+
+    [tag="typ", description="owner-bind or owner-migration"]
+    string(MAX_NPSESSION_TYPE_LEN) mSessionType;
+
+    [tag="flst", description="session's members."]
+    list<Member> mMembers;
+};
+
+class GetNpSessionResponse
+{
+    [tag="sess", description="list of sessions."]
+    list<GetNpSessionResponseItem> mSessions;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Create Session Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class LocalizedSessionStatusEntity
+{
+    [tag="lang", description="session status language code"]
+    string(MAX_NPSESSION_LANGUAGE_CODE_LEN) mNpLanguage;
+
+    [tag="sta", description="session status"]
+    Ps4NpSessionStatusString mSessionStatus;
+};
+typedef list<LocalizedSessionStatusEntity> LocalizedSessionStatusEntityList;
+
+[description="This TDF is used by Blaze code, to encode the JSON session-request part of the create NP session request."]
+class SessionRequestJsonBody
+{
+    [tag="tlid", description="The Title Id."]
+    TitleId mNpTitleId;
+
+    [tag="typ", description="owner-bind or owner-migration"]
+    string(MAX_NPSESSION_TYPE_LEN) mSessionType;
+    
+    [tag="pri", description="public or private"]
+    string(MAX_NPSESSION_PRIVACY_LEN) mSessionPrivacy;
+
+    [tag="lock", description="when true, join buttons are disabled in the shell UX."]
+    bool mSessionLockFlag;
+
+    [tag="mau", description="max users. Side: for UX display only. Blaze controls actual join-ability via sessionLockFlag."]
+    uint16_t mSessionMaxUser;
+
+    [tag="nam", description="session name"]
+    string(MAX_NPSESSION_NAME_LEN) mSessionName;
+
+    [tag="sta", description="session status"]
+    Ps4NpSessionStatusString mSessionStatus;
+
+    [tag="lang", description="session's localized statuses."]
+    LocalizedSessionStatusEntityList mLocalizedSessionStatus;
+
+    [tag="aplt", description="session available platforms. Currently only supports PS4"]
+    list<string(3)> mAvailablePlatforms; //3 chars for PS4
+};
+
+class PostNpSessionRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+    
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+
+    [tag="body", description="The payload data"]
+    blob mBody;
+};
+
+class PostNpSessionResponse
+{
+    [tag="ssid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Join Session Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class PostNpSessionMemberRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+
+    [tag="tlid", description="The Title Id."]
+    TitleId mNpTitleId;
+
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Leave Session Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class DeleteNpSessionMemberRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+
+    [tag="acid", description="The PSN SCE Account Id."]
+    ExternalPsnAccountId mAccountId;
+
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get Session Data Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class GetNpSessionDataRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="psid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get changeable-session-data Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class GetNpSessionChangeableDataRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="psid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Update changeable-session-data Request
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class PutNpSessionChangeableDataRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="psid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+
+    [tag="body", description="The payload data"]
+    blob mBody;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Update Session Image Request
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class PutNpSessionImageRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="psid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+    
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+
+    [tag="body", description="The payload data"]
+    blob mBody;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Update Session Basic Properties Request
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class PutNpSessionUpdateRequestBody
+{
+    [tag="lock", description="when true, join buttons are disabled in the shell UX."]
+    bool mSessionLockFlag;
+
+    [tag="pri", description="public or private"]
+    string(MAX_NPSESSION_PRIVACY_LEN) mSessionPrivacy;
+
+    [tag="mau", description="max users. Side: for UX display only. Blaze controls actual join-ability via sessionLockFlag."]
+    uint16_t mSessionMaxUser;
+
+    [tag="nam", description="session name"]
+    string(MAX_NPSESSION_NAME_LEN) mSessionName;
+
+    [tag="sta", description="session status"]
+    Ps4NpSessionStatusString mSessionStatus;
+
+    [tag="lang", description="session's localized statuses."]
+    LocalizedSessionStatusEntityList mLocalizedSessionStatus;
+};
+
+class PutNpSessionUpdateRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="psid", description="The NP Session Id."]
+    NpSessionId mSessionId;
+    
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mServiceLabel;
+
+    [tag="body", description="Request body"]
+    PutNpSessionUpdateRequestBody mBody;
+};
+
+}
+}

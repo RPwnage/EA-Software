@@ -1,0 +1,75 @@
+group rpcbt3allcommands : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+printComponentIncludes(subcomponent) ::= <<
+#include "<subcomponent.RelativeOutputPath;format="unixPath">/rpc/<subcomponent.Name;format="tl"><subcomponent.Type;format="tl">.h"
+>>
+
+rootComponent(fileNode, node) ::= <<
+
+#include "framework/blaze.h"
+#include "framework/util/shared/rawbuffer.h"
+#include "framework/protocol/shared/heat2decoder.h"
+#include "framework/protocol/shared/heat2util.h"
+<node.Subcomponents:printComponentIncludes(subcomponent=it);separator="\n">
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+
+using namespace Blaze;
+
+void handleAsyncNotification(const uint16_t componentId, const uint16_t commandId,
+                             RawBuffer* payload)
+{
+    Heat2Decoder decoder;
+    RawBuffer   printbuf(4*1024);
+
+    uint32_t id = (componentId \<\< 16 | commandId);
+    switch (id)
+    {
+        <node.Subcomponents:componentNotification(it)>
+        default:
+        {
+            /*// Use HeatIterator to print the payload
+            char8_t buf[4*1024];
+            Heat2Util::log(buf, sizeof(buf), *payload, 1);
+            printf("%s\n", buf);*/
+            break;
+        }
+    }
+}
+<\n><\n>
+>>
+
+componentCreation(component) ::= <<
+gCommands["<component.Name; format="tl"><if(component.IsMaster)>_master<endif>"] = new <component.Name><component.Type>Command();
+>>
+
+
+componentNotification(component) ::= "<component.Notifications:notification(it)>"
+
+notification(notification) ::= <<
+<if(notification.NotificationType)>
+case (<subcompId(component=component)> \<\< 16 | <notification.id>):    // <notification.Name>
+{
+    <printTypeRefFullScope(notification.NotificationType)> notification;
+    ::Blaze::BlazeRpcError err = Blaze::ERR_OK;
+    err = decoder.decode(*payload, notification);
+    if (err != ::Blaze::ERR_OK) 
+    {
+        BLAZE_ERR(::Blaze::Log::SYSTEM, "Failed to decode notification with error %s", ::Blaze::ErrorHelp::getErrorName(err));
+    }
+
+    StringBuilder s;
+    printf("%s\n", (s \<\< notification).get());    
+    break;
+}
+
+
+<endif>
+>>
+
+
+
+
+

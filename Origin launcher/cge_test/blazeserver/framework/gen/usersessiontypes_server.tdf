@@ -1,0 +1,746 @@
+[headername="framework/tdf/accessgroup_server.h"]
+#include "framework/gen/accessgroup_server.tdf"
+
+[headername="framework/tdf/userextendeddatatypes.h"]
+#include "framework/gen/userextendeddatatypes.tdf"
+
+[headername="framework/tdf/userinfotypes_server.h"]
+#include "framework/gen/userinfotypes_server.tdf"
+
+[headername="framework/tdf/networkaddress.h"]
+#include "framework/gen/networkaddress.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/externalsessiontypes.h"]
+#include "framework/gen/externalsessiontypes.tdf"
+
+[headername="framework/tdf/inetfilter.h"]
+#include "framework/gen/inetfilter.tdf"
+
+[headername="framework/tdf/notifications_server.h"]
+#include "framework/gen/notifications_server.tdf"
+
+[headername="framework/tdf/slivermanagertypes_server.h"]
+#include "framework/gen/slivermanagertypes_server.tdf"
+
+[headername="framework/tdf/controllertypes_server.h"]
+#include "framework/gen/controllertypes_server.tdf"
+
+[headername="framework/tdf/frameworkconfigtypes_server.h"]
+#include "framework/gen/frameworkconfigtypes_server.tdf"
+
+[headername="framework/tdf/uuid.h"]
+#include "framework/gen/uuid.tdf"
+
+[headername="framework/tdf/qosdatatypes.h"]
+#include "framework/gen/qosdatatypes.tdf"
+
+[headername="framework/tdf/metricsdatatypes.h"]
+#include "framework/gen/metricsdatatypes.tdf"
+
+[headername="framework/tdf/vault_server.h"]
+#include "framework/gen/vault_server.tdf"
+
+namespace Blaze
+{
+
+
+typedef uint32_t ConnectionId;
+
+[baseTdf = Blaze::UserInfoData, trackChanges = true]
+class UserInfo;
+
+[description="A collection of game settings flags: hostMigrationEnabled, rankedGame, gameEntryMethods (open to joins by: browser, matchmaking, invites, stalking), invite senders (admin only or open)"]
+bitfield ClientTypeFlags
+{
+    [description="If set, this client type only allows one login at a time."]
+    enforceSingleLogin : 1;
+    [description="If set, this client type can be a primary session."]
+    primarySession : 1;
+    [description="If set, this client type should log metrics."]
+    logMetrics : 1;
+    [description="If set, this session will receive updates about it's user info."]
+    updateUserInfoData : 1;
+    [description="If set, this session will validate the console environment (sandboxId on xone or nintendo environment on nx)."]
+    validateSandboxId : 1;
+    [description="If set, this session can have user extended data."]
+    hasUserExtendedData : 1;
+    [description="If set, this session can be an active player in a game."]
+    allowAsGamePlayer : 1;
+    [description="If set, this session can be part of a local connection group."]
+    allowAsLocalConnGroupMember : 1;
+    [description="If set, this session will update socket connection/disconnection metrics."]
+    trackConnectionMetrics : 1;
+    [description="If set, this session will have connectivity checking enabled by default."]
+    enableConnectivityChecks : 1;
+    [description="If set, check the client's externalId vs. the value returned from Nucleus."]
+    checkExternalId : 1;
+
+    [description="Indicates the type of client this is."]
+    clientTypeGameplayUser : 1;
+    [description="Indicates the type of client this is."]
+    clientTypeHttpUser : 1;
+    [description="Indicates the type of client this is."]
+    clientTypeDedicatedServer : 1;
+    [description="Indicates the type of client this is."]
+    clientTypeTools : 1;
+    [description="Indicates the type of client this is."]
+    clientTypeLimitedGameplayUser : 1;
+};
+
+[description="A collection of session flags: firstLogin, firstConsoleLogin"]
+bitfield SessionFlags
+{
+    [description="If set, indicates that this is the first time this user has logged into this Blaze server"]
+    firstLogin : 1;
+    [description="True if this is the first time the user has logged on to this Blaze server on the Console (not a Web login) & has external data set"]
+    firstConsoleLogin : 1;
+    [description="True if this user is part of its local user group."]
+    inLocalUserGroup : 1;
+    [description="True if this user is using expressLogin (will be removed altogether when expressLogin is removed)."]
+    skipPeriodicEntitlementStatusCheck : 1;
+    [description="True if this user session should have notifications directed to the NotificationCache."]
+    useNotificationCache : 1;
+    [description="True if this user session has opted to ignore any inactivity timeouts."]
+    ignoreInactivityTimeout : 1;
+    [tag="cacc", description="True if this user session is a child account."] 
+    isChildAccount : 1;
+    [tag="stpr", description="True if this user session is accosiated with a user account that has the Nucleus account StopProcess flag set."] 
+    stopProcess : 1;
+};
+
+[description="Stores 256 bits in 64-bit parts.", trackChanges = true]
+class Int256Buffer
+{
+    [tag="prt1"]
+    int64_t mPart1;
+    [tag="prt2"]
+    int64_t mPart2;
+    [tag="prt3"]
+    int64_t mPart3;
+    [tag="prt4"]
+    int64_t mPart4;
+};
+
+// TODO: Proto generation is disabled for UserSessionExtendedData
+[tdfid = "hash", description = "This class defines all the data that describes the session of a logged in user.", generateProto=false]
+class UserSessionData
+{
+    [tag="id", description="The globally unique id of the user's session."]
+    UserSessionId mUserSessionId;
+
+    [tag="cids", description="The child session id linked to this session."]
+    UserSessionId mChildSessionId;
+
+    [tag="pids", description="The parent session id linked to this session."]
+    UserSessionId mParentSessionId;
+
+    [tag="ctim", description="The time the session was created."]
+    TimeValue mCreationTime;
+
+    [tag="pnam", description = "The optional id provided via trustedLogin() RPC."]
+    string(MAX_PERSONA_LENGTH) mTrustedLoginId;
+
+    [tag="xdat", description="The extended data for this session."]
+    UserSessionExtendedData mExtendedData;
+
+    [tag="lat", default = 360.0f, description="The latitude of the user provided by GeoIP; may be overridden."]
+    float mLatitude;
+
+    [tag="lon", default = 360.0f, description="The longitude of the user provided by GeoIP; may be overridden."]
+    float mLongitude;
+
+    [tag="cmet", description="Upnp client metrics."]
+    ClientMetrics mClientMetrics;
+
+    [tag="cume", description="Contains metrics gathered by the console."]
+    ClientUserMetrics mClientUserMetrics;
+
+    [tag="umap", description="A map of server data associated with user."]
+    UserSessionAttributeMap mServerAttributes;
+
+    [tag="cong", description="The connection group associated with this user."]
+    ConnectionGroupId mConnectionGroupId;
+
+    [tag="addr", description="The connection IP/port associated with this user."]
+    string(64) mConnectionAddr;
+
+    [tag="dsui", description="The dirty sock user index associated with this user."]
+    int32_t mDirtySockUserIndex;
+    
+    [tag="ptvr", description="The prototunnel version of the client of the session."]
+    string(16) mProtoTunnelVer;
+
+    [tag="cndx", description="The connection user index that RPCs from the BlazeSDK are using for this session."]
+    uint32_t mConnectionUserIndex;
+
+    [tag="clst", description="The current state of the client, as provided/indicated by the client itself."]
+    ClientState mClientState;
+
+    [tag="rand", description="A random number that was generated for this session alone, and can be used in calls to createSHA256Sum, for example."]
+    Int256Buffer mRandom;
+
+    typedef map<UserSessionId, int32_t> Int32ByUserSessionId;
+    [tag="subs", description="A map of subscribed UserSessions paired with the number of time they have subscribed."]
+    Int32ByUserSessionId mSubscribedSessions;
+
+    typedef map<BlazeId, int32_t> Int32ByBlazeId;
+    [tag="subu", description="A map of BlazeIds this UserSession has added to it."]
+    Int32ByBlazeId mSubscribedUsers;
+
+    [tag="pntf", description="A list of notifications sent to this UserSession while there was no Connection to write to."]
+    NotificationDataList mPendingNotificationList;
+
+    [tag="clnt"]
+    ClientInfo mClientInfo;
+
+    [tag="uuid", description="the connection group uuid of the session"] 
+    UUID mUUID;
+};
+
+enum UserSessionDisconnectType
+{
+    DISCONNECTTYPE_CLIENT_LOGOUT,
+    DISCONNECTTYPE_PARENT_SESSION_LOGOUT,
+    DISCONNECTTYPE_CHANNEL_FAILED_TO_CONNECT,
+    DISCONNECTTYPE_CHANNEL_PEER_CLOSED_CONNECTION,
+    DISCONNECTTYPE_CHANNEL_READ_ERROR,
+    DISCONNECTTYPE_CONNECTION_FRAME_REJECTED,
+    DISCONNECTTYPE_CONNECTION_PACKET_TOO_LARGE,
+    DISCONNECTTYPE_CONNECTION_OUTPUT_ERROR,
+    DISCONNECTTYPE_SESSION_MASTER_DESTROYED,
+    DISCONNECTTYPE_DUPLICATE_LOGIN,
+    DISCONNECTTYPE_FORCED_LOGOUT,
+    DISCONNECTTYPE_INACTIVITY_TIMEOUT,
+    DISCONNECTTYPE_CLIENT_DISCONNECTED,
+    DISCONNECTTYPE_QUEUE_LIMIT_AND_GRACE_PERIOD_EXCEEDED,
+    DISCONNECTTYPE_QUEUE_LIMIT_AND_DATA_SIZE_EXCEEDED,
+    DISCONNECTTYPE_CLOSE_NORMAL,
+    DISCONNECTTYPE_ERROR_NORMAL,
+    DISCONNECTTYPE_WRITE_NORMAL,
+    DISCONNECTTYPE_SWITCH_CHANNEL,
+    DISCONNECTTYPE_SWITCH_CHANNEL_FAILURE,
+    DISCONNECTTYPE_FORCED,
+    DISCONNECTTYPE_UNKNOWN,
+    DISCONNECTTYPE_SERVER_SHUTDOWN,
+    DISCONNECTTYPE_DRAIN_SHUTDOWN,
+    DISCONNECTTYPE_ACCESS_REVOKED,
+    DISCONNECTTYPE_USERSESSION_MIGRATING,
+    DISCONNECTTYPE_MAX
+};
+
+[ description = "Used in the forceSessionLogout() RPC." ]
+class ForceSessionLogoutRequest
+{
+    [tag="sid", description="The UserSessionId to logout."]
+    UserSessionId mSessionId;
+
+    [tag="type", description="The disconnect reason on server side the UserSession is being logged out.", default=DISCONNECTTYPE_FORCED_LOGOUT]
+    UserSessionDisconnectType mReason; 
+
+    [tag="flrs", description="If the session is forcefully logged out, indicates the reason.", default=FORCED_LOGOUTTYPE_INVALID]
+    UserSessionForcedLogoutType mForcedLogoutReason;  
+};
+
+[description="Used to update the user session attribute on the master."]
+class UpdateUserSessionAttributeMasterRequest
+{
+    [tag="sess"] UserSessionId mSessionId;
+    [tag="bid"] BlazeId mBlazeId;
+    [tag="req", allowref=true] UpdateUserSessionAttributeRequest mReq;
+};
+
+[description="Used to update the hardware flags on the master."]
+class UpdateHardwareFlagsMasterRequest
+{
+    [tag="sess"] UserSessionId mSessionId;
+    [tag="req", allowref=true] UpdateHardwareFlagsRequest mReq;
+};
+
+[description="Used to update the client data on the master."]
+class UpdateUserSessionClientDataMasterRequest
+{
+    [tag="sess"] UserSessionId mSessionId;
+    [tag="req", allowref=true] UpdateUserSessionClientDataRequest mReq;
+};
+
+// TODO: Proto generation is disabled for NetworkInfo
+[description="Used to update the network info on the master.", generateProto=false]
+class UpdateNetworkInfoMasterRequest
+{
+    [tag="sess"] UserSessionId mSessionId;
+    [tag="info", allowref=true] NetworkInfo mNetworkInfo;
+    [tag="opts"] UpdateNetworkInfoOpts mOpts;
+};
+
+[description="Configuration for Authorization.", generateProto = false]
+class AuthorizationConfig
+{
+    typedef map<IpWhiteListName, NetworkFilterConfig, ignorecase> IpListMap;
+    
+    [tag="ipls", description="Named Ip Lists."]
+    IpListMap mIpLists;
+
+    typedef map<string(64), string(MAX_ACCESSGROUPNAME_LEN), ignorecase> ClientTypeMap;
+
+    [tag="ctag", description="Default access group for a client type."]
+    ClientTypeMap mClientTypeDefaults;
+    
+    typedef map<string(64), string(MAX_ACCESSGROUPNAME_LEN), ignorecase> ScopeOverrideMap;
+    
+    [tag="smap", description="Specifies access group overrides for access token scopes."]
+    ScopeOverrideMap mScopeOverrides;
+
+    typedef list<string(128)> AccessStringList;
+    
+    [generateProto = false ]
+    class AccessGroupEntry
+    {
+        [tag="pmsn", description="If Permissions is not specified, same as Permissions = [], i.e. no privilege."]
+        AccessStringList mPermissions;
+
+        [tag="ipwl", description="IpWhiteList not specified means allow all."]
+        AccessStringList mIpWhiteList;
+
+        [tag="trst", default=false, description="Require clients to have a valid client cert whose hash is trusted in the ssl context."]
+        bool mRequireTrustedClient;
+    };
+    typedef map<string(MAX_ACCESSGROUPNAME_LEN), AccessGroupEntry, ignorecase> AccessGroupMap;
+
+    [tag="acgp", description="Access group definition."]
+    AccessGroupMap mAccessGroups;
+};
+
+[description="Configuration for User Session client UED values that can be referenced by Blaze components such as Matchmaker and GameManager."]
+class UserSessionClientUEDConfig
+{
+    [tag="id", description="Id specified by the client to indicate the UED value used."]
+    uint16_t mId;
+
+    [tag="name", description="The name that is used by Blaze components (Add usersessions_ in front)."]
+    string(32) mName;
+    
+    [tag="def", default=0, description="Default value. Used before client defined values occur."]
+    UserExtendedDataValue mDefault;
+
+    [tag="min", default=0, description="Minimum value. Clamps input values."]
+    UserExtendedDataValue mMin;
+    
+    [tag="max", default=1000, description="Maximum value. Clamps input values."]
+    UserExtendedDataValue mMax;
+
+};
+typedef list<UserSessionClientUEDConfig> UserSessionClientUEDConfigList;
+
+typedef string(64) ReputationExpression;
+class ReputationConfig
+{
+    [tag="usee", default=false, reconfigurable="yes", description="If true, use external reputation."]
+    bool mUseExternalReputation;
+    
+    [tag="tmot", default="5s", reconfigurable="yes", description="External reputation lookup timeout. Should be significantly shorter than the usual RPC timeout."]
+    TimeValue mReputationLookupTimeout;
+
+    // this is configurable because MS expects to change the reputation stat name (and may do so again) in the future
+    // default is the reported final name MS will be using
+    [tag="erid", default="OverallReputationIsBad", reconfigurable="yes", description="If mUseExternalReputation is true, the identifier for retreiving external reputation."]
+    string(64) mExternalReputationIdentifier;
+    
+    [tag="rsrc", reconfigurable="yes", description="If mUseExternalReputation is false, the UED source for reputation data."]
+    UserExtendedDataName mReputationSourceUEDName;
+
+    [tag="repn", default="userReputation", reconfigurable="yes", description="The name of the UED value for storing user reputation."]
+    UserExtendedDataName mEvaluatedReputationUEDName;
+
+    [tag="drep", default=false, reconfigurable="yes", description="The default value for user reputation; used if the configured reputation source lookup fails. True is considered poor reputation. "]
+    bool mReputationDefaultValue;
+
+    [tag="rexp", default="reputationValue", reconfigurable="yes", description="The expression used to evaluate a reputation value. The expression should return true if the user's reputation value is considered poor reputation."]
+    ReputationExpression mPoorReputationCheckExpression;
+    
+    [tag="scid", description="GDNP service config identifier."]
+    XblScid mScid;
+
+    [tag="mock", default=false, description="For testing only. Indicates if reputation calls will use the mock service instead of calling the real external service."]
+    bool mUseMock;
+};
+
+class CheckConnectivityConfig
+{
+    [tag="wait", default="5s", description="Timeout to wait for connectivity (of a connection)."]
+    TimeValue mTimeToWait;
+
+    [tag="intv", default="5s", description="Interval at which the connectivity (of enabled connections) is checked.  If 0s, then checking is disabled."]
+    TimeValue mInterval;
+};
+
+class ProductNamePINInfo
+{
+    [tag="relt", reconfigurable="yes", default="unknown", description = "The release type for this product name. Supplied as the 'rel' parameter for PIN events."]
+    string(-1) releaseType;
+
+};
+typedef map<ProductName, ProductNamePINInfo, ignorecase> ProductNamePINInfoMap;
+
+class TitlePINInfo
+{
+    [tag="tiid", default="", reconfigurable="yes", description="Title Id. Also used to populate the custom HTTP header 'x-ea-game-id'."]
+    string(-1) mTitleId;
+
+    [tag="tidt", default="projectId", reconfigurable="yes", description="Title Id type. Also used to populate the custom HTTP header 'x-ea-game-id-type'."]
+    string(-1) mTitleIdType;
+};
+typedef map<ClientPlatformType, TitlePINInfo> TitlePINInfoMap;
+
+typedef map<string(-1), ClientPlatformTypeList> ClientPlatformsByProjectIdMap;
+
+class PINConfig
+{
+    [tag="vpth", default="", description="The VaultLookup to the entry in Vault where overrides for 'secret' config values are stored (optional; ignored if Vault is disabled)."]
+    VaultLookup mVaultPath;
+
+    [tag="appi", default="", reconfigurable="yes", description="MD5 hash string to identify the Blaze server as trusted or non-throttled to River."]
+    string(-1) mApplicationId;
+
+    [tag="gami", default="", reconfigurable="yes", description="The 'ea-game-id' generated for the title when registering the title with River via EA Console."]
+    string(-1) mEaGameId;
+
+    [tag="tenv", default="", reconfigurable="yes", description="The environment this Blaze instance is running in. Used to populate the custom HTTP header 'x-ea-env'."]
+    string(-1) mEnvironment;
+
+    [tag="taxv", default="1.1", reconfigurable="yes", description="PIN Taxonomy version. Also used to populate the custom HTTP header 'x-ea-taxv'."]
+    string(-1) mPINTaxonomyVersion;
+
+    [tag="tpim", reconfigurable="yes", description="Per-platform Title Id and Title ID type. Must contain an entry for every platform hosted by the blazeserver."]
+    TitlePINInfoMap titlePINInfo;
+
+    [tag="uspl", default=false, reconfigurable="yes", description="If user session is unavailable, set platform in PIN event header to server's platform"]
+    bool mUseServerPlaform;
+
+    [tag="name", reconfigurable="yes", description="PIN-specific product name info."]
+    ProductNamePINInfoMap productNamesPINInfo;
+ 
+    [tag="mrps", default=200, reconfigurable="yes", description="Specifies the preferred number of PIN requests that a single Blaze instance will send to River per second."]
+    int32_t mMaxRequestsPerSecond;
+
+    [tag="pstr", default=true, reconfigurable="yes", description="If true, the Blaze server will always write the PIN data to a pinevents log file.  After the log file has rotated out (see logging.cfg), a Blaze server process will read the PIN event from the log file and send each event to River. The log file is deleted once River has either accepted or explicitly rejected every PIN event in the log file. If false, the Blaze server will attempt to send PIN events directly to River. This option is useful while working on Windows and looking for immediate results in PIN, but it provides no guarantee that the data will be sent to River."]
+    bool mEnablePersistentStorage;
+};
+
+typedef string(-1) NonCrossplayPlatformSetName;
+
+[description="Configuration for User Sessions.", generateProto = false]
+class UserSessionsConfig
+{
+    [tag="scto", default="4m", reconfigurable="yes", description="Timeout for non-persistent user sessions."]
+    TimeValue mSessionCleanupTimeout;
+
+    typedef map<ClientType, TimeValue> TimeValueByClientTypeMap;
+    [tag="sctc", reconfigurable="yes", description="Timeout for non-persistent user sessions by client type.  This overrides the default sessionCleanupTimeout setting."]
+    TimeValueByClientTypeMap mSessionCleanupTimeoutByClientType;
+    
+    [tag="asrt", default="0s", reconfigurable="yes", description="Timeout for triggering user remaping to occur after the removal of an auxSlave"]
+    TimeValue mUserRemapOnAuxSlaveRemovalTimeout;
+
+    [tag="slca", default=true, reconfigurable="yes", description="Controls if single login check is done per account or per account and per platform. True means that only one login is permitted per Nucleus account (across all platforms); false means that only one login is permitted per Nucleus account on each platform."]
+    bool mSingleLoginCheckPerAccount;
+
+    [tag="fold", default=true, reconfigurable="yes", description="If true, when the Nth persona of an account that has more than one linked persona (1:N) on the same platform tries to authenticate, the existing persona's session is booted offline with FORCED_LOGOUTTYPE_LOGGEDIN_ELSEWHERE. If false, the new login fails with ERR_DUPLICATE_LOGIN. HTTP/WAL sessions will not boot a console user session offline."]
+    bool mForceMultiLinkedSessionOffline;
+    
+    [tag="walp", default=false, reconfigurable="yes", description="If false, personas can only create HTTP/WAL usersessions if there isn't already a primary persona for the associated platform. If set to true, WAL authentications can cause the primary persona on a platform to be updated. Updating the primary persona will kick offline any WAL sessions for other same-platform personas on the account. WAL sessions will never update primary persona if the primary is currently authenticated with a non-WAL usersession."]
+    bool mPrimaryPersonaUpdatableByWalAuthentication;
+    
+    [tag="usdb", default=true, reconfigurable="no", description="Whether to use database."]
+    bool mUseDatabase;
+
+    [tag="dbpt", reconfigurable="no", description="The database instance names that are used for the user sessions tables for each platform."]
+    DbNameByPlatformTypeMap mDbNamesByPlatform;
+
+    [tag="lnou", default=false, reconfigurable="yes", description="Skips UED setup in the login process if DB issues are occurring elsewere. (DB usage is still attempted.)"]
+    bool mAllowLoginOnUEDLookupError;
+    
+    [tag="adps", reconfigurable="yes", description="(DEPRECATED) List of persona names for whom full logging will be enabled. Going forward, auditing will be controlled strictly via RPCs in the BlazeController."]
+    PersonaNameList mAuditPersonas;
+
+    [tag="uscm", default=4096, reconfigurable="yes", description="Size of the user cache."]
+    uint32_t mUserCacheMax;
+    
+    [tag="usgd", default=true, reconfigurable="yes", description="Enable the usersessionextended data to have ip based location info."]
+    bool mUseGeoipData;
+
+    [tag="oppa", default=true, reconfigurable="yes", description="If set, only shows primary account info.  Otherwise, allows account info from non-primary users to be sent to the clients."]
+    bool mOnlyShowPrimaryPersonaAccounts;
+    
+    [tag="pslt", default=200, reconfigurable="yes", description="Used to do a geo location lookup on the user's best ping site if latency is under threshold. Used for when Blaze fails to resolve the user's actual geo location during login."]
+    int32_t mPingSiteLatencyThresholdForFallbackGeoipLookup;
+
+    const char8_t* NAME_HANDLER_NAME = "nameHandler";
+    
+    [tag="nmhd", default="console", reconfigurable="yes", description="Name handler."]
+    string(64) mNameHandler;
+    
+    [tag="mchs", default=4, reconfigurable="yes", description="The max number of concurrent sessions for a user connecting to the HTTP endpoint."]
+    uint32_t mMaxConcurrentHttpSessions;
+
+    [tag="mcus", default=10, reconfigurable="yes", description="The max number of concurrent user sessions per user by BlazeId."]
+    uint32_t mMaxConcurrentUserSessions;
+
+    [tag="atrz", reconfigurable="yes", description="Define the authorization for a blaze server instance."]
+    AuthorizationConfig mAuthorization;
+    
+    [tag="uscl", reconfigurable="no", description="Client defined UED values that are mapped to names, so they can be referenced by Blaze components such as Matchmaker and GameManager."]
+    UserSessionClientUEDConfigList mUserSessionClientUEDConfigList;
+
+    [tag="mcua", default=4, reconfigurable="yes", description="The max number UED attributes allowed in the mClientAttributes UED value. (Once exceeded, USER_ERR_MAX_DATA_REACHED will be returned by the function that sets the UEDs)"]
+    uint32_t mMaxClientUEDAttributes;
+
+    [tag="eity", default=INVALID, reconfigurable="yes", description="DEPRECATED - Unused Define the type of user's ExternalId."]
+    ClientPlatformType mExternalIdType;
+
+    [tag="muur", default=10000, reconfigurable="yes", description="The max bytes/second data rate for UED updates (calculated per-client). We delay UED updates to a given client after their update rate passes this value."]
+    uint32_t mMaxUEDUpdateRate;
+
+    [tag="urtd", default="1s", reconfigurable="yes", description="[Debug/Testing Only] The update time delay for UED. Normally 1 second. Larger values will increase the delay between sending messages (once the mMaxUEDUpdateRate byte limit is reached)."]
+    TimeValue mUEDUpdateRateTimeDelay;
+    
+    [tag="repc", reconfigurable="yes", description="Defines the reputation configuration for the BlazeServer instance."]
+    ReputationConfig mReputation;
+
+    [tag="ngid", default=1000000, reconfigurable="yes", description="(DEPRECATED - the negative external id cache has been removed) Size of negative external id LRU cache"]
+    uint32_t mNegativeExternalIdCacheSize;
+
+    [tag="ngpn", default=1000000, reconfigurable="yes", description="Size of negative persona name LRU cache"]
+    uint32_t mNegativePersonaNameCacheSize;
+
+    [tag="ngoi", default=1000000, reconfigurable="yes", description="(DEPRECATED - the negative origin id cache has been removed) Size of negative origin id LRU cache"]
+    uint32_t mNegativeOriginIdCacheSize;
+
+    [tag="cnct", reconfigurable="yes", description="The check connectivity configuration."]
+    CheckConnectivityConfig mCheckConnectivitySettings;
+
+    [tag="pinc", reconfigurable="yes", description="The configuration for the PIN system."]
+    PINConfig mPINSettings;
+
+    [tag="qoss", reconfigurable="yes", description="The qos settings configuration."]
+    QosConfigInfo QosSettings;
+
+    typedef map<ClientPlatformType, ClientPlatformTypeList> PlatformRestrictionList;
+    [tag="pltr", description="Map of platforms to the list of platforms they support.  If empty, the platform is assumed to support all."]
+    PlatformRestrictionList mPlatformRestrictions; 
+
+
+    typedef map<NonCrossplayPlatformSetName, ClientPlatformTypeList> NonCrossplayPlatformSet;
+    [tag="pset", description="Identifies sets of platforms that support interactions even if cross-play is disabled. A platform may only appear in a single non-crossplay platform set."]
+    NonCrossplayPlatformSet mNonCrossplayPlatformSets; 
+};
+
+[description="A globally replicated user session existence object.", tdfid="hash", trackChanges=true]
+class UserSessionExistenceData
+{
+    [tag="usid", description = "The UserSessionId for this existence data."]
+    UserSessionId mUserSessionId;
+
+    [tag="styp", description = "The type of UserSession (e.g. normal, guest, or WAL clone)."]
+    UserSessionType mUserSessionType;
+
+    [tag="uid", description = "The Blaze id of the user this session belongs to."]
+    BlazeId mBlazeId;
+
+    [tag="pnam", description="The name of the logged in persona."] 
+    string(MAX_PERSONA_LENGTH) mPersonaName;
+
+    [tag="nspc", description="The namespace of the logged in persona."] 
+    string(MAX_NAMESPACE_LENGTH) mPersonaNamespace;
+
+    [tag="udid"]
+    string(UNIQUE_DEVICE_ID_MAX) mUniqueDeviceId;
+
+    [tag="dvlo"]
+    DeviceLocality mDeviceLocality;
+
+    [tag="ctim", description="The time the session was created. This is duplicated from UserSessionData, used solely for PIN StepID calculation."]
+    TimeValue mCreationTime; // (eliminate by: GOS-30204)
+
+    [tag="ctyp", description="The client type of the session."]
+    ClientType mClientType;
+
+    [tag="aids", description="Contains platform ids and current client platform."] 
+    PlatformInfo mPlatformInfo;
+
+    [tag="cver", description = "The version of the client of the session."] 
+    string(CLIENT_VERSION_MAX_LENGTH) mClientVersion;
+
+    [tag="bsdk", description="The BlazeSDK version of the client's session."]
+    string(64) mBlazeSDKVersion;
+
+    [tag="ptvr", description="The prototunnel version of the client of the session."]
+    string(16) mProtoTunnelVer;
+
+    [tag="lcle", description="The locale of the session."]
+    uint32_t mSessionLocale;
+
+    [tag="cses", description="The country/region of the session."]
+    uint32_t mSessionCountry;
+
+    [tag="calc", description="This user's account locale."]
+    uint32_t mAccountLocale;
+
+    [tag="cact", description="This user's account country."]
+    uint32_t mAccountCountry;
+
+    [tag="pact", description="This user's previous account country."]
+    uint32_t mPreviousAccountCountry;
+
+    [tag="serv", description="The service name that the client used to connect to the Blaze Server."]
+    ServiceName mServiceName; 
+
+    [tag="prod", description="The product name that the user used to authenticate."]
+    ProductName mProductName; 
+
+    [tag="agrp", description="The authorization group of this session."]
+    AccessGroupName mAuthGroupName; 
+
+    [tag="sesf", description="A set of flags pertaining to session information."]
+    SessionFlags mSessionFlags;
+
+    [tag="iids", description="The list of ids of instances that own this session. Core slave always @ index 0."]
+    InstanceIdList mInstanceIds;
+
+    [tag="clip", description="Client IP for this user."]
+    uint32_t mClientIp;
+};
+
+[ description = "Request for user info from a remote session." ]
+class GetUserInfoDataRequest
+{
+    [tag="sid", description="Remote session id."]
+    UserSessionId mUserSessionId;
+};
+
+// TODO: Proto generation is disabled for UserSessionData
+[ description = "Request for user session data from a remote session.", generateProto=false ]
+class GetUserSessionDataResponse
+{
+    [tag="usd", allowref=true, description="Full UserSessionData for the user. Includes ConnectionGroupId."]
+    UserSessionData mUserSessionData;
+
+    [tag="usoc", description="List of all user sessions on that Connection.  (Useful for MLU tracking.)"]
+    UserSessionIdList mUsersOnConnection;
+};
+
+[ description = "Response containing user info from a remote session." ]
+class GetUserInfoDataResponse
+{
+    [tag="info", description="The user info for this session.", allowref=true]
+    UserInfoData mUserInfo;
+};
+
+class UpdateDirtySockUserIndexMasterRequest
+{
+    [tag="sid", description="session id of the session to update."]
+    UserSessionId mUserSessionId;
+        
+    [tag="dsui", description="The DirtySock user index."]
+    int32_t mDirtySockUserIndex;
+};
+
+class InsertUniqueDeviceIdMasterRequest
+{
+    [tag="sid", description="session id of the session to update."]
+    UserSessionId mUserSessionId;
+
+    [tag="udid", description="The unique device Id."]
+    string(UNIQUE_DEVICE_ID_MAX) mUniqueDeviceId;
+};
+
+class GetUserIpAddressRequest
+{
+    [tag="sid", description="session id of the session to get user IP address for."]
+    UserSessionId mUserSessionId;
+};
+
+class GetUserIpAddressResponse
+{
+    [tag="addr", description="user IP address"]
+    IpAddress mIpAddress;
+};
+
+class GetIpFilterByNameRequest
+{
+    [tag="iwln"] IpWhiteListName mIpWhiteListName;
+};
+
+class GetIpFilterByNameResponse
+{
+    [tag="snl"] list<CidrBlock> mSubNets;
+};
+
+class CheckConnectivityRequest
+{
+    [tag="sid", description="The session ID for the connection to check"]
+    UserSessionId mUserSessionId;
+
+    [tag="cnto", description="Timeout (relative) to wait for connectivity"]
+    TimeValue mConnectivityTimeout;
+};
+
+class CheckConnectivityResponse
+{
+    [tag="cres", description="Result code of the connectivity check for the session"]
+    uint32_t mConnectivityResult;
+};
+
+class UserSessionSubscriberRequest
+{
+    [tag="nsid"]
+    UserSessionId mNotifierSessionId;
+
+    [tag="ssid"]
+    UserSessionId mSubscriberSessionId;
+
+    [tag="imdt"]
+    bool mSendImmediately;
+};
+
+class FetchUserSessionsRequest
+{
+    [tag="sid"]
+    UserSessionIdList mUserSessionIds;
+};
+
+typedef list<UserSessionData> UserSessionDataList;
+
+// TODO: Proto generation is disabled for UserSessionDataList
+[generateProto=false]
+class FetchUserSessionsResponse
+{
+    [tag="data"]
+    UserSessionDataList mData;
+};
+
+class ValidateUserExistenceRequest
+{
+    [tag="sid"]
+    UserSessionId mUserSessionId;
+};
+
+class FetchUsersAuditStateRequest
+{
+    [tag="ulst", description="The BlazeID list of the users"]
+    BlazeIdList mBlazeIdList;
+};
+
+typedef map<BlazeId, bool> AuditStateByBlazeIdsMap;
+class FetchUsersAuditStateResponse
+{
+    [tag="audi", description="The audit states of the users"]
+    AuditStateByBlazeIdsMap mAuditStateByBlazeIdsMap;
+
+    [tag="auds", description="Whether audit logging is suppressed."]
+    bool mAuditLoggingSuppressed;
+};
+
+}

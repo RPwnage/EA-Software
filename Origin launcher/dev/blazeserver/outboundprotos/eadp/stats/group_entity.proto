@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package eadp.stats;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+import "google/rpc/status.proto";
+
+option java_package = "com.ea.gs.stats.grpc";
+option java_outer_classname = "GroupEntityProto";
+option java_multiple_files = true;
+
+// Cache eviction is both time-based and size-based.
+message ReadCacheConfiguration {
+    // How long to cache data for.
+    // Min: 1 second. Max: 5 minutes.
+    // Note that these constraints are subject to change.
+    google.protobuf.Duration ttl = 1;
+
+    // How many group entities should we cache? For a community, this may just be 1, but for
+    // future group or segment use we'll need to cap this value.
+    // Min: 1. Max: 1,000,000.
+    // Note that these constraints are subject to change.
+    google.protobuf.UInt32Value max_size = 2;
+}
+
+// Updates are buffered until it reaches a max size OR the max time elapses OR some other conditions occurs (eg. switching operators)
+// before flushing (as a single update) to the database.
+message WriteBufferConfiguration {
+    // How long to buffer updates before flushing to the database.
+    // Min: 1 second. Max: 5 minutes.
+    // Note that these constraints are subject to change.
+    google.protobuf.Duration max_time = 1;
+
+    // The max number of updates to buffer before flushing to the database.
+    // Min: 10. Max: 10,000,000.
+    // Note that these constraints are subject to change.
+    google.protobuf.UInt32Value max_size = 2;
+}
+
+message GroupEntityConfiguration {
+    // String representing a group type (e.g. "FIXED_ENTITY") - has no particular meaning to Stats,
+    // beyond being a reference to this configuration.
+    string group_type = 1;
+
+    // Read cache configuration. If present, use the specified settings, otherwise fallback to service level default configuration.
+    ReadCacheConfiguration read_cache_config = 2;
+
+    // Write buffer configuration. If present, use the specified settings, otherwise fallback to service level default configuration.
+    WriteBufferConfiguration write_buffer_config = 3;
+}
+
+message GroupEntity {
+    // the ID of the group entity, which is not interpreted by the service
+    // (e.g. "COMMUNITY_ALL")
+    string entity_id = 1;
+
+    // the (opaque) type of the entity, which is matched against the
+    // GroupEntityConfiguration from the category
+    string group_type = 2;
+}

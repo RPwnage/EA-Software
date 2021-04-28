@@ -1,0 +1,91 @@
+<project>
+
+  <!-- Construct relative paths for the rpc2typecomp2 step -->
+  <property name="package.relative.builddir" value="@{StrReplace('${package.builddir}','${package.dir}\\','')}"/>
+  <property name="package.relative.builddir" value="@{StrReplace('${package.relative.builddir}','${package.dir}/','')}"/>
+  <property name="package.relative.builddir" value="@{StrReplace('${package.relative.builddir}','\\','/')}"/>
+  
+  <property name="package.blazeserver.rpc2typecomp2.output" value="${package.relative.builddir}/bin/rpc2typecomp2.jar"/>
+  <property name="package.blazeserver.rpc2typecomp2.intdir" value="${package.relative.builddir}/bin/rpc2typecomp2"/>
+  
+  <target name="rpc2typecomp2">
+
+    <mkdir dir="${package.dir}/${package.blazeserver.rpc2typecomp2.intdir}"/>
+
+    <dependent name="antlr"/>
+
+    <!-- Copy antlr.jar to the packaeg build directory so we can relativize the path 
+             This is a workaround for classpath length problems -->
+    <do unless="@{FileExists('${package.builddir}/bin/antlr.jar')}">
+      <echo message="Copying ${package.antlr.jar} to ${package.builddir}/bin/antlr.jar"/>
+      <copy file="${package.antlr.jar}" tofile="${package.builddir}/bin/antlr.jar"/>
+    </do>
+
+    <!-- Run ANTLR to convert grammars to Java source code. -->
+    <exec program="${java.exe}" clearenv="true" workingdir="${package.dir}">
+        <args>
+            <arg value="-cp ${package.relative.builddir}/bin/antlr.jar org.antlr.Tool"/>
+            <arg value="-o ${package.blazeserver.rpc2typecomp2.intdir}"/>
+            <arg value="${exec.inputs.all}"/>
+        </args>
+        <inputs>
+            <includes name="${package.dir}/tools/rpc2typecomp2/**.g"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.dir}/${package.blazeserver.rpc2typecomp2.output}" asis="true"/>
+        </outputs>
+    </exec>
+
+    <!-- Compile the Java source code. -->
+    <exec program="${java.compiler}" clearenv="true" workingdir="${package.dir}">
+        <args>
+            <arg value="-cp ${package.relative.builddir}/bin/antlr.jar"/>
+            <arg value="-d ${package.blazeserver.rpc2typecomp2.intdir}"/>
+            <arg value="${exec.inputs.all}"/>
+        </args>
+        <inputs>
+            <includes name="${package.dir}/tools/rpc2typecomp2/**.java"/>
+            <includes name="${package.dir}/${package.blazeserver.rpc2typecomp2.intdir}/**.java"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.dir}/${package.blazeserver.rpc2typecomp2.output}" asis="true"/>
+        </outputs>
+    </exec>
+
+    <!-- Get a list of all the class names (sans path information). -->
+    <property name="package.blazeserver.rpc2typecomp2.classes" value="@{DirectoryGetFiles('${package.dir}/${package.blazeserver.rpc2typecomp2.intdir}', '*.class', ' ')}"/>
+    <property name="package.blazeserver.rpc2typecomp2.classes" value="@{StrReplace(${package.blazeserver.rpc2typecomp2.classes}, '${package.dir}', '')}"/>
+    <property name="package.blazeserver.rpc2typecomp2.classes" value="@{StrReplace(${package.blazeserver.rpc2typecomp2.classes}, '\\', '/')}"/>
+    <property name="package.blazeserver.rpc2typecomp2.classes" value="@{StrReplace(${package.blazeserver.rpc2typecomp2.classes}, '/${package.blazeserver.rpc2typecomp2.intdir}/', '')}"/>
+
+    <!-- Pack all the classes into a single Java executable archive. -->
+    <exec program="${java.archiver}" clearenv="true" workingdir="${package.dir}/${package.blazeserver.rpc2typecomp2.intdir}">
+        <args>
+            <arg value="cf"/>
+            <arg value="../rpc2typecomp2.jar"/>
+            <arg value="-C ."/>
+            <!-- arg value="TdfGrammar.tokens"/ -->
+            <arg value="${package.blazeserver.rpc2typecomp2.classes}"/>
+        </args>
+        <inputs>
+            <includes name="${package.dir}/${package.blazeserver.rpc2typecomp2.intdir}/*.class"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.dir}/${package.blazeserver.rpc2typecomp2.output}" asis="true"/>
+        </outputs>
+    </exec>
+
+  </target>
+
+  <target name="cleantools_rpc2typecomp2">
+    <echo message="Cleaning rpc2typecomp2..."/>
+    <delete failonmissing="false">
+      <fileset>
+        <includes name="${package.dir}/${package.blazeserver.rpc2typecomp2.output}"/>
+        <includes name="${package.dir}/${package.blazeserver.rpc2typecomp2.intdir}/*.class"/>
+        <includes name="${package.builddir}/bin/antlr.jar"/>
+      </fileset>
+    </delete>
+  </target>
+  
+</project>

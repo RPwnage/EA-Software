@@ -1,0 +1,657 @@
+/*! ************************************************************************************************/
+/*!
+    \file rules.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="gamemanager/tdf/matchmaker_types.h"]
+#include "gamemanager/gen/matchmaker_types.tdf"
+
+[headername="framework/tdf/userextendeddatatypes.h"]
+#include "framework/gen/userextendeddatatypes.tdf"
+
+[headername="gamemanager/tdf/gamemanager.h"] // for GameName in GameNameRuleCriteria
+#include "gamemanager/gen/gamemanager.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+// NOTE: although Matchmaker has its own namespace in c++, 
+//   the matchmaker RPCs are defined in the GameManager namespace (since the Matchmaker is not a component)
+namespace Blaze
+{
+namespace GameManager
+{
+
+////////////////////////////////////////////////////////////////////////////////
+// GeoLocation Rule ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class GeoLocationRuleCriteria
+{
+    [tag="thld", description="The name of the minFitThreshold list to use when calculating the fitScore."]
+    MinFitThresholdName mMinFitThresholdName;
+};
+ 
+[description="Settings used to send the rule status back to client for a matchmaking session."]
+class GeoLocationRuleStatus
+{
+    [tag="dist", description="The current maximum distance being considered. Distance is in miles."]
+    uint32_t mMaxDistance;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// GameName Rule ///////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a gamebrowser matchmaking session."]
+class GameNameRuleCriteria
+{
+    [tag="subs", default="", description="Client specified string fragment used to search for all game names that contain it. Default of empty string, disables rule."]
+    Blaze::GameManager::GameName mSearchString;
+};
+
+//////////////////////////////////////////////////////
+// Virtual Game Rule
+//////////////////////////////////////////////////////
+
+[description="Settings used to instantiate a VirtualGameRule instance in a matchmaking session."]
+class VirtualGameRulePrefs
+{
+    [
+        description = "The possible desired values for a game's 'isVirtualized' setting."
+    ]
+    enum VirtualGameDesiredValue
+    {
+        [description="placeholder invalid"]
+        INVALID =      0x0,
+        
+        [description="we want an standard game"]
+        STANDARD =      0x1,
+        
+        [description="we want a virtualized game"]
+        VIRTUALIZED =       0x2,
+        
+        [description="we don't care about the game's virtualized setting"]
+        ABSTAIN =       0x8
+        
+    };
+
+    [tag="thld", description="The name of the minFitThreshold list to use when calculating the fitScore for the virtualGameRule.  Setting the name to the empty string (default) will disable the rule (all evaluations are a match, returning the maxPossibleFitScore for the rule."]
+        MinFitThresholdName mMinFitThresholdName;
+    
+    [tag="valu", default=STANDARD, description="Your desired value for the game's isVirtualized setting."]
+        VirtualGameDesiredValue mDesiredVirtualGameValue;
+};
+
+
+[description="Settings used to send the ranking rule information back to client for a matchmaking session."]
+class VirtualGameRuleStatus
+{
+    [tag="vval", description="Flags representing the virtual game values (or player's desired values) that we'll currently match. See VirtualGameRulePrefs::VirtualGameDesiredValue."]
+    uint8_t mMatchedVirtualizedFlags; 
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// AvoidGamesRule //////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class AvoidGamesRuleCriteria
+{
+    [tag="gidl", description="List of game ids to prevent matching games with."]
+    Blaze::GameManager::GameIdList mGameIdList;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// AvoidPlayersRule ////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class AvoidPlayersRuleCriteria
+{
+    [tag="asts", description="Disallows you matching other sessions/games with a player in this user set ids' associationlists, clubs etc. Set to empty (the default), to ignore using user sets."]
+    ObjectIdList mAvoidListIds;
+
+    [tag="alst", description="Disallows you matching other sessions/games with a player in this list. Leave empty (the default), to ignore using this list."]
+    BlazeIdList mAvoidList;
+
+    [tag="accl", description="Disallows you matching other sessions/games with a player whose NucleusAccountId is in this list. Leave empty (the default), to ignore using this list."]
+    AccountIdList mAvoidAccountList;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// XblBlockPlayersRule /////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class XblBlockPlayersRuleCriteria
+{
+    [tag="dsrl", default=false, description="If set, the rule will be disabled for this matchmaking session only.  Can be set globally via IsXblBlockPlayersRuleEnabled."]
+    bool mDisableRule;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// PreferredPlayersRule ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class PreferredPlayersRuleCriteria
+{
+    [tag="reqp", default=false, description="Set to true to guarantee only sessions/games having at least one preferred player can be matched by your session."]
+    bool mRequirePreferredPlayer;
+
+    [tag="pset", description="Increases chance you match other sessions/games with a player in this user set id's associationlist, club etc. Set to OBJECT_ID_INVALID (the default), to ignore using a user set."]
+    ObjectId mPreferredListId;
+
+    [tag="plst", description="Increases chance you match other sessions/games with a player in this list. Leave empty (the default), to ignore using this list."]
+    BlazeIdList mPreferredList;
+
+    [tag="alst", description="Increases chance you match other sessions/games with a player whose NucleusAccountId is in this list. Leave empty (the default), to ignore using this list."]
+    AccountIdList mPreferredAccountList;
+};
+ 
+////////////////////////////////////////////////////////////////////////////////
+// PreferredGamesRule ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class PreferredGamesRuleCriteria
+{
+    [tag="reqp", default=false, description="Set to true to guarantee only games listed can be matched by your session."]
+    bool mRequirePreferredGame;
+
+    [tag="plst", description="Increases chance or requires(mRequiredPrefferedGame set) that you match the games in this list. Leave empty (the default), to ignore using this list."]
+    GameIdList mPreferredList;
+};
+
+
+//////////////////////////////////////////////////////
+// Game Attribute Rule
+//////////////////////////////////////////////////////
+
+[
+    description="The max number of possible values an explicit attribute rule can define (Game Attributes can be explicit, all Player Attributes are explicit)",
+    details = "Ideally, this would be a config file value, but it's used by an EASTL Bitset, and must be known at compile time.  Note: you'll get a server log err if a explicit rule has too many possible values."
+]
+const uint32_t MAX_EXPLICIT_ATTRIBUTE_RULE_POSSIBLE_VALUE_COUNT = 64;
+
+
+[
+    description = "The data needed to invoke a single specific game attribute matchmaking rule.",
+    details = "The client only sends up a rule's desired values and the rule and fitThresholdList names (the server looks up the definition from the name).  Rule are defined in the matchmaking config file."
+]
+class GameAttributeRuleCriteria
+{
+    [tag="thld", description="Each MinFitThresholdList within a game attribute rule has a unique name (case insensitive).  Note: different rules may contain threshold lists with the same name."]
+        MinFitThresholdName mMinFitThresholdName;
+        
+    [tag="valu", description="A list of desired values for a game attribute matchmaking rule.  The desired values are case-insensitive, and must be selected from the possible values in the rule definition."]
+        Collections::AttributeValueList mDesiredValues;
+};
+
+typedef map<RuleName, GameAttributeRuleCriteria, ignorecase> GameAttributeRuleCriteriaMap;
+
+class DedicatedServerAttributeRuleCriteria
+{
+    [tag="thld", description="The minFitThreshold value."]
+        float mMinFitThresholdValue;
+        
+    [tag="valu", description="Desired value for a dedicated server attribute matchmaking rule.  The desired value is case-insensitive, and must be selected from the possible values in the rule definition."]
+        Collections::AttributeValue mDesiredValue;
+};
+
+typedef map<RuleName, DedicatedServerAttributeRuleCriteria, ignorecase> DedicatedServerAttributeRuleCriteriaMap;
+
+[description="Settings used to send the game attribute rule information back to client for a matchmaking session."]
+class GameAttributeRuleStatus
+{
+    [tag="name", description="unique rule name (case insensitive)."]
+    RuleName mRuleName;
+    
+    [tag="valu", description="A list of case-insensitive rule values match the session at this point."]
+    Collections::AttributeValueList mMatchedValues;
+};
+
+typedef map<RuleName, GameAttributeRuleStatus, ignorecase> GameAttributeRuleStatusMap;
+
+//////////////////////////////////////////////////////
+// Player Attribute Rule
+//////////////////////////////////////////////////////
+
+[
+    description = "The data needed to invoke a single specific generic matchmaking rule.",
+    details = "The client only sends up a rule's desired values and the rule and fitThresholdList names (the server looks up the definition from the name).  Rule are defined in the matchmaking config file."
+]
+class PlayerAttributeRuleCriteria
+{
+    [tag="thld", description="Each MinFitThresholdList within a player attribute rule has a unique name (case insensitive).  Note: different rules may contain threshold lists with the same name."]
+        MinFitThresholdName mMinFitThresholdName;
+
+    [tag="valu", description="Only used when rule is set to ARBITRARY. A list of desired values for a player attribute matchmaking rule.  The desired values are case-insensitive, and must be selected from the possible values in the rule definition."]
+        Collections::AttributeValueList mDesiredValues;
+};
+
+typedef map<RuleName, PlayerAttributeRuleCriteria, ignorecase> PlayerAttributeRuleCriteriaMap;
+
+[description="Settings used to send the generic rule information back to client for a matchmaking session."]
+class PlayerAttributeRuleStatus
+{
+    [tag="name", description="unique rule name (case insensitive)."]
+    RuleName mRuleName;
+    
+    [tag="valu", description="A list of case-insensitive rule values match the session at this point."]
+    Collections::AttributeValueList mMatchedValues;
+};
+
+
+typedef map<RuleName, PlayerAttributeRuleStatus, ignorecase> PlayerAttributeRuleStatusMap;
+
+
+////////////////////////////////////////////////////////////////////////////////
+// User Extended Data Rule ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class UEDRuleCriteria
+{
+    [tag="thld", description="The name of the threshold list to use when determining a match."]
+    MinFitThresholdName mThresholdName;
+
+    [tag="cval", default=INVALID_USER_EXTENDED_DATA_VALUE, description="Client value used to search against another sessions or games UED value.  Default search value is the sessions caclulated UED value."]
+    UserExtendedDataValue mClientUEDSearchValue;
+
+    [tag="oval", default=INVALID_USER_EXTENDED_DATA_VALUE, description="Client value used instead of the calculated value from the user extended data that other sessions search against.  This value is only useful in the create game matchmaking mode. Default value is the sessions caculated UED value."]
+    UserExtendedDataValue mOverrideUEDValue;
+};
+
+typedef map<RuleName, UEDRuleCriteria, ignorecase> UEDRuleCriteriaMap;
+
+[description="Settings used to send the rule status back to client for a matchmaking session."]
+class UEDRuleStatus
+{
+    [tag="name", description="unique rule name (case insensitive)."]
+    RuleName mRuleName;
+
+    [tag="mued", description="The value of the entities user extended data value (either the player who owns the session or the calculated value using all of the players in the group)."]
+    UserExtendedDataValue mMyUEDValue;
+
+    [tag="amin", description="minimum user extended data value the session accepts."]
+    UserExtendedDataValue mMinUEDAccepted;
+
+    [tag="amax", description="maximum user extended data value the session accepts."]
+    UserExtendedDataValue mMaxUEDAccepted;
+};
+
+typedef map<RuleName, UEDRuleStatus, ignorecase> UEDRuleStatusMap;
+
+////////////////////////////////////////////////////////////////////////////////
+// ModRule ////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class ModRuleCriteria
+{
+    [tag="mods", description="Bitset signifying desired game mods."]
+    uint32_t mDesiredModRegister;
+
+    [tag="isen", default=false, description="Controls whether the rule is used in matchmaking (true) or not (false)"]
+    bool mIsEnabled;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Player Count Rule ///////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// NOTE: Though this is called the PlayerCountRule, it only accounts for Game Participants, and ignores Spectators during evaluation.
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class PlayerCountRuleCriteria
+{
+    [tag="issg", description="Flag to specify if it's a single group game (only meaningful to createGame MM sessions)."]
+        uint8_t mIsSingleGroupMatch;
+
+    [tag="thld", description="The name of the decay list to use for this rule."]
+        MinFitThresholdName mRangeOffsetListName;
+    
+    [tag="pcnt", default=1, description="Your ideal value for the number of Participants in the game (including you if matchmaking, not including you if gamebrowsing)."]
+        uint16_t mDesiredPlayerCount;
+        
+    [tag="pcap", default=1, description="The max current number of Participants in the game (including you if matchmaking, not including you if gamebrowsing)."]
+        uint16_t mMaxPlayerCount;
+        
+    [tag="pmin", default=1, description="The min current number of Participants you'll consider (including you if matchmaking, not including you if gamebrowsing)."]
+        uint16_t mMinPlayerCount;
+};
+
+[description="Settings used to send the rule information back to client for a matchmaking session."]
+class PlayerCountRuleStatus
+{
+    [tag="pmin", description="The minimum number of Participants the PlayerCountRule would currently match."]
+    uint16_t mMinPlayerCountAccepted;
+    
+    [tag="pmax", description="The maximum number of Participants the PlayerCountRule would currently match."]
+    uint16_t mMaxPlayerCountAccepted;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Total Player Slots Rule /////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// NOTE: Though this is called the TotalPlayerSlotsRule, it only accounts for Game Participant slots, and ignores Spectator slots during evaluation.
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class TotalPlayerSlotsRuleCriteria
+{
+    [tag="thld", description="The name of the decay list to use for this rule."]
+    MinFitThresholdName mRangeOffsetListName;
+
+    [tag="mins", default=1, description="Minimum value for the game's current total Participant slots you'll consider."]
+    uint16_t mMinTotalPlayerSlots;
+    
+    [tag="dess", default=1, description="Your ideal value for the game's current total Participant slots."]
+    uint16_t mDesiredTotalPlayerSlots;
+
+    [tag="maxs", default=1, description="Maximum value for the game's current total Participant slots you'll consider."]
+    uint16_t mMaxTotalPlayerSlots;
+};
+
+[description="Settings used to send the rule information back to client for a matchmaking session."]
+class TotalPlayerSlotsRuleStatus
+{
+    [tag="pmin", description="The minimum total Participant slots of games TotalPlayerSlotsRule would currently match."]
+    uint16_t mMinTotalPlayerSlotsAccepted;
+    
+    [tag="pmax", description="The maximum total Participant slots of games TotalPlayerSlotsRule would currently match."]
+    uint16_t mMaxTotalPlayerSlotsAccepted;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Free Player Slots Rule //////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// NOTE: Though this is called the FreePlayerSlotsRule, it only accounts for open Participant slots, and ignores Spectator slots during evaluation.
+const uint16_t INVALID_FREE_PLAYER_SLOTS_RULE_MAX_SIZE = 65535; //can't use UINT16_MAX because typecomp doesn't like assigning constants to constants.
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class FreePlayerSlotsRuleCriteria
+{
+    [tag="mins", default=0, description="Minimum number of empty Participant slots in the game."]
+    uint16_t mMinFreePlayerSlots;
+    
+    [tag="maxs", default=INVALID_FREE_PLAYER_SLOTS_RULE_MAX_SIZE, description="Maximum number of empty Participant slots in the game. Set to INVALID_FREE_PLAYER_SLOTS_RULE_MAX_SIZE to disable rule."]
+    uint16_t mMaxFreePlayerSlots;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Player Slot Utilization Rule ///////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// NOTE: Though this is called the PlayerSlotUtilizationRule, it only accounts for open Participant slots, and ignores Spectator slots during evaluation.
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class PlayerSlotUtilizationRuleCriteria
+{
+    [tag="thld", description="The name of the decay list to use for this rule."]
+    MinFitThresholdName mRangeOffsetListName;
+
+    [tag="minp", default=0, description="Minimum value for the percent of total Participant slots that are filled by Participants (including you if matchmaking, not including you if gamebrowsing)."]
+    uint8_t mMinPercentFull;
+    
+    [tag="desp", default=100, description="Ideal value for the percent of total Participant slots that are filled by Participants (including you if matchmaking, not including you if gamebrowsing)."]
+    uint8_t mDesiredPercentFull;
+    
+    [tag="maxp", default=100, description="Maximum value for the percent of total Participant slots that are filled by Participants (including you if matchmaking, not including you if gamebrowsing)."]
+    uint8_t mMaxPercentFull;
+};
+
+[description="Settings used to send the rule information back to client for a matchmaking session."]
+class PlayerSlotUtilizationRuleStatus
+{
+    [tag="pmin", description="The minimum percent of total Participant slots that are filled by Participants the PlayerSlotUtilizationRule would currently match."]
+    uint8_t mMinPercentFullAccepted;
+    
+    [tag="pmax", description="The maximum percent of total Participant slots that are filled by Participants the PlayerSlotUtilizationRule would currently match."]
+    uint8_t mMaxPercentFullAccepted;
+};
+
+//////////////////////////////////////////////////////
+// Team Balance Rule
+//////////////////////////////////////////////////////
+
+
+[description="Settings used to instantiate the TeamBalanceRule instance for a matchmaking session."]
+class TeamBalanceRulePrefs
+{
+    [tag="thld", description="The name of the decay list to use for this rule - in this case, a rangeOffsetList."]
+        MinFitThresholdName mRangeOffsetListName;
+
+    [tag="sdif", description="The max size difference between any two teams - Used to allow unbalanced teams.  For example, if the max difference is 3, a 1 Participant team could match a 4 Participant team."]
+        uint16_t mMaxTeamSizeDifferenceAllowed;
+};
+
+
+[description="Settings used to send the team balance rule information back to client for a matchmaking session."]
+class TeamBalanceRuleStatus
+{
+    [tag="sdif", description="The max size difference between the smallest and largest two teams the TeamBalanceRule would currently match."]
+        uint16_t mMaxTeamSizeDifferenceAccepted;
+};
+
+
+//////////////////////////////////////////////////////
+// Team Ued Postition Parity Rule
+//////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the TeamUEDPositionParityRule instance for a matchmaking session."]
+class TeamUEDPositionParityRulePrefs
+{
+    [tag="name", description="Each team ued balance rule has a unique name (case insensitive). This is the name of the rule defintiion specified in the server's matchmaking config file. This name must be provided (non-empty) in order for rule to be evaluated for this session."]
+        RuleName mRuleName;
+    [tag="thld", description="The name of the decay list to use for this rule - in this case, a rangeOffsetList."]
+        MinFitThresholdName mRangeOffsetListName;
+};
+ 
+[description="Settings used to send the TeamUEDPositionParityRule information back to client for a matchmaking session."]
+class TeamUEDPositionParityRuleStatus
+{
+    [tag="name", description="The unique (case insensitive) name of this matchmaking rule defined in the configuration."]
+        RuleName mRuleName;
+    [tag="tdif", description="The max UED difference accepted at each nth player position."]
+        uint64_t mMaxUEDDifferenceAcceptedTopPlayers;
+    [tag="bdif", description="The max UED difference accepted at each nth player position."]
+        uint64_t mMaxUEDDifferenceAcceptedBottomPlayers;
+    [tag="topn", description="The number of positions from the top being evaluated."]
+        uint16_t mTopPlayersCounted;
+    [tag="botn", description="The number of positions from the bottom being evaluated."]
+        uint16_t mBottomPlayersCounted;
+};
+
+//////////////////////////////////////////////////////
+// Team Ued Balance Rule
+//////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the TeamUEDBalanceRule instance for a matchmaking session."]
+class TeamUEDBalanceRulePrefs
+{
+    [tag="name", description="Each team ued balance rule has a unique name (case insensitive). This is the name of the rule defintiion specified in the server's matchmaking config file. This name must be provided (non-empty) in order for rule to be evaluated for this session."]
+        RuleName mRuleName;
+
+    [tag="thld", description="The name of the decay list to use for this rule - in this case, a rangeOffsetList."]
+        MinFitThresholdName mRangeOffsetListName;
+};
+
+[description="Settings used to send the team ued balance rule information back to client for a matchmaking session."]
+class TeamUEDBalanceRuleStatus
+{
+    [tag="name", description="The unique (case insensitive) name of this matchmaking rule defined in the configuration."]
+        RuleName mRuleName;
+
+    [tag="sdif", description="The max ued difference between the smallest and largest two teams the TeamUEDBalanceRule would currently match."]
+        uint64_t mMaxTeamUEDDifferenceAccepted;
+
+    [tag="mued", description="The session's calculated user extended data value (either the player who owns the session or the calculated value using all of the players in the group)."]
+        UserExtendedDataValue mMyUEDValue;
+};
+
+//////////////////////////////////////////////////////
+// Team Composition Rule
+//////////////////////////////////////////////////////
+
+[description="Settings used to instantiate the TeamCompositionRule instance for a matchmaking session."]
+class TeamCompositionRulePrefs
+{
+    [tag="name", description="Each team composition rule has a unique name (case insensitive). This is the name of the rule defintiion specified in the server's matchmaking config file. This name must be provided (non-empty) in order for rule to be evaluated for this session."]
+        RuleName mRuleName;
+
+    [tag="thld", description="Each MinFitThresholdList within a team composition rule has a unique name (case insensitive). Note: different rules may contain threhold lists with the same name."]
+        MinFitThresholdName mMinFitThresholdName;
+};
+
+[description="A potential team composition, i.e. a list of the sizes of the groups (sorted non-ascending) that can make up a team. The sum of the list's values equals the team's capacity."]
+typedef list<uint16_t> TeamCompositionStatus;
+
+[description="A list of team compositions."]
+typedef list<TeamCompositionStatus> TeamCompositionStatusList;
+
+[description="Data about which team compositions the rule will accept. Sent back to client as part of asynchronous status notifications for a matchmaking session."]
+class TeamCompositionRuleStatus
+{
+    [tag="name", description="The unique (case insensitive) name of this matchmaking rule defined in the configuration."]
+        RuleName mRuleName;
+
+    [tag="mytm", description="A list of currently acceptable team compositions for the team your session would join."]
+        TeamCompositionStatusList mAcceptableCompositionsForMyTeam;
+
+    [tag="ottm", description="A list of currently acceptable team compositions for the team(s) your session would not join."]
+        TeamCompositionStatusList mAcceptableCompositionsForOtherTeams;
+};
+
+//////////////////////////////////////////////////////
+// Team Min Size Rule
+//////////////////////////////////////////////////////
+
+
+[description="Settings used to instantiate the TeamMinSizeRule instance for a matchmaking session."]
+class TeamMinSizeRulePrefs
+{
+    [tag="thld", description="The name of the decay list to use for this rule - in this case, a rangeOffsetList."]
+        MinFitThresholdName mRangeOffsetListName;
+
+    [tag="pcnt", default=0, description="The min team size desired (including yourself and your game group, if this is your team). Any teams larger than this size will be considered."]
+        uint16_t mTeamMinSize;
+};
+
+
+[description="Settings used to send the team min size rule information back to client for a matchmaking session."]
+class TeamMinSizeRuleStatus
+{
+    [tag="pcnt", description="The min team size you'll consider (including yourself).  A team's Participant Count must be >= mTeamMinSizeAccepted Participants to be considered."]
+        uint16_t mTeamMinSizeAccepted;
+};
+
+
+//////////////////////////////////////////////////////
+// Team Count Rule
+//////////////////////////////////////////////////////
+
+
+[description="Settings used to instantiate the TeamCountRule instance for a matchmaking session."]
+class TeamCountRulePrefs
+{
+    [tag="tcnt", default=0, description="The number of teams in games we will join. (Default will disable rule, uses 1 if teamcount is needed)"]
+        uint16_t mTeamCount;
+};
+
+//////////////////////////////////////////////////////
+// Reputation Rule
+//////////////////////////////////////////////////////
+enum ReputationRequirement
+{
+    REJECT_POOR_REPUTATION, // in FG, only matches games that haven't set the 'allowAnyReputation' flag, in CG, only matches other REJECT_POOR_REPUTATION sessions, and creates a game with the 'allowAnyReputation' flag cleared.
+    ACCEPT_ANY_REPUTATION, // In FG, matches any game. In CG matches any MM session, will create a game with the 'allowAnyReputation' flag set.
+    MUST_ALLOW_ANY_REPUTATION // In FG, only matches games that have set the 'allowAnyReputation' flag. In CG mode, will create a game with the 'allowAnyReputation' flag set.
+};
+ 
+[description="Settings used to instantiate the ReputationRule instance for a matchmaking session."]
+class ReputationRulePrefs
+{
+    // The default is to REJECT_POOR_REPUTATION, which can be automatically updated in the Matchmaker if the user is has a poor reputation.
+    [tag="repr", default=REJECT_POOR_REPUTATION, description="The reputation requirement of matching sessions and games."]
+        ReputationRequirement mReputationRequirement;
+};
+
+//////////////////////////////////////////////////////
+// Expanded PingSite Rule
+//////////////////////////////////////////////////////
+enum LatencyCalcMethod
+{
+    INVALID_LATENCY_CALC_METHOD = 0,
+    BEST_LATENCY,
+    WORST_LATENCY,
+    AVERAGE_LATENCY,
+    MEDIAN_LATENCY
+};
+
+enum SessionMatchCalcMethod
+{
+    INVALID_SESSION_CALC_METHOD = 0,
+    MY_BEST,
+    MUTUAL_BEST
+};
+
+[addProtoAlias = true]
+enum PingSiteSelectionMethod
+{
+    INVALID_PING_SITE_SELECTION_METHOD = 0,
+
+// Original Names: 
+    STD_DEV = 1,
+    BEST_SITE,
+    AVERAGE_SITE,
+    WORST_SITE,
+
+// Alternative descriptive names: (Same values & order as above)
+    STANDARD_DEVIATION = 1,      
+    BEST_FOR_FASTEST_PLAYER, 
+    AVERAGE_FOR_ALL_PLAYERS,   
+    BEST_FOR_SLOWEST_PLAYER
+};
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class ExpandedPingSiteRuleCriteria
+{
+    [tag="thld", description="The name of the decay list to use when determining a match."]
+    MinFitThresholdName mRangeOffsetListName;
+
+    [tag="lcm", description="Specifies how the latency value used to generate fit percents is calculated (applicable to groups only)."]
+    LatencyCalcMethod mLatencyCalcMethod;
+
+    [tag="smcm", description="Specifies how a ping site is chosen to calculate the match's fit score."]
+    SessionMatchCalcMethod mSessionMatchCalcMethod;
+
+    [tag="pssm", description="Specifies how a ping sites are ordered when choosing dedicated servers."]
+    PingSiteSelectionMethod mPingSiteSelectionMethod;
+
+    [tag="pswl", description="Specifies a set of ping sites that are considered in the rule, other ping sites will be ignored.  Default (empty list) means the rule will consider all ping sites."]
+    PingSiteAliasList mPingSiteWhitelist;
+};
+
+class ExpandedPingSiteRuleStatus
+{
+    [tag="valu", description="A list of case-insensitive rule values that match the session at this point."]
+    PingSiteAliasList mMatchedValues;
+
+    [tag="mlat", description="The maximum latency allowed by the session at this point."]
+    uint32_t mMaxLatency;
+};
+
+
+[description="Settings used to instantiate the rule instance for a matchmaking session."]
+class PlatformRuleCriteria
+{
+    [tag="cpov", description="Used to set the platform, when searching from a platform that doesn't have one.  If set to 'common', all platforms will be searched for."]
+        ClientPlatformTypeList mClientPlatformListOverride;
+
+    [tag="cpmm", description="If set, the Game's Override List must match the ClientPlatformListOverride setting provided."]
+        bool mCrossplayMustMatch;
+};
+
+} // namespace GameManager
+} // namespace Blaze

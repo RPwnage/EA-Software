@@ -1,0 +1,38 @@
+# Documentation - https://docs.docker.com/compose/compose-file/
+# (make sure to read the documentation of the version number specified below - currently 3.8)
+# We try and use the known versions of following containers currently to keep things stable.
+
+version: "3.8"
+services:
+
+  blaze:
+    image: blaze-build:1.8
+    network_mode: "host"
+    volumes:
+      - ./../..:/blazeserver
+      - ./../../init/logs:/logs
+      - ./wait-for-it.sh:/tmp/wait-for-it.sh
+    working_dir: /blazeserver/etc
+    # CAP_SYS_PTRACE is required by google coredumper
+    cap_add:
+      - SYS_PTRACE
+    entrypoint:
+      - /tmp/wait-for-it.sh
+      - localhost:30000
+      - --delay=1
+      - --
+      - /blazeserver/build/blazeserver/15.1.1.10.1/unix64-clang-debug/bin/blazeserver
+      - --dbdestructive
+      - -DBASE_PORT=11000
+      - --logdir
+      - /logs
+      - --logname
+      - blazeserver
+      - env/local.boot
+    depends_on:
+      - redis-cluster
+      - gen-blaze-redis-config
+    environment:
+      USER: ${USER}
+      HOME: ${HOME}
+      LD_LIBRARY_PATH: "/blazeserver/build/blazeserver/15.1.1.10.1/unix64-clang-debug/container_lib"

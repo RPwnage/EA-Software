@@ -1,0 +1,224 @@
+group servercommon : base;
+
+rootComponent(fileNode, component) ::= <<>>
+component(fileNode, component) ::= <<>>
+baseComponent(fileNode, component) ::= <<>>
+masterComponent(fileNode, component) ::= "<component(...)>"
+slaveComponent(fileNode, component) ::= "<component(...)>"
+command(fileNode, command, component) ::= <<>>
+
+
+compName(component) ::= "<component.Name; format=\"tl\">"
+subcompName(component) ::= "<component.Name; format=\"tl\"><if(component.IsMaster)>_master<endif>"
+subcompName2(component) ::= "<component.Name><if(component.IsMaster)>Master<else>Slave<endif>"
+compId(component) ::= "<component.CompId; format=\"@0x%04X\">"
+subcompId(component) ::= "<component.SubComponentId; format=\"@0x%04X\">"
+clientName(component) ::= "<component.Name>Component"
+clientIdSymbol(component) ::= "<clientName(component=component); format=\"tu\">_COMPONENT_ID"
+
+componentTypes(component) ::= <<
+<if (component.Types)>
+<component.Types: {const EA::TDF::ObjectType <it.Name> = EA::TDF::ObjectType(<compId(component=component)>, <it.Value>);}; separator="\n">
+<endif>
+>>
+
+componentTypeDefines(component) ::= <<
+<if (component.Types)>
+<component.Types: {extern const <fileNode.InputParams.DllApiMacro> EA::TDF::ObjectType <it.Name>;}; separator="\n">
+<endif>
+>>
+
+openNamespace(name) ::= <<
+namespace <name>
+{
+>>
+
+closeNamespace(name) ::= <<
+}
+>>
+
+
+compNamespace(component, noBlaze) ::= <<
+<if(noBlaze)>
+<if (rest(component.Scope.FullNameList))>
+<rest(component.Scope.FullNameList); separator="::">::
+<endif>
+<else>
+<if (component.Scope.FullNameList)>
+<component.Scope.FullNameList; separator="::">::
+<endif>
+<endif>
+>>
+
+revCloseNamespaces(namespaces) ::= <<
+<closeNamespace(name=last(namespaces))>
+<if(trunc(namespaces))>
+<revCloseNamespaces(trunc(namespaces))>
+<endif>
+>>
+
+openCompNamespace(component, noBlaze) ::= <<
+<if(noBlaze)>
+<rest(component.Scope.FullNameList): openNamespace(name=it); separator="\n">
+<else>
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+<endif>
+>>
+
+closeCompNamespace(component, noBlaze) ::= <<
+<if(noBlaze)>
+<rest(component.Scope.FullNameList): revCloseNamespaces(namespaces=it); separator="\n">
+<else>
+<component.Scope.FullNameList: revCloseNamespaces(namespaces=it); separator="\n">
+<endif>
+>>
+commandSig(req,resp,respraw,err,tailval,nullval,sep) ::= <<
+<[{<if(command.RequestType)><req><elseif(nullval)><nullval><endif>},{<if(command.ResponseType)><resp><elseif(nullval)><nullval><endif>},{<if(command.errortype)><err><elseif(nullval)><nullval><endif>},{<if(tailval)><tailval><endif>},{<if(nullval)><nullval><endif>},{<if(nullval)><nullval><endif>},{<if(respraw)><respraw><endif>}]; separator={<sep>}>
+>>
+
+
+printInclude(inc) ::= <<#include "<if(inc.packageName)><inc.packageName>/<endif><if(inc.headername)><inc.headername><else><inc.Filename><endif>">>
+
+componentNameForTrace() ::= "<component.Name;format=\"tl\"><if(component.IsMaster)>_<component.Type;format=\"tl\"><endif>(<component.SubComponentId;format=\"@0x%04x\">)"
+
+includeFiles(component) ::= <<>>
+
+printTypeOrEmpty(type) ::=  "<if(type)><printTypeRefFullScope(type)><else>google::protobuf::Empty<endif>"
+printGrpcServiceScope() ::= "<fileNode.ProtoPackageName; format=\"dotToColon\">"
+printGrpcResponseType(command) ::= "<printGrpcServiceScope()>::<command.Name; format=\"pascal\">GrpcResponse"
+printGrpcServiceType(component) ::= "<printGrpcServiceScope()>::<component.Name><component.Type>Service"
+printGrpcCommandType(command) ::= "<if(!component.grpcOnly)>LegacyBlazeRpc<elseif(command.IsBidirectionalStreaming)>BidirectionalStreamingRpc<elseif(command.IsServerStreaming)>ServerStreamingRpc<elseif(command.IsClientStreaming)>ClientStreamingRpc<else>UnaryRpc<endif>"
+printGrpcCommandStubName(command) ::= "<command.Name;format=\"pascal\">GrpcCommandStub"
+printGrpcCommandCreatorName(command) ::= "create<command.Name;format=\"pascal\">Grpc"
+printGrpcCommandCreatorDecl(command) ::= "<if(command.generateProto)>void <printGrpcCommandCreatorName(command)>(grpc::Service* service, grpc::ServerCompletionQueue* cq, ::Blaze::Grpc::GrpcEndpoint* endpoint)<endif>"
+
+
+// HTTP static defines for component classes on both server & client.
+httpStaticDefines(component, command) ::= <<
+<if(command.http)>
+<if(command.http.basic_auth)>
+const char8_t* get<command.Name; format="pascal">Authorization(EA::TDF::Tdf& tdf) { return static_cast\<<printTypeRefFullScope(command.RequestType)> &\>(tdf).<command.http.DOT.basic_auth:{ n | get<n; format="pascal">()}; separator=".">; }<endif>
+
+<if(command.http.resource_components)>
+<command.http.resource_components:{rcomp| <if(rcomp.token)>static const uint32_t s<component.Name><component.Type>_<command.Name>ResourceComponentTags<i0>[] = { <rcomp.token_tags:{<it; format="hex">}; separator=", "> };<endif> }; separator="\n">
+static const ::Blaze::HttpFieldMapping s<component.Name><component.Type>_<command.Name>ResourceComponents[] =
+{
+    <command.http.resource_components:{rcomp| {<if(rcomp.fragment)>"<rcomp.fragment>"<else>nullptr<endif>, <if(rcomp.token)>"<rcomp.token>", s<component.Name><component.Type>_<command.Name>ResourceComponentTags<i0>, EAArrayCount(s<component.Name><component.Type>_<command.Name>ResourceComponentTags<i0>)<else>nullptr, nullptr, 0<endif> } }; separator=",\n">
+};
+<endif>
+
+<if(command.http.custom_request_headers)>
+<command.http.custom_request_headers.keys:{key| static const uint32_t s<component.Name><component.Type>_<command.Name>RequestHeaderTags<i0>[] = { <command.http.custom_request_headers_tags.(key):{<it; format="hex">}; separator=", "> }; //tags for custom request header <key> mapping to <command.http.custom_request_headers.(key)> }; separator="\n">
+static const HttpFieldMapping s<component.Name><component.Type>_<command.Name>RequestHeaderMap[] =
+{
+    <command.http.custom_request_headers.keys:{key|{ "<key>",  "<command.http.custom_request_headers.(key)>", s<component.Name><component.Type>_<command.Name>RequestHeaderTags<i0>, EAArrayCount(s<component.Name><component.Type>_<command.Name>RequestHeaderTags<i0>) }}; separator=",\n">
+};
+<endif>
+
+<if(command.http.custom_response_headers)>
+<command.http.custom_response_headers.keys:{key| static const uint32_t s<component.Name><component.Type>_<command.Name>ResponseHeaderTags<i0>[] = { <command.http.custom_response_headers_tags.(key):{<it; format="hex">}; separator=", "> }; //tags for custom response header <key> mapping to <command.http.custom_response_headers.(key)>  }; separator="\n">
+static const HttpFieldMapping s<component.Name><component.Type>_<command.Name>ResponseHeaderMap[] =
+{
+    <command.http.custom_response_headers.keys:{key|{ "<key>",  "<command.http.custom_response_headers.(key)>", s<component.Name><component.Type>_<command.Name>ResponseHeaderTags<i0>, EAArrayCount(s<component.Name><component.Type>_<command.Name>ResponseHeaderTags<i0>) }}; separator=",\n">
+};
+<endif>
+
+<if(command.http.custom_error_headers)>
+<command.http.custom_error_headers.keys:{key|static const uint32_t s<component.Name><component.Type>_<command.Name>ErrorHeaderTags<i0>[] = { <command.http.custom_error_headers_tags.(key):{<it; format="hex">}; separator=", "> }; //tags for error header <key> mapping to <command.http.custom_error_headers.(key)> }; separator="\n">
+static const HttpFieldMapping s<component.Name><component.Type>_<command.Name>ErrorHeaderMap[] =
+{
+    <command.http.custom_error_headers.keys:{key|{ "<key>",  "<command.http.custom_error_headers.(key)>", s<component.Name><component.Type>_<command.Name>ErrorHeaderTags<i0>, EAArrayCount(s<component.Name><component.Type>_<command.Name>ErrorHeaderTags<i0>) }}; separator=",\n">
+};
+<endif>
+
+<if(command.http.url_params)>
+<command.http.url_params.keys:{key| static const uint32_t s<component.Name><component.Type>_<command.Name>UrlParamsTags<i0>[] = { <command.http.url_params_tags.(key):{<it; format="hex">}; separator=", "> }; //tags for param <key> mapping to <command.http.url_params.(key)>}; separator="\n">
+static const HttpFieldMapping s<component.Name><component.Type>_<command.Name>UrlParamsMap[] =
+{
+    <command.http.url_params.keys:{key|{ "<key>",  "<command.http.url_params.(key)>", s<component.Name><component.Type>_<command.Name>UrlParamsTags<i0>, EAArrayCount(s<component.Name><component.Type>_<command.Name>UrlParamsTags<i0>) }}; separator=",\n">
+};
+<endif>
+
+<if(command.http.requestPayloadMember)>
+static const uint32_t s<component.Name><component.Type>_<command.Name>RequestPayloadMemberTags[] =
+{<command.RequestPayloadMemberTags:{<it; format="hex">}; separator=", ">};
+<endif>
+
+<if(command.http.responsePayloadMember)>
+static const uint32_t s<component.Name><component.Type>_<command.Name>ResponsePayloadMemberTags[] =
+{<command.ResponsePayloadMemberTags:{<it; format="hex">}; separator=", ">};
+<endif>
+
+<if(command.http.requestPayloadBlob)>
+EA::TDF::TdfBlob& get<command.Name; format="pascal">RequestBlob(EA::TDF::Tdf& tdf) { return static_cast\<<printTypeRefFullScope(command.RequestType)> &\>(tdf).<command.http.DOT.requestPayloadBlob:{ n | get<n; format="pascal">()}; separator=".">; }<endif>
+<if(command.http.responsePayloadBlob)>
+EA::TDF::TdfBlob& get<command.Name; format="pascal">ResponseBlob(EA::TDF::Tdf& tdf) { return static_cast\<<printTypeRefFullScope(command.ResponseType)> &\>(tdf).<command.http.DOT.responsePayloadBlob:{ n | get<n; format="pascal">()}; separator=".">; }<endif>
+
+<if(command.http.success_error_codes)>
+<command.http.success_error_codes.keys:{key|static const uint32_t s<component.Name><component.Type>_<command.Name>SuccessStatusCodeTags<i0>[] = { <command.http.success_error_codes_tags.(key):{<it; format="hex">}; separator=", "> }; }; separator="\n">
+static const SuccessStatusCodeMapping s<component.Name><component.Type>_<command.Name>SuccessStatusCodeMap[] =
+{
+    <command.http.success_error_codes.keys:{key|{s<component.Name><component.Type>_<command.Name>SuccessStatusCodeTags<i0>, EAArrayCount(s<component.Name><component.Type>_<command.Name>SuccessStatusCodeTags<i0>), <command.http.success_error_codes.(key)>}}; separator=",\n">
+};
+<endif>
+
+<if(command.http.status_code_errors)>
+static const StatusCodeErrorMapping s<component.Name><component.Type>_<command.Name>StatusCodeErrorMap[] =
+{
+    <command.http.status_code_errors.keys:{key|{ <key>, <command.http.status_code_errors_tags.(key).Name> }}; separator=",\n">
+};
+<endif>
+
+
+static const ::Blaze::RestResourceInfo s<component.Name><component.Type>_<command.Name>RestInfo =
+{ 
+#ifdef BLAZE_CLIENT_SDK
+    <clientName(component)>::<clientIdSymbol(component)>, //Component id
+    <clientName(component)>::CMD_<command.Name; format="toUpper">,  //Command id
+#else
+    <component.Name><component.Type>::COMPONENT_ID, //Component id
+    <component.Name><component.Type>::CMD_<command.Name; format="toUpper">,  //Command id
+#endif
+    <if(command.http.apiVersion)>    "<command.http.apiVersion>"<elseif(component.http.apiVersion)>    "<component.http.apiVersion>"<else>    nullptr<endif>,  // Api Version
+    "<command.http.resource>",  //resource
+    "<command.http.resource; format="formatUriMetrics">",  //formatted resource for metrics
+    s<component.Name><component.Type>_<command.Name>ResourceComponents,
+    EAArrayCount(s<component.Name><component.Type>_<command.Name>ResourceComponents), //resource path components size
+    "<command.http.method>",  //method
+    <if(command.http.basic_auth)>    &get<command.Name; format="pascal">Authorization<else>    nullptr<endif>,  //HTTP basic authorization
+    <if(command.http.custom_request_headers)>    s<component.Name><component.Type>_<command.Name>RequestHeaderMap<else>    nullptr<endif>, //custom request headers map
+    <if(command.http.custom_response_headers)>    s<component.Name><component.Type>_<command.Name>ResponseHeaderMap<else>    nullptr<endif>, //custom response headers map
+    <if(command.http.custom_error_headers)>    s<component.Name><component.Type>_<command.Name>ErrorHeaderMap<else>    nullptr<endif>, //custom error response headers map
+    <if(command.http.url_params)>    s<component.Name><component.Type>_<command.Name>UrlParamsMap<else>    nullptr<endif>, //url params map
+    <if(command.http.custom_request_headers)>    EAArrayCount(s<component.Name><component.Type>_<command.Name>RequestHeaderMap)<else>    0<endif>, //custom request headers map size
+    <if(command.http.custom_response_headers)>    EAArrayCount(s<component.Name><component.Type>_<command.Name>ResponseHeaderMap)<else>    0<endif>, //custom response headers map size
+    <if(command.http.custom_error_headers)>    EAArrayCount(s<component.Name><component.Type>_<command.Name>ErrorHeaderMap)<else>    0<endif>, //custom error response headers map size
+    <if(command.http.url_params)>    EAArrayCount(s<component.Name><component.Type>_<command.Name>UrlParamsMap)<else>    0<endif>, //url params map size
+    <if(command.http.requestPayloadMember)>    "<command.http.requestPayloadMember>"<else>    nullptr<endif>, //request payload member name
+    <if(command.http.responsePayloadMember)>    "<command.http.responsePayloadMember>"<else>    nullptr<endif>, //response payload member name
+    <if(command.http.requestPayloadBlob)>    &get<command.Name; format="pascal">RequestBlob<else>    nullptr<endif>, //request payload blob field name
+    <if(command.http.responsePayloadBlob)>    &get<command.Name; format="pascal">ResponseBlob<else>    nullptr<endif>, //response payload blob field name
+    <if(command.http.requestPayloadMember)>    s<component.Name><component.Type>_<command.Name>RequestPayloadMemberTags<else>    nullptr<endif>, //request payload member tag list
+    <if(command.http.requestPayloadMember)>    EAArrayCount(s<component.Name><component.Type>_<command.Name>RequestPayloadMemberTags)<else>    0<endif>, //request payload member tag list size
+    <if(command.http.responsePayloadMember)>    s<component.Name><component.Type>_<command.Name>ResponsePayloadMemberTags<else>    nullptr<endif>, //response payload member tag list
+    <if(command.http.responsePayloadMember)>    EAArrayCount(s<component.Name><component.Type>_<command.Name>ResponsePayloadMemberTags)<else>    0<endif>, //response payload member tag list size
+    <if(command.http.success_error_codes)>    s<component.Name><component.Type>_<command.Name>SuccessStatusCodeMap<else>    nullptr<endif>, //success status code map
+    <if(command.http.success_error_codes)>    EAArrayCount(s<component.Name><component.Type>_<command.Name>SuccessStatusCodeMap)<else>    0<endif>, //success status code map size
+    <if(command.http.status_code_errors)>    s<component.Name><component.Type>_<command.Name>StatusCodeErrorMap<else>    nullptr<endif>, // map of http status code to blaze rpc error
+    <if(command.http.status_code_errors)>    EAArrayCount(s<component.Name><component.Type>_<command.Name>StatusCodeErrorMap)<else>    0<endif>, //status code to blaze rpc error map size
+    <if(command.http.addEncodedPayload)>    <command.http.addEncodedPayload><elseif(command.http.addEncodedPayload)>    <command.http.addEncodedPayload><else>    false<endif>, //addEncodedPayload to request body
+    <if(command.http.contentType)>    "<command.http.contentType>"<elseif(command.http.contentType)>    "<command.http.contentType>"<else>    nullptr<endif>, // Content-Type of the request.  If "", it is assumed that the Content-Type header exists in the custom_request_headers map.
+    <if(command.http.compressPayload)>    <command.http.compressPayload><elseif(command.http.compressPayload)>    <command.http.compressPayload><else>    false<endif>, // Whether the payload should be gzip compressed.
+    ::Blaze::Encoder::<if(command.http.headerEncoderSubType)><command.http.headerEncoderSubType><elseif(component.http.headerEncoderSubType)><component.http.headerEncoderSubType><else>NORMAL<endif>,  // Header encoder sub type
+    ::Blaze::Encoder::<if(command.http.urlParamEncoderSubType)><command.http.urlParamEncoderSubType><elseif(component.http.urlParamEncoderSubType)><component.http.urlParamEncoderSubType><else>NORMAL<endif>,  // URLParam encoder sub type
+    ::Blaze::Encoder::<if(command.http.payloadEncoderSubType)><command.http.payloadEncoderSubType><elseif(component.http.payloadEncoderSubType)><component.http.payloadEncoderSubType><else>DEFAULTDIFFERNCE<endif>,  // Payload encoder sub type
+    <if(command.http.use_response_header_blazeerror)><command.http.use_response_header_blazeerror><elseif(component.http.use_response_header_blazeerror)><component.http.use_response_header_blazeerror><else>    false<endif>,  //retrieve BlazeError from the response header map if available
+    <if(command.http.encodeEnumsAsStrings)>    <command.http.encodeEnumsAsStrings><elseif(command.http.encodeEnumsAsStrings)>    <command.http.encodeEnumsAsStrings><else>    false<endif>, // Encode all enumerations as strings instead of int value.  Can have mixed encoding by using actual ints for int values.
+    <if(command.http.encodeBoolsAsTrueFalse)>    <command.http.encodeBoolsAsTrueFalse><elseif(command.http.encodeBoolsAsTrueFalse)>    <command.http.encodeBoolsAsTrueFalse><else>    false<endif>, // Encode all booleans as "true" or "false" instead of "1" or "0".
+    <if(command.http.encodeListsAsCSV)>    <command.http.encodeListsAsCSV><elseif(command.http.encodeListsAsCSV)>    <command.http.encodeListsAsCSV><else>    false<endif>, // In url query parameters, encode lists as comma-separated values instead of duplicating entries (i.e. list=item1,item2 instead of list=item1&list=item2).
+    <if(command.http.encodeVariableGenericWithoutTdfInfo)>    <command.http.encodeVariableGenericWithoutTdfInfo><elseif(component.http.encodeVariableGenericWithoutTdfInfo)>    <component.http.encodeVariableGenericWithoutTdfInfo><else>    false<endif>, // Encode variable and generic tdfs without tdf class info.
+    <if(command.http.maxHandledUrlRedirects)>    <command.http.maxHandledUrlRedirects><elseif(command.http.maxHandledUrlRedirects)>    <command.http.maxHandledUrlRedirects><else>    5<endif> // Max number of times Blaze automatically attempts re-sending a request on a redirection url. Specify 0 to disable automatic attempting to re-send a request with its redirection url.
+};
+<endif>
+>>
+// end http static defines

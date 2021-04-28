@@ -1,0 +1,130 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+	<nativetoolchain>
+		<compiler
+				path="${package.StadiaSDK.compiler}"
+				path-clanguage="${package.StadiaSDK.c-compiler}"
+				version="${package.StadiaSDK.clang.version}"
+				>
+			<system-includedirs>
+				${package.stadiasdk.includedir}
+			</system-includedirs>
+			<common-options>
+				<!-- DAVE FUTURE REFACTOR TODO: lot of copy paste for some standard clang settings between different configs, should standardize -->
+			
+				-fms-extensions
+				-m64
+				-march=broadwell
+				-fPIC
+				-gdwarf-aranges
+
+				<!-- put functions and data in their own sections, link time -gc-sections can then cull function by function reducing binary size -->
+				-ffunction-sections
+				-fdata-sections
+				
+				<!-- Keep the frame pointer around for performing backtraces -->
+				-fno-omit-frame-pointer
+				
+				<!-- Enable Advanced Vector Extension (AVX) instructions. -->
+				 -mavx2 
+				 
+				 <!-- Stop the compiler being so aggressive at introducing memcpy's with aligned 256 bit wide (AVX) move instructions, 
+				 Compiler's aggressive assumptions can lead to crashes with pointers coming from typical EA custom allocators which don't align how the compiler assumes.
+				 NOTE: This value was previously 8 but was updated to 16 after testing in FIFA and Frostbite -->
+				 -fmax-type-align=16		
+			</common-options>
+			<template>
+				<!-- Swapped options and includedirs so that -nostdinc can be specified in cc.options in general.xml -->
+				<commandline>
+					%defines%
+					%options%
+					%includedirs%
+					-o "%objectfile%"           <!-- object file -->
+					-c "%sourcefile%"           <!-- source file -->
+				</commandline>
+				<pch.commandline>
+					%defines%
+					%includedirs%
+					%system-includedirs%
+					%options%
+					-o "%pchfile%"              <!-- pch file -->
+					-c "%sourcefile%"           <!-- full path to pch header -->
+				</pch.commandline>
+				<define>-D %define%</define>
+				<includedir>-I "%includedir%"</includedir>
+				<system-includedir>-I "%includedir%"</system-includedir>
+			</template>
+		</compiler>
+
+		<linker
+				path="${package.StadiaSDK.linker}"
+				version="${package.StadiaSDK.clang.version}"
+				>
+			<system-librarydirs>
+				<!-- We let the compiler choose the standard library directories based on other command line arguments we give it (e.g. -m32). -->
+			</system-librarydirs>
+			<common-options>
+				-stdlib=libc++
+				-m64
+				-lpthread
+				-ldl
+				-lrt
+				-l:libggp.so
+				-Xlinker --build-id=sha1
+				-Wl,--gc-sections
+			</common-options>
+			<template>
+				<commandline>
+					%options%
+					%objectfiles%
+					%librarydirs%
+					-Xlinker --start-group
+					%libraryfiles%
+					-Xlinker --end-group
+				</commandline>
+				<librarydir>-L "%librarydir%"</librarydir>
+				<libraryfile>"%libraryfile%"</libraryfile>
+				<objectfile>"%objectfile%"</objectfile>
+			</template>
+		</linker>
+
+		<assembler
+				path="${package.StadiaSDK.assembler}"
+				version="${package.StadiaSDK.assembler.version}"
+				>
+			<common-options>
+				--MD "%objectfile%.d"
+			</common-options>
+			<template>
+				<commandline>
+					%options%
+					%includedirs%
+					-o "%objectfile%"
+					-c "%sourcefile%"
+				</commandline>
+				<define>--defsym %define%</define>
+				<includedir>-I"%includedir%"</includedir>
+				<system-includedir>-I"%includedir%"</system-includedir>
+			</template>
+		</assembler>
+
+		<librarian
+				path="${package.StadiaSDK.archiver}"
+				version="${package.StadiaSDK.archiver.version}"
+				>
+			<common-options>
+				-crs "%liboutputname%"
+			</common-options>
+			<template>
+				<commandline>
+					%options%
+					%objectfiles%
+				</commandline>
+				<objectfile>"%objectfile%"</objectfile>
+			</template>
+		</librarian>
+	</nativetoolchain>
+
+</project>

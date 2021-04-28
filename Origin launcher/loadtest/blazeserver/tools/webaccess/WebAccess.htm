@@ -1,0 +1,164 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" >
+<head>
+    <title>Blaze Web Access Page</title>
+    <script type="text/javascript">
+        var sessionKey = "";
+        var xmlhttp;
+
+        function addBlazeCommands()
+        {
+            //
+            // TODO: Add your commands here
+            //
+            addCommand("clubs/getClubs/[sessionkey]?clid|0=2");
+            addCommand("clubs/changeClubStrings/[sessionkey]?clid=2&cnam=NewName&cabr=NNM&cdsc=Some%20nice%20polite%20description");
+        }
+        
+        function getSessionKey(email, password, persona)
+        {
+            var date = new Date();
+            var timestamp = date.getTime();
+            var loginUrl = 'http://' 
+                            + document.getElementById("blazeServer").value
+                            + '/authentication/expressLogin?mail=' + email
+                            + '&pass=' + password 
+                            + '&pnam=' + persona
+                            + '&xxxx=' + timestamp;
+            try 
+            {
+                xmlhttp = new XMLHttpRequest();
+                setStatus("Logging in user: " + email + " / " + password + " / " + persona);
+                setStatus("Url: " + loginUrl);
+                xmlhttp.open("GET", loginUrl, false);
+                xmlhttp.send(null);
+                setStatus("Done.");
+                sessionKey = xmlhttp.responseXML.getElementsByTagName("sessionkey").item(0).text;
+                setStatus("Session Key: " + sessionKey);
+            }
+            catch(err)
+            {
+                stateChanged(xmlhttp);
+                setStatus("Error: " + err.description);
+            }
+        }
+
+
+        function executeCommand(command)
+        {
+            if (document.getElementById("checkAutoClear").checked)
+            {
+                document.getElementById('response').innerHTML="";
+            }
+            
+            var date = new Date();
+            var timestamp = date.getTime();
+            var commandUrl = 
+                "http://" 
+                + document.getElementById("blazeServer").value 
+                + "/"  + command.replace("[sessionkey]", sessionKey)
+                + '&xxxx=' + timestamp; // this will make each request unique and bypass caching
+            setStatus("Executing command: " + commandUrl);
+            xmlhttp = new XMLHttpRequest();
+            try
+            {
+                xmlhttp.open("GET", commandUrl, false);
+                xmlhttp.send(null);
+                setStatus("Done.");
+                var result = xmlhttp.responseXML.xml;
+                setStatus(result);
+            }
+            catch(err)
+            {
+                setStatus("Error: " + err.description);
+            }
+        }
+
+        function stateChanged(xmlhttp)
+        {
+            setStatus("State Changed");
+            if (xmlhttp.responseText != null)
+                setStatus("Response: " + xmlhttp.responseText);
+            else
+                setStatus("Error. Server is gone?");
+        }
+        
+        function executeLink(command)
+        {
+            document.getElementById("immCommand").value = command;
+            if (document.getElementById("checkExecuteImmediately").checked)
+                executeCommand(command);
+            else
+                document.getElementById("immCommand").focus();
+        }
+
+        function executeImmediate(command)
+        {
+            if (document.getElementById("checkAddToCommands").checked)
+                addCommand(command);
+            executeCommand(command);
+        }
+        
+        function addCommand(command)
+        {
+            document.getElementById("commandList").innerHTML += 
+                '<div><a href="#" onclick="executeLink(this.innerText);">' + command + '</a></div>';
+        }
+        
+        var logEntryCounter = 0;
+        function setStatus(text)
+        {
+            var resp = document.getElementById("response");
+            resp.innerHTML += '<div id="logEntry' + logEntryCounter + '" style="margin:10px"></div>';
+            document.getElementById("logEntry" + logEntryCounter).innerText = text;
+            resp.scrollTop = resp.scrollHeight;
+            logEntryCounter++;
+        }
+        
+    </script>
+</head>
+<body onload="addBlazeCommands()">
+    <h1 style="margin-bottom:0px">Blaze Web Access</h1>
+    <div id="disclaimer" style="font-size:smaller; margin-bottom:10px">
+        This page works only under IE7. Add your set of commands in TODO section of html code.
+    </div>
+    <div id="serverName">
+        Server: <input id="blazeServer" value="localhost:43722" style="width:300px"/>
+    </div>
+    <div id="UserData">
+        <div id="PredefUser">
+            Select predefined user:
+            <select id="predName" style="margin-left:20px;margin-right:20px">
+                <option value="nexus001">nexus001</option>
+                <option value="nexus002">nexus002</option>
+                <option value="nexus003">nexus003</option>
+                <option value="nexus004">nexus004</option>
+                <option value="nexus005">nexus005</option>
+            </select>
+            <button onclick="getSessionKey(document.getElementById('predName').value + '@ea.com', 'nexus', document.getElementById('predName').value)">Login</button>
+        </div>
+        <div id="arbitraryUser" style="margin-top:10px">
+            or enter email:
+            <input id="uemail" style="margin-left:20px;margin-right:20px"/>
+            password:
+            <input id="upassword" style="margin-left:20px;margin-right:20px"/>
+            persona:
+            <input id="upersona" style="margin-left:20px;margin-right:20px"/>
+            <button onclick="getSessionKey(document.getElementById('uemail').value, document.getElementById('upassword').value, document.getElementById('upersona').value)">Login</button>
+        </div>
+    </div>
+    <div id="commands" style="margin-top:10px;margin-bottom:10px;border-top-width:1px;border-top-color:Black;border-top-style:solid">
+        <input type="checkbox" id="checkExecuteImmediately" checked="checked"  /> Execute Immediately
+        <div id="commandList" style="height:200px;overflow:scroll">
+        </div>
+    </div>
+    <div id="immediate" style="margin-top:10px;margin-bottom:10px">
+        <input id="immCommand" maxlength="512" style="width:800px" />
+        <button id="runImmediate" onclick="executeImmediate(document.getElementById('immCommand').value);">Execute</button>
+        <input type="checkbox" id="checkAddToCommands" checked="checked"  /> Add to Commands
+    </div>
+    <button onclick="document.getElementById('response').innerHTML=''">Clear</button>
+    <input type="checkbox" id="checkAutoClear"/>Auto Clear
+    <div id="response" style="height:400px;background-color:#eeeeff;overflow:scroll"></div>
+</body>
+</html>

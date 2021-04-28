@@ -1,0 +1,264 @@
+// This file defines the extension options that can be used to decorate proto files.
+// The options are similar to attribute tagging mechanism we have with EATDF. 
+// In protobuf, it is possible to extend options by defining extension messages which is what we do below.
+// We use these options to aid the custom code generation. These options can also be accessed at run-time however
+// currently we have no use case for it.
+
+syntax = "proto3";
+
+import "google/protobuf/descriptor.proto";
+
+package eadp.blaze.protobuf;
+
+option csharp_namespace = "eadp.blaze.protobuf";
+option go_package = "gitlab.ea.com/eadp-gameplay-services/blaze-support/blazegoprotos/eadp/blaze/protobuf;eadp_blaze_protobuf";
+option java_package = "com.ea.eadp.blaze.protobuf";
+option objc_class_prefix = "EADP_BLAZE_PROTOBUF";
+
+// Options that can be specified on a field
+message FieldOptions
+{
+    string description = 1; // Description provided in the tdf file. Informational purpose only. 
+    string default = 2; // String representation of the default value in the tdf file. Informational purpose only.
+    bool prim_type_is_same = 3; // true if proto type and tdf type are same primitive type (proto does not support integral type smaller than int32_t/uint32_t). We use this to optimize the case when integral types are same.
+    bool value_is_proxy = 4; // Used for annotate 'on-the-fly fields' generated to fix the container type incompatibility
+    bool has_ignore_case = 5; // Used for maps that have ignoreCase set (in case of string keys)
+    bool key_is_enum = 6; // Used to annotate map if the key type is actually enum (proto map do not support enum keys whereas tdf maps do)
+    string key_tdf_type = 7; // Used to annotate key type in map if not directly compatible. 
+    string value_tdf_type = 8; // Used to annotate value type in map and list.
+
+    string type_alias = 9; // Use this to generate the code having the type's specified typedef, instead of actual type (for convenience/maintenance etc)
+    string string_value_max_len = 10; // Max length needed/allowed for the string (so titles can allocate local buffer sizes appropriately etc). "-1" means no explicit limit. Note: to allow specifying named constants here, this is string. Plugins parse out regular int values from the string.
+
+    string details = 20;
+    bool track_changes = 21;
+    string tdfregistration = 22;
+    bool advanced = 23;
+    bool allowref = 24;
+    string nameoverride = 25;
+    string print_format = 26;
+    string reconfigurable = 27;
+    string tdfid = 28;
+    string tag = 29;
+    int32 bit_size = 30; //used by bitfield members
+    bool ownsmem = 31;
+}
+
+// Extend the FieldOptions message to allow for the additional options we define.
+extend google.protobuf.FieldOptions 
+{
+    FieldOptions field_options = 20004; // The tag has to not collide with any existing tag in the message. This is a sufficiently random magic value.
+}
+
+// Options that can be specified on a message
+message MsgOptions
+{
+    //Used by Blaze's orig custom Raven.x protoc compiler (see ../blazeserver_grpc_tools/src/google/protobuf/compiler/blaze/cpp_helpers.cc etc):
+    string tdf_type = 2;
+    bool message_is_proxy = 3;          // Used for fixing container type inflexibility by annotating the generated nested message.
+    bool message_is_response = 4;       // Used to identify response message that are generated on the fly (actual response and the status field)
+    bool message_is_notification = 5;   // Used to identify notification message that are generated on the fly
+
+
+    // Protobuf class/member outputs options
+    string description = 1;
+    string details = 6;
+    bool track_changes = 7;
+    string tdfregistration = 8;
+    bool advanced = 9;
+    bool allowref = 10;
+    string nameoverride = 11;
+    string print_format = 12;
+    string reconfigurable = 13;
+    string tdfid = 14;
+    bool alloc_in_place = 15;
+    string full_name = 16;
+
+
+
+    // For things like C++ typedefs, or special Blaze specific component code which can't otherwise be generated properly:
+    // If a member in the following oneof is specified, the custom plugin should generate the custom 'thing' based on the member.
+    // Depending on the case, plugin may also omit generating any regular/stock protobuf message code (to avoid C++ compile issues etc).
+    // If none of the below is specified, stock protobuf generation is used.
+
+    oneof custom_generated_output_option {
+        bool generate_entity_types_block = 100; // If specified, plugin generates an entity types block.
+        bool generate_permissions_block  = 101;
+        bool generate_errors_block = 102;
+        bool generate_sdkerrors_block = 103;
+        GenerateExplicitConstant generate_constant = 104;
+        GenerateExplicitTypedef generate_typedef = 105;
+        GenerateExplicitFwdDecl generate_fwd_decl = 106;
+        GenerateExplicitInclude generate_include = 107;
+    }
+    message GenerateExplicitConstant
+    {
+        string name = 1;
+        string type = 2;
+        string const_value = 3;
+        bool is_string_len = 4; //may be useful for custom plugin
+        string description = 5;
+        string details = 6;
+    }
+    message GenerateExplicitTypedef
+    {
+        string alias = 1;
+        string for_type = 2;
+        string description = 3;
+        string details = 4;
+    }
+    message GenerateExplicitFwdDecl  // For potential back compat custom generating: .tdfs' 'baseTdf' featyure allowed referencing a non-generated class, that's a subclass of a TDF. (For instance see stats_configtypes_server.tdf baseTdf=StatData, and typedef list<Stat> StatList).
+    {
+        string subclass = 1;
+        string base_proto = 2; //note: must have a generated base class by spec.
+    }
+    message GenerateExplicitInclude  // For potential back compat custom generating: .tdfs allowed specifying explicit #include of a non-code generated header. (For instance see stats_configtypes_server.tdf and its #include stats/statstypes.h and baseTdf=StatData). Protobuf can't 'import' a non-generated file, but the following allows custom plugins to generate similar code.
+    {
+        string statement = 1;
+    }
+}
+
+extend google.protobuf.MessageOptions 
+{
+    MsgOptions msg_options = 20004; // The tag has to not collide with any existing tag in the message. This is a sufficiently random magic value.
+}
+
+
+message FileOptions
+{
+    string proto_root = 1;
+
+    message ImportOptions
+    {
+        string headername = 1;
+        bool client_include = 2;
+    }
+    map<string, ImportOptions> imports = 2; // map of import statements to attributes
+}
+
+extend google.protobuf.FileOptions 
+{
+    FileOptions file_options = 20004; // The tag has to not collide with any existing tag in the message. This is a sufficiently random magic value.
+}
+
+message EnumOptions // Note: In addition to actual Blaze API enums, constants like BlazeErrors, may also be represented using .proto enums.
+{
+    string description = 1;
+    string full_name = 2;
+}
+
+extend google.protobuf.EnumOptions 
+{
+    EnumOptions enum_options = 20004; // The tag has to not collide with any existing tag in the message. This is a sufficiently random magic value.
+}
+
+message EnumValueOptions
+{
+    string description = 1;
+    string nameoverride = 2;
+    string details = 3;
+    string name = 4;
+    bool has_identity = 5;
+    bool client_export = 6;
+    string passthrough = 7;
+    string payload = 8; //used for notifications w/custom plugin C++ generation
+}
+
+extend google.protobuf.EnumValueOptions 
+{
+    EnumValueOptions enum_value_options = 20004; // The tag has to not collide with any existing tag in the message. This is a sufficiently random magic value.
+}
+
+message MethodOptions
+{
+    string description = 1;             // Informational string about your rpc that is available in the generated code. The description should be informative but short (There isn't a strict limit on the length however).
+    bool requires_authentication = 2;   // Whether RPC requires authentication. See Blaze docs for details
+    bool internal = 3;                  // If set, this rpc can only be accessed on the internal endpoints. False by default.
+    int32 id = 4;                       // (For tdfs, required) This is a numeric representation of the rpc command used to identify the rpc encoded on the wire. Once set, you should not change this id otherwise you'll break the backward compatibility.
+    bool allow_guest_call = 5;          // If set to true, the rpc is allowed to be invoked by a guest user session. False by default.
+    bool blocking = 6;                  // If set, the fiber processing the rpc is allowed to block. If rpc's generate_command_class or passthrough attribute is set, the fiber is allowed to block regardless of this attribute.
+    bool client_export = 7;             // If set to false, the client does not generate code for this rpc. True by default. You can use this attribute to remove any rpcs that need to be in the slave definition(for intra-cluster communication) but will never be used by the SDK client. Note that this attribute does not provide any security against a (hacked) client that can figure out a way to call the rpc. If you want to protect access to your rpc, see the internal attribute instead.
+    bool generate_command_class = 8;    // (Optional, slave only) (defaults to true) This flag controls the code generated for a server component command. If true, a command stub class header is generated, and the server code will create a command and start it when the request comes in. If false, a private virtual abstract function is created in the component stub class. This is to be overridden by the component implementation, and is called to process any incoming requests for that command.
+    bool ignore_sharding_key = 9;       // If set, sharding key defined at component level is ignored. False by default
+    string passthrough = 10;            // If set, this attribute defines the name of the master method this method passes through to. False by default.
+    bool requires_user_session = 11;    // See Blaze docs for details
+    bool set_current_user_session = 12; // See Blaze docs for details
+    bool reset_idle_timer = 13;         // See Blaze docs for details
+    string details = 14;                // Additional information about your rpc that serves as documentation but not available in the generated code. This can be used for the cases where description attribute is not enough.
+    string fiber_stack_size  = 15;      // See Blaze docs for details
+    string errortype = 16;              // The class name of a that will be returned in the case of an error. This is in addition to any error code defined by the rpc.
+    repeated string errors = 17;        // This is a list of error codes that this rpc can return
+    RpcHttpBlock http = 18;             // Optional. This attribute allows custom mapping of a http request to rpc or vice versa. See Blaze docs.
+    bool obfuscate_platform_info = 19;  // (Optional, false by default. Multi-platform deployments only.) If set, the component's obfuscatePlatformInfo method is invoked on the rpc response before it is sent down to clients (intra-cluster communication will not be affected). 
+}
+
+extend google.protobuf.MethodOptions 
+{
+    MethodOptions rpc_options = 20004; // The tag has to not collide with any existing tag in the message. This is a sufficiently random magic value.
+}
+
+message ServiceOptions
+{
+    string comp_id_str = 1;             // Component configured 'id', in the form of a 'cateogryname/index' pair. Internally Blaze uses this to generate the system wide unique ComponentId.
+    string name = 2;                    // Component name
+    string namespace = 3;               // Component namespace
+    string description = 4;             // Component description
+    string details = 5;                 // Component details
+    string configuration_type = 6;      // Name of the message type that holds the component's config file's values
+    string preconfiguration_type = 7;   // Name of the message type that holds the component's preconfig file's values
+
+    bool requires_master = 8;           // Whether component requires an active master component to activate
+    bool factory_create = 9;            // Whether or not the server will generate factory creation code for the component. optional and defaults to true
+    bool expose_raw_config = 10;        // See Blaze docs for details.
+    bool set_current_user_session = 11; // This attribute should not be used as the requires_authentication and requiresUserSession should be sufficient for the needs.
+    string clientname = 12;             // Specific to slave components. It defines a name of the class generated on the client side of the component.
+    
+    bool is_sharded = 13;               // Whether sharded. Any component that uses sliver MUST be sharded
+    bool use_slivers = 14;              // Whether uses silvers. Enables sliver based sharding of the keys provided in any sharded RPC
+    string sharding_key = 15;           // The name of the request Tdf member in this component's sharded RPCs most commonly used as the sharding key.  Can be overriden per-RPC.
+
+    bool should_auto_register_for_master_replication = 16;   // See Blaze docs for details.
+    bool should_auto_register_for_master_notifications = 17; // See Blaze docs for details.
+    bool has_custom_replication_mediator = 18; // (optional, default false) determines whether or not a slave's ReplicatedDataMediator will generate a factory function. If true, no factory function is generated and the user can override the mediator type. See How To Use Replication for more information
+
+    RpcHttpBlock http = 19;             // Optional. This attribute allows custom mapping of a http request to rpc or vice versa. See Blaze docs.
+    map<string, string> alloc_groups = 20;  // Component's memory allocation groups (optional)
+
+    bool grpc_only = 21;                // Used to indicate this method is not defined/supported for EATDF rpc.
+}
+
+extend google.protobuf.ServiceOptions 
+{
+    ServiceOptions service_options = 20004; // The tag has to not collide with any existing tag in the message. This is a sufficiently random magic value.
+}
+
+message RpcHttpBlock
+{
+    string api_version = 1;             // Will prefix the resource with a specific value, e.g, /1/resource
+    string header_encoder_sub_type = 2; // Optional. Used to control how parameters get encoded. Default value is NORMAL, which means all members are encoded. DEFAULTDIFFERNCE will only encode parameters that are difference from the default value of the member
+    string url_param_encoder_sub_type = 3;
+    string payload_encoder_sub_type = 4;
+    string resource = 5;                // Template parameters can be used here and are identified by brace brackets. If the requested URL matches this resource path with template parameters as place holders, this RPC will be triggered and the values of request field will be set with any template parameter values defined in the requested URL.
+    string method = 6;                  // Method type of the request. For example: GET, PUT, POST etc
+    string basic_auth = 7;              // Optional. (blazeserver only) Set the HTTP Basic Authentication in the format of username:password
+    map<string, string> url_params = 8; // Map the param names from request members
+    map<string, string> custom_request_headers = 9;     // Map the request headers from request members
+    map<string, string> custom_response_headers = 10;   // Map the response headers into response members
+    map<string, string> custom_error_headers = 11;      // Map the response headers into error response members
+    map<string, int64> success_error_codes = 12;        // (blazeserver only) Map response members to HTTP success codes
+    map<int64, string> status_code_errors = 13;         // (blazeserver only) Map response HTTP error codes to RPC errors. Each RPC error that appears in this map must be listed in the RPC definition's errors block and defined in the component definition's errors block.
+    string request_payload_member = 14; // Map the request payload from a specific request member
+    string request_payload_blob = 15;   // Map the request payload as a blob from a request TDF member. Typically, such TDF member is of TDF blob type
+    string response_payload_member = 16;// Map the response payload into a specific response TDF member
+    string response_payload_blob = 17;  // Map the response payload into a TDF blob in a response TDF
+    bool add_encoded_payload  = 18;
+    string content_type = 19;
+    bool compress_payload = 20;
+    bool use_blaze_error_code = 21;
+    bool use_response_header_blazeerror = 22;
+    bool encode_enums_as_strings = 23;
+    bool encode_bools_as_true_false = 24;
+    bool encode_lists_as_csv = 25;
+    bool encode_variable_generic_without_tdf_info = 26;
+    int64 max_handled_url_redirects = 27;  // (blazeserver only) Specifies max number of times Blaze automatically internally attempts re-sending an http rpc request on a redirection url (if one is received). Specify 0 to disable automatic attempting to re-send a request with its redirection url. The default if unspecified is 5.
+}

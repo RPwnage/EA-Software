@@ -1,0 +1,320 @@
+group grpcservice : servercommon;
+
+logInfo(msg) ::= <<
+// TdfToProto INFO: <msg>
+>>
+
+logWarn(msg) ::= <<
+// TdfToProto WARN: <msg>
+>>
+
+logError(msg) ::= <<
+// TdfToProto ERROR: <msg>
+>>
+
+// Use C-style comment in order to support multi-line descriptions
+printDescription(node) ::="<if(node.description)>/* <node.description>*/<endif>"
+
+printTypeList(typeList) ::= <<
+<typeList; separator=".">
+>>
+
+printInclude(node) ::= <<
+<node.relativeProtoPath; format="includeproto">
+>>
+
+forwardDeclare(fullTypeName, typeName) ::= <<
+<if(!fileNode.DefTable.(fullTypeName))>
+<trunc(fullTypeName):{namespace <it>\{}>class <typeName>;<trunc(fullTypeName):{\}}><fileNode.DefTable.Add.(fullTypeName)>
+<endif>
+>>
+
+printResponseType(command) ::= <<
+<command.Name; format="pascal">GrpcResponse
+>>
+
+printNotificationType(component) ::= <<
+<component.Name><component.Type>NotificationMsg
+>>
+
+printEventType(component) ::= <<
+<component.Name><component.Type>EventMsg
+>>
+
+printTypeListFull(typeList) ::= <<
+<typeList; format="protoFullyQualified">
+>>
+
+printServiceOptions(component) ::= <<
+option (eadp.blaze.protobuf.service_options) = { //service
+    comp_id_str: "<component.CompIdStr>"<if(component.Name)>,
+    name: "<component.Name>"<endif>,
+    description: "<if(component.description)><component.description; format="stripnl"><else>Component info.<endif>"<if(component.details)>,
+    details: "<component.details; format="stripnl">"<endif><if(component.configurationType)>,
+    configuration_type: "<component.configurationType>"<endif><if(component.preconfigurationType)>,
+    preconfiguration_type: "<component.preconfigurationType>"<endif><if(isFalse.(component.requiresMaster))>,
+    requires_master: <component.requiresMaster><endif><if(isFalse.(component.factory_create))>,
+    factory_create: <component.factory_create><endif><if(component.exposeRawConfig)>,
+    expose_raw_config: <component.exposeRawConfig><endif><if(isFalse.(component.setCurrentUserSession))>,
+    set_current_user_session: <component.setCurrentUserSession><endif><if(component.clientname)>,
+    clientname: "<component.clientname>"<endif><if(component.isSharded)>,
+    is_sharded: <component.isSharded><endif><if(component.useSlivers)>,
+    use_slivers: <component.useSlivers><endif><if(component.shardingKey)>,
+    sharding_key: "<component.shardingKey>"<endif><if(isFalse.(component.shouldAutoRegisterForMasterReplication))>,
+    should_auto_register_for_master_replication: <component.shouldAutoRegisterForMasterReplication><endif><if(isFalse.(component.shouldAutoRegisterForMasterNotifications))>,
+    should_auto_register_for_master_notifications: <component.shouldAutoRegisterForMasterNotifications><endif><if(component.has_custom_replication_mediator)>,
+    has_custom_replication_mediator: <component.has_custom_replication_mediator><endif>,
+    grpc_only: <if(component.grpcOnly)>true<else>false<endif><if(component.http)>,
+    <printRpcHttpBlock(HttpBlock=component.http)><endif><if(component.alloc_groups)>,
+    <printListAsOptionStrStrMap(listNode=component.alloc_groups, mapName="alloc_groups", listItemMemberForKey="Name", listItemMemberForValue="Value")><endif>
+};
+>>
+
+// Side: for usability, ensure at least a first line is printed (either apiVersion, or resource).
+printRpcHttpBlock(HttpBlock) ::= <<
+<if(HttpBlock)>http: {<{ <if(HttpBlock.apiVersion)> api_version: "<HttpBlock.apiVersion>"<elseif(!HttpBlock.resource)> api_version: ""<endif><if(HttpBlock.resource)><if(HttpBlock.apiVersion)>,<\n><else> <endif>resource: "<HttpBlock.resource>"<endif><if(HttpBlock.method)>,
+method: "<HttpBlock.method>"<endif><if(HttpBlock.basic_auth)>,
+basic_auth: "<HttpBlock.basic_auth>"<endif><if(HttpBlock.url_params)>,
+<printAsOptionStrStrMap(mapNode=HttpBlock.url_params, mapName="url_params")><endif><if(HttpBlock.custom_request_headers)>,
+<printAsOptionStrStrMap(mapNode=HttpBlock.custom_request_headers, mapName="custom_request_headers")><endif><if(HttpBlock.custom_response_headers)>,
+<printAsOptionStrStrMap(mapNode=HttpBlock.custom_response_headers, mapName="custom_response_headers")><endif><if(HttpBlock.custom_error_headers)>,
+<printAsOptionStrStrMap(mapNode=HttpBlock.custom_error_headers, mapName="custom_error_headers")><endif><if(HttpBlock.success_error_codes)>,
+<printAsOptionStrNumMap(mapNode=HttpBlock.success_error_codes, mapName="success_error_codes")><endif><if(HttpBlock.status_code_errors)>,
+<printAsOptionNumStrMap(mapNode=HttpBlock.status_code_errors, mapName="status_code_errors")><endif><if(HttpBlock.requestPayloadMember )>,
+request_payload_member: "<HttpBlock.requestPayloadMember>"<endif><if(HttpBlock.requestPayloadBlob)>,
+request_payload_blob: "<HttpBlock.requestPayloadBlob>"<endif><if(HttpBlock.responsePayloadMember)>,
+response_payload_member: "<HttpBlock.responsePayloadMember>"<endif><if(HttpBlock.responsePayloadBlob)>,
+response_payload_blob: "<HttpBlock.responsePayloadBlob>"<endif><if(isFalse.(HttpBlock.addEncodedPayload))>,
+add_encoded_payload: <HttpBlock.addEncodedPayload><endif><if(HttpBlock.contentType)>,
+content_type: "<HttpBlock.contentType>"<endif><if(HttpBlock.useBlazeErrorCode)>,
+use_blaze_error_code: <HttpBlock.useBlazeErrorCode><endif><if(HttpBlock.use_response_header_blazeerror)>,
+use_response_header_blazeerror: <HttpBlock.use_response_header_blazeerror><endif><if(HttpBlock.compressPayload)>,
+compress_payload: <HttpBlock.compressPayload><endif><if(HttpBlock.encodeEnumsAsStrings)>,
+encode_enums_as_strings: <HttpBlock.encodeEnumsAsStrings><endif><if(HttpBlock.encodeBoolsAsTrueFalse)>,
+encode_bools_as_true_false: <HttpBlock.encodeBoolsAsTrueFalse><endif><if(HttpBlock.encodeListsAsCSV)>,
+encode_lists_as_csv: <HttpBlock.encodeListsAsCSV><endif><if(HttpBlock.encodeVariableGenericWithoutTdfInfo)>,
+encode_variable_generic_without_tdf_info: <HttpBlock.encodeVariableGenericWithoutTdfInfo><endif><if(HttpBlock.headerEncoderSubType)>,
+header_encoder_sub_type: "<HttpBlock.headerEncoderSubType>"<endif><if(HttpBlock.urlParamEncoderSubType)>,
+url_param_encoder_sub_type: "<HttpBlock.urlParamEncoderSubType>"<endif><if(HttpBlock.payloadEncoderSubType)>,
+payload_encoder_sub_type: "<HttpBlock.payloadEncoderSubType>"<endif><if(HttpBlock.maxHandledUrlRedirects)>,
+max_handled_url_redirects: <HttpBlock.maxHandledUrlRedirects><endif>}; anchor, separator=",\n    ">
+}<endif>
+>>
+
+
+
+createResponseMessage(command) ::= <<
+<if(command.generateProto)>
+message <printResponseType(command)>
+{
+    option (eadp.blaze.protobuf.msg_options) = { //cmd rsp
+        <printBasicClassMsgOptions(node=command)>,
+        message_is_response: true
+    };
+
+    google.rpc.Status status = 1;
+    <if(command.ResponseType)><printTypeListFull(command.ResponseType.Symbol.FullName)><else>    google.protobuf.Empty<endif> response = 2;
+}
+<endif>
+>>
+
+addCommandRpc(command) ::= <<
+<if(command.generateProto)>rpc <command.Name>(<if(command.RequestType)><if(command.IsClientStreaming)>stream <endif><printTypeListFull(command.RequestType.Symbol.FullName)><else>google.protobuf.Empty<endif>) returns (<if(command.IsServerStreaming)>stream <endif><fileNode.ProtoPackageName>.<printResponseType(command)>) {
+    option (eadp.blaze.protobuf.rpc_options) = { //cmd
+        id: <command.id> /*eatdf*/,
+        description: "<command.description; format="stripnl">"<if(isFalse.(command.requires_authentication))>,
+        requires_authentication: <command.requires_authentication><endif><if(command.internal)>,
+        internal: <command.internal><endif><if(isFalse.(command.allowGuestCall))>,
+        allow_guest_call: <command.allowGuestCall><endif><if(isFalse.(command.blocking))>,
+        blocking: <command.blocking><endif><if(isFalse.(command.client_export))>,
+        client_export: <command.client_export><endif><if(isFalse.(command.generate_command_class))>,
+        generate_command_class: <command.generate_command_class><endif><if(command.ignoreShardingKey)>,
+        ignore_sharding_key: <command.ignoreShardingKey><endif>,
+        requires_user_session: <if(command.requiresUserSession)>true<else>false<endif><if(isFalse.(command.setCurrentUserSession))>,
+        set_current_user_session: <command.setCurrentUserSession><endif><if(isFalse.(command.reset_idle_timer))>,
+        reset_idle_timer: <command.reset_idle_timer><endif><if(command.details)>,
+        details: "<command.details; format="stripnl">"<endif><if(command.fiber_stack_size)>,
+        fiber_stack_size: "<command.fiber_stack_size>"<endif><if(command.errortype)>,
+        errortype: "<command.errortype>"<endif><if(command.passthrough_origval)>,
+        passthrough: "<command.passthrough_origval>"<endif><if(command.errors)>,
+        <printAsOptionStrList(listNode=command.errors, listName="errors")><endif><if(command.http)>,
+        <printRpcHttpBlock(HttpBlock=command.http)><endif><if(command.obfuscate_platform_info)>,
+        obfuscate_platform_info: <command.obfuscate_platform_info><endif>
+    };
+};<endif>
+>>
+
+addNotificationIdEnum(notification) ::= <<
+<if(notification.generateProto)><if(notification.NotificationType)><notification.Name; format="_guard"> = <notification.protobuf_tag> [
+    (eadp.blaze.protobuf.enum_value_options) = { //NotificationIdEnum for (<notification.Name>(<printTypeListFull(notification.NotificationType.Symbol.FullName)>))
+        name: "<notification.Name>",
+        payload: "<notification.NotificationType.Symbol.FullName>",
+        description: "<if(notification.description)><notification.description; format="stripnl"><endif>"<if(notification.details)>,
+        details: "<notification.details; format="stripnl">"<endif>,
+        client_export: <if(notification.client_export)>true<else>false<endif><if(notification.passthrough_origval)>,
+        passthrough: "<notification.passthrough_origval>"<endif>
+    }
+];<endif><endif>
+>>
+
+addNotificationMsg(notification) ::= <<
+<if(notification.generateProto)><if(notification.NotificationType)><printTypeListFull(notification.NotificationType.Symbol.FullName)> <notification.Name> = <notification.protobuf_tag>; <endif><endif>
+>>
+
+addEventMsg(event) ::= <<
+<if(event.generateProto)><if(event.EventType)><printTypeListFull(event.EventType.Symbol.FullName)> <event.Name> =  <event.id> [ (eadp.blaze.protobuf.field_options) = { description: "EventMsg: <if(event.description)><event.description; format="stripnl"><endif>"<if(event.details)>, details: <event.details; format="stripnl"><endif> } ];<endif><endif>
+>>
+
+
+
+component(fileNode, component) ::= <<
+<fileNode.DefTable.Clear>
+syntax = "proto3";
+
+package <fileNode.ProtoPackageName>;
+
+option csharp_namespace = "<fileNode.ProtoPackageName>";
+option go_package = "<fileNode.ProtoPackageName; format="goPackageImportPath">;<fileNode.ProtoPackageName; format="goPackage">";
+option java_package = "<fileNode.ProtoPackageName; format="javaPackage">";
+option objc_class_prefix = "<fileNode.ProtoPackageName; format="objcPrefix">";
+
+import "eadp/blaze/protobuf/commonincludes.proto";
+<if(component.generateProto)>
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+<endif>
+<\n>
+option (eadp.blaze.protobuf.file_options) = { //component file
+    proto_root: "<fileNode.protoRootDir>"<if(fileNode.Includes)>,
+    <printImportsFileOptions(fileNode=fileNode)><endif>
+};
+
+<if(component.generateProto)>
+// component <if(component.Name)><component.Name><endif><if(component.Type)><component.Type><endif>
+
+<if(component.Types)>
+message <component.Name><component.Type>EntityType
+{
+    option (eadp.blaze.protobuf.msg_options) = { //EntityTypes
+        generate_entity_types_block : true,
+        description: "<component.Name><component.Type>EntityType::Type enum values correspond to the Entity Types for the component.",
+        message_is_response: true
+    };
+    enum Type
+    {
+        // note: first enum value must be zero in proto3
+        ENTITY_TYPE_INVALID    = 0 [ (eadp.blaze.protobuf.enum_value_options) = { description: "Invalid entity type." } ];
+        <component.Types:{it|<it.Name>    = <it.Value> [(eadp.blaze.protobuf.enum_value_options) = { name: "<if(it.name)><it.name><endif>"<if(isFalse.(it.has_identity))>, has_identity: <it.has_identity><endif> } ];}; separator="\n" > //entityType
+    }
+}
+<endif>
+
+<if(component.permissions)>
+message <component.Name><component.Type>Permission
+{
+    option (eadp.blaze.protobuf.msg_options) = { //Permissions
+        generate_permissions_block : true,
+        description: "<component.Name><component.Type>Permission::Type enum values correspond to the Permissions for the component."
+    };
+    enum Type
+    {
+        PERMISSION_NONE    = 0 [(eadp.blaze.protobuf.enum_value_options) = { description: "No permission." }];
+        <component.permissions:{it|<it.Name>    = <it.FullValue; format="hex"> [(eadp.blaze.protobuf.enum_value_options) = {<if(it.description)> description: "<it.description; format="stripnl">" <endif>} ];}; separator="\n" > //permission
+    }
+}
+<endif>
+
+<if(component.Errors)>
+message <component.Name><component.Type>ServiceError
+{
+    option (eadp.blaze.protobuf.msg_options) = { //ServiceErrors
+        generate_errors_block : true,
+        description: "<component.Name><component.Type>ServiceError::Type enum can be used for easy error code comparison on the client for rpc specific errors.",
+        message_is_response: true
+    };
+    enum Type
+    {
+        ERR_OK    = 0 [(eadp.blaze.protobuf.enum_value_options) = { description: "No error." }];
+        <component.Errors:{e|<e.Name>    = <e.FullValue; format="hex"> [(eadp.blaze.protobuf.enum_value_options) = {<if(e.description)> description: "<e.description; format="stripnl">" <endif>} ];}; separator="\n">
+    }
+}
+<endif>
+
+
+<if(component.Notifications)>
+message <printNotificationType(component)>
+{
+    option (eadp.blaze.protobuf.msg_options) = { //Notifications
+        description: "Notification Message for <component.Name><component.Type>Service",
+        message_is_notification: true
+    };
+
+    // NotificationId enum identifies the notification as different notifications can have the same message.
+    // The actual message type of the notification is the type listed against the enum field.
+    enum NotificationId
+    {
+        INVALID = 0;
+
+        <component.Notifications:addNotificationIdEnum();separator="\n\n">
+    }
+
+    NotificationId notificationId = 1;
+    google.protobuf.Any notificationMsg = 2;
+}
+<endif>
+
+
+<component.Commands:createResponseMessage();separator="\n\n">
+
+<if(component.Commands)>
+service <component.Name><component.Type>Service
+{
+    <printServiceOptions(component)>
+
+    <component.Commands:addCommandRpc();separator="\n\n">
+
+    <if(component.Notifications)>    rpc subscribeNotifications(google.protobuf.Empty) returns (stream <fileNode.ProtoPackageName>.<printNotificationType(component)>) {
+        option (eadp.blaze.protobuf.rpc_options) = { //notification cmd
+            description: "Subscribe to notifications from <component.Name><component.Type>Service.",
+            requires_authentication: true
+        };
+    };<endif>
+}
+<elseif(component.Notifications)>
+service <component.Name><component.Type>Service
+{
+    <printServiceOptions(component)>
+
+    <if(component.Notifications)>    rpc subscribeNotifications(google.protobuf.Empty) returns (stream <fileNode.ProtoPackageName>.<printNotificationType(component)>) {
+        option (eadp.blaze.protobuf.rpc_options) = { //notification cmd
+            description: "Subscribe to notifications from <component.Name><component.Type>Service.",
+            requires_authentication: true
+        };
+    };<endif>
+}
+<endif>
+
+<if(component.Notifications)>
+message Unused<printNotificationType(component)>
+{
+    option (eadp.blaze.protobuf.msg_options) = { //Notifications Unused
+        description: "Unused notification message to ensure that all the notification messages are exported in proto files so unpacking them from 'Any' type won't fail on the client side.",
+        message_is_response: true
+    };
+
+    <component.Notifications:addNotificationMsg();separator="\n">
+}
+<endif>
+
+<if(component.Events)>
+message Unused<printEventType(component)>
+{
+    option (eadp.blaze.protobuf.msg_options) = { //Events Unused
+        description: "Unused event message to ensure that all the events messages are exported in proto files so unpacking them from 'Any' type won't fail on the client side.",
+        message_is_response: true
+    };
+
+    <component.Events:addEventMsg();separator="\n">
+}
+<endif>
+<endif>
+>>

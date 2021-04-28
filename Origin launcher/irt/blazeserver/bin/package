@@ -1,0 +1,240 @@
+#!/opt/local/bin/python
+
+#/usr/bin/env python2.5
+#
+# Version 1.0 -- Blaze Package Script
+
+import commands, os, sys, time
+
+DEFAULT_CONFIG = 'package-blaze.cfg'
+## \var DEFAULT_CONFIG
+## Holds default name for config file used for deploying.
+
+global includefiles, includedests, excludefiles
+global archive, archiveDir, build, validationscript
+
+includefiles = []
+## \var includefiles
+## Holds the files to be included in the server tar.gz file. (Wildcards accepted)
+includedests = []
+## \var includedests
+## Holds the destination for files in case they are to be placed in directories other than
+## where they originated from.
+excludefiles = []
+## \var excludefiles
+## Holds the files to be excluded from the tar.gz file. (Wildcards accepted)
+archive = ''
+## \var archive
+## prefix of the archive file to be created.
+archiveDir = './archive'
+## \var archiveDir
+## Directory of the archive file to be created.
+build = 'debug'
+## \var build
+## Build to use (debug, release, profile).
+validationscript = 'validation'
+## \var validationscript
+## Script that validates deploy.
+validationcheck = True
+## \var validationcheck
+## Flag to indicate whether a validation check should be done.
+usecontainer = False
+## \var container
+## Flag to indicate whether a container should be used for blazeserver -v checking
+
+def build_dist():
+    """\brief Constructs the tar.gz file that contains all the necessary files for the
+    server to startup the remote machine.
+    Reads from deploy.cfg file for the INCLUDE_FILES and EXCLUDE_FILES and creates 
+    the package accordingly.  To include files add them to the INCLUDE_FILES list in
+    the same format as the existing entries (wildcards allowed) and excluded files are
+    taken from the EXCLUDE_LIST.  Files can not be on both lists.  For example, you can 
+    not add a file on the INCLUDE_LIST and also have a wildcard entry on the 
+    EXCLUDE_LIST that will match the included file's criteria.  The file will be 
+    excluded.
+    """
+    includelist = []
+    excludelist = []
+    
+    print 'BUILD-DIST: Creating archive ...'
+
+    # validate build
+    if validationcheck == True:
+        valsuffix = ' '
+        if usecontainer:
+            valsuffix = '-container '
+        statusoutput = commands.getstatusoutput('. ./setenv.sh ' + os.getcwd() + '/.. && ./' + validationscript + valsuffix + build)
+        if statusoutput[0] != 0:
+            print 'BUILD ERROR:'
+            print statusoutput[1]
+            # command.getstatusoutput() returns an exit status according to the rules for the C wait() function,
+            # but sys.exit() doesn't support exit status > 255
+            sys.exit(-1 if not os.WIFEXITED(statusoutput[0]) else os.WEXITSTATUS(statusoutput[0]))
+    else:
+        print 'BUILD-DIST: Skipping validation check...'
+
+    for filename in includefiles:
+        includelist.append('../' + filename)
+    for filename in excludefiles:
+        excludelist.append('../' + filename)
+
+    # blaze-YYYYmmddTHHMMSS.tar.gz
+    archivename = archive + '-' + time.strftime('%Y%m%dT%H%M%S', time.gmtime())
+
+    # build command string
+    archivecommand = 'tar czf ' + archivename + '.tar.gz ' + ' '.join(includelist) + ' --ignore-failed-read'
+    for exclude in excludelist:
+        archivecommand = archivecommand + ' --exclude=' + exclude
+
+    statusoutput = commands.getstatusoutput(archivecommand)
+    if statusoutput[0] != 0:
+        print 'BUILD ERROR:'
+        print statusoutput[1]
+        os.remove(archivename + '.tar.gz')
+        sys.exit(statusoutput[0])
+
+    statusoutput = commands.getstatusoutput('mkdir -p ' + archiveDir + '/' + archivename + ' && mv ' + archivename + '.tar.gz ' + archiveDir + '/' + archivename)
+    if statusoutput[0] != 0:
+        print 'BUILD ERROR:'
+        print statusoutput[1]
+        sys.exit(statusoutput[0])
+
+    # untar, remap the files, and recreate the archive
+    os.chdir(archiveDir + '/' + archivename)
+    remapcommand = 'tar -xzf ' + archivename + '.tar.gz && rm ' + archivename + '.tar.gz && '
+    for file, dest in zip(includefiles, includedests):
+        if dest != '':
+            remapcommand = remapcommand + 'mkdir -p ' + dest[2:] + ' && mv ' + file[2:] + ' ' + dest[2:] + ' && rmdir -p ' + file[2:file.rindex('/')] + ' --ignore-fail-on-non-empty && '
+    remapcommand = remapcommand + 'tar -czf ' + archivename + '.tar.gz * && mv ' + archivename + '.tar.gz ..'
+
+    statusoutput = commands.getstatusoutput(remapcommand)
+    if statusoutput[0] != 0:
+        print 'BUILD ERROR:'
+        print statusoutput[1]
+        sys.exit(statusoutput[0])
+    os.chdir('..')
+    statusoutput = commands.getstatusoutput('rm -rf ' + archivename)
+    if statusoutput[0] != 0:
+        print 'BUILD ERROR:'
+        print statusoutput[1]
+        sys.exit(statusoutput[0])
+
+    print 'BUILD-DIST: Created ' + archivename
+    print 'BUILD-DIST: Done'
+    return
+
+
+def clean_dist():
+    """\brief Cleans the archive directory of all previously build deploy archives
+    """
+    print 'CLEAN-DIST: Cleaning archives ...'
+
+    statusoutput = commands.getstatusoutput('rm -rf ' + archiveDir)
+    if statusoutput[0] != 0:
+        print 'CLEAN WARNING:'
+        print 'Error while purging archive directory'
+
+    print 'CLEAN-DIST: Done'
+    return
+
+def read_config(configfile):
+    """\brief Parse config file for necessary deploy parameters.
+    @param configfile Name of file to parse for options.
+    
+    This function parses the deploy.cfg file for all the necessary configuration
+    options for the servers to be successfully deployed.
+    """
+    global dir, servers, user, year, includefiles, includedests, excludefiles, olddeploycount, env, bootFileOverride, usecontainer
+
+    serversection = False
+    includesection = False
+    excludesection = False
+    for option in open(configfile):
+        option = option.split()
+
+        # ignore comments
+        if len(option) == 0 or option[0] == '#':
+            serversection = includesection = excludesection = False
+            continue
+        elif serversection == True:
+            servers.append(option[0])
+            continue
+        elif includesection == True:
+            option[0] = option[0].replace('out/linux/build', 'out/linux/' + build)
+            includefiles.append('./' + option[0])
+            if len(option) == 1:
+                includedests.append('')
+            else:
+                includedests.append('./' + option[2])
+            continue
+        elif excludesection == True:
+            option[0] = option[0].replace('out/linux/build', 'out/linux/' + build)
+            excludefiles.append('./' + option[0])
+            continue
+        if option[0] == 'DEPLOY_DIR:': 
+            if dirset == False:
+                dir = option[1]
+            else:
+                continue
+        elif option[0] == 'DEPLOY_SERVERS:':
+            serversection = True
+        elif option[0] == 'DEPLOY_USER:':
+            user = option[1]
+        elif option[0] == 'DEPLOY_YEAR:':
+            year = option[1]
+        elif option[0] == 'DEPLOY_BOOT_OVERRIDE:':
+            bootFileOverride = option[1]
+        elif option[0] == 'DEPLOY_INCLUDEFILES:':
+            includesection = True
+        elif option[0] == 'DEPLOY_EXCLUDEFILES:':
+            excludesection = True
+        elif option[0] == 'OLD_DEPLOY_COUNT:':
+            olddeploycount = option[1]
+        else:
+            print 'READ ERROR: invalid option - ' + option[0]
+            sys.exit(-1)
+
+def usage():
+    """\brief Print usage for calling deploy script.
+    """
+    print 'Usage: ./package <command> [options]'
+    print '\nCommands:'
+    print 'build-dist, clean-dist, clean-build'
+
+if len(sys.argv) < 2:
+    usage()
+    sys.exit(-1)
+
+config = DEFAULT_CONFIG
+## \var config
+## Config file used for deployment of servers.  Script gets all needed information
+## from this script.
+
+for option in sys.argv[2:]:
+    if option.find('-a=') != -1:
+        archive = option[3:]
+    elif option.find('-b=') != -1:
+        build = option[3:]
+    elif option.find('--config=') != -1:
+        config = option[9:]
+    elif option.find('--archiveDir=') != -1:
+        archiveDir = option[13:]
+    elif option.find('--usecontainer=') != -1:
+        usecontainer = option[15:]
+    else:
+        usage()
+        sys.exit(-1)
+
+read_config(config)
+
+if sys.argv[1] == 'build-dist':
+    build_dist()
+elif sys.argv[1] == 'clean-dist':
+    clean_dist()
+elif sys.argv[1] == 'clean-build':
+    clean_dist()
+    build_dist()
+else:
+    print 'Usage Error: invalid option ' + sys.argv[1] + ' specified\n'
+    usage()
+    sys.exit(-1)

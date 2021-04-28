@@ -1,0 +1,101 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- setup mono environment properties -->
+  <include file="mono-buildtools.xml"/>
+
+  <!-- Set up xcode environment properties -->
+
+  <do unless="@{PropertyExists('xcode-application-directory')}">
+    <do if="@{PlatformIsWindows()}">
+      <property name="xcode-application-directory" value="/Applications/Xcode.app"/>
+    </do>
+
+    <do if="@{PlatformIsOSX()}">
+      <eval code="@{DirectoryGetDirectories('/Applications', 'Xcode*', '|')}"
+            property="xcode-directories" type="Function" />
+
+      <fail if="@{StrContains('${xcode-directories}', '|')}"
+            message="This system has more than one version of Xcode installed.  Please specify which version to use by setting a property called xcode-application-directory to the value of the version of Xcode to be used."/>
+
+      <property name="xcode-application-directory" value="${xcode-directories}"/>
+    </do>
+  </do>
+
+  <choose>
+    <do if="@{StrStartsWith('${xcode-application-directory}','/')}">
+      <eval property="xcode-app-developer-dir" code="@{StrReplace('${xcode-application-directory}/Contents/Developer','//','/')}" type="Function"/>
+    </do>
+    <do>
+      <eval property="xcode-app-developer-dir" code="@{StrReplace('/Applications/${xcode-application-directory}/Contents/Developer','//','/')}" type="Function"/>
+    </do>
+  </choose>
+
+  <do if="@{PlatformIsOSX()}">
+    <fail unless="@{DirectoryExists('${xcode-app-developer-dir}')}"
+          message="Xcode could not be found at location ${xcode-app-developer-dir} on that system."/>
+  </do>
+
+  <property name="package.xcode.toolbindir" value="${xcode-app-developer-dir}/usr/bin/"/>
+  <property name="package.xcode.toolchainbindir" value="${xcode-app-developer-dir}/Toolchains/XcodeDefault.xctoolchain/usr/bin/"/>
+
+  <property name="package.xcode.compiler"     value="${package.xcode.toolchainbindir}clang++"/>
+  <property name="package.xcode.c-compiler"   value="${package.xcode.toolchainbindir}clang"/>
+  <property name="package.xcode.assembler"    value="${package.xcode.toolchainbindir}as"/>
+  <property name="package.xcode.archiver"     value="${package.xcode.toolchainbindir}libtool"/>
+  <property name="package.xcode.linker"       value="${package.xcode.toolchainbindir}clang++"/>
+
+  <do.once context="project" key="SetXcodeVersion">
+    <SetXcodeVersion VersionPropertyName="package.xcode.version" />
+  </do.once>
+  
+  <!-- Find out whether the osx host machine is on an arm64 or an x86_64 machine -->
+  <createtask name="GetMacOSHostArchitecture">
+    <parameters>
+      <option name="OutPropertyName" value="Required"/>
+    </parameters>
+    <code>
+      <record property="__uname_output" silent="true">
+        <exec program="uname" commandline="-m"/>
+      </record>
+      <choose>
+        <do if="@{StrEndsWith('${__uname_output}', 'x86_64')}">
+          <!-- Test if we are in an x86_64 process running under Rosetta.  If that is the case, we are on an arm64 host. -->
+          <record property="__sysctl_output" silent="true">
+            <exec program="sysctl" commandline="-in sysctl.proc_translated"/>
+          </record>
+          <eval code="@{StrEndsWith('${__sysctl_output}','1')}" type="Function" property="__sysctl_result"/>
+          <property name="${GetMacOSHostArchitecture.OutPropertyName}" value="arm64" if="${__sysctl_result}"/>
+          <property name="${GetMacOSHostArchitecture.OutPropertyName}" value="x86_64" unless="${__sysctl_result}"/>
+        </do>
+        <do if="@{StrEndsWith('${__uname_output}', 'arm64')}">
+          <!-- Highly unlikely we will get here unless Framework itself is built as native osx-arm64.  -->
+          <property name="${GetMacOSHostArchitecture.OutPropertyName}" value="arm64"/>
+        </do>
+        <do>
+          <property name="${GetMacOSHostArchitecture.OutPropertyName}" value="Unknown"/>
+        </do>
+      </choose>
+    </code>
+  </createtask>
+  
+  <!-- Get the list of architectures that the binary is built with -->
+  <createtask name="GetOsxBinaryArchitectures">
+    <parameters>
+      <option name="binaryPath" value="Required"/>
+      <option name="OutPropertyName" value="Required"/>
+    </parameters>
+    <code>
+      <record property="__lipo_output" silent="true">
+        <exec program="lipo" commandline="-archs ${GetOsxBinaryArchitectures.binaryPath}"/>
+      </record>
+      <foreach item="String" in="${__lipo_output}" delim="${nant.endline}" property="__line">
+        <!-- Output will be on the last line -->
+        <property name="${GetOsxBinaryArchitectures.OutPropertyName}" value="${__line}"/>
+      </foreach>
+    </code>
+  </createtask>
+
+</project>

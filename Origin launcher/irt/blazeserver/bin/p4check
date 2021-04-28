@@ -1,0 +1,153 @@
+#!/usr/bin/env python
+
+#
+# Version 1.0 -- Perforce Preflight Check
+#
+# This script will compare client and server views of a depot
+# to verify that there are no files that remain to be added to
+# the depot.
+#
+# A configuration file is used as an exclude list.
+#
+# TODO:
+# -----
+# - Add a option to pass in exclude list or file.
+# - Warn if client has not been sync-ed recently.
+#
+
+import os, sys
+import marshal
+import fnmatch
+import re
+import ConfigParser
+from ConfigParser import SafeConfigParser
+
+#
+# Exec a command and parse it using P4/Python dictionary parsing.
+#
+def runcmd(cmd):
+        fd = os.popen(cmd, 'rb')
+        results = []
+        while 1:
+                try:
+                        d = marshal.load(fd)
+                        results.append(d)
+                except EOFError:
+                        break
+        fd.close()
+        return results
+
+#
+# HACK method to handle an issue where P4 -G is not
+# returning all data.
+#
+def runcmdraw(cmd):
+	fd = os.popen(cmd, 'r')
+	results = []
+	try:
+		data = {}
+		for l in fd.readlines():
+			if l.startswith('...'):
+				l = l.strip()
+				s = l.split(' ', 2)
+				if len(s) == 3:
+					data[s[1]] = s[2]
+			else:
+				results.append(data)
+				data = {}
+	except EOFError:
+		pass
+
+	fd.close()
+	return results
+
+# 
+# file walk function to capture files
+#
+def append(filedict, dirname, names):
+        for name in names:
+                f = os.path.join(dirname, name)
+                f = f.replace('\\','/')
+                if os.path.isfile(f):
+			if re.search(gFilter, f):
+				pass
+			else:
+				filedict[f] = 1 
+
+# 
+# Compare 2 maps
+#
+def diffMaps(map1, map2):
+	inMap1 = []
+	inMap2 = []
+	dupes = []
+
+	for i in map1.keys():
+		if map2.has_key(i) and map2[i]:
+			dupes.append(i)
+		else:
+			inMap1.append(i)
+	for i in map2.keys():
+		if map1.has_key(i) and map1[i]:
+			pass
+		else:
+			inMap2.append(i)
+	return [inMap1, inMap2, dupes]
+
+#
+# Build global exclude list for files and directories.
+#
+def buildExcludeList(cfgpath):
+  config = ConfigParser.SafeConfigParser()
+  config.read(cfgpath)
+  pattern = ''
+  exclude = config.get('EXCLUDE', 'FILES')
+  exclude = exclude.replace('.','\.')
+  s = exclude.strip().replace(' ','|')
+  return s
+
+cfgpath = os.path.join(os.path.dirname(sys.argv[0]),'p4check.cfg')
+gFilter = buildExcludeList(cfgpath)
+
+#
+# Retrieve client spec
+#
+[client_spec] = runcmd("p4 -G client -o")
+name = client_spec['Client']
+root = client_spec['Root']
+root = root.replace('\\','/')
+
+#
+# Retrieve file information
+#
+info = runcmdraw("p4 fstat //%s/..." % name)
+
+#
+# Retrieve files in open state
+#
+open = runcmd("p4 -G opened")
+
+#
+# Grab files from p4, grab local files, diff
+#
+filesInPerforce = {}
+filesLocal = {}
+
+for i in info:
+	if i.has_key('headAction') and i['headAction'] != 'delete':
+		filesInPerforce[i['clientFile'].replace('\\','/')] = 1 
+
+for i in open:
+    cfile = i['clientFile']
+    cfile = cfile.replace('//%s' % i['client'], root)
+    filesInPerforce[cfile.replace('\\','/')] = 1 
+		
+os.path.walk(root, append, filesLocal)
+[p4only, localonly, dupes] = diffMaps(filesInPerforce, filesLocal)
+
+print "Found %d files that have not been added to Perforce." % len(localonly)
+
+if len(localonly) > 0:
+	print "Files found:"
+	for f in localonly:
+		print f

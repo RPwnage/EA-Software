@@ -1,0 +1,65 @@
+<project>
+
+    <createtask name="messages.gen.java">
+        <parameters>
+            <option name="rootdir"      value="Required"/> <!-- The root directory where all the proto files are located. ProtoC needs the files to be processed from same directory structure so we create a common root. -->
+            <option name="inputdir"     value="Required"/> <!-- The directory whose proto files you want to process. All proto files (including subdirectories) are processed. Normally, same as rootdir but can be different if you want to process input proto files in different directories separately. -->
+            <option name="outputdir"    value="Required"/> <!-- The directory where you want to output the generated code. -->
+            <option name="depfilename"  value="Required"/> <!-- The dependency file name to use.-->
+        </parameters>
+
+        <code>
+            <mkdir dir="${messages.gen.java.outputdir}"/>
+            <task name="generate_relative_proto_paths" inputdir="${messages.gen.java.inputdir}" rootdir="${messages.gen.java.rootdir}"/>
+
+            <exec program="${package.dir}/bin/protoc.exe" workingdir="${messages.gen.java.rootdir}">
+                <args>
+                    <arg value="--proto_path=."/>
+                    <arg value="--proto_path=${package.protobuf.dir}/src"/>
+                    <arg value="--java_out=${messages.gen.java.outputdir}"/>
+                    <arg value="${proto.files.relative}"/>
+                </args>
+                <inputs>
+                    <includes name="${messages.gen.java.inputdir}/**.proto"/>
+                    <includes name="${package.dir}/bin/protoc.exe"/>
+                </inputs>
+                <outputs>
+                    <includes name="${messages.gen.java.outputdir}/${messages.gen.java.depfilename}" />
+                </outputs>
+            </exec>
+            <touch file="${messages.gen.java.outputdir}/${messages.gen.java.depfilename}"/>
+        </code>
+    </createtask>
+
+    <createtask name="services.gen.java">
+        <parameters>
+            <option name="rootdir"      value="Required"/> <!-- The root directory where all the proto files are located. ProtoC needs the files to be processed from same directory structure so we create a common root. -->
+            <option name="inputdir"     value="Required"/> <!-- The directory whose proto files you want to process. All proto files (including subdirectories) are processed. Normally, same as rootdir but can be different if you want to process input proto files in different directories separately. -->
+            <option name="outputdir"    value="Required"/> <!-- The directory where you want to output the generated code. -->
+            <option name="depfilename"  value="Required"/> <!-- The dependency file name to use.-->
+        </parameters>
+        <code>
+            <mkdir dir="${services.gen.java.outputdir}"/>
+            <task name="generate_relative_proto_paths" inputdir="${services.gen.java.inputdir}" rootdir="${services.gen.java.rootdir}"/>
+
+            <exec program="${package.dir}/bin/protoc.exe" workingdir="${services.gen.java.rootdir}">
+                <args>
+                    <arg value="--proto_path=."/>
+                    <arg value="--proto_path=${package.protobuf.dir}/src"/>
+                    <arg value="--grpc_out=${services.gen.java.outputdir}"/>
+                    <arg value="--plugin=protoc-gen-grpc=${package.dir}/bin/grpc_java_plugin.exe"/>
+                    <arg value="${proto.files.relative}"/>
+                </args>
+                <inputs>
+                    <includes name="${services.gen.java.inputdir}/**.proto"/>
+                    <includes name="${package.dir}/bin/protoc.exe"/>
+                    <includes name="${package.dir}/bin/grpc_java_plugin.exe"/>
+                </inputs>
+                <outputs>
+                    <includes name="${services.gen.java.outputdir}/${services.gen.java.depfilename}" />
+                </outputs>
+            </exec>
+            <touch file="${services.gen.java.outputdir}/${services.gen.java.depfilename}"/>
+        </code>
+    </createtask>
+</project>

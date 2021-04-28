@@ -1,0 +1,155 @@
+group rpcclientcomponentmanagerheader : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+rootComponent(fileNode, node) ::= <<
+
+<centralFileHeader()>
+<openIncludeGuard()>
+
+/*** Include Files ********************************************************************************/
+
+#include "BlazeSDK/blazesdk.h"
+#include "BlazeSDK/callback.h"
+#include "BlazeSDK/jobid.h"
+#include "BlazeSDK/blazesender.h"
+#include "BlazeSDK/blazeerrors.h"
+#include "EATDF/tdf.h"
+#include "EATDF/tdfobjectid.h"
+#include "BlazeSDK/component/framework/tdf/entity.h"
+#include "BlazeSDK/blaze_eastl/vector_map.h"
+#include "framework/protocol/shared/encoder.h"
+
+namespace Blaze
+{
+
+class RpcJobBase;
+class Component;
+
+/// @cond INTERNAL_DOCS
+
+//Component Id defines
+<node.Components: {const EA::TDF::ComponentId <clientIdSymbol(component=it)> = <compId(it)>;<\n>}>
+
+//Component Class forwards & Entity Type defines
+<node.Components: printComponentEntities(component=it); separator="\n">
+
+/// @endcond
+
+/*! **********************************************************************************************/
+/*!
+    \class ComponentManager
+
+    \brief The hub class for all components.
+
+    The ComponenentManager class is used to access all the various components for a particular 
+    user id.
+
+    \note
+        This class should not be constructed/deconstructed directly.  
+**************************************************************************************************/
+class BLAZESDK_API ComponentManager
+{
+public:
+
+    /*! ******************************************************************************************/
+    /*! \brief  Returns the user index this manager sends messages for.
+    **********************************************************************************************/
+    uint32_t getUserIndex() const { return mUserIndex; }
+
+    <node.Components: printComponentGetter(component=it)>
+
+    /*! ******************************************************************************************/
+    /*! \brief  Returns a component given a component id (or nullptr if none found).
+                Prefer to use the direct component getter method(s) if available for 
+                a component.
+
+          Used by titles that need to access a new component added to blaze at 
+          runtime without recompiling blaze. For example, if a title wants to add a
+          new component in a post-ship patch, they can add it to blaze using its
+          createComponent(BlazeHub *hub) factory method.  The team uses
+          getComponentByID to get the created component instance
+    **********************************************************************************************/
+    Blaze::Component* getComponentById(EA::TDF::ComponentId componentId) const
+    {
+        ComponentMap::const_iterator iter = mComponentMap.find(componentId);
+        return (iter != mComponentMap.end()) ? iter->second : nullptr;
+    }
+
+/// @cond INTERNAL_DOCS
+public:
+    typedef Component* (*CreationFunction)(ComponentManager*);
+
+public:
+    ComponentManager();
+    virtual ~ComponentManager();
+
+    void createComponent(EA::TDF::ComponentId componentId, CreationFunction createFunction);
+    void createComponent(EA::TDF::ComponentId componentId, CreationFunction createFunction, const BlazeSender::ServerConnectionInfo& addr, Encoder::Type encoderType=Encoder::JSON, const char8_t* certData=nullptr, const char8_t* keyData=nullptr, size_t certDataSize = 0, size_t keyDataSize = 0);
+    void destroyComponent(EA::TDF::ComponentId componentId);
+
+    JobId sendRequest(EA::TDF::ComponentId componentId, uint16_t commandId, const EA::TDF::Tdf* request,
+                      RpcJobBase* job, const JobId& reserveId, uint32_t timeout);
+
+    const char8_t* getComponentName(EA::TDF::ComponentId componentId) const;
+    const char8_t* getCommandName(uint16_t componentId, uint16_t commandId) const;
+    const char8_t* getNotificationName(EA::TDF::ComponentId componentId, uint16_t notificationId) const;
+    const char8_t* getErrorName(BlazeError errorCode) const;
+    
+    BlazeSender& getDefaultSender() const { return *mDefaultSender; }
+    
+    BlazeSender* getBlazeSender(uint16_t componentId);
+
+protected:
+    friend class BlazeSender;
+    void init(BlazeHub* hub, BlazeSender* conn, uint32_t userIndex);
+
+    void handleNotification(EA::TDF::ComponentId componentId, uint16_t commandId, const uint8_t* buf, size_t bufSize);
+    Component* getCustomComponentById(EA::TDF::ComponentId componentId) const;
+/// @endcond
+
+private:
+    // This map initially contains the standard set of components. Additional custom 
+    // components can be added to it at runtime by the client.
+    typedef Blaze::vector_map\<EA::TDF::ComponentId, Component*\> ComponentMap;
+    ComponentMap mComponentMap;
+    
+    typedef Blaze::vector_map\<uint16_t, BlazeSender*\> ComponentConnectionMap;
+    ComponentConnectionMap mComponentConnMap;
+
+    BlazeHub* mBlazeHub;
+    BlazeSender* mDefaultSender;
+    uint32_t mUserIndex;
+
+#if ENABLE_BLAZE_SDK_LOGGING
+public: 
+    const BlazeHub* getBlazeHub() const { return mBlazeHub; }
+#endif
+};
+
+} //Blaze
+
+<closeIncludeGuard()>
+<standardFileFooter()>
+
+>>
+
+
+
+printComponentEntities(component) ::= <<
+<openCompNamespace(component=component, noBlaze=1)>
+class <clientName(component=component)>;
+<componentTypeDefines(component=component)>
+<closeCompNamespace(component=component, noBlaze=1)>
+<\n>
+>>
+
+printComponentGetter(component) ::= <<
+/*! **********************************************************************************************/
+/*! \brief  Returns the <component.Name>Component object for this manager.
+**************************************************************************************************/
+<compNamespace(component=component)><clientName(component=component)>* get<clientName(component=component)>() const
+    { return (<compNamespace(component=component)><clientName(component=component)>*) getComponentById(<clientIdSymbol(component=component)>); }
+<\n>
+>>

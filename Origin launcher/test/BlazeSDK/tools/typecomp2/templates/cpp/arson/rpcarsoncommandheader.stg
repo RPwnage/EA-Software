@@ -1,0 +1,227 @@
+group rpcarsoncommandheader : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+
+command(fileNode, command, component) ::= <<
+
+<standardFileHeader()>
+<openIncludeGuard()>
+
+//Testing: ID <component.CompId> category <command.id>   // TODO: (((mComponent->getId()) & RPC_MASK_TYPE) \>\> 11)
+//arson includes
+#include "commands/blaze/client/Commands.h"
+#include "commands/blaze/client/ArsonCommand.h"
+#include "shared/blaze/blazeclientstructures.h"
+<if(command.telemetry)>
+//telemetry includes
+#include "commands/telemetry/client/TelemetryCommand.h"
+<endif>
+//blaze includes
+<if(component.IsCompTypeArson)>
+<generateCustomCommandStub()>
+<else>
+<generateDefaultCommand()>
+<endif>
+
+<closeIncludeGuard()>
+<standardFileFooter()>
+
+>>
+
+
+generateDefaultCommand() ::= <<
+#include "BlazeSDK/component/<clientName(component); format="toLower">.h"
+<addIncludes()>
+
+
+/**************************************************************************************************/
+/*!
+    \class <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command
+
+    Stub class for the <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command command.
+*/
+/**************************************************************************************************/
+
+class <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command : public ArsonCommand
+{
+public:
+    <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command( Arson::ClientStructures::ArsonMetaData *metadata ,
+    <if(command.RequestType)>
+        <printTypeRefFullScope(command.RequestType)> *request ,
+        <endif>
+        uint32_t timeoutMS = ARSON_DEFAULT_TIMEOUT_MS )
+        : ArsonCommand ( metadata, timeoutMS)
+        <if(command.RequestType)>
+        , mArsonRequest (request)
+        <endif>
+    {
+        <if(command.ResponseType)>
+        mArsonResponse = new <printTypeRefFullScope(command.ResponseType)>;
+        <endif>
+        <if(command.errortype)>
+        mArsonErrorStruct = new <printTypeRefFullScope(command.errortype)>;
+        <endif>
+    }
+
+    virtual ~<command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command()
+    {
+        <if(command.ResponseType)>
+        delete mArsonResponse;
+        <endif>
+        <if(command.errortype)>
+        delete mArsonErrorStruct;
+        <endif>
+    }
+
+    <if(command.ResponseType)>
+    <printTypeRefFullScope(command.ResponseType)> *getArsonResponse() { return mArsonResponse; }
+    <endif>
+    <if(command.errortype)>
+    <printTypeRefFullScope(command.errortype)> *getArsonError() { return mArsonErrorStruct; }
+    <endif>
+
+    virtual void start()
+    {
+        // Make the sdk call
+        ((<compNamespace(component=component)><clientName(component=component)>*)(mBlazeHub->getComponentManager( mArsonCommandMetaData->getUserIndex() )->getComponentById(<compNamespace(component=component)><clientName(component=component)>::<clientIdSymbol(component=component)>)))-><command.Name>(
+        <if(command.RequestType)>
+        *mArsonRequest,
+        <endif>
+            <component.Scope.FullNameList;separator="::">::<clientName(component);format="pascal">::<command.Name;format="pascal">Cb( this, &<command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command::processResponse ) );
+    }
+
+
+    virtual void cancel(ArsonCommandErrorCode arsonErrorCode)
+        { mArsonErrorCode = arsonErrorCode; LogManager::LogInfo( "<command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command was cancelled (%s)\n", LogManager::GetCommandErrorName(arsonErrorCode) ); LOG_ARSON_ERROR(mArsonErrorCode);}
+
+    virtual void finishError( ArsonCommandErrorCode arsonErrorCode, const char8_t* arsonErrMsg = "")
+        { mArsonErrorCode = arsonErrorCode; LOG_ERROR((char*)arsonErrMsg); LOG_ARSON_ERROR(mArsonErrorCode); mCommandFinished = true; }
+
+    virtual void finishSuccess() { mArsonErrorCode = ARSON_ERR_OK; mCommandFinished = true; }
+
+private:
+
+    void processResponse(
+        <if(command.ResponseType)>
+        const <printTypeRefFullScope(command.ResponseType)>* response,
+        <endif>
+        <if(command.errortype)>
+        const <printTypeRefFullScope(command.errortype)>* errorStruct,
+        <endif>
+        Blaze::BlazeError errorCode, Blaze::JobId )
+    {
+        mArsonCommandMetaData->setBlazeErrCode(errorCode);
+        if ( errorCode == Blaze::ERR_OK )
+        {
+            // Save sdk results as needed
+            <if(command.ResponseType)>
+            response->copyInto(*mArsonResponse);
+            <endif>
+        }
+        else <if(command.errortype)>if ( errorStruct )   // The Error Tdf can be nullptr in a disconnect<endif>
+        {
+             // Handle sdk error
+             <if(command.errortype)>
+             errorStruct->copyInto(*mArsonErrorStruct );
+             <endif>
+        }
+        finishSuccess();
+    }
+
+
+    <if(command.RequestType)>
+    <printTypeRefFullScope(command.RequestType)>* mArsonRequest;
+    <endif>
+    <if(command.ResponseType)>
+    <printTypeRefFullScope(command.ResponseType)> *mArsonResponse;
+    <endif>
+    <if(command.errortype)>
+    <printTypeRefFullScope(command.errortype)> *mArsonErrorStruct;
+    <endif>
+};
+>>
+
+
+generateCustomCommandStub() ::= <<
+<addIncludes()>
+
+/**************************************************************************************************/
+/*!
+    \class <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub
+
+    Stub class for the <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command command.
+*/
+/**************************************************************************************************/
+
+class <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub : public ArsonCommand
+<if(command.telemetry)>, public TelemetryCommand <endif>
+{
+public:
+    <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub( Arson::ClientStructures::ArsonMetaData *metadata ,
+    <if(command.RequestType)>
+        <printTypeRefFullScope(command.RequestType)> *request ,
+        <endif>
+        uint32_t timeoutMS = ARSON_DEFAULT_TIMEOUT_MS )
+        : ArsonCommand ( metadata, timeoutMS)
+        <if(command.RequestType)>
+        , mArsonRequest (request)
+        <endif>
+    {
+        <if(command.ResponseType)>
+        mArsonResponse = new <printTypeRefFullScope(command.ResponseType)>;
+        <endif>
+        <if(command.errortype)>
+        mArsonErrorStruct = new <printTypeRefFullScope(command.errortype)>;
+        <endif>
+    }
+
+    virtual ~<command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub()
+    {
+        <if(command.ResponseType)>
+        delete mArsonResponse;
+        <endif>
+        <if(command.errortype)>
+        delete mArsonErrorStruct;
+        <endif>
+
+        if ((this->getBlazeHub() != nullptr) && (this->getBlazeHub()->getScheduler() != nullptr))
+        {
+            this->getBlazeHub()->getScheduler()->cancelByAssociatedObject(this); // no-ops if nothing to cancel
+        }
+    }
+
+    <if(command.ResponseType)>
+    <printTypeRefFullScope(command.ResponseType)> *getArsonResponse() { return mArsonResponse; }
+    <endif>
+   <if(command.errortype)>
+    <printTypeRefFullScope(command.errortype)> *getArsonError() { return mArsonErrorStruct; }
+    <endif>
+
+    <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub *create();
+
+    virtual void start()
+        { finishError(ARSON_ERR_SYSTEM ,"Command <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command not implemented"); }
+
+
+    virtual void cancel(ArsonCommandErrorCode arsonErrorCode) {}
+
+protected:
+    <if(command.RequestType)>
+    <printTypeRefFullScope(command.RequestType)> *mArsonRequest;
+    <endif>
+    <if(command.ResponseType)>
+    <printTypeRefFullScope(command.ResponseType)> *mArsonResponse;
+    <endif>
+    <if(command.errortype)>
+    <printTypeRefFullScope(command.errortype)> *mArsonErrorStruct;
+    <endif>
+};
+>>
+
+
+
+addIncludes() ::= <<
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+>>

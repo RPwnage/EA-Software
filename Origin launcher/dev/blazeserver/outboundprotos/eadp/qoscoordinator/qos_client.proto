@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package eadp.qoscoordinator;
+
+import "google/rpc/status.proto";
+import "eadp/annotations.proto";
+
+option java_package = "com.ea.gs.qoscoordinator.grpc";
+option java_outer_classname = "QosCoordinatorClientProto";
+option java_multiple_files = true;
+
+service QOSCoordinator{
+    // This is the public-facing services that QOS Clients will use
+     option (eadp.grpc.service_mapping) = {
+         ports: [ PUBLIC, S2S, S2S_ADMIN]
+     };
+
+    rpc ClientCall(ClientRequest) returns (ClientResponse) {};
+}
+
+// enum QosCommonSiteFields aka struct QosCommonSiteT
+message PingSite{
+   string siteName = 1;
+   string probeAddr = 2;
+   int32 probePort= 3;
+   bytes secureKey = 4;
+   int32 probeVersion = 5;
+}
+
+// enum QosCommonControlConfigFields aka struct QosCommonControlConfigT
+message ControlConfig{
+   string control = 1;
+   int32 value = 2;
+   string pValue = 3;
+}
+
+// enum QosCommonTestFields aka struct QosCommonTestT
+message QosTest{
+   string testName = 1;
+   string siteName = 2;
+   int32 probeCountUp = 3;
+   int32 probeCountDown = 4;
+   int32 probeSizeUp = 5;
+   int32 probeSizeDown = 6;
+   int32 timeout = 7;
+   int32 minTimeBetweenProbes = 8;
+   int32 timeTillResend= 9;
+   int32 resendExtraProbeCount = 10;
+   int32 acceptableLostProbeCount = 11;
+   int32 initSyncTimeout = 12;
+}
+
+// enum QosCommonRawResultsFields aka struct QosCommonRawResultsT
+message ClientRawResult{
+   repeated ProbeResult probeResult = 1;
+   string clientAddressFromServer = 2;
+   string siteName = 3;
+   string testName = 4;
+   int32 result = 5;
+}
+
+// enum QosCommonProbeResultFields aka struct QosCommonProbeResultT
+message ProbeResult{
+   int32 clientSendTime = 1;
+   int32 serverReceiveTime = 2;
+   int32 serverSendDelta = 3;
+   int32 clientReceiveDelta = 4;
+}
+
+// enum ClientModifierFields aka struct QosCommonClientModifiersT
+message ClientModifiers{
+   enum FirewallType{
+      FIREWALL_UNKNOWN = 0;
+      FIREWALL_OPEN = 1;
+      FIREWALL_MODERATE = 2;
+      FIREWALL_STRICT = 3;
+      FIREWALL_NUMNATTYPES = 4; // I don't think we'll need this for the coordinator itself, but the .proto files might be shared.
+   }
+   string clientAddressInternal = 1;   //NAT calculations
+   string platform = 2;               //NAT calculations
+   FirewallType firewallType = 3;     //NAT calculations
+   uint32 packetQueueRemaining = 4;   //is the client receiving too much traffic? if so the results may be effected
+   uint32 stallCountComm = 5;         //has the client not received consistent processing time, when talking with the coordinator?
+   uint32 stallDurationComm = 6;     //what is the total time that the client spent in a stalled state?
+   uint32 stallCountProbe = 7;        //has the client not received consistent processing time, when probing with the QosServer?
+   uint32 stallDurationProbe = 8;     //what is the total time that the client spent in a stalled state?
+}
+
+// enum ClientToCoordinatorRequestFields aka struct QosCommonClientToCoordinatorRequestT
+message ClientRequest{
+   repeated ClientRawResult results = 1;
+   string qosProfile = 2;
+   int64 serviceRequestId = 3;
+   uint32 probeVersion = 4;
+   ClientModifiers clientModifiers = 5;
+}
+
+//enum QosCommonTestResultFields aka struct QosCommonTestResultT
+message TestResult{
+   string siteName = 1;
+   uint32 minRTT = 2;
+   uint32 upbps = 3;
+   uint32 downbps = 4;
+   uint32 result = 5;
+}
+
+//enum CoordinatorToClientResponseFields aka struct QosCommonCoordinatorToClientResponseT
+message ClientResponse{
+   enum FirewallType{
+      FIREWALL_UNKNOWN = 0;
+      FIREWALL_OPEN = 1;
+      FIREWALL_MODERATE = 2;
+      FIREWALL_STRICT = 3;
+      FIREWALL_NUMNATTYPES = 4; // I don't think we'll need this for the coordinator itself, but the .proto files might be shared.
+   }
+   google.rpc.Status status = 1;
+   int64 serviceRequestId = 2;
+   string clientAddressFromCoordinator = 3;
+   FirewallType firewallType = 4;
+   uint32 timeTillRetry = 5;
+   string clientExternalAddress = 6;
+   repeated PingSite pingSites = 7;
+   repeated ControlConfig controlConfigs = 8;
+   repeated QosTest tests = 9;
+   repeated TestResult results = 10;
+
+   int32 profileVersion = 11;
+}

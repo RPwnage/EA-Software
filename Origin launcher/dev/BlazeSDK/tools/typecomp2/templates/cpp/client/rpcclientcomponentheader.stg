@@ -1,0 +1,297 @@
+group rpcclientcomponentheader : errorcommon;
+
+component(fileNode, component) ::= <<
+<standardFileHeader()>
+<openIncludeGuard()>
+
+/****** Include Files ********************************************************************************/
+#include "BlazeSDK/blazesdk.h"
+#include "BlazeSDK/callback.h"
+#include "BlazeSDK/componentmanager.h"
+#include "BlazeSDK/component.h"
+#include "BlazeSDK/rpcjob.h"
+#include "BlazeSDK/blazesender.h"
+#include "BlazeSDK/blazeerrors.h"
+#include "framework/protocol/shared/encoder.h"
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+/****** Defines/Macros/Constants/Typedefs ************************************************************/
+
+namespace Blaze
+{
+
+<printComponentErrors(component=component)>
+
+<openCompNamespace(component=component, noBlaze=1)>
+
+<componentTypeDefines(component=component)>
+
+
+/*! ****************************************************************************/
+/*!
+    \class <clientName(...)>
+    \ingroup _mod_components
+
+    \brief <if(component.description)><component.description><else>This component needs a description.<endif>
+
+<if(component.details)>
+    <component.details>
+
+
+<endif>
+****************************************************************************/
+class <dllApiMacro()> <clientName(...)> : public Blaze::Component
+{
+public:
+    static const uint16_t <clientName(...); format="tu">_COMPONENT_ID = <compId(component)>;
+
+    /*! ****************************************************************************/
+    /*! \brief  Creates this component class type for use in the client.
+    ********************************************************************************/
+    static void createComponent(BlazeHub *hub);
+
+    static void createComponent(BlazeHub *hub, const BlazeSender::ServerConnectionInfo& addr, Encoder::Type encoderType=Encoder::JSON, const char8_t* certData=nullptr, const char8_t* keyData=nullptr, size_t certDataSize = 0, size_t keyDataSize = 0);
+
+    // Deprecated
+    static void createComponent(ComponentManager* componentManager);
+
+<if(component.Commands)><component.Commands:{command | <if(command.client_export)><clientCommandHandler(command)><endif>}; separator=""><endif>
+<if(component.Notifications)>
+
+    /*! ***********************Notifications*****************************************/
+
+<component.Notifications:clientNotificationHandler(notification=it); separator="\n\n">
+
+<endif>
+
+/*! \cond INTERNAL_DOCS */
+public:
+    virtual ~<clientName(...)>() {}
+
+    virtual const char8_t* getComponentName() const { return "<clientName(...)>"; }
+    virtual const char8_t* getCommandName(uint16_t commandId) const;
+    virtual const char8_t* getErrorName(BlazeError errorCode) const;
+    virtual const char8_t* getNotificationName(uint16_t notificationId) const;
+    const RestResourceInfo* getRestInfo(uint16_t commandId) const;
+
+#ifdef BLAZE_ENABLE_TDF_CREATION_BY_ID
+    EA::TDF::Tdf* createRequestTdf(uint16_t commandId);
+    EA::TDF::Tdf* createResponseTdf(uint16_t commandId);
+    EA::TDF::Tdf* createErrorTdf(uint16_t commandId);
+    EA::TDF::Tdf* createNotificationTdf(uint16_t notificationId);
+#endif
+
+public:
+<if(component.Commands)>
+<component.Commands:{command | <if(command.client_export)><listCommandIds(command)><endif>}; separator="">
+<endif>
+
+<if(component.Notifications)>
+<component.Notifications:listNotificationIds(notification=it); separator="\n">
+<endif>
+
+protected:
+    /*! \brief Internal create function used by ComponentManager*/
+    static Component *createInstance(ComponentManager *manager);
+
+    /* \brief Message handler used interally to process notifications from the component manager. */
+    void handleNotification(uint16_t command, const uint8_t *buf, size_t bufSize, uint32_t userIndex);
+
+protected:
+    <clientName(...)>(Blaze::ComponentManager *manager);
+
+    <if(component.Notifications)>
+    static const size_t MAX_NOTIFICATIONS = <length(component.Notifications)>;
+    FunctorBase mNotificationTable[MAX_NOTIFICATIONS];
+    <endif>
+
+/*! \endcond */
+
+};
+
+
+<if(component.Commands)>
+<component.Commands:{command | <listInlinedMethods(command)>}; separator="">
+<endif>
+
+
+<closeCompNamespace(component=component)>
+
+<closeIncludeGuard()>
+<standardFileFooter()>
+
+>>
+
+functorCountBase0(types) ::= <<
+<if(types)><length([types])><endif>
+>>
+
+functorCountBase1(types) ::= <<
+<length([1, types])>
+>>
+
+functorCountBase2(types) ::= <<
+<length([1, 2, types])>
+>>
+
+functorCountBase3(types) ::= <<
+<length([1, 2, 3, types])>
+>>
+
+functorCountBase4(types) ::= <<
+<length([1, 2, 3, 4, types])>
+>>
+
+functorCountBase5(types) ::= <<
+<length([1, 2, 3, 4, 5, types])>
+>>
+
+printFQRequestType(command) ::= <<
+<printTypeRefFullScope(command.RequestType)>
+>>
+
+printFQResponseType(command) ::= <<
+<printTypeRefFullScope(command.ResponseType)>
+>>
+
+printFQErrorType(command) ::= <<
+<printTypeRefFullScope(command.errortype)>
+>>
+
+printFQNotificationType(notification) ::= <<
+<printTypeRefFullScope(notification.NotificationType)>
+>>
+
+clientCommandHandler(command) ::= <<
+    /*! \brief The functor type for the <command.Name> command. */
+    typedef Functor<functorCountBase2([last(command.ResponseType), last(command.errortype)])>\<<if(command.ResponseType)>const <printFQResponseType(command)> *, <endif><if(command.errortype)>const <printFQErrorType(command)> *, <endif>BlazeError,JobId\> <command.Name; format="pascal">Cb;
+    /*! ****************************************************************************/
+    /*!
+        \brief  <if(command.description)><command.description><else>This command needs a description.<endif>
+
+        <if(command.details)><command.details><endif>
+        <if(command.ResponseType)>
+        \par Response Type
+            <printFQResponseType(command)>
+
+        <endif>
+        <if(command.errortype)>
+        \par Error Type
+            <printFQErrorType(command)>
+
+        <endif>
+        \par Error Codes
+            \li Blaze::ERR_OK
+            \li Blaze::ERR_SYSTEM
+            \li Blaze::ERR_TIMEOUT
+            <if(command.requires_authentication)>
+            \li Blaze::ERR_AUTHORIZATION_REQUIRED
+            <endif>
+            <if(command.errors)><command.errors:{\li Blaze::<it>}; separator="\n"><endif>
+
+<if(command.RequestType)>
+        \param request  The request object for this command.
+
+<endif>
+        \param callback Supply a functor callback to dispatch upon RPC completion (or cancellation/timeout).
+                        The callback is not dispatched if the RPC job is removed without being executed or cancelled.
+                          Note: The default callback functor makes this a fire and forget RPC.
+        \param reserveId Optional job id to assign this transaction.  If valid, the RPC will use this job
+                          id instead of assigning a new one.  A job id is obtained from the JobScheduler::reserveId method.
+        \param timeout     The amount of time in milliseconds that will elapse before this transaction is
+                         considered timed out.
+        \param clientProvidedResponse Client-provided TDF to be filled in with the data contained in the response from the server.
+                         If nullptr, the callback mechanism will allocate one internally. In both cases, the response TDF is returned
+                         as a parameter of the callback. But, if internally allocated, the response TDF cannot be considered valid
+                         beyond the lifetime of the callback.
+        \return  The job id of the pending request.  This can be used to cancel the request in the BlazeHub's JobScheduler.
+    */
+    JobId <command.Name>(<if(command.RequestType)>const <printFQRequestType(command)> &request,
+
+<endif>
+const <command.Name; format="pascal">Cb &callback = <command.Name; format="pascal">Cb(),
+         JobId reserveId = Blaze::INVALID_JOB_ID, uint32_t timeout = Blaze::USE_DEFAULT_TIMEOUT, EA::TDF::Tdf *clientProvidedResponse = nullptr);
+
+    template \<typename P1\>
+    JobId <command.Name>(<if(command.RequestType)>const <printFQRequestType(command)> &request,
+
+<endif>
+const Functor<functorCountBase3([last(command.ResponseType), last(command.errortype)])>\<<if(command.ResponseType)>const <printFQResponseType(command)> *, <endif><if(command.errortype)>const <printFQErrorType(command)> *, <endif>BlazeError, JobId, P1\> &callback,
+         P1 arg1, JobId reserveId = Blaze::INVALID_JOB_ID, uint32_t timeout = Blaze::USE_DEFAULT_TIMEOUT, EA::TDF::Tdf *clientProvidedResponse = nullptr);
+
+    template \<typename P1, typename P2\>
+    JobId <command.Name>(<if(command.RequestType)>const <printFQRequestType(command)> &request,
+
+<endif>
+const Functor<functorCountBase4([last(command.ResponseType), last(command.errortype)])>\<<if(command.ResponseType)>const <printFQResponseType(command)> *, <endif><if(command.errortype)>const <printFQErrorType(command)> *, <endif>BlazeError, JobId, P1, P2\> &callback,
+         P1 arg1, P2 arg2, JobId reserveId = Blaze::INVALID_JOB_ID, uint32_t timeout = Blaze::USE_DEFAULT_TIMEOUT, EA::TDF::Tdf *clientProvidedResponse = nullptr);
+
+    template \<typename P1, typename P2, typename P3\>
+    JobId <command.Name>(<if(command.RequestType)>const <printFQRequestType(command)> &request,
+
+<endif>
+const Functor<functorCountBase5([last(command.ResponseType), last(command.errortype)])>\<<if(command.ResponseType)>const <printFQResponseType(command)> *, <endif><if(command.errortype)>const <printFQErrorType(command)> *, <endif>BlazeError, JobId, P1, P2, P3\> &callback,
+         P1 arg1, P2 arg2, P3 arg3, JobId reserveId = Blaze::INVALID_JOB_ID, uint32_t timeout = Blaze::USE_DEFAULT_TIMEOUT, EA::TDF::Tdf *clientProvidedResponse = nullptr);
+
+
+>>
+
+clientNotificationHandler(notification) ::= <<
+    /*! \brief The callback type for the <notification.Name> notification */
+    typedef Functor<functorCountBase1(notification.NotificationType)>\<<if(notification.NotificationType)>const <printFQNotificationType(notification)> *,<endif> uint32_t\> <notification.Name>Cb;
+    /*! ****************************************************************************/
+    /*! \brief Sets the notification handler for the <notification.Name> notification
+        \param handler The function to call when the <notification.Name> notification is received.
+    */
+    void set<notification.Name>Handler(const <notification.Name>Cb &handler);
+
+    /*! ****************************************************************************/
+    /*! \brief Clears the current handler for the <notification.Name> notification */
+    void clear<notification.Name>Handler();
+>>
+
+
+listCommandIds(command) ::= <<
+    static const uint16_t CMD_<command.Name; format="tu"> = <command.id>;
+
+>>
+
+listNotificationIds(notification) ::= <<
+    static const uint16_t NTF_<notification.Name; format="tu"> = <notification.id>;
+>>
+
+listInlinedMethods(command) ::= <<
+inline JobId <clientName(command.Parent)>::<command.Name>(<if(command.RequestType)>const <printFQRequestType(command)> &request, <endif>const <command.Name; format="pascal">Cb &callback, JobId reserveId, uint32_t timeout, EA::TDF::Tdf *clientProvidedResponse)
+{
+    return mManager->sendRequest(getComponentId(), CMD_<command.Name; format="tu">, <if(command.RequestType)>&request<else>nullptr<endif>,
+        BLAZE_NEW(MEM_GROUP_FRAMEWORK_TEMP, "RpcJob") RpcJob\<<if(command.ResponseType)><printFQResponseType(command)><else>void<endif>,<if(command.errortype)><printFQErrorType(command)><else>void<endif>\>(getComponentId(), CMD_<command.Name; format="tu">, callback, clientProvidedResponse, *mManager),
+        reserveId, timeout);
+}
+
+template \<typename P1\>
+JobId <clientName(command.Parent)>::<command.Name>(<if(command.RequestType)>const <printFQRequestType(command)> &request, <\n>         <endif>const Functor<functorCountBase3([last(command.ResponseType), last(command.errortype)])>\<<if(command.ResponseType)>const <printFQResponseType(command)> *, <endif><if(command.errortype)>const <printFQErrorType(command)> *, <endif>BlazeError, JobId, P1\> &callback,
+         P1 arg1, JobId reserveId, uint32_t timeout, EA::TDF::Tdf *clientProvidedResponse)
+{
+    return mManager->sendRequest(getComponentId(), CMD_<command.Name; format="tu">, <if(command.RequestType)>&request<else>nullptr<endif>,
+        BLAZE_NEW(MEM_GROUP_FRAMEWORK_TEMP, "RpcJob") RpcJob1\<<if(command.ResponseType)><printFQResponseType(command)><else>void<endif>,<if(command.errortype)><printFQErrorType(command)><else>void<endif>,P1\>(getComponentId(), CMD_<command.Name; format="tu">, callback, arg1, clientProvidedResponse, *mManager),
+        reserveId, timeout);
+}
+
+template \<typename P1, typename P2\>
+JobId <clientName(command.Parent)>::<command.Name>(<if(command.RequestType)>const <printFQRequestType(command)> &request, <\n>         <endif>const Functor<functorCountBase4([last(command.ResponseType), last(command.errortype)])>\<<if(command.ResponseType)>const <printFQResponseType(command)> *, <endif><if(command.errortype)>const <printFQErrorType(command)> *, <endif>BlazeError, JobId, P1, P2\> &callback,
+         P1 arg1, P2 arg2, JobId reserveId, uint32_t timeout, EA::TDF::Tdf *clientProvidedResponse)
+{
+    return mManager->sendRequest(getComponentId(), CMD_<command.Name; format="tu">, <if(command.RequestType)>&request<else>nullptr<endif>,
+        BLAZE_NEW(MEM_GROUP_FRAMEWORK_TEMP, "RpcJob") RpcJob2\<<if(command.ResponseType)><printFQResponseType(command)><else>void<endif>,<if(command.errortype)><printFQErrorType(command)><else>void<endif>,P1,P2\>(getComponentId(), CMD_<command.Name; format="tu">, callback, arg1, arg2, clientProvidedResponse, *mManager),
+        reserveId, timeout);
+}
+
+template \<typename P1, typename P2, typename P3\>
+JobId <clientName(command.Parent)>::<command.Name>(<if(command.RequestType)>const <printFQRequestType(command)> &request, <\n>         <endif>const Functor<functorCountBase5([last(command.ResponseType), last(command.errortype)])>\<<if(command.ResponseType)>const <printFQResponseType(command)> *, <endif><if(command.errortype)>const <printFQErrorType(command)> *, <endif>BlazeError, JobId, P1, P2, P3\> &callback,
+         P1 arg1, P2 arg2, P3 arg3, JobId reserveId, uint32_t timeout, EA::TDF::Tdf *clientProvidedResponse)
+{
+    return mManager->sendRequest(getComponentId(), CMD_<command.Name; format="tu">, <if(command.RequestType)>&request<else>nullptr<endif>,
+        BLAZE_NEW(MEM_GROUP_FRAMEWORK_TEMP, "RpcJob") RpcJob3\<<if(command.ResponseType)><printFQResponseType(command)><else>void<endif>,<if(command.errortype)><printFQErrorType(command)><else>void<endif>,P1,P2,P3\>(getComponentId(), CMD_<command.Name; format="tu">, callback, arg1, arg2, arg3, clientProvidedResponse, *mManager),
+        reserveId, timeout);
+}
+
+>>

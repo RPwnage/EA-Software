@@ -1,0 +1,71 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<choose>
+		<do if="${__Framework_used_as_build_dependent_package??false}">
+			<!-- 
+				If Framework is used as build dependent, we want to use default setup because 'package.Framework.builddir' will be
+				setup to be under top package's build dir.  This is necessary because we don't want the executing binaries (either
+				frameworkunittest is true or not) being rebuilt and overwritten.  NOTE: Only Framework's unit tests should
+				be making build dependent to Framework!  If your project do make a build dependent to Framework's modules, you need
+				to setup up this property on command line and assign it to true.
+			-->
+			<property name="package.Framework.binary-output-folder" value="${package.Framework.builddir}/${config}/bin"/>
+		</do>
+		<do if="${frameworkunittest??false}">
+			<!-- 
+				When rebuilding before running unit tests, we output to the configbindir and mimic the directory structure of 
+				the Framework package and copy files that need to be stored relative to the executable.
+			-->
+			<property name="package.Framework.binary-output-folder" value="${package.Framework.builddir}/${config}/bin/Framework/dev/bin"/>
+		</do>
+		<do>
+			<!-- setting the binary output location to the bin directory where we have traditionally kept the Framework binaries -->
+			<property name="package.Framework.binary-output-folder" value="${package.Framework.dir}/bin"/>
+		</do>
+	</choose>
+
+	<publicdata packagename="Framework" configbindir="${package.Framework.binary-output-folder}">
+		<!-- We need to expose the CSharpLibrary modules for all configs because packages like FbPackages need to reference them under osx build. -->
+		<module name="DefaultMetricsProcessor" buildtype="CSharpLibrary"/>
+		<module name="EA.DependencyGenerator.GCC" buildtype="CSharpLibrary"/>
+		<module name="EA.Tasks" buildtype="CSharpLibrary"/>
+		<module name="EAAssemblyResolver" buildtype="CSharpLibrary"/>
+		<module name="eapm" buildtype="CSharpProgram"/>
+		<module name="NAnt.Authentication" buildtype="CSharpLibrary"/>
+		<module name="NAnt.Core" buildtype="CSharpLibrary"/>
+		<module name="NAnt.NuGet" buildtype="CSharpLibrary"/>
+		<module name="NAnt.Perforce" buildtype="CSharpLibrary"/>
+		<module name="NAnt.FASTBuild" buildtype="CSharpLibrary"/>
+		<module name="NAnt.Perforce.ConnectionManagement" buildtype="CSharpLibrary">
+			<contentfiles>
+				<includes name="${package.Framework.dir}/data/P4ProtocolOptimalProxyMap.xml" optionset="copy-if-newer"/>
+			</contentfiles>
+		</module>
+		<module name="NAnt.Tasks" buildtype="CSharpLibrary"/>
+		<module name="P4ToolPackageServer" buildtype="CSharpLibrary"/>
+		<module name="ProtocolPackageServer" buildtype="CSharpLibrary"/>
+		<module name="WebServicePackageServer" buildtype="CSharpLibrary"/>
+		<do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+			<!-- These buildtypes are not supported under config like osx -->
+			<module name="EA.DependencyGenerator" buildtype="ManagedCppAssembly"/>
+			<module name="PackageInstaller" buildtype="CSharpWindowsProgram"/>
+		</do>
+	</publicdata>
+	
+	<!-- 
+		define taskdef for doing automatic build / test / submit operations with Framework, wrapped
+		in target to avoid paying this cost unless we are actually going to use these tasks
+	-->
+	<target name="define-framework-release-tasks">
+		<taskdef assembly="${nant.project.temproot}/FrameworkReleaseTasks.dll">
+			<sources>
+				<includes name="${package.Framework.dir}/scripts/FrameworkReleaseTasks/*.cs"/>
+			</sources>
+			<references>
+				<includes name="${package.Framework.dir}/bin/NAnt.Authentication.dll"/>
+				<includes name="${package.Framework.dir}/bin/NAnt.Perforce.dll"/>
+				<includes name="${package.Framework.dir}/bin/NAnt.Perforce.ConnectionManagement.dll"/>
+			</references>
+		</taskdef>
+	</target>
+</project>

@@ -1,0 +1,312 @@
+// We assume that all request and response types are valid and just use them
+// directly in the code generation.
+//
+// The compiler should ensure that all commands within a component have a unique ID.
+// The compiler should ensure that all components within a file have a unique ID.
+// Zero is not a valid component or command ID
+// Enforce that method names must start with lowercase letter.
+// Enforce C++ rules for method names and TDF type names.
+// Allow C++ style comments.
+
+[ headername="gamereporting/tdf/gamereporting.h" ]
+#include "gamereporting/gen/gamereporting.tdf"
+
+[ headername="gamereporting/tdf/gamehistory.h" ]
+#include "gamereporting/gen/gamehistory.tdf"
+
+[
+    client_include = false,
+    headername="gamemanager/tdf/gamemanager_server.h"
+]
+#include "gamemanager/gen/gamemanager_server.tdf"
+
+[
+    client_include = false, 
+    headername="gamereporting/tdf/gamereporting_server.h"
+]
+#include "gamereporting/gen/gamereporting_server.tdf"
+
+[
+    client_include = false,
+    headername="gamereporting/tdf/gamereportingevents_server.h"
+]
+#include "gamereporting/gen/gamereportingevents_server.tdf"
+
+namespace Blaze
+{
+namespace GameReporting
+{
+[
+    id = core/28,
+    description = "Receives and processes game reports.",
+    details = "Refer to 3.x upgrade guide for details on converting GameReporting from Blaze 2.x.",
+    configurationType = GameReportingConfig
+]
+component GameReporting
+{
+    permissions
+    {
+        PERMISSION_SUBMIT_TRUSTED_GAMEREPORT    = 1;    // Trusted mid/end game report (trusted sources only, should not need further verification)
+        PERMISSION_SUBMIT_ONLINE_GAMEREPORT     = 2;    // Normal, verified game report (verified against other players' reports, should still be checked)
+        PERMISSION_SUBMIT_OFFLINE_GAMEREPORT    = 3;    // Unverified report not associated with a game (may be faked, should be throughly checked for cheating)
+        PERMISSION_SUBMIT_GAMEEVENTS            = 4;    // Unverified game events (may be faked, should be checked)
+        PERMISSION_UPDATE_METRIC                = 5;    // Unverified metric update (may be faked, should be checked)
+        PERMISSION_GET_GAMEREPORT_INFORMATION   = 6;    // Permission used for all get* GameReport RPCs
+        PERMISSION_GET_TOURNAMENT_GAME_REPORT   = 7;    // GetTournamentGameReportView command permission
+
+    }
+
+    errors
+    {
+        //Generic gamereporting errors
+        GAMEREPORTING_ERR_UNEXPECTED_REPORT                   = 1;
+
+        //Report collation errors
+        GAMEREPORTING_COLLATION_ERR_NO_VALID_REPORTS          = 100;
+        GAMEREPORTING_COLLATION_ERR_NO_REPORTS                = 101;
+        GAMEREPORTING_COLLATION_REPORTS_INCONSISTENT          = 102;
+        GAMEREPORTING_COLLATION_ERR_MISSING_GAME_ATTRIBUTE    = 103; 
+        GAMEREPORTING_COLLATION_ERR_INVALID_GAME_ATTRIBUTE    = 104;
+
+        //Report processing errors
+        GAMEREPORTING_CUSTOM_ERR_PROCESSING_FAILED            = 200;
+        GAMEREPORTING_CONFIG_ERR_MISSING_PROCESSOR_ATTRIBUTE  = 201;
+        GAMEREPORTING_CONFIG_ERR_INVALID_PROCESSOR_ATTRIBUTE  = 202;
+        GAMEREPORTING_CONFIG_ERR_STAT_UPDATE_FAILED           = 203;
+        GAMEREPORTING_CUSTOM_ERR_PROCESS_UPDATED_STATS_FAILED = 204;
+        GAMEREPORTING_ERR_INVALID_GAME_TYPE                   = 205;
+
+        //Offline processing errors
+        GAMEREPORTING_OFFLINE_ERR_INVALID_GAME_TYPE           = 301;
+        GAMEREPORTING_OFFLINE_ERR_REPORT_INVALID              = 302;
+
+        //Trusted gamereporting errors
+        GAMEREPORTING_TRUSTED_ERR_INVALID_GAME_TYPE           = 401;
+        GAMEREPORTING_TRUSTED_ERR_REPORT_INVALID              = 402;
+
+        //Game history errors
+        [ description = "Game report query requested is not defined." ]
+        GAMEHISTORY_ERR_UNKNOWN_QUERY                         = 501;
+        [ description = "Game report query requested is not defined." ]
+        GAMEHISTORY_ERR_INVALID_COLUMNKEY                     = 502;
+        [ description = "Game report query requested is not defined." ]
+        GAMEHISTORY_ERR_INVALID_FILTER                        = 503;
+        [ description = "Game report query requested is not defined." ]
+        GAMEHISTORY_ERR_INVALID_GAMETYPE                      = 504;
+        [ description = "Game report view requested is not defined." ]
+        GAMEHISTORY_ERR_UNKNOWN_VIEW                          = 505;
+        [ description = "Game report query requested is invalid." ]
+        GAMEHISTORY_ERR_INVALID_QUERY                         = 506;
+        [ description = "Query variables are needed but not provided." ]
+        GAMEHISTORY_ERR_MISSING_QVARS                         = 507;
+        [ description = "Query variables provided are invalid." ]
+        GAMEHISTORY_ERR_INVALID_QVARS                         = 508;
+    }
+
+    [isSharded=true, shardingKey="gameReportingId", useSlivers=true]
+    slave
+    {
+        methods
+        {
+            [
+                id = 1,
+                shardingKey = "gameReport.gameReportingId",
+                errors = { GAMEREPORTING_ERR_INVALID_GAME_TYPE, GAMEREPORTING_ERR_UNEXPECTED_REPORT },
+                description = "This command receives game report.",
+                details = "Game reports are accumulated until all reports for the given game are collected.",
+                allowGuestCall = true,
+                fiber_stack_size = "medium"
+            ]
+            void submitGameReport(SubmitGameReportRequest);
+
+            [
+                id = 100,
+                shardingKey = "gameReport.gameReportingId",
+                errors = { GAMEREPORTING_TRUSTED_ERR_INVALID_GAME_TYPE, GAMEREPORTING_TRUSTED_ERR_REPORT_INVALID, GAMEREPORTING_ERR_UNEXPECTED_REPORT },
+                description = "This command recieves a game report from a dedicated server.",
+                details = "Trusted mid game reports are processed immediately by the slave.",
+                allowGuestCall = true,
+                fiber_stack_size = "medium"
+            ]
+            void submitTrustedMidGameReport(SubmitGameReportRequest);
+
+            [
+                id = 101,
+                shardingKey = "gameReport.gameReportingId",
+                errors = { GAMEREPORTING_TRUSTED_ERR_INVALID_GAME_TYPE, GAMEREPORTING_TRUSTED_ERR_REPORT_INVALID, GAMEREPORTING_ERR_UNEXPECTED_REPORT },
+                description = "This command recieves a game report from a dedicated server at the end of a game.",
+                details = "Trusted end of game reports are processed immediately by the slave and game history is stored.",
+                allowGuestCall = true,
+                fiber_stack_size = "medium"
+            ]
+            void submitTrustedEndGameReport(SubmitGameReportRequest);
+
+            [
+                id = 2,
+                ignoreShardingKey = true,
+                errors = { GAMEREPORTING_OFFLINE_ERR_INVALID_GAME_TYPE },
+                description = "This command receives game reports for a game that occured offline.",
+                details = "Offline game reports are processed by this command resulting in changes to the sending users offline stats.",
+                allowGuestCall = true,
+                fiber_stack_size = "medium" 
+            ]
+            void submitOfflineGameReport(SubmitGameReportRequest);
+
+            [
+                id = 3,
+                ignoreShardingKey = true,
+                description = "Processes game events collected by the game during play.",
+                details = "Used by titles that do not wish to use end of game reports.  Game events offer a simple way to report data for processing immediately on submission.  As a result features like game history are not supported.  Event processing occurs only on the slave.  In a game with multiple players submitting events, processing will occur for each submission.  If you wish to use events instead of game reports, design the game accordingly to handle these limitations.",
+                allowGuestCall = true,
+                fiber_stack_size = "medium" 
+            ]
+            void submitGameEvents(GameEvents);
+
+            [
+                id = 4,
+                ignoreShardingKey = true,
+                errors = { GAMEHISTORY_ERR_UNKNOWN_QUERY },
+                description = "Return the query config for the query name requested."
+            ]
+            GameReportQuery getGameReportQuery(GetGameReportQuery);
+
+            [
+                id = 5,
+                ignoreShardingKey = true,
+                description = "Return a list of game report queries." 
+            ]
+            GameReportQueriesList getGameReportQueriesList();
+
+            [
+                id = 6,
+                ignoreShardingKey = true,
+                requiresUserSession = false,
+                errors = { GAMEHISTORY_ERR_UNKNOWN_QUERY, GAMEHISTORY_ERR_INVALID_GAMETYPE, GAMEHISTORY_ERR_INVALID_QUERY, GAMEHISTORY_ERR_INVALID_COLUMNKEY, GAMEHISTORY_ERR_INVALID_FILTER, GAMEHISTORY_ERR_MISSING_QVARS, GAMEHISTORY_ERR_INVALID_QVARS },
+                description = "Return a list of game reports for the query name requested." 
+            ]
+            GameReportsList getGameReports(GetGameReports);
+
+            [
+                id = 7,
+                ignoreShardingKey = true,
+                errors = { GAMEHISTORY_ERR_UNKNOWN_VIEW, GAMEHISTORY_ERR_INVALID_QUERY, GAMEHISTORY_ERR_MISSING_QVARS, GAMEHISTORY_ERR_INVALID_QVARS },
+                description = "Return a game report view" 
+            ]
+            GetGameReportViewResponse getGameReportView(GetGameReportViewRequest);
+
+            [
+                id = 8,
+                ignoreShardingKey = true,
+                errors = { GAMEHISTORY_ERR_UNKNOWN_VIEW },
+                description = "Return a game report view info."
+            ]
+            GameReportViewInfo getGameReportViewInfo(GetGameReportViewInfo);
+
+            [
+                id = 9,
+                ignoreShardingKey = true,
+                description = "Return a list of game report view info."
+            ]
+            GameReportViewInfosList getGameReportViewInfoList();
+
+            [
+                id = 10,
+                ignoreShardingKey = true,
+                description = "Return a list of defined game report types."
+            ]
+            GetGameReportTypesResponse getGameReportTypes();
+
+            [
+                id = 11,
+                ignoreShardingKey = true,
+                description = "Updates a custom game metric (if metric is defined in the configuration.)",
+                generate_command_class = false
+            ]
+            void updateMetric(UpdateMetricRequest);
+
+            [
+                id = 12,
+                ignoreShardingKey = true,
+                description = "Retrieve column information without the actual values for the given view.",
+                errors = { GAMEHISTORY_ERR_UNKNOWN_VIEW }
+            ]
+            GameReportColumnInfoResponse getGameReportColumnInfo(GetGameReportColumnInfo);
+
+            [
+                id = 13,
+                ignoreShardingKey = true,
+                description = "Retrieve only the column values, without the information headers.",
+                errors = { GAMEHISTORY_ERR_UNKNOWN_VIEW, GAMEHISTORY_ERR_INVALID_QUERY, GAMEHISTORY_ERR_MISSING_QVARS, GAMEHISTORY_ERR_INVALID_QVARS }
+            ]
+            GetGameReportColumnValuesResponse getGameReportColumnValues(GetGameReportViewRequest);
+
+            [
+                id = 14,
+                ignoreShardingKey = true,
+                errors = { GAMEHISTORY_ERR_UNKNOWN_VIEW, GAMEHISTORY_ERR_INVALID_QUERY, GAMEHISTORY_ERR_MISSING_QVARS, GAMEHISTORY_ERR_INVALID_QVARS },
+                description = "Return a game report view for a given tournament game. Calls getGameReportView internally." 
+            ]
+            GetGameReportViewResponse getTournamentGameReportView(GetTournamentGameReportViewRequest);
+
+            [
+                id = 200,
+                description = "Informs game reporting that a game has started.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false
+            ]
+            void gameStarted(GameManager::StartedGameInfo);
+
+            [
+                id = 201,
+                description = "Informs game reporting that a game has finished.",
+                client_export = false,
+                internal = true,
+                requires_authentication = false,
+                generateProto = false
+            ]
+            void gameFinished(GameManager::GameInfo);
+        }
+
+        notifications
+        {
+            [
+                id = 114,
+                description = "Sent to game participants when the game report processing has either completed or failed for a game.",
+                details = "A slave-to-client only notification."
+            ]
+            ResultNotification(Blaze::GameReporting::ResultNotification);
+        }
+
+        events
+        {
+            [ id = 1000 ]
+            GameReportInvalidEvent(GameReportInvalid);
+
+            [ id = 1001 ]
+            GameReportDiscrepancyEvent(GameReportDiscrepancy);
+
+            [ id = 1002 ]
+            GameReportSucceededEvent(GameReportSucceeded);
+
+            [ id = 1003 ]
+            GameReportProcessFailedEvent(GameReportProcessFailed);
+
+            [ id = 1004 ]
+            GameReportCustomEvent(CustomEvent);
+
+            [ id = 1005 ]
+            GameReportRejectedEvent(GameReportRejected);
+
+            [ id = 1006 ]
+            GameReportCollationFailedEvent(GameReportCollationFailed);
+
+            [ id = 1007 ]
+            GameReportOrphanedEvent(GameReportOrphaned);
+        }
+    }
+}
+
+} // GameReporting
+} // Blaze

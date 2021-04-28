@@ -1,0 +1,123 @@
+[headername="stats/tdf/stats_configtypes_server.h"]
+#include "stats_configtypes_server.tdf"
+
+#include "stats/statscommontypes.h"
+
+namespace Blaze
+{
+namespace Stats
+{
+
+[baseTdf=Blaze::Stats::StatCategoryData]
+class StatCategory;
+
+typedef list<StatCategory> CategoriesList;
+
+[baseTdf=Blaze::Stats::StatGroupData]
+class StatGroup;
+
+typedef list<StatGroup> StatGroupsList;
+
+[baseTdf=Blaze::Stats::LeaderboardGroupData]
+class LeaderboardGroup;
+
+typedef list<LeaderboardGroup> LeaderboardGroupsList;
+
+typedef list<string(64)> DbNameList;
+class ShardInfo
+{
+    [tag="etp",  description="Entity Type."] ObjectType mEntityType;
+    [tag="dbnm", description="Database names."] DbNameList mDbNames;
+};
+typedef list<ShardInfo> ShardInfoList;
+typedef map<ScopeName, bool, ignorecase> KeyScopeChangeMap;
+
+class StatsConfig
+{
+    [tag="dbna", default="", reconfigurable="no", description="regular configuration data"]
+    string(64) mDbName;
+
+    [tag="rlve", reconfigurable="yes", description="All rollover data has been set in stats config."]
+    RolloverData mRollover;
+
+    [tag="kysp", reconfigurable="no", description="Key scope name/value pairs for the keyscope defined in the stats config."]
+    KeyScopesMap mKeyscopes;
+    
+    [tag="kscl", reconfigurable="yes", description="keyscope change validation map"]
+    KeyScopeChangeMap mKeyScopeChangeMap;
+    
+    [tag="shrd", reconfigurable="no", description="Shard data"]
+    ShardInfoList mShardInfoList;
+
+    [tag="cate", reconfigurable="no", description="Categories informations"]
+    CategoriesList mCategories;
+
+    [tag="usta", reconfigurable="no", description="The user stats setting in the stats config."]
+    UserSessionStatsList mUserSessionStats;
+
+    [tag="grop", reconfigurable="no", description="The stat group setting data."]
+    StatGroupsList mStatGroups;
+
+    [tag="lgrp", reconfigurable="no", description="Leaderboard Groups setting."]
+    LeaderboardGroupsList mLeaderboardGroups;
+
+    [tag="lrsz", reconfigurable="yes", default=1024, description="Maximum number of rows for the stats LRU cache."]
+    uint32_t mLruSize;
+
+    [tag="mxrw", reconfigurable="yes", default=1024, description="The max rows want to return for unbounded stat fetches."]
+    uint32_t mMaxRowsToReturn;
+
+    [tag="mxls", reconfigurable="yes", default=1024, description="The max number of leaderboards that can be created from a single keyscope. Exceeding this value will cause an error. (Using an empty keyscope will generate leaderboards for each possible key value)."]
+    uint32_t mMaxKeyScopeGeneratedLeaderboards;
+
+    [tag="stim", reconfigurable="yes", default="2s", description="format 0d:0h:0m:0s; The timeout for slave to wait for out-of-sequence stat updates."]
+    TimeValue mStatUpdateSequenceTimeout;
+
+    [tag="sswp", reconfigurable="yes", default="5s", description="format 0d:0h:0m:0s; On master, how often stat updates are swept from the cache. Should not be less than slave's timeout."]
+    TimeValue mStatUpdateSweepInterval;
+
+    [tag="hier", reconfigurable="no", description="Leaderboard hierarchy data."]
+    LeaderboardHierarchyList mLeaderboardHierarchy;
+
+    [tag="lbur", reconfigurable="no", description="user rank setting in stats config."]
+    UserSessionRanksList mUserSessionRanks;
+
+    [tag="mlta", reconfigurable="yes", default=100, description="The max number of tree nodes to return per notification after a call to getLeaderboardTreeAsync"]
+    uint32_t mMaxNodesPerLeaderboardTreeNotification;
+
+    [tag="tppt", reconfigurable="yes", default="3s", description="format 0d:0h:0m:0s; The max consecutive processing time allowed when trimming leaderboard periods."]
+    TimeValue mTrimPeriodsMaxProcessingTime;
+
+    [tag="tptm", reconfigurable="yes", default="5s", description="format 0d:0h:0m:0s; How long to wait to resume trimming leaderboard periods after the trim periods max processing time is exceeded."]
+    TimeValue mTrimPeriodsTimeout;
+};
+
+typedef map<SequenceId, StatUpdateNotification> StatUpdateMap;
+
+[
+    description = "Request cached stat updates/deletes."
+]
+class GetStatUpdatesRequest
+{
+    [tag="lsid", description="List of cached stat updates to retrieve, by sequence ID."] list<SequenceId> mSequenceIdList;
+};
+
+[
+    description = "Retrieved cached stat updates/deletes."
+]
+class GetStatUpdatesResponse
+{
+    [tag="updt", description="Map of cached stat updates, indexed by sequence ID."] StatUpdateMap mStatUpdateMap;
+};
+
+[
+    description = "Info about the slave starting up to use global cache/stats."
+]
+class InitializeGlobalCacheRequest
+{
+    [tag="iid", description="Instance ID of the slave starting up to use global cache/stats."]
+    InstanceId mInstanceId;
+};
+
+}
+}

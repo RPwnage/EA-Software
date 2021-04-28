@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# relative path of script relative to launch location
+srcDir=$(dirname ${BASH_SOURCE[0]})
+
+set -e
+
+source $srcDir/clientdeploy.cfg
+source $srcDir/util
+
+makeSudoStr $clientuser
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 command"
+    echo "command:  start     - starts clients on all client boxes"
+    echo "          stop      - stops all clients on all client boxes"
+    echo "          status    - lists stress processes on all client boxes"
+    echo "          wipelogs  - clears logs on all client boxes"
+    echo "          wipecores - clears cores on all client boxes"
+    echo "          wipeall   - wipes all deployed data from all client boxes"
+    exit 1
+fi
+
+if [ -z "$runname" ]; then 
+    echo "File: clientdeploy.cfg does not specify \"runname\". Please define this variable in clientdeploy.cfg."
+    exit 1
+fi
+
+if [ -z "$clientpath" ]; then
+    echo "File: clientdeploy.cfg does not specify \"clientpath\". Please define this variable in clientdeploy.cfg."
+    exit 1
+fi
+
+STRESS_COUNT=${#stressinstances[@]}
+CONTAINER_NAME_PREFIX="stress_client"
+
+for i in ${!clienthost[*]}; do
+    echo "Host: ${clienthost[$i]}"
+    case "$1" in
+    start)
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost[$i]} "cd $clientpath; if [ ! -d log ]; then $sudoStr mkdir log; fi; cd etc; ../runstressclients ${clientrun[$i]} ${CONTAINER_NAME_PREFIX} > /dev/null 2>&1 &"
+        echo "done."
+        ;;
+    stop)
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost[$i]} "docker stop \$(docker ps -a -q --filter=\"name=${CONTAINER_NAME_PREFIX}\") > /dev/null 2>&1 &"
+        echo "done."
+        ;;
+    status)
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost[$i]} "echo /proc/sys/fs/file-nr; cat /proc/sys/fs/file-nr; echo disk usage:; df | grep /opt | awk '{print \$5 \"  \" \$4}'; ps -fu $clientuser | grep -v PID | grep stress; echo -n Expected count/process count $(($STRESS_COUNT * $(seq ${clientrun[i]} | wc -w)))/; ps -fu $clientuser | grep -v PID | grep stress | wc -l; ls $clientpath/etc/core.*; echo -------------------"
+        ;;
+    wipelogs)
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost[$i]} "cd $clientpath; $sudoStr rm -rf log"
+        echo "done."
+        ;;
+    wipecores)
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost[$i]} "cd $clientpath; $sudoStr rm -rf etc/core.*"
+        echo "done."
+        ;;
+    wipedocker)
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost[$i]} "docker rmi -f src.ent.ea.com:8443/gs/gs_docker_sandbox/$2 > /dev/null 2>&1"
+        echo "done."
+        ;;
+    wipeall)
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost[$i]} "$sudoStr rm -rf $clientpath"
+        echo "done."
+        ;;
+    *)
+        echo "Unknown command - $1, check usage"
+        exit 1
+    esac
+done
+

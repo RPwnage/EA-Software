@@ -1,0 +1,152 @@
+group rpcarsonservercommandshelpersource1 : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+rootComponent(fileNode, node) ::= <<
+<standardFileHeader()>
+#include "commands/serverrpcmanager.h"
+#include "commands/blaze/generatedcommands.h"
+#include "commands/blaze/client/Commands.h"
+#include "shared/framework/protocol/shared/heat2decoder.h"
+#include "shared/framework/protocol/shared/heat2encoder.h"
+#include "framework/util/shared/rawbuffer.h"
+
+<node.Subcomponents:helperDefinitions(component=it); separator="\n\n">
+<standardFileFooter()>
+>>
+
+helperDefinitions(component) ::= <<
+<if(!component.IsMaster)><component.Commands:helperDefinition(command=it); separator = "\n\n"><endif>
+>>
+
+helperDefinition(command) ::= <<
+<if(command.ResponseType)>
+int32_t <component.Name;format="pascal"><component.Type;format="pascal">_<command.Name;format="pascal">CommandHelper( uint8_t* pubRequestData, uint32_t uiRequestDataLen, uint8_t*& ppubResponseData, uint32_t& puiResponseDataLen )
+{
+    int32_t iResult = 0;
+    Blaze::RawBuffer* pRawRequest =  new Blaze::RawBuffer( pubRequestData, uiRequestDataLen );;
+    Blaze::RawBuffer* pRawResponse = nullptr;
+    Blaze::Heat2Decoder* pHeatDecoder = new Blaze::Heat2Decoder();
+    Blaze::Heat2Encoder* pHeatEncoder = nullptr;
+    Arson::ClientStructures::ArsonMetaData metaData;
+    if( nullptr != ppubResponseData )
+    {
+        delete [] ppubResponseData;
+        ppubResponseData = nullptr;
+    }
+    puiResponseDataLen = 0;
+    pRawRequest->put( uiRequestDataLen );
+    iResult = pHeatDecoder->decode(*pRawRequest, metaData);
+    EA_ASSERT(iResult == 0);
+
+    <if(command.ResponseType)>
+    <printTypeRefFullScope(command.ResponseType)> *pSRsp = nullptr;
+    <endif>
+    <if(command.errortype)>
+    <printTypeRefFullScope(command.errortype)> *pSErr = nullptr;
+    <endif>
+
+    <if(command.RequestType)>
+    <printTypeRefFullScope(command.RequestType)> request;
+    iResult = pHeatDecoder->decode(*pRawRequest, request);  
+    
+    // Heat decoder may now fail for edge test cases, e.g. non utf8 tdfstrings. Return appropriate code for validation
+    if (iResult != Blaze::ERR_OK)
+    {
+        metaData.setArsonErrCode(ARSON_ERR_SYSTEM);
+        <if(component.IsCompTypeArson)>
+        LOG_ERROR( "<command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub aborted due to failure decoding request. Check request. For instance are TDF strings valid utf8" );
+        <else>
+        LOG_ERROR( "<command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command aborted due to failure decoding request. Check request. For instance are TDF strings valid utf8" );
+        <endif>
+        LOG_ARSON_ERROR((ArsonCommandErrorCode)metaData.getArsonErrCode());
+        pRawResponse = new Blaze::RawBuffer(CONST_MAX_ROW_BUFFER_LEN);
+        pHeatEncoder = new Blaze::Heat2Encoder();
+        pHeatEncoder->encode(*pRawResponse, metaData);
+        puiResponseDataLen = static_cast\<uint32_t\>(pRawResponse->size());
+        ppubResponseData = new uint8_t[puiResponseDataLen];
+        ::memcpy(ppubResponseData, pRawResponse->head(), puiResponseDataLen);
+        delete pHeatDecoder;
+        delete pHeatEncoder;
+        delete pRawRequest;
+        delete pRawResponse;
+        return( 0 );
+    }
+
+    <endif>
+
+    <if(component.IsCompTypeArson)>
+        <if(command.RequestType)>
+    <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub *creater = new <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub( &metaData, &request );
+        <else>
+    <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub *creater = new <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub( &metaData );
+        <endif>
+    <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub *command = creater->create();
+    <else>
+        <if(command.RequestType)>
+    <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command *command = new <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command( &metaData, &request );
+        <else>
+    <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command *command = new <command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command( &metaData );
+        <endif>
+    <endif>
+
+    ExecuteCommand(command);
+
+    if( nullptr != ArsonCommand::mBlazeSdkAssertMessage )
+    {
+        iResult = ARSON_BLAZESDK_ASSERT;
+    }
+    else
+    {
+        iResult = (int32_t)command->getArsonErrorCode();
+    }
+    metaData.setArsonErrCode(iResult); //pack into metadata for trip back to client
+    pRawResponse = new Blaze::RawBuffer( CONST_MAX_ROW_BUFFER_LEN );
+    pHeatEncoder = new Blaze::Heat2Encoder();
+    if( ( iResult != ARSON_ERR_OK ) && ( iResult != ARSON_SERVER_OUTPUT ) && ( iResult != ARSON_CONSOLE_PATH ) ) 
+    {
+        <if(component.IsCompTypeArson)>
+        LOG_ERROR( "<command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">CommandStub failed" );
+        <else>
+        LOG_ERROR( "<command.Parent.Name><command.Parent.Type>_<command.Name;format="pascal">Command failed" );
+        <endif>
+        LOG_ARSON_ERROR((ArsonCommandErrorCode)metaData.getArsonErrCode());
+    }
+    <if(command.ResponseType)>
+    pSRsp = command->getArsonResponse();
+    <endif>
+    <if(command.errortype)>
+    pSErr = command->getArsonError();
+    <endif>
+    pHeatEncoder->encode(*pRawResponse, metaData);
+    <if(command.ResponseType)>
+    if(pSRsp != nullptr)
+        pHeatEncoder->encode(*pRawResponse, *pSRsp);
+    <endif>
+    <if(command.errortype)>
+        if(pSErr != nullptr)
+        {
+            char8_t errStruct[CONST_MAX_ERR_MESSAGE_LENGTH]; //defined in errorhelper.h
+            pSErr->print(errStruct, CONST_MAX_ERR_MESSAGE_LENGTH, 0);
+            LOG_ERROR( "Blaze error structure returned" );
+            LOG_ERROR( errStruct );
+            pHeatEncoder->encode(*pRawResponse, *pSErr);
+        }
+    <endif>
+    puiResponseDataLen = static_cast\<uint32_t\>(pRawResponse->size());
+    ppubResponseData = new uint8_t [ puiResponseDataLen ];
+    ::memcpy( ppubResponseData, pRawResponse->head(), puiResponseDataLen );
+    delete command;
+    <if(component.IsCompTypeArson)>
+    delete creater;
+    <endif>
+    delete pHeatDecoder;
+    delete pHeatEncoder;
+    delete pRawRequest;
+    delete pRawResponse;
+    return( iResult );
+}
+<endif>
+>>
+

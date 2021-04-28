@@ -1,0 +1,74 @@
+<project>
+  <createtask name="package.blazeserver.tdf.task">
+    <parameters>
+      <option name="inputs" value="Required"/>
+      <option name="templatedir" value="Required"/>
+      <option name="basetemplatedir" value="Required"/>
+      <option name="outdir" value="Required"/>
+      <option name="basedir" value="Required"/>
+      <option name="type" value="Required"/>
+      <option name="language" value="Required"/>
+      <option name="cfgdoc" value="false"/>
+      <option name="luagen" value="true"/>
+    </parameters>
+    <code>
+
+      <dependent name="antlr"/>
+
+      <property name="package.blazeserver.tdf.task.basedir" value="@{PathGetFullPath(${package.blazeserver.tdf.task.basedir})}"/>
+
+      <!-- Convert the TDF fileset to a property containing the relative paths to each TDF -->
+      <property name="package.blazeserver.tdf.task.inputs.relative" value="@{FileSetToString(${package.blazeserver.tdf.task.inputs}, ' ')}"/>
+      <property name="package.blazeserver.tdf.task.inputs.relative" value="@{StrReplace(${package.blazeserver.tdf.task.inputs.relative}, '${package.blazeserver.tdf.task.basedir}/', '')}"/>
+      <property name="package.blazeserver.tdf.task.inputs.relative" value="@{StrReplace(${package.blazeserver.tdf.task.inputs.relative}, '${package.blazeserver.tdf.task.basedir}\\', '')}"/>
+      <property name="package.blazeserver.tdf.task.inputs.relative" value="@{StrReplace(${package.blazeserver.tdf.task.inputs.relative}, '\\', '/')}"/>
+
+      <!-- Make sure paths are unix-style -->
+      <property name="package.blazeserver.tdf.task.templatedir" value="@{PathToUnix(${package.blazeserver.tdf.task.templatedir})}"/>
+      <property name="package.blazeserver.tdf.task.outdir"      value="@{PathToUnix(${package.blazeserver.tdf.task.outdir})}"/>
+      <property name="package.blazeserver.tdf.task.basedir"     value="@{PathToUnix(${package.blazeserver.tdf.task.basedir})}"/>
+
+      <property name="os.delim" value=";"/>
+      <property name="os.delim" value=":" if="${config-system} == unix64"/>
+
+      <!-- Use output .d files to perform dependency checking -->
+      <fileset name="tdf.deps">
+	    <includes name="${package.blazeserver.tdf.task.outdir}/configdoctdf.d" if="${package.blazeserver.tdf.task.cfgdoc} == true"/>
+      </fileset>
+      <foreach item="String" in="${package.blazeserver.tdf.task.inputs.relative}" property="tdf">
+        <property name="tdfname" value="@{PathGetFileNameWithoutExtension('${tdf}')}"/>
+        <property name="tdfpath" value="@{StrSubstring('${tdf}',0,@{StrIndexOf('${tdf}','/gen/')})}"/>
+        <fileset name="tdf.deps" append="true">
+          <includes name="${package.blazeserver.tdf.task.outdir}/${tdfpath}/tdf/${tdfname}.d"/>
+        </fileset>
+      </foreach>
+
+      <do if="@{FileSetCount('${package.blazeserver.tdf.task.inputs}')} > 0">
+        <exec program="${java.exe}" clearenv="true" workingdir="${package.blazeserver.tdf.task.basedir}">
+          <args>
+            <arg value="-Xmx512M"/>
+            <arg value="-cp ${package.builddir}/bin/antlr.jar${os.delim}${package.builddir}/bin/typecomp.jar"/>
+            <arg value="TdfComp tdf"/>
+            <arg value="-luagen" if="${package.blazeserver.tdf.task.luagen} == true"/>
+            <arg value="-cfgdoc" if="${package.blazeserver.tdf.task.cfgdoc} == true"/>
+            <arg value="-lang ${package.blazeserver.tdf.task.language}"/>
+            <arg value="-t ${package.blazeserver.tdf.task.templatedir}"/>
+            <arg value="-oc ${package.blazeserver.tdf.task.outdir}"/>
+            <arg value="-oh ${package.blazeserver.tdf.task.outdir}"/>
+            <arg value="-sdk ${package.blazeserver.dir}/component"/>
+            <arg value="-sdk ${package.blazeserver.dir}/customcomponent"/>
+            <arg value="-sdk ${package.blazeserver.dir}/proxycomponent"/>
+            <arg value="${package.blazeserver.tdf.task.inputs.relative}"/>
+          </args>
+          <inputs fromfileset="${package.blazeserver.tdf.task.inputs}">
+            <includes name="${package.dir}/${package.blazeserver.tdf.task.basetemplatedir}/*.stg"/>
+            <includes name="${package.dir}/${package.blazeserver.tdf.task.basetemplatedir}/**.stg"/>
+            <includes name="${package.builddir}/bin/typecomp.jar"/>
+          </inputs>
+          <outputs fromfileset="tdf.deps">
+          </outputs>
+        </exec>
+      </do>
+    </code>
+  </createtask>
+</project>

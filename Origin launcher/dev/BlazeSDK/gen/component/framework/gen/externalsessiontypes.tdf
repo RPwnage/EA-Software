@@ -1,0 +1,230 @@
+/*! ************************************************************************************************/
+/*!
+    \file externalsessiontypes.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/network.h"]
+#include "framework/gen/network.tdf" // for NpSessionId in Ps4ExternalSessionIdentification.
+[headername="framework/tdf/userdefines.h"] // for ClientPlatformType in ExternalSessionPlatformActivityType
+#include "framework/gen/userdefines.tdf"
+
+namespace Blaze
+{
+typedef string(20) TitleId; // pre: max 64 bits (20 chars) for Xbox. Max 12 chars for PS4
+typedef string(64) XblScid;
+typedef string(64) XblSessionTemplateName;
+typedef string(256) XblSessionName;
+typedef string(16) XblContractVersion;
+typedef string(38) XblCorrelationId; // GUID in hex registry format, 36 chars +2 braces
+typedef blob Ps4NpSessionImage;
+typedef blob ExternalSessionCustomData;
+typedef string(-1) ExternalSessionCustomDataString;
+typedef string(512) Ps4NpSessionStatusString; // max 128 UTF-8 chars for PS4
+typedef map<string(5), Ps4NpSessionStatusString, ignorecase> Ps4NpSessionStatusStringLocaleMap; // side: locale format is usually xx-XX, but allowing case insensitive for user convenience.
+typedef string(100) XblTournamentDefinitionName; // max 100 chars for X1
+typedef string(33) UtcTimeString; // UTC string format like: YYYY-MM-DDTHH:MM:SS.XXXXXXXZ or YYYY-MM-DDTHH:MM:SS.XXXXXXX-XX:XX
+typedef string(-1) TournamentId;
+typedef string(-1) TournamentOrganizer;
+typedef string(14) XblSessionInviteProtocol; // Xbox inviteProtocol has possible values 'game', 'tournamentGame' (max length 14)
+typedef string(38) XblActivityHandleId; // For Xbox: 64 bit unsigned, in hex registry format, 36 chars +2 braces
+typedef int64_t PsnServiceLabel;
+typedef string(32) PsnUdsObjectId; // For PS: max 32 chars
+typedef string(36) PsnMatchId; // For PS: max 36 chars
+typedef string(36) PsnPlayerSessionId; // For PS: max 36 chars
+
+[description="DEPRECATED use XblScid instead."]
+typedef XblScid Scid;
+[description="DEPRECATED use XblSessionTemplateName instead."]
+typedef XblSessionTemplateName ExternalSessionTemplateName;
+[description="DEPRECATED use XblSessionName instead."]
+typedef XblSessionName ExternalSessionName;
+[description="DEPRECATED use XblContractVersion instead."]
+typedef XblContractVersion ContractVersion;
+[description="DEPRECATED use XblCorrelationId instead."]
+typedef XblCorrelationId ExternalSessionCorrelationId;
+[description="DEPRECATED use XblSessionInviteProtocol instead."]
+typedef XblSessionInviteProtocol ExternalSessionInviteProtocol;
+[description="DEPRECATED use XblActivityHandleId instead."]
+typedef XblActivityHandleId ExternalSessionActivityHandleId;
+[description="DEPRECATED use XblTournamentDefinitionName instead."]
+typedef XblTournamentDefinitionName ExternalSessionTournamentDefinitionName;
+[description="DEPRECATED use Ps4NpSessionStatusString instead."]
+typedef Ps4NpSessionStatusString ExternalSessionStatusString;
+[description="DEPRECATED use Ps4NpSessionStatusStringLocaleMap instead."]
+typedef Ps4NpSessionStatusStringLocaleMap ExternalSessionStatusStringLocaleMap;
+[description="DEPRECATED use Ps4NpSessionImage instead."]
+typedef Ps4NpSessionImage ExternalSessionImage;
+[description="DEPRECATED use PsnServiceLabel instead."]
+typedef PsnServiceLabel ExternalSessionServiceLabel;
+
+[description="Platform dependent type of activity the external session represents. Some platforms may have more than one, e.g. PS5 PlayerSessions and Matches."]
+enum ExternalSessionActivityType
+{
+    [description="Main type designate-able as the primary joinable activity for the user in the UX. PS4 NpSessions, PS5 PlayerSessions, etc"]
+    EXTERNAL_SESSION_ACTIVITY_TYPE_PRIMARY = 0x0,
+    [description="PS5 Match Activities"]
+    EXTERNAL_SESSION_ACTIVITY_TYPE_PSN_MATCH = 0x01
+};
+
+class ExternalSessionActivityTypeInfo
+{
+    [tag="plat", description="platform."] ClientPlatformType mPlatform;
+    [tag="type", description="platform specific activity type.", default=EXTERNAL_SESSION_ACTIVITY_TYPE_PRIMARY] ExternalSessionActivityType mType;
+    [tag="xgen", description="The current client's platform, for APIs supporting multiple platforms via crossgen."] ClientPlatformType mCrossgenClientPlatform;
+};
+
+[description="Maximum length in characters of contract version. Assumed to be 64 bit"]
+const uint16_t MAX_XBLCONTRACTVERSION_CHAR_LEN = 20;
+[description="DEPRECATED use MAX_XBLCONTRACTVERSION_CHAR_LEN instead."]
+const uint16_t MAX_CONTRACTVERSION_CHAR_LEN = 20;
+// can expand this enum to include external session entity types in the future
+enum ExternalSessionType
+{
+    EXTERNAL_SESSION_INVALID = 0x0,
+    EXTERNAL_SESSION_GAME = 0x01,
+    EXTERNAL_SESSION_MATCHMAKING_SESSION = 0x02,
+    EXTERNAL_SESSION_GAME_GROUP = 0x03,
+    EXTERNAL_SESSION_MATCHMAKING_SCENARIO = 0x04
+};
+
+[description="Maximum length in characters of first party id for a user for external services updates. Assumed to be 64 bit"]
+const uint16_t MAX_EXTERNAL_ID_CHAR_LEN = 20;
+
+[description="External session identification info for PS5 Match.", trackChanges = true]
+class Ps5ExternalSessionIdentificationMatch
+{
+    [tag="maid", description="MatchId, generated by PSN when Match created."]
+    PsnMatchId mMatchId;
+    [tag="maoi", description="UDS Activity Object Id for the Match, specified by title when Match created."]
+    PsnUdsObjectId mActivityObjectId;
+};
+[description="External session identification info for PS5 PlayerSession.", trackChanges = true]
+class Ps5ExternalSessionIdentificationPlayerSession
+{
+    [tag="psid", description="PlayerSession Id, generated by PSN when PlayerSession created."]
+    PsnPlayerSessionId mPlayerSessionId;
+};
+[description="External session identification info for PS5.", trackChanges = true]
+class Ps5ExternalSessionIdentification
+{
+    [tag="matc", description="PS5 Match identification info"]
+    Ps5ExternalSessionIdentificationMatch mMatch;
+
+    [tag="pses", description="PS5 PlayerSession identification info"]
+    Ps5ExternalSessionIdentificationPlayerSession mPlayerSession;
+};
+[description="External session identification info for Xbox One and Xbox Series X.", trackChanges = true]
+class XboxOneExternalSessionIdentification
+{
+    [tag="stmn", description="Xbox session template name"]
+    XblSessionTemplateName mTemplateName;
+    [tag="esnm", description="Xbox session name"]
+    XblSessionName mSessionName;
+    [tag="coid", description="Xbox correlation id"]
+    XblCorrelationId mCorrelationId;
+};
+
+[description="External session identification info for PS4.", trackChanges = true]
+class Ps4ExternalSessionIdentification
+{
+    [tag="npsi", description="PS4 NP session id"]
+    NpSessionId mNpSessionId;
+};
+
+[description="External session identification info.", trackChanges = true]
+class ExternalSessionIdentification
+{
+    [tag="xone"] XboxOneExternalSessionIdentification mXone;
+    [tag="ps4"] Ps4ExternalSessionIdentification mPs4;
+    [tag="ps5"] Ps5ExternalSessionIdentification mPs5;
+};
+
+[description="Info about the rate limit for a user."]
+class RateLimitInfo
+{
+    [tag="rtna", description="The time when the next call to the rpc could be made (per title per user). In UNIX epoch seconds. 0 if info unavailable."]
+    float mRateLimitNextAvailable;
+    [tag="rttp", description="The rate limit time period. Empty if info unavailable."]
+    string(-1) mRateLimitTimePeriod;
+    [tag="rtli", description="The limit on the number of calls for the rpc, over the rate limit time period."]
+    uint16_t mRateLimitLimit;
+    [tag="rtre", description="Number of calls to the rpc remaining until the limit is reached. 0 if info unavailable."]
+    uint16_t mRateLimitRemaining;
+    [tag="cntx", description="Extra context info for debugging."]
+    string(-1) mContext;
+};
+
+[description="Info about the external session error."]
+class ExternalSessionErrorInfo
+{
+    [tag="rate", description="The rate limit info."]
+    RateLimitInfo mRateLimitInfo;
+    [tag="code", description="the external session service error code."]
+    int32_t mCode;
+    [tag="mesg", description="the external session service message for debugging."]
+    string(129) mMessage;//max 129 chars for PS4
+};
+
+[description="Status string displayed for the external session in the shell UX.", trackChanges=true]
+class ExternalSessionStatus
+{
+    [tag="unlo", description="The default non localized status string displayed in the shell UX."]
+    Ps4NpSessionStatusString mUnlocalizedValue;
+
+    [tag="locl", description="Localized status strings displayed in the shell UX."]
+    Ps4NpSessionStatusStringLocaleMap mLangMap;
+};
+
+[description="Tournament game's external session data.", trackChanges=true]
+class TournamentSessionData
+{
+    [tag="tsta", default="1970-01-01T00:00:00Z", description="(Optional, Xbox only) UTC start time for match. E.g. 2008-09-28T16:56:01Z. If set in the past, XBL will automatically use the current time."]
+    UtcTimeString mScheduledStartTime;
+
+    [tag="arto", default="365d", description="(Optional, Xbox only) How long from the scheduled start time before a match result must be reported to the first party service, before the service automatically sets an internal disqualification status for the match's players, on the game's first party session. On X1, must be greater than forfeit timeout. Currently not exposed in the shell, and typically not needed for Blaze titles. Its recommend titles effectively omit using this, by using a very high value."]
+    TimeValue mArbitrationTimeout;
+
+    [tag="frto", default="364d", description="(Optional, Xbox only). How long from the scheduled start time a user has to actively join to the tournament game, before first party automatically sets an internal disqualification status for the user, on the first party session. Currently not exposed in the shell, and typically not needed for Blaze titles. Its recommend titles effectively omit using this, by using a very high value."]
+    TimeValue mForfeitTimeout;
+    
+    [tag="tdef", description="DEPRECATED - No longer required. (Xbox only) Name of the configured tournament definition."]
+    XblTournamentDefinitionName mTournamentDefinition;
+};
+
+[description="Data Blaze serializes and stores in the PS5 PlayerSession's custom data string.", trackChanges=true]
+class ExternalSessionBlazeSpecifiedCustomDataPs5
+{
+    [tag="gid", description="Blaze GameId"]
+    uint64_t mGameId;
+    [tag="gmd", description="Blaze GameMode"]
+    string(-1) mMode;
+};
+[description="For PS5, the max length of a PlayerSession's customdata string."]
+const uint16_t MAX_PSN_EXTERNALSESSION_CUSTOMDATA_LEN = 1024;
+
+[description="Specifies platform dependent settings for Blaze handling of recent players for external session members. For Xbox platforms using MPSD, these settings only apply to 'Large' MPSD sessions.", trackChanges=true]
+class ExternalSessionRecentPlayersSettings
+{
+    [description="Enumeration of possible grouping types from which to add players to the recent players lists of external session members. Only used by supported platforms."]
+    enum GroupingMode
+    {
+        [description="Blaze's automatic recent players handling disabled. (Up to the title to make own custom XBL calls to update recent players as appropriate)."]
+        NO_GROUPING = 0x0,
+        [description="Blaze will add players from game's roster to each member's recent players list."]
+        GAME_ROSTER = 0x01,
+        [description="Blaze will add players from same Team to each member's recent players list. If no Teams, works like GAME_ROSTER"]
+        TEAM = 0x02
+    };
+    [tag="grp", default=TEAM, description="used only when Blaze auto-populates 1st party sessions' members' recent players lists, specifies type of group from which each member's recent players list is populated. For Xbox One/XBSX."]
+    GroupingMode mGrouping;
+
+    [tag="maxp", default=100, description="Internally used for ensuring calls don't exceed known/expected 1st-party and Blaze limits. Specifies a max users Blaze may include in each member's 1st party recent players update. For Xbox One/XBSX."]
+    uint64_t mMaxPlayersPerUpdate;
+};
+
+}
+
+

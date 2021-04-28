@@ -1,0 +1,58 @@
+<project default="regress" xmlns="schemas/ea/framework3.xsd">
+
+  <!--
+    Enable eaconfig the analyze option through eaconfig.
+    Can also be done by a custom build type, but this is
+    easier.
+  -->
+
+    <optionset name="config-options-common">
+        <option name="analyze" value="build"/>
+    </optionset>
+  
+  <!-- TODO
+    VS2012 adds several options for static code analysis that are not present in VS2010:
+      analyze:only
+      analyze:quiet
+      analyze:log
+      analyze:stacksize
+      analyze:max_paths
+
+    EAConfig presently only supports analyze, so we may want to add support for some or all
+    of these additional flags.
+  -->
+
+    <package/>
+
+    <Program name="TestAnalyzeModule">
+    <sourcefiles>
+        <includes name="main.cpp"></includes>
+    </sourcefiles>
+    </Program>
+
+    <target name="regress">
+
+        <foreach item="String" in="${package.configs}" property="test-config">
+            <delete dir="${package.builddir}"/>
+
+            <record property="test-build-output" silent="true">
+                <nant buildfile="${nant.project.buildfile}" target="build" verbose="true">
+                <property name="config" value="${test-config}"/>
+                <property name="masterconfigfile" value="${nant.project.masterconfigfile}"/>
+                <property name="buildroot" value="${nant.project.buildroot}"/>
+                </nant>
+            </record>
+            <do if="@{StrIndexOf('${test-build-output}',' -analyze ')} == -1">
+                <echo message="${test-build-output}"/>
+                <fail if="@{StrIndexOf('${test-build-output}',' -analyze ')} == -1" message="analyze compiler option not passed by eaconfig."/>
+            </do>
+        </foreach>
+
+        <!--
+        TODO: check that the option is present in a Visual Studio solution file and
+        a vstomakefile-generated makefile.
+        -->
+
+    </target>
+
+</project>

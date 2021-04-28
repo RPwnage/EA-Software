@@ -1,0 +1,339 @@
+/*! ************************************************************************************************/
+/*!
+    \file externalsessiontypes_server.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/externalsessiontypes.h"] // for ExternalSession types
+#include "framework/gen/externalsessiontypes.tdf"
+
+[headername="framework/tdf/userdefines.h"] // for UserIdentification and ServiceName
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/network.h"] // for PresenceMode
+#include "framework/gen/network.tdf"
+
+// TODO: Disabling proto generation because of circular import caused by Blaze::GameManager namespace
+[headername="gamemanager/tdf/gamemanager_types.h", includeProto=false]  // For PlayerRemoveReason, etc.
+#include "gamemanager/gen/gamemanager_types.tdf"
+
+namespace Blaze
+{
+
+[description="External session image path"]
+typedef string(256) ExternalSessionImageHandle;
+
+typedef string(100) XblSessionNamePrefix; // Xbox One has max 100 chars
+typedef list<XblSessionTemplateName> XblSessionTemplateNameList;
+
+const PsnServiceLabel INVALID_PSN_SERVICE_LABEL = -1;
+[description="DEPRECATED use INVALID_PSN_SERVICE_LABEL instead."]
+const PsnServiceLabel INVALID_EXTERNAL_SESSION_SERVICE_LABEL = -1;
+
+typedef map<ClientPlatformType, bool> PlatformBoolMap;
+
+[description="Used to track the game's state progression for doing external session updates."]
+enum SimplifiedGamePlayState
+{
+    [description="Unknown or invalid state."]
+    GAME_PLAY_STATE_INVALID,
+    [description="Game has not reached GameState::IN_GAME yet. For PS5."]
+    GAME_PLAY_STATE_PRE_GAME,
+    [description="Game reached GameState::IN_GAME, but not yet finished. For PS5, PS4, Xbox."]
+    GAME_PLAY_STATE_IN_GAME,
+    [description="This includes any case leading to game reporting starting or GameState::POST_GAME, after being in game. For PS5."]
+    GAME_PLAY_STATE_POST_GAME,
+    [description="End of values sentinel"]
+    GAME_PLAY_STATE_MAX
+};
+
+[description="auth info for user to do ops on external sessions", tdfid = "hash", trackChanges = true]
+class ExternalUserAuthInfo
+{
+    [tag="etok", description="Optional cached external auth token to use for operating on external sessions."]
+    string(-1) mCachedExternalSessionToken;
+
+    [tag="svcn", description="The service name for the user's user session if available, or else the default service name if it has no user session."]
+    ServiceName mServiceName;
+};
+
+[description="info on an external session's member"]
+class ExternalMemberInfo
+{
+    [tag="usid"] UserIdentification mUserIdentification;
+    [tag="auth"] ExternalUserAuthInfo mAuthInfo;
+    [tag="tidx", description="tracks PS5 Match team"] GameManager::TeamIndex mTeamIndex;
+};
+
+typedef list<ExternalMemberInfo> ExternalMemberInfoList;
+typedef map<ExternalSessionActivityType, ExternalMemberInfoList> ExternalMemberInfoListByActivityType;
+typedef map<ClientPlatformType, ExternalMemberInfoListByActivityType> ExternalMemberInfoListByActivityTypeInfo;
+
+[description="Blaze game's info, used to update its external session's properties.", trackChanges=true]
+class ExternalSessionUpdateInfo
+{
+    [tag="full"]
+    PlatformBoolMap mFullMap;
+    
+    [tag="gset"]
+    GameManager::GameSettings mSettings;
+
+    [tag="gsta", description="(TO BE DEPRECATED: use mSimplifiedState instead)"]
+    GameManager::GameState mState;
+
+    [tag="mode"]
+    Collections::AttributeValue mGameMode;
+
+    typedef map<ClientPlatformType,PresenceMode> PresenceModeByPlatformMap;
+    [tag="prmp"] PresenceModeByPlatformMap mPresenceModeByPlatform;
+
+    // we use externalSessionIdentification here because it's possible we've had to disassociate an external session from any platform
+    // this will eliminate need for an update
+    [tag="esid"] ExternalSessionIdentification mSessionIdentification;
+    [tag="nam"] GameManager::GameName mGameName;
+    [tag="mau", description="(TO BE DEPRECATED: use mSlotCapacities instead)"] uint16_t mMaxUsers;
+    [tag="cap"] GameManager::SlotCapacitiesVector mSlotCapacities;
+    [tag="sta"] ExternalSessionStatus mStatus;
+
+    [tag="ssta", default=GAME_PLAY_STATE_INVALID]
+    SimplifiedGamePlayState mSimplifiedState;
+
+    [tag="tids"] GameManager::TeamIdVector mTeamIdsByIndex;
+    typedef map<GameManager::TeamIndex, string(-1)> TeamNameByTeamIndexMap;
+    [tag="tnms"] TeamNameByTeamIndexMap mTeamNameByIndex;
+    [tag="ggty"] GameManager::GameType mGameType;
+    [tag="gmid"] GameManager::GameId mGameId;
+
+    [tag="emem"] ExternalMemberInfoListByActivityTypeInfo mTrackedExternalSessionMembers;
+    [tag="dnfs"] UserIdentificationList mDnfPlayers;
+
+    [tag="exrp"] ExternalSessionRecentPlayersSettings mRecentPlayersSettings;
+    [tag="xlrg"] bool mXblLarge;
+};
+
+[description="Extra info about the game's event triggering update of its external session's properties. (Typically holds values that may not be available/cached on the game (nor its ExternalSessionUpdateInfo) by time the queued update executes).", trackChanges=true]
+class ExternalSessionUpdateEventContext
+{
+    [tag="ispu", description="The final update snapshot sent before game cleanup. Set only on game cleanup. For PS5."]
+    ExternalSessionUpdateInfo mFinalUpdateContext;
+
+    class MembershipChange
+    {
+        [tag="minf"] ExternalMemberInfo mUser;
+        [tag="rmrs", default=GameManager::SYS_PLAYER_REMOVE_REASON_INVALID] GameManager::PlayerRemovedReason mRemoveReason;
+        [tag="psta"] GameManager::PlayerState mPlayerState;
+    };
+    [tag="memb", description="Player membership change info, if update triggered by player membership change. For PS5."]
+    list<MembershipChange> mMembershipChangedContext;
+};
+
+[description="Blaze game's info, used to update its external session's properties and constants."]
+class ExternalSessionCreationInfo
+{
+    [tag="etyp", default=EXTERNAL_SESSION_GAME] ExternalSessionType mExternalSessionType;
+    [tag="esid"] uint64_t mExternalSessionId;
+
+    [tag="edat", description="Title-specified custom data"]
+    ExternalSessionCustomData mExternalSessionCustomData;
+
+    [tag="tid", description="Tournament identification"]
+    GameManager::TournamentIdentification mTournamentIdentification;
+
+    [tag="etrn", description="Tournament info"]
+    TournamentSessionData mTournamentInfo;
+
+    [tag="updt"]
+    ExternalSessionUpdateInfo mUpdateInfo;
+};
+
+[description="info for joining a user to its external session"]
+class ExternalUserJoinInfo
+{
+    [tag="usid"] UserIdentification mUserIdentification;
+
+    [tag="ires", description="Whether player is be joined as reserved or active."]
+    bool mReserved;
+
+    [tag="auth", description="Optional cached external auth info to use for adding the joined member to their external session."]
+    ExternalUserAuthInfo mAuthInfo;
+
+    [tag="tidx"] GameManager::TeamIndex mTeamIndex;
+};
+
+typedef list<ExternalUserJoinInfo> ExternalUserJoinInfoList;
+
+// This class is Xbox MPSD sessions specific. Not expected used on other platforms. (Maybe deprecated once XBSX moves off MPSD).
+[description="create external session parameters"]
+class CreateExternalSessionParameters
+{
+    [tag="user"] ExternalUserJoinInfo mExternalUserJoinInfo;
+
+    [tag="stmn"] XblSessionTemplateName mXblSessionTemplateName;
+    [tag="enam"] XblSessionName mXblSessionName;
+    [tag="crea", description="Info for initializing external session's constants and properties."]
+    ExternalSessionCreationInfo mExternalSessionCreationInfo;
+};
+
+// This class is Xbox MPSD sessions specific. Not expected used on other platforms. (Maybe deprecated once XBSX moves off MPSD).
+[description="join external session parameters"]
+class JoinExternalSessionParameters
+{
+    [tag="ulst"] ExternalUserJoinInfoList mExternalUserJoinInfos;
+
+    [tag="gtok"] string(-1) mGroupExternalSessionToken;
+
+    [tag="esid"] ExternalSessionIdentification mSessionIdentification;
+    [tag="crea", description="Info for initializing external session's constants and properties, if creating the external session."]
+    ExternalSessionCreationInfo mExternalSessionCreationInfo;
+};
+
+[description="check external session join restrictions parameters"]
+typedef JoinExternalSessionParameters CheckExternalSessionRestrictionsParameters;
+
+[description="info for leaving a user from its external session"]
+class ExternalUserLeaveInfo
+{
+    [tag="usid"] UserIdentification mUserIdentification;
+};
+
+typedef list<ExternalUserLeaveInfo> ExternalUserLeaveInfoList;
+
+// This class is Xbox MPSD sessions specific. Not expected used on other platforms. (Maybe deprecated once XBSX moves off MPSD).
+[description="leave external session parameters"]
+class LeaveGroupExternalSessionParameters
+{
+    [tag="ulst"] ExternalUserLeaveInfoList mExternalUserLeaveInfos;
+    [tag="esid"] ExternalSessionIdentification mSessionIdentification;
+    [tag="xlrg"] bool mXblLarge;
+};
+
+
+[description="result external session"]
+class ExternalSessionResult
+{
+    [tag="esid"] ExternalSessionIdentification mSessionIdentification;
+};
+
+[description="update external session parameters"]
+class UpdateExternalSessionPropertiesParameters
+{
+    [tag="esid"] ExternalSessionIdentification mSessionIdentification;
+    [tag="usid", description="if needed, a user who will make the call to update the external session. May be empty if no specific caller is needed (for instance certificate based calls)."]
+    ExternalMemberInfo mCallerInfo;
+
+    [tag="orig"] ExternalSessionUpdateInfo mExternalSessionOrigInfo;
+    [tag="updt"] ExternalSessionUpdateInfo mExternalSessionUpdateInfo;
+    [tag="ctxt"] ExternalSessionUpdateEventContext mContext;
+};
+
+
+[description="set primary external session parameters"]
+class SetPrimaryExternalSessionParameters
+{
+    [tag="esid", description="session to set as primary"] ExternalSessionIdentification mSessionIdentification;
+    [tag="exid"] UserIdentification mUserIdentification;
+    [tag="auth"] ExternalUserAuthInfo mAuthInfo;
+    [tag="newg"] GameManager::GameActivity mNewPrimaryGame;
+    [tag="oldg"] GameManager::GameId mOldPrimaryGameId;
+    [tag="tiid"] TitleId mTitleId;
+    [tag="push"] PsnPushContextId mPsnPushContextId;
+};
+
+typedef ExternalSessionIdentification SetPrimaryExternalSessionResult;
+typedef ExternalSessionErrorInfo SetPrimaryExternalSessionErrorResult;
+
+
+[description="clear primary external session parameters"]
+class ClearPrimaryExternalSessionParameters
+{
+    [tag="exid"] UserIdentification mUserIdentification;
+    [tag="auth"] ExternalUserAuthInfo mAuthInfo;
+};
+
+typedef ExternalSessionErrorInfo ClearPrimaryExternalSessionErrorResult;
+
+[description="Request to determine which external session (if any) is the user's primary session."]
+class UpdateExternalSessionPresenceForUserParameters
+{
+    [tag="user", description="the user to update for."]
+    UserIdentification mUserIdentification;
+
+    [tag="gact", description="user's current games it's a member of. Sent to server in order to pick which (if any) will be the user's primary session."]
+    GameManager::GameActivityList mCurrentGames;
+
+    [tag="cgam", description="the game the user created, joined or left."]
+    GameManager::GameActivity mChangedGame;
+
+    [tag="ogid", description="id of the user's prior primary game, sent up from client. INVALID_GAME_ID if user had no primary game."]
+    GameManager::GameId mOldPrimaryGameId;
+
+    [tag="chng", description="whether user created, joined or left the changed game."]
+    GameManager::UpdateExternalSessionPresenceForUserReason mChange;
+
+    [tag="titl", description="Title Id for the client."]
+    TitleId mTitleId;
+
+    [tag="push", description="Push context id for a PS5 client"]
+    PsnPushContextId mPsnPushContextId;
+
+    [tag="remr", description="remove reason."]
+    GameManager::PlayerRemovedReason mRemoveReason;
+};
+
+typedef UpdateExternalSessionPresenceForUserParameters UpdatePrimaryExternalSessionForUserParameters;
+
+[description="update external session parameters"]
+class UpdateExternalSessionImageParameters
+{
+    [tag="usid"] ExternalMemberInfo mCallerInfo;
+    [tag="esid"] ExternalSessionIdentification mSessionIdentification;
+    [tag="img"] Ps4NpSessionImage mImage;
+};
+
+typedef ExternalSessionErrorInfo UpdateExternalSessionImageErrorResult;
+
+class ExternalSessionPlatformError
+{
+    [tag="berr"]
+    uint32_t mBlazeRpcErr;
+    
+    [tag="usrs", description="affected users"]
+    UserIdentificationList mUsers;
+};
+
+typedef map<ClientPlatformType, ExternalSessionPlatformError> PlatformErrorMap;
+
+[description="contains information of external session api error per platform"]
+class ExternalSessionApiError
+{
+    [tag="perr"]
+    PlatformErrorMap mPlatformErrorMap;
+
+    // The failedOnAllPlatform flag indicates whether the api call failed for the all the involved platforms in a call. This may be a sub set of the hosted platforms (cluster hosts pc, xone, ps4 but call only contained users from xone and ps4).
+    // This member helps in two ways. 
+    // 1. For a single platform cluster, we'd end up retaining our old flow and most specific error codes.
+    // 2. For shared cluster, we'd end up retaining our old path if all the users happen to belong to the same platform.  
+    [tag="all", default=false, description="whether the api call failed on all platforms or a partial fail happened."]
+    bool mFailedOnAllPlatforms;
+
+    // If the call involved users from only 1 platform (applicable in both single and shared cluster), we cache the most accurate error code in the 
+    // mSinglePlatformBlazeRpcErr. Otherwise, we don't use following member and instead return GAMEMANAGER_ERR_EXTERNAL_SESSION_ERROR.  
+    [tag="serr", default=0, description="Most specific error code if the api call was made on behalf of users on just one platform."]
+    uint32_t mSinglePlatformBlazeRpcErr;
+};
+
+[description="contains information of the platform that failed in the join init request. This info is then used in the actual join call."]
+class ExternalSessionJoinInitError
+{
+    [tag="perr"]
+    map<ClientPlatformType, uint32_t> mPlatformRpcErrorMap;
+
+    [tag="all", default=false, description="whether the api call failed on all platforms or a partial fail happened."]
+    bool mFailedOnAllPlatforms;
+};
+
+}
+
+

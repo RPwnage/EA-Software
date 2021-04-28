@@ -1,0 +1,164 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'copy-asset-files')}' == 'exclude'">
+    <target name="copy-asset-files" style="use" allowoverride="true">
+      <call target="eaconfig.copy-asset-files"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'add-assets-as-deployable-content')}' == 'exclude'">
+    <target name="add-assets-as-deployable-content" style="use" allowoverride="true">
+      <call target="eaconfig.add-assets-as-deployable-content"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <!-- - - - - - - - - -helper targets - - - - - - - - - - - - - - - - - -->
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <!-- ////////////////////////////////////////////////////////////////// -->
+  <!-- Copy asset files target.                                           -->
+  <!-- ////////////////////////////////////////////////////////////////// -->
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'eaconfig.copy-asset-files')}' == 'exclude'">
+    <target name="eaconfig.copy-asset-files" hidden="true" style="use" allowoverride="true">
+
+      <!-- 
+            The following eaconfig-single-package-build-graph target could change the global build.module, groupname, and eaconfig.build.group 
+            properties. So we're caching these info now in a temp variable and reset it after calling that target.
+      -->
+      <property name="original.build.module" value="${build.module??${buildStepModuleName??${package.name}}}" local="true"/>
+      <property name="original.groupname" value="${groupname??${buildStepModuleGroupName??runtime.${build.module}}}" local="true"/>
+      <property name="original.eaconfig.build.group" value="${eaconfig.build.group??runtime}" local="true"/>
+
+      <property name="__reuse-package-build-graph" value="@{HasUsableBuildGraph('${config}','${__eaconfig.build.groups??${eaconfig.build.group??runtime}}')}" local="true"/>
+      <do unless="${__reuse-package-build-graph}">
+        <!-- In case this is called from the post build step and build graph is not present-->
+        <call target="eaconfig-single-package-build-graph"/>
+      </do>
+
+      <echo message="Copying asset files..."/>
+
+      <property name="build.module" value="${original.build.module}"/>
+      <property name="groupname" value="${original.groupname}"/>
+      <property name="eaconfig.build.group" value="${original.eaconfig.build.group}"/>
+
+      <property name="package.app-package-dir" value="@{GetModuleOutputDir('bin', '${package.name}')}/${build.module}" local="true"/>
+
+      <!-- Copy destination directory can be defined in the package build script: -->
+      <property name="build.asset-configbuilddir" value="${${groupname}.asset-configbuilddir??${package.${package.name}.asset-configbuilddir??${package.asset-configbuilddir??}}}"/>
+      <property name="build.asset-configbuilddir" value="${package.app-package-dir}" if="@{StrIsEmpty('${build.asset-configbuilddir}')}"/>
+
+      <!-- If the provided path is a relative path, build a full path from default output bin folder. -->
+      <do unless="@{PathIsPathRooted('${build.asset-configbuilddir}')}">
+        <!-- asset-deploy-basedir.${config-system} is really only defined in iphone and osx configs as they are deployed inside the module's app bundle! -->
+        <property name="asset-deploy-basedir" value="${asset-deploy-basedir.${config-system}??@{GetModuleOutputDir('bin','${package.name}')}}" local="true"/>
+        <property name="build.asset-configbuilddir" value="${asset-deploy-basedir}/${property.value}"/>
+      </do>
+
+      <echo message="  * ${groupname} (${${groupname}.buildtype})"/>
+
+      <property name="eaconfig-copy-asset-files.filesetnames" local="true" value=""/>
+
+      <choose>
+        <do if="@{FileSetExists('${groupname}.additional-assetfiles.${config-system}')}">
+          <property name="eaconfig-copy-asset-files.excludedfiles"  local="true" value="${groupname}.additional-assetfiles.${config-system}"/>
+        </do>
+        <do if="@{FileSetExists('${groupname}.additional-assetfiles')}">
+          <property name="eaconfig-copy-asset-files.excludedfiles"  local="true" value="${groupname}.additional-assetfiles"/>
+        </do>
+        <do if="@{FileSetExists('package.${package.name}.additional-assetfiles')}">
+          <property name="eaconfig-copy-asset-files.excludedfiles" local="true" value="package.${package.name}.additional-assetfiles"/>
+        </do>
+      </choose>
+
+      <get-module-asset-files
+        module-groupname="${groupname}"
+        asset-filesets-property="eaconfig-copy-asset-files.filesetnames" />
+
+      <choose>
+        <do if="@{StrIsEmpty('${build.asset-configbuilddir}')}" unless="@{StrIsEmpty('${eaconfig-copy-asset-files.filesetnames}')}">
+          <warn message="Destination directory in 'copy-asset-files' is empty. Copy step is skipped."/>
+        </do>
+        <do>
+          <!-- The ${groupname}.__synctargetdir_copy_assets_flattened__ property is created internally by ios_config to handle
+                the problem that if assets is being copied by Xcode's Copy Resource Phase, Xcode will copy them flattened. -->
+          <synctargetdir
+            todir="${build.asset-configbuilddir}"
+            hardlinkifpossible="true"
+            clobber="true"
+            flatten="${${groupname}.__synctargetdir_copy_assets_flattened__??false}"
+            deleteemptydirs="true">
+            <copyfilesonly>${${groupname}.CopyAssetsWithoutSync??false}</copyfilesonly>
+            <excludefiles>
+              <includes fromfileset="${eaconfig-copy-asset-files.excludedfiles}" if="@{PropertyExists('eaconfig-copy-asset-files.excludedfiles')}"/>
+              <includes fromfileset="eaconfig-copy-asset-files.additional-excludedfiles" if="@{FileSetExists('eaconfig-copy-asset-files.additional-excludedfiles')}"/>
+            </excludefiles>
+            <fileset-names>
+              ${eaconfig-copy-asset-files.filesetnames}
+            </fileset-names>
+          </synctargetdir>
+        </do>
+      </choose>
+
+      <do unless="${__reuse-package-build-graph}">
+        <!-- reset build graph in case we are chaining other targets-->
+        <init-build-graph
+          build-group-names="${eaconfig.build.group.names??${eaconfig.build.group}}"
+          build-configurations="dummy"/>
+      </do>
+
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'eaconfig.add-assets-as-deployable-content')}' == 'exclude'">
+    <target name="eaconfig.add-assets-as-deployable-content" hidden="true" style="use" allowoverride="true">
+
+      <property name="__reuse-package-build-graph" value="@{HasUsableBuildGraph('${config}','${__eaconfig.build.groups??${eaconfig.build.group??runtime}}')}" local="true"/>
+      <do unless="${__reuse-package-build-graph}">
+        <!-- In case this is called from the post build step and build graph is not present-->
+        <call target="eaconfig-single-package-build-graph"/>
+      </do>
+
+      <echo message="Adding asset files as deployable content..."/>
+
+      <property name="build.module" value="${build.module??${buildStepModuleName??${package.name}}}"/>
+      <property name="groupname" value="${groupname??${buildStepModuleGroupName??runtime.${build.module}}}"/>
+
+      <echo message="  * ${groupname} (${${groupname}.buildtype})"/>
+
+      <property name="eaconfig-add-assets-as-deployable-content.filesetnames" local="true" value=""/>
+
+      <get-module-asset-files
+        module-groupname="${groupname}"
+        asset-filesets-property="eaconfig-add-assets-as-deployable-content.filesetnames" />
+
+      <create-custom-build-step
+        module-groupname="${groupname}"
+        filesets-property="${eaconfig-add-assets-as-deployable-content.filesetnames}" />
+
+      <do unless="${__reuse-package-build-graph}">
+        <!-- reset build graph in case we are chaining other targets-->
+        <init-build-graph
+          build-group-names="${eaconfig.build.group.names??${eaconfig.build.group}}"
+          build-configurations="dummy"/>
+      </do>
+    </target>
+  </do>
+
+  <!-- ////////////////////////////////////////////////////////////////// -->
+  <!-- Create app bundle.                                                 -->
+  <!-- ////////////////////////////////////////////////////////////////// -->
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'eaconfig.create-app-package')}' == 'exclude'">
+    <target name="eaconfig.create-app-package" description="copy all necessary assets and create final app bundle" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="eaconfig-build-graph" force="true" />
+      <nant-build configs="${config}"/>
+    </target>
+  </do>
+
+</project>

@@ -1,0 +1,71 @@
+group stubheadercommon : servercommon;
+
+////////////////////////////
+//processCommandDefinition
+////////////////////////////
+processCommandDefinition(command) ::= <<
+<if(!command.generate_command_class)>
+<if(!command.passthrough)>
+virtual <command.Name;format="pascal">Error::Error process<command.Name;format="pascal">(<commandSig(req={const <printTypeRefFullScope(command.RequestType)> &request}, resp={<printTypeRefFullScope(command.ResponseType)> &response}, err={<printTypeRefFullScope(command.errortype)> &error}, sep=", ")><if(command.RequestType)>
+, <elseif(command.ResponseType)>, <elseif(command.errortype)>, <endif>const ::Blaze::Message* message) = 0;
+
+<endif>
+<endif>
+>>
+
+
+////////////////////////////
+//componentConfigForwardDecl
+////////////////////////////
+componentConfigForwardDecl() ::= <<
+<if(component.configurationType)>
+<component.configurationType.Symbol.Scope.FullNameList: openNamespace(name=it); separator="\n">
+class <component.configurationType.Symbol.BaseSymbol.Name>;
+<component.configurationType.Symbol.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+<endif>
+
+<if(component.preconfigurationType)>
+<component.preconfigurationType.Symbol.Scope.FullNameList: openNamespace(name=it); separator="\n">
+class <component.preconfigurationType.Symbol.BaseSymbol.Name>;
+<component.preconfigurationType.Symbol.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+<endif>
+>>
+
+////////////////////////////
+//componentAutoConfig
+////////////////////////////
+componentAutoConfig() ::= <<
+<if(component.configurationType)>
+    const <printTypeRef(component.configurationType)>& getConfig() const { return (const <printTypeRef(component.configurationType)>&) getConfigTdf(); }
+  
+protected:
+    bool onValidateConfigTdf(EA::TDF::Tdf& config, const EA::TDF::Tdf* referenceConfigPtr, ::Blaze::ConfigureValidationErrors& validationErrors) { return onValidateConfig((<printTypeRef(component.configurationType)>&) config, (const <printTypeRef(component.configurationType)>*) referenceConfigPtr, validationErrors); }
+    virtual bool onValidateConfig(<printTypeRef(component.configurationType)>& config, const <printTypeRef(component.configurationType)>* referenceConfigPtr, ::Blaze::ConfigureValidationErrors& validationErrors) const { return true; }    
+    bool onPrepareForReconfigureComponent(const EA::TDF::Tdf& newConfig) { return onPrepareForReconfigure((<printTypeRef(component.configurationType)>&) newConfig); }
+    virtual bool onPrepareForReconfigure(const <printTypeRef(component.configurationType)>& newConfig) { return true; }
+<endif>
+
+<if(component.preconfigurationType)>
+public:
+    const <printTypeRef(component.preconfigurationType)>& getPreconfig() const { return (const <printTypeRef(component.preconfigurationType)>&) getPreconfigTdf(); }
+    
+protected:
+    bool onValidatePreconfigTdf(EA::TDF::Tdf& preconfig, const EA::TDF::Tdf* referencePreconfigPtr, ::Blaze::ConfigureValidationErrors& validationErrors) { return onValidatePreconfig((<printTypeRef(component.preconfigurationType)>&) preconfig, (const <printTypeRef(component.preconfigurationType)>*) referencePreconfigPtr, validationErrors); }
+    virtual bool onValidatePreconfig(<printTypeRef(component.preconfigurationType)>& preconfig, const <printTypeRef(component.preconfigurationType)>* referencePreconfigPtr, ::Blaze::ConfigureValidationErrors& validationErrors) const { return true; }    
+<endif>
+    
+    
+<if(component.configurationType)>
+public:
+    const ::Blaze::ConfigMap* getComponentConfig() const;
+private:
+    virtual bool loadConfig(EA::TDF::TdfPtr& newConfig, bool loadFromStaging);
+
+    const ::Blaze::ConfigFile* mComponentConfig;
+    const ::Blaze::ConfigFile* mInitialComponentConfig;
+<endif>
+
+>>
+
+printTypeOrEmpty(type) ::=  "<if(type)><printTypeRefFullScope(type)><else>google::protobuf::Empty<endif>"
+printGrpcCommandTypedef(component, command) ::= "<if(command.generateProto)>using <printGrpcCommandStubName(command)> = ::Blaze::Grpc::<printGrpcCommandType(command)>\<<printGrpcServiceType(component)>::AsyncService, <printTypeOrEmpty(command.RequestType)>, <printGrpcResponseType(command)>\>;<\n><endif>"

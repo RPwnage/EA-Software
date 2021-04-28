@@ -1,0 +1,214 @@
+group luarpcdoc : servercommon;
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<
+$standardFileHeader()$
+<head>
+<title>Remote Procedure Calls ($component.Name$)</title>
+<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" name="luadoc" href="../wadl.css" />
+</head>
+
+<h1 class="pagetitle">Remote Procedure Calls ($component.Name$)</h1>
+<a name="Overview"></a><h1> <span class="mw-headline">Overview</span></h1>
+This document describes the bound Lua RPC methods used to provide RPC functionality for $component.Name$ in our testing Lua scripting environments. These environments include the BT3 tool's Lua scripting environment as well as the Stress LuaStressModule bindings and can be used interchangeably with either.  This document assumes some familiarity with the Lua language, but more information can be found on the main Lua site: <a href="http://www.lua.org">www.lua.org</a>.
+</p><p>For general background information see <a href="http://developer.ea.com/display/blaze/BT3+Tool+Help" title="BT3 Tool Help">BT3 Tool Help</a> on the GOS confluence site. 
+</p><p>The typecomp2 tool is used for code generation for Blaze and it has been extended for Lua scripting purposes.  The new modifications to <b>typecomp2</b> are intended to allow a user to generate a complete Lua-scriptable tester from preexisting .tdf/.rpc files. The tool generates Lua to C++ function bindings to provide RPC functionality.  These functions are generated using .rpc files for each component.  In order to provide the correct TDF class data to these bound Lua functions, TDF conversions functions to and from C++ and generated for TDF types found in .tdf files and are documented in the linked to types HTML.</p>
+<table id="toc" class="toc" summary="Contents"><tr><td><div id="toctitle"><h2>Contents</h2></div>
+<ul>
+<li class="toclevel-1"><a href="#Overview"><span class="toctext">Overview</span></a></li>
+<li class="toclevel-1"><a href="#LuaRpcMethods"><span class="toctext">Lua RPC Methods</span></a>
+<ul>
+$component.Commands:{$tocHelper(command=it)$}$
+</ul>
+</li>
+<li class="toclevel-1"><a href="#Notifications"><span class="toctext">Notifications</span></a>
+<ul>
+$component.Notifications:{$tocNotificationHelper(notification=it)$}$
+</ul>
+</li>
+</td></tr>
+</table>
+<h2><a name="LuaRpcMethods"></a>Lua RPC Methods</h2>
+$if(component.Commands)$
+$component.Commands:{$contentHelper(command=it)$}$
+$else$
+None
+$endif$
+<h2><a name="Notifications"></a>Notifications</h2>
+$if(component.Notifications)$
+$component.Notifications:{$notificationHelper(notification=it)$}$
+$else$
+None
+$endif$
+$standardFileFooter()$
+>>
+
+commandName() ::= <<
+$component.Name; format="tl"$_$command.Name$
+>>
+
+notificationName() ::= <<
+$notification.Name$
+>>
+
+tocHelper(command) ::= <<
+<li class="toclevel-2"><a href="#$commandName()$"><span class="toctext">$commandName()$</span></a></li>
+>>
+
+tocNotificationHelper(notification) ::= <<
+<li class="toclevel-2"><a href="#$notificationName()$"><span class="toctext">$notificationName()$</span></a></li>
+>>
+
+commandArgumentsHelper(stressMode) ::= "$if(stressMode)$instance$if(command.RequestType)$, $endif$$endif$$if(command.RequestType)$$last(command.RequestType.Symbol.FullNameList); format=\"java\"$$endif$"
+
+contentHelper(command) ::= <<
+<br>
+<a name="$commandName()$"></a>
+<h2><span class="mw-headline">$commandName()$</span></h2>
+$if(command.description)$
+$command.description$
+$else$
+This command has no description
+$endif$
+<a name="$commandName()$_RequestType"></a><h3><span class="mw-headline">Request Type</span></h3>
+$if(command.RequestType)$
+<b><a href="$hyperlinkToLuaTypeFromLuaRpc(command.RequestType.Symbol)$">$command.RequestType.Symbol.FullNameList; separator="::"$</a></b>
+<div class=\"indented\">$generateExampleLuaTable(tdfClass=command.RequestType.Symbol)$</div>
+$else$
+This command does not take in a request type.
+$endif$
+<a name="$commandName()$_ResponseType"></a><h3><span class="mw-headline">Response Type</span></h3>
+$if(command.ResponseType)$
+<b><a href="$hyperlinkToLuaTypeFromLuaRpc(command.ResponseType.Symbol)$">$command.ResponseType.Symbol.FullNameList; separator="::"$</a></b>
+<div class=\"indented\">$generateExampleLuaTable(tdfClass=command.ResponseType.Symbol)$</div>
+$else$
+This command does not return a response type.
+$endif$
+
+<a name="$commandName()$_Usage"></a><h3><span class="mw-headline">BT3 Interactive Mode Usage</span></h3>
+<pre>
+blazeRpcError$if(command.ResponseType)$, $last(command.ResponseType.Symbol.FullNameList); format="java"$$endif$ = $commandName()$($commandArgumentsHelper()$)
+if(blazeRpcError == BlazeRpcError.ERR_OK) then
+    print("$commandName()$ succeeded.");
+$if(command.ResponseType)$
+    print("Response was:");
+    if $last(command.ResponseType.Symbol.FullNameList); format="java"$ == nil then
+     print "nil"
+    else
+      for k, v in pairs ($last(command.ResponseType.Symbol.FullNameList); format="java"$) do
+        print ("key = ", k, " = ", v)
+      end
+    end
+
+$endif$
+else
+    print("$commandName()$ failed, error was:"..PrintErrorCode(blazeRpcError));
+end
+</pre>
+<a name="$commandName()$_Usage"></a><h3><span class="mw-headline">Stress Mode Usage</span></h3>
+<pre>
+blazeRpcError$if(command.ResponseType)$, $last(command.ResponseType.Symbol.FullNameList); format="java"$$endif$ = $commandName()$($commandArgumentsHelper(stressMode="true")$)
+if(blazeRpcError == BlazeRpcError.ERR_OK) then
+    print("$commandName()$ succeeded.");
+$if(command.ResponseType)$
+    print("Response was:");
+    if $last(command.ResponseType.Symbol.FullNameList); format="java"$ == nil then
+     print "nil"
+    else
+      for k, v in pairs ($last(command.ResponseType.Symbol.FullNameList); format="java"$) do
+        print ("key = ", k, " = ", v)
+      end
+    end
+
+$endif$
+else
+    print("$commandName()$ failed, error was:"..PrintErrorCode(blazeRpcError));
+end
+</pre>
+>>
+
+notificationHelper(notification) ::= <<
+<br>
+<a name="$notificationName()$"></a>
+<h2><span class="mw-headline">$notificationName()$</span></h2>
+$if(notification.description)$
+$notification.description$
+$else$
+This notification has no description
+$endif$
+<a name="$notificationName()$_NotificationID"></a><h3><span class="mw-headline">Notification ID</span></h3>
+Blaze.$component.Name$Slave.NOTIFY_$notification.Name; format="tu"$ ($notification.id$)
+<a name="$notificationName()$_NotificationType"></a><h3><span class="mw-headline">Notification Type</span></h3>
+$if(notification.NotificationType)$
+<b><a href="$hyperlinkToLuaTypeFromLuaRpc(notification.NotificationType.Symbol)$">$notification.NotificationType.Symbol.FullNameList; separator="::"$</a></b>
+<div class=\"indented\">$generateExampleLuaTable(tdfClass=notification.NotificationType.Symbol)$</div>
+$else$
+This notification does not have a notification type.
+$endif$
+<a name="$notificationName()$_Bt3Usage"></a><h3><span class="mw-headline">Bt3 Interactive Mode Usage</span></h3>
+<pre>
+
+function notificationCallback(component_id, type_id$if(notification.NotificationType)$, $last(notification.NotificationType.Symbol.FullNameList); format="java"$$endif$)
+    print("received notification callback for component_id:"..component_id.." and type_id:"..type_id)
+$if(notification.NotificationType)$
+    if($last(notification.NotificationType.Symbol.FullNameList); format="java"$ ~= nil) then
+      for k, v in pairs ($last(notification.NotificationType.Symbol.FullNameList); format="java"$) do
+        print ("key = ", k, " = ", v)
+      end
+    end
+
+$endif$
+end
+
+local callback_id = register_async_handler(Blaze.$component.Name$.COMPONENT_ID, Blaze.$component.Name$.NOTIFY_$notification.Name; format="tu"$, notificationCallback)
+
+-- Do stuff
+
+unregister_async_handler(callback_id)
+
+</pre>
+<a name="$notificationName()$_Bt3Stress"></a><h3><span class="mw-headline">Bt3 Stress Mode Usage</span></h3>
+<pre>
+
+function notificationCallback(component_id, type_id$if(notification.NotificationType)$, $last(notification.NotificationType.Symbol.FullNameList); format="java"$$endif$)
+    print("received notification callback for component_id:"..component_id.." and type_id:"..type_id)
+$if(notification.NotificationType)$
+    if($last(notification.NotificationType.Symbol.FullNameList); format="java"$ ~= nil) then
+      for k, v in pairs ($last(notification.NotificationType.Symbol.FullNameList); format="java"$) do
+        print ("key = ", k, " = ", v)
+      end
+    end
+
+$endif$
+end
+
+function Module.Main(instance)
+    local callback_id = register_async_handler(instance, Blaze.$component.Name$.COMPONENT_ID, Blaze.$component.Name$.NOTIFY_$notification.Name; format="tu"$, notificationCallback)
+
+    -- Do stuff
+
+    unregister_async_handler(instance, callback_id);
+end
+
+</pre>
+<a name="$notificationName()$_LegacyStress"></a><h3><span class="mw-headline">Legacy Stress Mode Usage</span></h3>
+<pre>
+
+-- Only one notification callback function per component 
+function $component.Name$_onAsyncNotificationHandler(instance, notification_data, component_id, type_id)
+    if(component_id == $component.CompId$) then
+        if(type_id == $notification.id$) then
+           print("$component.Name$ notification $notification.Name$ received.")
+$if(notification.NotificationType)$
+           print("Notification Data of type $notification.NotificationType.Symbol.FullNameList; separator="::"$ received:")
+           for k, v in pairs notification_data do
+              print ("key = ", k, " = ", v)
+           end
+
+$endif$
+        end    
+    end
+end
+</pre>
+
+>>

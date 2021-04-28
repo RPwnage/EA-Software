@@ -1,0 +1,81 @@
+[ headername="xbltournamentshub/tdf/xbltournamentshub.h" ]
+#include "xbltournamentshub/gen/xbltournamentshub.tdf"
+
+[headername="xblserviceconfigs/tdf/xblserviceconfigs.h"]
+#include "xblserviceconfigs/gen/xblserviceconfigs.tdf"
+
+namespace Blaze
+{
+namespace XBLServices
+{
+
+[
+    id = core/1031,
+    description = "xbl tournaments hub service proxy",
+    details = "Proxy component used to define xbl tournaments hub arena service",
+    proxyOnly = true,
+    http = {
+        payloadEncoderSubType = "NORMAL"
+    }
+]
+component XBLTournamentsHub
+{
+    errors
+    {
+        [ description = "Exernal session authentication error, possibly due to invalid/expired token" ]
+        XBLTOURNAMENTSHUB_AUTHENTICATION_REQUIRED = 1;
+        [ description = "The specified scid, or session template was invalid, or the service config may not configured for sessions." ]
+        XBLTOURNAMENTSHUB_RESOURCE_NOT_FOUND = 2; //http 404
+        [ description = "Requested service config or operation cannot be accessed. May be due to caller's account not having access to sandbox or having 'multiplayer' privilege disabled, a certificate error, server or client using a title id that's incorrect or not having access to scid, invalid attempt to access a private session by non-member, or attempt to directly join others as non-reserved." ]
+        XBLTOURNAMENTSHUB_ACCESS_FORBIDDEN = 3; //http 403
+        [ description = "Invalid or malformed request parameters. Invalid parameters may be caused by mismatched contract versions, an attempt to join an external session which is already at its max cap, or a badly configured session template (invalidly enabling managed initializations requirements etc)." ]
+        XBLTOURNAMENTSHUB_BAD_REQUEST = 4; //http 400
+        [ description = "The external session service is currently unavailable, possibly due to momentary downtime, updates or service maintenance." ]
+        XBLTOURNAMENTSHUB_SERVICE_UNAVAILABLE = 7; //http 503
+        [ description = "The external session service call failed due to possible bad gateway." ]
+        XBLTOURNAMENTSHUB_BAD_GATEWAY = 8; //http 502
+        [ description = "The external session service had an unspecified internal error. Check with Microsoft for potential issues." ]
+        XBLTOURNAMENTSHUB_SERVICE_INTERNAL_ERROR = 9; //http 500
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+                id = 1,
+                description = "Get the Arena Tournament Team for a user.",
+                details = "Get the Arena Tournament Team for specified xuid",
+                requires_authentication = false,
+                client_export = false,
+                errortype = XBLServices::TournamentsHubErrorResponse,
+                errors = { XBLTOURNAMENTSHUB_BAD_REQUEST, XBLTOURNAMENTSHUB_AUTHENTICATION_REQUIRED, XBLTOURNAMENTSHUB_ACCESS_FORBIDDEN, XBLTOURNAMENTSHUB_RESOURCE_NOT_FOUND, XBLTOURNAMENTSHUB_SERVICE_UNAVAILABLE,  XBLTOURNAMENTSHUB_BAD_GATEWAY, XBLTOURNAMENTSHUB_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "tournaments/{organizerId}/{tournamentId}/teams?memberId={memberId}",
+                    method = "GET",
+                    custom_request_headers = {
+                        "x-xbl-contract-version" = "header.contractVersion",
+                        "Accept"                 = "header.accept",
+                        "Accept-Language"        = "header.acceptLanguage",
+                        "Authorization"          = "header.authToken",
+                        "X-Xbl-OnBehalfOf-Title" = "header.onBehalfOfTitle"
+                    },
+                    status_code_errors = {
+                        400 = XBLTOURNAMENTSHUB_BAD_REQUEST,
+                        401 = XBLTOURNAMENTSHUB_AUTHENTICATION_REQUIRED,
+                        403 = XBLTOURNAMENTSHUB_ACCESS_FORBIDDEN,
+                        404 = XBLTOURNAMENTSHUB_RESOURCE_NOT_FOUND,
+                        503 = XBLTOURNAMENTSHUB_SERVICE_UNAVAILABLE,
+                        500 = XBLTOURNAMENTSHUB_SERVICE_INTERNAL_ERROR,
+                        502 = XBLTOURNAMENTSHUB_BAD_GATEWAY
+                    }
+                }
+            ]
+            GetArenaTeamForUserResponse getTournamentTeamForUser(GetArenaTeamForUserRequest);
+        }
+    }
+}
+
+
+}
+}

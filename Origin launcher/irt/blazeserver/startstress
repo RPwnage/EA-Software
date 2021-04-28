@@ -1,0 +1,218 @@
+#!/bin/sh
+
+echo "`hostname` `date`"
+echo
+
+if [ $# -ne 3 ]
+then
+	echo "$0 parameter error $#: $@"
+	exit 2
+fi
+
+echo "`date`   $*" >> ~/startstress.log
+chmod -R u+w stress
+cd ${HOME}/stress
+
+ARG_deploystress_cfg="bin/$1"
+. ${ARG_deploystress_cfg}
+ARG_HOST_ID="$2"
+ARG_ACTION="$3"
+ARG_startstress_cfg="bin/$ARG_startstress_cfg"
+
+#read slaves list
+target_conns=`cat $ARG_startstress_cfg | sed -n '/target\['$ARG_HOST_ID'\]/,/}/p' | grep 'target_slaves=' | sed 's/.*target_slaves.*=//g' | sed 's/\"//g' `
+
+#read number of connections per slave
+target_numconns=`cat $ARG_startstress_cfg | sed -n '/target\['$ARG_HOST_ID'\]/,/}/p' | grep 'target_connections=' | sed 's/.*target_connections.*=//g' | sed 's/\"//g' `
+
+#read number slaves
+target_num=`cat $ARG_startstress_cfg | sed -n '/target\['$ARG_HOST_ID'\]/,/}/p' | grep 'target_slaves_len=' | sed 's/.*target_slaves_len.*=//g' | sed 's/\"//g' `
+
+
+#read base id per slave
+target_base_id=`cat $ARG_startstress_cfg | sed -n '/target\['$ARG_HOST_ID'\]/,/}/p' | grep base_id_list | sed 's/.*base_id_list.*=//g' | sed 's/\"//g' `
+
+#read instance and block delays
+startup_instance_delay=`grep startup_delay $ARG_startstress_cfg | sed 's/.*=//g'`
+startup_block_delay=$startup_instance_delay
+
+iterator_idx=0
+iterator_data=0
+
+#slaves list
+declare -a dep_target_hosts
+
+for iterator_data in $target_conns
+do
+	dep_target_hosts[$iterator_idx]=$iterator_data
+	iterator_idx=$[iterator_idx+1]
+done
+
+#list of number of connections to each slave server (pair dep_target_hosts,dep_target_num_list)
+declare -a dep_target_num_list
+
+iterator_idx=0
+for iterator_data in $target_numconns
+do
+	dep_target_num_list[$iterator_idx]=$iterator_data
+	iterator_idx=$[iterator_idx+1]
+done
+
+#list of base_ids to each slave server (pair dep_target_hosts,dep_target_num_list)
+declare -a dep_target_baseid_list
+
+iterator_idx=0
+for iterator_data in $target_base_id
+do
+	dep_target_baseid_list[$iterator_idx]=$iterator_data
+	iterator_idx=$[iterator_idx+1]
+done
+
+host=$target_conns
+host_count=$target_num
+
+#build targets array
+targets=`seq 1 $host_count`
+
+#print arguments if debugging
+if [ ! $ARG_startstress_debug -eq 0 ]
+then
+	echo "------------------------------------------------------------"
+	echo "Script Arguments:"
+	echo "Host Designation : $ARG_HOST_ID"
+	echo "Target connections: $target_conns"
+	echo "Command : $ARG_ACTION"
+	echo "Number of connections : $target_numconns"
+	echo "Base ID : $target_base_id"
+	echo "Stress Config File : $ARG_stress_config"
+	echo "Delay between starting instances in milliseconds : $startup_instance_delay"
+	echo "Delay between starting blocks in milliseconds : $startup_block_delay"
+	echo "Slaves Count : $host_count"
+	echo "Target Array : $targets"
+	echo "------------------------------------------------------------"
+fi
+
+action=""
+case $ARG_ACTION in
+status)
+	action="$ARG_ACTION"
+	ls etc/core* 2>/dev/null
+	;;
+start)
+	killall stress
+	action="$ARG_ACTION"
+	;;
+kill)
+	killall stress
+	exit 0
+	;;
+deploy)
+	killall stress
+	action="$ARG_ACTION"
+	cores="etc/core*"
+	for i in $cores
+	do
+		if [ -e ${i} ]
+		then
+			echo "Refusing to deploy because 1 or more core files exist."
+			exit 2
+		fi
+	done
+	mkdir --parents stress
+	LOGCLEAN="${HOME}/stress/stressclean.sh"
+
+	echo '#!/bin/sh' > ${LOGCLEAN}
+	echo 'cd '"${HOME}"'/stress' >> ${LOGCLEAN}
+	for i in ${targets}
+	do
+		echo  >> ${LOGCLEAN}
+		echo 'TMP_LS=`ls --reverse stressout'${i}'_*.log 2>/dev/null`' >> ${LOGCLEAN}
+		echo 'TMP_RM=`echo $TMP_LS | cut -d " " -f 5-`' >> ${LOGCLEAN}
+		echo 'if [ "${TMP_RM}" != "" ]' >> ${LOGCLEAN}
+		echo 'then' >> ${LOGCLEAN}
+		echo '    rm ${TMP_RM}' >> ${LOGCLEAN}
+		echo 'fi' >> ${LOGCLEAN}
+	done
+	chmod 0700 ${LOGCLEAN}
+
+	crontab -l | grep -v ${LOGCLEAN} >~/crontab.conf
+	echo "*/5 * * * * ${LOGCLEAN}" >>~/crontab.conf
+	crontab ~/crontab.conf
+	rm -f logrotate.conf logrotate.out logrotate.state
+	;;
+push)
+	action="status"
+	;;
+deletecores)
+	rm -f etc/core*
+	exit 0
+	;;
+*)
+	echo "$0 parameter error $#: $@"
+	exit 2
+	;;
+esac
+
+total_logins=0
+total_active=0
+target_iterator=0
+
+for i in $targets
+do
+	target_id=${dep_target_baseid_list[$target_iterator]}
+	tnum_con=${dep_target_num_list[$target_iterator]}
+
+	LAUNCH_FILE="${HOME}/stress/launch${i}"
+	LOGNAME="stressout${i}"
+	case $action in
+	status)
+		echo "Status ($2:$i) -> ${dep_target_hosts[$target_iterator]}:"
+
+		pid=`cat pid${i}.txt`
+		count=`ps -p ${pid} --no-heading | wc -l`
+		if [ $count -ne 1 ]
+		then
+			echo "    ****** NOT RUNNING ****** (${count})"
+		else
+			lin=`tac ${LOGNAME}.log | grep -m 1 "cumulativ"`
+			tim=`echo "$lin" | sed 's_^\([0-9]*/[0-9][0-9]/[0-9][0-9]-[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\).*$_\1_'`
+			ins=`echo "$lin" | sed 's_^.*instances=\([0-9/]*\).*$_\1_'`
+			lin=`tac ${LOGNAME}.log | grep -m 1 "Active Users"`
+			act=`echo "$lin" | sed 's_^.*Active Users: \([0-9]*\)$_\1_'`
+			lin=`tac ${LOGNAME}.log | grep -m 1 "Current Logins"`
+			cur=`echo "$lin" | sed 's_^.*Current Logins: \([0-9]*\)$_\1_'`
+			echo "    $tim   Inst: $ins   Logins: $cur   Active: $act"
+			total_logins=$((total_logins + cur))
+			total_active=$((total_active + act))
+		fi
+		continue
+		;;
+	deploy)
+		LOCAL_CONFIG_FILE=stress_local${i}.cfg
+
+		cat etc/stress/${ARG_stress_config} | sed "s/first_user_id = 60000000/first_user_id = ${target_id}/" | sed "s/start-index = 2/start-index=${target_id}/" | sed 's/\[ARG_NUM_CONNECTIONS\]/'$tnum_con'/' | sed 's/\[ARG_STARTUP_INSTANCE_DELAY\]/'$startup_instance_delay'/' | sed 's/\[ARG_STARTUP_BLOCK_DELAY\]/'$startup_block_delay'/' > etc/${LOCAL_CONFIG_FILE}
+
+		echo "#!/bin/sh" >${LAUNCH_FILE}
+		echo "ulimit -c unlimited" >>${LAUNCH_FILE}
+		echo "cd ${HOME}/stress/etc" >>${LAUNCH_FILE}
+		echo "../out/linux/debug/bin/stress -c ${LOCAL_CONFIG_FILE} -s ${dep_target_hosts[$target_iterator]} --logdir ../ --logname ${LOGNAME} &" >>${LAUNCH_FILE}
+		echo 'PID=$!' >>${LAUNCH_FILE}
+		echo 'echo $PID >'"../pid${i}.txt" >>${LAUNCH_FILE}
+		chmod 0700 ${LAUNCH_FILE}
+		;;
+	esac
+
+	echo "Starting ($2:$i) -> ${dep_target_hosts[$target_iterator]}."
+	target_iterator=$[target_iterator+1]
+
+	at NOW << EOF
+${LAUNCH_FILE}
+EOF
+done
+
+case $action in
+status)
+	echo "Total: Logins: ${total_logins}   Active: ${total_active}"
+	;;
+esac
+

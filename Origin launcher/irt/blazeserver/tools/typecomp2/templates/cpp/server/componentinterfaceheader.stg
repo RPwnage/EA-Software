@@ -1,0 +1,212 @@
+group componentinterfaceheader : servercommon;
+
+component(fileNode, component) ::= <<
+<fileNode.DefTable.Clear>
+<standardFileHeader()>
+<openIncludeGuard()>
+
+/*** Include Files ********************************************************************************/
+#include "framework/component/component.h"
+#include "framework/util/shared/blazestring.h"
+#include "blazerpcerrors.h"
+#include "framework/component/blazerpc.h"
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl">_defines.h"
+
+/*** Defines/Macros/Constants/Typedefs ************************************************************/
+
+namespace Blaze
+{
+class RpcProxyResolver;
+class InetAddress;
+}
+
+<component.Commands:forwardDeclareCommandTypes();separator="\n">
+<component.Notifications:forwardDeclareNotif();separator="\n">
+<if(component.IsMaster)><component.ReplMaps:forwardDeclareMapTypes();separator="\n">
+<else><component.Master.ReplMaps:forwardDeclareMapTypes();separator="\n">
+
+<component.ReplMaps:forwardDeclareMapTypes();separator="\n">
+<endif>
+
+<component.Events:forwardDeclareEventTypes();separator="\n">
+
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+
+/*! ***************************************************************/
+/*! \class <component.Name><component.Type>
+    
+        Virtual base class for implementation and proxy classes.
+*/  
+/*******************************************************************/
+
+<if(component.Notifications)>class <component.Name><component.Type>Listener;<endif>
+class <component.Name><component.Type> : public ::Blaze::Component
+{
+public:
+    static const uint16_t COMPONENT_ID;
+    static const size_t COMPONENT_IDX;
+    static const size_t& COMPONENT_TYPE_IDX;
+    static const size_t& LOGGING_CATEGORY;
+    static const ::Blaze::MemoryGroupId& COMPONENT_MEMORY_GROUP;
+    static const ::Blaze::ComponentData COMPONENT_INFO;
+
+    
+<if(component.Commands)>
+    typedef enum
+    {
+        <component.Commands:{CMD_<it.Name; format="toUpper"> = <it.id>}; separator=",\n">
+    } CommandType;    
+    
+    <component.Commands:{static const ::Blaze::CommandInfo CMD_INFO_<it.Name; format="toUpper">;}; separator="\n">      
+   
+<endif>
+
+
+<if(component.Notifications)>
+    typedef enum
+    {
+        <component.Notifications:{NOTIFY_<it.Name; format="toUpper"> = <it.id>}; separator=",\n">
+    } NotificationType;        
+    
+    <component.Notifications:{static const ::Blaze::NotificationInfo NOTIFICATION_INFO_<it.Name; format="toUpper">;}; separator="\n">      
+<endif>
+
+<if(component.Events)>
+    typedef enum
+    {
+        <component.Events:{EVENT_<it.Name; format="toUpper"> = (<subcompId(component=component)> \<\< 16) | <it.id>}; separator=",\n">
+    } EventType;
+<endif>
+
+    <component.ReplMaps:{static const CollectionIdRange <it.Name;format="toUpper">_MAP_ID_RANGE;}; separator="\n">
+
+
+    <component.Name><component.Type>(::Blaze::RpcProxyResolver& resolver, const ::Blaze::InetAddress& externalAddress = ::Blaze::InetAddress());
+    virtual ~<component.Name><component.Type>(){}
+    
+    <if(component.isSharded)>
+    virtual bool getShardKeyFromRequest(uint16_t commandId, const EA::TDF::Tdf& request, ObjectId& shardKey) const;
+    <if(component.useSlivers)>
+    virtual bool isShardedBySlivers() const { return true; }
+    <endif>
+    <endif>
+
+    
+    <component.Commands:{command|::Blaze::BlazeRpcError <command.Name>(<commandSig(req={const <printTypeRefFullScope(command.RequestType)> &request}, resp={<printTypeRefFullScope(command.ResponseType)> &response}, respraw="::Blaze::RawBuffer* responseRaw = nullptr", err={<printTypeRefFullScope(command.errortype)> &error}, tailval="const ::Blaze::RpcCallOptions &options = ::Blaze::RpcCallOptions()", sep=", ")>) {return sendRequest(CMD_INFO_<command.Name; format="toUpper">, <commandSig(req="(const EA::TDF::Tdf*) &request", resp="(EA::TDF::Tdf*) &response", respraw="responseRaw", err="(EA::TDF::Tdf*) &error", tailval="options", nullval="nullptr", sep=", ")>); }}; separator="\n\n">
+
+<if(!component.proxyOnly)>
+    // Static methods for creating the implementation and proxy instances of this interface
+    static <component.Name><component.Type>* createImpl();
+<endif>
+    
+<if(component.Notifications)>
+    const ::Blaze::Dispatcher\<<component.Name><component.Type>Listener\>& getDispatcher() const { return mNotificationDispatcher; }
+    bool hasNotificationListener() const { return !mNotificationDispatcher.isEmpty(); }
+    void addNotificationListener(<component.Name><component.Type>Listener& listener) { mNotificationDispatcher.addDispatchee(listener); }
+    void removeNotificationListener(<component.Name><component.Type>Listener& listener) { mNotificationDispatcher.removeDispatchee(listener); }
+
+<endif>
+    //These are all the methods that can be used to set hooks on various RPCs.
+    <component.Commands:hookDeclaration(command=it); separator="\n">
+
+protected:
+
+<if(component.Notifications)>
+    ::Blaze::Dispatcher\<<component.Name><component.Type>Listener\> mNotificationDispatcher;
+
+<endif>
+   <component.Commands:{<if(it.RequestType)><hookNamespace(component)><hookRequestVariableDeclaration(command=it)><"\n"><endif><if(it.ResponseType)><hookNamespace(component)><hookResponseVariableDeclaration(command=it)><"\n"><elseif(it.errortype)><hookNamespace(component)><hookResponseVariableDeclaration(command=it)><"\n"><endif>}>
+
+};
+
+<if(component.Notifications)>
+class <component.Name><component.Type>Listener
+{
+public:
+
+    virtual ~<component.Name><component.Type>Listener() {}
+    
+    <component.Notifications:notificationHandler(); separator="\n">    
+};
+<endif>
+
+<component.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+
+<closeIncludeGuard()>
+<standardFileFooter()>
+>>
+
+notificationHandler(notification) ::= <<
+<if(!notification.passthrough)>virtual void on<notification.Name>(<if(notification.NotificationType)>const <printTypeRefFullScope(notification.NotificationType)>& data,<endif>::Blaze::UserSession *associatedUserSession) <if(component.IsMaster)> = 0;<else><if(notification.client_export)> {} <else> = 0;<endif><endif><endif>
+>>
+
+forwardDeclareCommandTypes(command) ::= <<
+<if(command.RequestType)><forwardDeclare(fullTypeName=command.RequestType.Symbol.FullNameList, typeName=command.RequestType.Symbol.Name)><endif>
+<if(command.ResponseType)><forwardDeclare(fullTypeName=command.ResponseType.Symbol.FullNameList, typeName=command.ResponseType.Symbol.Name)><endif>
+<if(command.errortype)><forwardDeclare(fullTypeName=command.errortype.Symbol.FullNameList, typeName=command.errortype.Symbol.Name)><endif>
+>>
+
+forwardDeclareNotif(notification) ::= <<
+
+<if(notification.NotificationType)><forwardDeclare(fullTypeName=notification.NotificationType.Symbol.FullNameList, typeName=notification.NotificationType.Symbol.Name)><endif>
+>>
+
+forwardDeclareMapTypes(map) ::= <<
+<if(map.item_type)><forwardDeclare(fullTypeName=map.item_type.Symbol.FullNameList, typeName=map.item_type.Symbol.Name)><endif>
+<if(map.master_item_type)><forwardDeclare(fullTypeName=map.master_item_type.Symbol.FullNameList, typeName=map.master_item_type.Symbol.Name)><endif>
+<if(map.slave_item_type)><forwardDeclare(fullTypeName=map.slave_item_type.Symbol.FullNameList, typeName=map.slave_item_type.Symbol.Name)><endif>
+<if(map.tdf_type)><forwardDeclare(fullTypeName=map.tdf_type.Symbol.FullNameList, typeName=map.tdf_type.Symbol.Name)><endif>
+<if(map.context_type)><forwardDeclare(fullTypeName=map.context_type.Symbol.FullNameList, typeName=last(map.context_type.Symbol.Name))><endif>
+>>
+
+forwardDeclareEventTypes(event) ::= "<forwardDeclare(fullTypeName=event.EventType.Symbol.FullNameList, typeName=event.EventType.Symbol.Name)><endif>"
+
+forwardDeclare(fullTypeName, typeName) ::= <<
+<if(!fileNode.DefTable.(fullTypeName))>
+<trunc(fullTypeName):{namespace <it>\{}>class <typeName>;<trunc(fullTypeName):{\}}><fileNode.DefTable.Add.(fullTypeName)>
+<endif>
+>>
+
+commandHookRequestType(command) ::= "<command.Name;format=\"pascal\">RequestHookCb"
+commandHookResponseType(command) ::= "<command.Name;format=\"pascal\">ResponseHookCb"
+hookRequestVariable(command) ::= "m<commandHookRequestType(command)>"
+hookResponseVariable(command) ::= "m<commandHookResponseType(command)>"
+hookNamespace(component) ::= "<component.Scope.FullName>::<component.Name><component.Type>::"
+hookRequestVariableDeclaration(command) ::= "<commandHookRequestType(command)> <hookRequestVariable(command)>;"
+hookResponseVariableDeclaration(command) ::= "<commandHookResponseType(command)> <hookResponseVariable(command)>;"
+
+
+hookDeclaration(command) ::= <<
+<if(command.RequestType)>
+typedef ::Blaze::Functor3\< <printTypeRefFullScope(command.RequestType)>&, ::Blaze::BlazeRpcError&, bool& \> <commandHookRequestType(command)>;
+
+<endif>
+<if(command.ResponseType)>
+<if(command.errortype)>
+typedef ::Blaze::Functor3\< <printTypeRefFullScope(command.ResponseType)>&, ::Blaze::BlazeRpcError&, <printTypeRefFullScope(command.errortype)>& \> <commandHookResponseType(command)>;
+
+<else>
+typedef ::Blaze::Functor2\< <printTypeRefFullScope(command.ResponseType)>&, ::Blaze::BlazeRpcError& \> <commandHookResponseType(command)>;
+
+<endif>
+<elseif(command.errortype)>
+typedef ::Blaze::Functor2\< ::Blaze::BlazeRpcError&, <printTypeRefFullScope(command.errortype)>& \> <commandHookResponseType(command)>;
+
+<endif>
+<if(command.RequestType)>
+void set<command.Name>RequestHook(<commandHookRequestType(command)>& reqCb) { <hookRequestVariable(command)> = reqCb; }
+const <commandHookRequestType(command)>& get<command.Name;format="pascal">RequestHook() const { return <hookRequestVariable(command)>; }
+
+<endif>
+<if(command.ResponseType)>
+void set<command.Name>ResponseHook(<commandHookResponseType(command)>& respCb) { <hookResponseVariable(command)> = respCb; } 
+const <commandHookResponseType(command)>& get<command.Name;format="pascal">ResponseHook() const { return <hookResponseVariable(command)>; }
+
+<elseif(command.errortype)>
+void set<command.Name>ResponseHook(<commandHookResponseType(command)>& respCb) { <hookResponseVariable(command)> = respCb; } 
+const <commandHookResponseType(command)>& get<command.Name;format="pascal">ResponseHook() const { return <hookResponseVariable(command)>; }
+
+<endif>
+>>
+
+

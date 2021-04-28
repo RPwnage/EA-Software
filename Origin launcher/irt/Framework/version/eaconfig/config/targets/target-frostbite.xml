@@ -1,0 +1,70 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<!-- this file contains targets used by frostbite which used to live in FBConfig -->
+<!-- these target don't contain anything frostbite specific, they are just helper targets or they alias existing eaconfig targets -->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<do unless="'@{OptionSetGetValue('config.targetoverrides', 'opensln')}' == 'exclude'">
+		<target name="opensln" allowoverride="true">
+			<call target="visualstudio-internal-open" />
+		</target>
+	</do>
+
+	<do unless="'@{OptionSetGetValue('config.targetoverrides', 'gensln')}' == 'exclude'">
+		<target name="gensln" allowoverride="true">
+			<call target="slngroupall" unless="${eaconfig.enablesndbs??false}" />
+			<call target="slngroupallsndbs " if="${eaconfig.enablesndbs??false}" />
+		</target>
+	</do>
+
+	<do unless="'@{OptionSetGetValue('config.targetoverrides', 'buildsln')}' == 'exclude'">
+		<target name="buildsln" allowoverride="true">
+			<call target="msbuild" />
+		</target>
+	</do>
+
+	<do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuildsln')}' == 'exclude'">
+		<target name="incredibuildsln" allowoverride="true">
+			<call target="incredibuild" />
+		</target>
+	</do>
+
+		<do unless="'@{OptionSetGetValue('config.targetoverrides', 'debugbuildgraph')}' == 'exclude'">
+		<target name="debugbuildgraph" allowoverride="true">
+			<call target="viewbuildinfo" />
+		</target>
+	</do>
+
+	<do unless="'@{OptionSetGetValue('config.targetoverrides', 'releasepackage')}' == 'exclude'">
+		<target name="releasepackage" allowoverride="true">
+			<call target="gensln" />
+			<call target="buildsln" />
+			<call target="deploy" />
+		</target>
+	</do>
+
+	<!-- This target is used to download arbitrary dependent packages without building them
+	     To use, list the package and version in your masterconfig.xml and run: nant -buildpackage:FbConfig -D:DependentPackageName=<name> DependentPackage -->
+	<do unless="'@{OptionSetGetValue('config.targetoverrides', 'DependentPackage')}' == 'exclude'">
+		<target name="DependentPackage" allowoverride="true">
+			<fail unless="@{PropertyExists('DependentPackageName')}" message="Please provide property 'DependentPackageName' to use 'DependentPackage'."/>
+			<dependent name="${DependentPackageName}"/>
+		</target>
+	</do>
+
+	<do unless="'@{OptionSetGetValue('config.targetoverrides', 'DependentPackageGroup')}' == 'exclude'">
+		<target name="DependentPackageGroup" allowoverride="true">
+			<fail unless="@{PropertyExists('DependentPackageGroupName')}" message="Please provide property 'DependentPackageGroupName' to use 'DependentPackageGroup'."/>
+			<property local="true" name="packages-in-group" />
+			<collect-masterconfig-packages groupname="${DependentPackageGroupName}" target-property="packages-in-group" />
+
+			<!-- run dependent on each package in the group -->
+			<foreach item="String" in="${packages-in-group}" property="package">
+				<property local="false" name="DependentPackageName" value="${package}" />
+				<call target="DependentPackage" />
+			</foreach>
+		</target>
+	</do>
+
+</project>

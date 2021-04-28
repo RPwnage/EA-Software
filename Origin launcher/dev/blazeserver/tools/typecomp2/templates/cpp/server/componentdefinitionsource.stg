@@ -1,0 +1,98 @@
+group componentinterfacesource : servercommon;
+
+component(fileNode, component) ::= <<
+<standardFileHeader()>
+/*** Include Files ********************************************************************************/
+#include "framework/blaze.h"
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl">_defines.h"
+<if(component.Master)>#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Master.Name;format="tl"><component.Master.Type;format="toLower">.h"<endif>
+<if(component.Slave)>#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Slave.Name;format="tl"><component.Slave.Type;format="toLower">.h"<endif>
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+
+/********************************************************************************
+  Command Info Section
+    The remainder of this file spells out the component information structures.
+********************************************************************************/
+
+<if(component.Types)>
+static const ObjectTypeInfo s<component.Name>ObjectTypeInfo[] =
+{
+<component.Types:{type|   {
+    <component.CompId; format="@0x%04X">, //Component Id
+    <type.Value>, //Entity Type Id
+    <type.has_identity>, //has identity
+    "<type.name>" //name
+  }}; separator=",\n"  >
+};
+<endif>
+
+<if(component.permissions)>
+static const PermissionInfo s<component.Name>PermissionInfo[] =
+{
+<component.permissions:{permission|   {
+    Authorization::<permission.Name>, //permission id (global)
+    <component.CompId; format="@0x%04X">, //Component Id
+    <permission.Value; format="hex">, //permission id (within component)   
+    "<permission.Name>" //name
+  }}; separator=",\n"  >
+};
+<endif>
+
+<if(component.Errors)>
+static const ::Blaze::ErrorInfo s<component.Name>ErrorInfo[] =
+{
+<component.Errors:{error|   {
+    ::Blaze::<error.Name>, //error id (global)
+    <component.CompId; format="@0x%04X">, //Component Id
+    <error.Value; format="hex">, //error id (within component)   
+    "<error.Name>", //name
+    "<error.description>", //description
+    <if(error.http_status_code)>    <error.http_status_code><else>    ::Blaze::DEFAULT_HTTP_STATUS_CODE<endif> //http status code
+  }}; separator=",\n"  >
+};
+<endif>
+
+static const char8_t* s<component.Name>AllocGroups[] =
+{
+    "0"
+    <if(component.alloc_groups)>
+    <component.alloc_groups:{alloc_group|   , "<alloc_group.Name>" }; separator="\n"  >
+    <endif>
+};
+
+
+const ::Blaze::ComponentBaseInfo <component.Name; format="toUpper">_COMPONENT_BASE_INFO(
+    <component.CompId; format="@0x%04X">,
+    "<component.Name; format="toLower">", //base name
+    <if(component.Types)>    s<component.Name>ObjectTypeInfo, EAArrayCount(s<component.Name>ObjectTypeInfo)<else>    nullptr, 0<endif>,
+    <if(component.permissions)>    s<component.Name>PermissionInfo, EAArrayCount(s<component.Name>PermissionInfo)<else>    nullptr, 0<endif>,
+    <if(component.Errors)>    s<component.Name>ErrorInfo, EAArrayCount(s<component.Name>ErrorInfo)<else>    nullptr, 0<endif>,
+    <printTdfTypeDescOrNull(component.configurationType)>, //config create func
+    <printTdfTypeDescOrNull(component.preconfigurationType)>, //config create func
+    <if(component.Slave)>    &<component.Slave.Name><component.Slave.Type>::COMPONENT_INFO<else>    nullptr<endif>,
+    <if(component.Master)>    &<component.Master.Name><component.Master.Type>::COMPONENT_INFO<else>    nullptr<endif>,
+    s<component.Name>AllocGroups, EAArrayCount(s<component.Name>AllocGroups)
+);
+
+
+<component.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+
+namespace Blaze
+{
+    // These are our type defines used to hook up the preprocessor variables this type library uses to set defaults like logging and allocation index. 
+    const size_t& COMPONENT_TYPE_INDEX_<component.Name;format="toLower"> = <component.Scope.FullNameList; separator="::">::<component.Name; format="toUpper">_COMPONENT_BASE_INFO.index;
+    const ::Blaze::MemoryGroupId& COMPONENT_MEMGROUP_<component.Name;format="toLower"> = <component.Scope.FullNameList; separator="::">::<component.Name; format="toUpper">_COMPONENT_BASE_INFO.memgroup;
+
+    namespace BlazeRpcLog
+    {
+        const size_t& <component.Name; format="toLower"> = <component.Scope.FullNameList; separator="::">::<component.Name; format="toUpper">_COMPONENT_BASE_INFO.index;
+    }
+}
+
+<standardFileFooter()>
+>>
+
+printTypeOrVoid(type) ::=  "<if(type)><printTypeRefFullScope(type)><else>void<endif>"
+printTdfTypeDescOrNull(type) ::= "<if(type)>&EA::TDF::TypeDescriptionSelector\<<printTypeRefFullScope(type)>\>::get()<else>nullptr<endif>"

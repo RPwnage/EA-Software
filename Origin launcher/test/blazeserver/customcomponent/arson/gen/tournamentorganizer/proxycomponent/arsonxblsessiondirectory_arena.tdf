@@ -1,0 +1,204 @@
+/*! ************************************************************************************************/
+/*!
+    \file arsonxblsessiondirectory_arena.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+[headername="framework/tdf/externalsessiontypes.h"]
+#include "framework/gen/externalsessiontypes.tdf"
+
+[ headername="xblserviceconfigs/tdf/xblserviceconfigs.h" ]
+#include "xblserviceconfigs/gen/xblserviceconfigs.tdf"
+
+[ headername="xblclientsessiondirectory/tdf/xblclientsessiondirectory.h" ]
+#include "xblclientsessiondirectory/gen/xblclientsessiondirectory.tdf"
+
+[ headername="xblserviceconfigs/tdf/xblsessiondirectorycommontypes.h" ]
+#include "xblserviceconfigs/gen/xblsessiondirectorycommontypes.tdf"
+
+[headername="arson/tdf/arsonxblsessiondirectorycommontypes.h"]//for ArsonArenaResults
+#include "arson/gen/arsonxblsessiondirectorycommontypes.tdf"
+
+namespace Blaze
+{
+
+namespace ArsonXBLServices
+{
+
+[trackChanges = true]
+class ArsonArenaMemberPropertiesSystemArbitration
+{
+    [tag="arbi", description="tournament match results"]
+    Arson::ArsonArenaResults mResults;
+};
+[trackChanges = true]
+class ArsonArenaMemberPropertiesSystem
+{
+    [tag="actv", description="whether member is marked as active in MPS"]
+    bool mActive;
+    [tag="arbi", description="the member's properties.system.arbitration block"]
+    ArsonArenaMemberPropertiesSystemArbitration mArbitration;
+};
+[trackChanges = true]
+class ArsonArenaMemberProperties
+{
+    [tag="syst", description="the member's properties.system block"]
+    ArsonArenaMemberPropertiesSystem mSystem;
+};
+
+[trackChanges = true]
+class ArsonArenaMember
+{
+    [tag="syst", description="the member's constants block"]
+    XBLServices::MemberConstants mConstants;
+
+    [tag="prop", description="the member's properties block"]
+    ArsonArenaMemberProperties mProperties;
+
+    [tag="arbi", description="the member's arbitration status. Possible values may include 'complete', 'incomplete', 'inpgrogress', 'joining', 'playing' or 'waiting'"]
+    string(12) mArbitrationStatus; //12 chars for 'inprogress'
+};
+typedef map<string(-1), ArsonArenaMember> ArsonArenaMembers;
+
+[description="Arena MPSD game and team sessions' 'servers.tournaments' section", trackChanges = true]
+class ArsonArenaServersTournaments
+{
+    [tag="cnst", description="MPS 'servers.tournaments.constants'"]
+    XBLServices::ServersTournamentsConstants mConstants;
+};
+[trackChanges = true]
+class ArsonArenaServersArbitrationPropertiesSystem
+{
+    [tag="conf"] uint8_t mResultConfidenceLevel;
+    [tag="rsrc"] string(-1) mResultSource; //servers.arbitration.properties.system.resultSource
+    [tag="stat"] string(15) mResultState; //poss values: completed, canceled, noresults, partialresults. 15 chars for partialresults
+    [tag="arbi"] Arson::ArsonArenaResults mResults;
+};
+[trackChanges = true]
+class ArsonArenaServersArbitrationProperties
+{
+    [tag="syst"] ArsonArenaServersArbitrationPropertiesSystem mSystem; //servers.arbitration.properties.system
+};
+[trackChanges = true]
+class ArsonArenaServersArbitration
+{
+    [tag="cnst"] XBLServices::ServersArbitrationConstants mConstants; //servers.arbitration.constants
+    [tag="prop"] ArsonArenaServersArbitrationProperties mProperties; //servers.arbitration.properties
+};
+[trackChanges = true]
+class ArsonArenaMultiplayerSessionServers
+{
+    [tag="trna", description="MPS 'servers.tournaments' section"]
+    ArsonArenaServersTournaments mTournaments;
+    [tag="arbn", description="MPS 'servers.arbitration' section"]
+    ArsonArenaServersArbitration mArbitration;   
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//     Update Arena Game Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="MPS Subscriptions Event Hub section. Used to enable shoulder tap features.", trackChanges = true]
+class MultiplayerSessionSubscriptionsEntryEventHub
+{
+    [tag="nspc", description="MPS Subscriptions Event Hub's namespace"]
+    string(-1) mNamespace;
+    [tag="name", description="MPS Subscriptions Event Hub's name"]
+    string(-1) mName;
+    [tag="akey", description="MPS Subscriptions Event Hub's access key"]
+    string(-1) mAccessKeyName;
+    [tag="pkey", description="MPS Subscriptions Event Hub's partition key"]
+    string(-1) mPartitionKey;
+    [tag="ctxt", description="MPS Subscriptions Event Hub's context"]
+    string(-1) mContext;
+};
+
+[description="Arena/tournament match session's subscription entry", trackChanges = true]
+class MultiplayerSessionSubscriptionsEntry
+{
+    [tag="evhb", description="MPS Subscriptions' event hub"]
+    MultiplayerSessionSubscriptionsEntryEventHub mEventHub;
+    [tag="ctyp", description="MPS Subscriptions' change types"]
+    list<string(-1)> mChangeTypes;
+};
+[trackChanges = true]
+typedef map<TournamentId, MultiplayerSessionSubscriptionsEntry> MultiplayerSessionSubscriptions;
+
+[trackChanges = true]//ensure members or subscriptions sections omitted if unspecified
+class PutUpdateArenaGameRequestBody
+{
+    [tag="memb", description="MPS members. for optionally posting members' results"]
+    ArsonArenaMembers mMembers;
+    
+    [tag="subs", description="The MPS subscriptions. for optionally adding Azure Event Hub subscriptions"]
+    MultiplayerSessionSubscriptions mSubscriptions;
+};
+
+class PutUpdateArenaGameRequest
+{
+    [tag="scid", description="service config identifier"]
+    XblScid mScid;
+
+    [tag="stnm", description="session template name"]
+    XblSessionTemplateName mSessionTemplateName;
+
+    [tag="snam", description="session name"]
+    XblSessionName mSessionName;
+
+    [tag="prjh", description=""]
+    XBLServices::MultiplayerSessionRequestHeader mHeader;
+
+    [tag="prjb", description="request body"]
+    PutUpdateArenaGameRequestBody mBody;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get Arena Multiplayer Sessions Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+
+[description="Arena/tournament match session's arbitration status", trackChanges = true]
+class ArenaSessionArbitration
+{
+    [tag="stat", description="MPS arbitration status. Possible values: inprogress, waiting, complete, incomplete, playing"]
+    string(10) mStatus; // 10 chars for inprogress or incomplete
+};
+
+[trackChanges = true]
+class ArenaMultiplayerSessionResponse
+{
+    [tag="prop", description="MPS properties block"]
+    XBLServices::MultiplayerSessionProperties mProperties;
+
+    [tag="cons", description="MPS constants block"]
+    XBLServices::MultiplayerSessionConstants mConstants;
+
+    [tag="memb", description="MPS members"]
+    ArsonArenaMembers mMembers;
+
+    [tag="coid", description="MPS CorrelationId"]
+    XblCorrelationId mCorrelationId;
+    
+    [tag="srvr", description="MPS servers block"]
+    ArsonArenaMultiplayerSessionServers mServers;
+
+    [tag="arbi", description="MPS arbitration block"]
+    ArenaSessionArbitration mArbitration;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Helper TDFs
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Info about an Arena Team Multiplayer Session", trackChanges = true]
+class TOArenaTeamParams
+{
+    [tag="unam"] XBLServices::MultiplayerSessionTeamName mUniqueName;
+    [tag="name"] XBLServices::MultiplayerSessionTeamName mDisplayName;
+};
+typedef list<TOArenaTeamParams> TOArenaTeamParamsList;
+
+}
+} // Blaze

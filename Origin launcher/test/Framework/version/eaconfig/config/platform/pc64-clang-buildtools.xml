@@ -1,0 +1,193 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <compiler
+    path="${cc}"
+    path-clanguage="${cc-clanguage??${cc}}"
+    version="${clang_version}"
+    >
+    <common-defines>
+      ${cc.defines??}
+      WIN32
+    </common-defines>
+    <common-options if="${eaconfig.treat-pc-clang-as-vc??false}">
+      ${pc-clang.cc.options??}
+      /FS
+      -bigobj
+      -Zc:inline
+    </common-options>
+    <common-options unless="${eaconfig.treat-pc-clang-as-vc??false}" >
+      ${pc-clang.cc.options??}
+      ${cc.options??}
+      /FS
+      -bigobj
+      -Zc:inline
+    </common-options>
+    <system-includedirs>
+      ${package.VisualStudio.includedirs??${package.eaconfig.vc.includedirs}}
+      ${package.WindowsSDK.includedirs??${eaconfig.PlatformSDK.includedirs}}
+      ${package.GDK.includedirs??}
+    </system-includedirs>
+    <template>
+      <do if="${eaconfig.treat-pc-clang-as-vc??false}">
+        <commandline>
+          %defines%
+          %includedirs%
+          %system-includedirs%
+          %options%
+          -Fo"%objectfile%"
+          "%sourcefile%"
+        </commandline>
+        <commandline-clanguage>
+          %defines%
+          %includedirs%
+          %system-includedirs%
+          %options%
+          -Fo"%objectfile%"
+          "%sourcefile%"
+        </commandline-clanguage>
+        <usingdir> </usingdir>
+      </do>
+      <do unless="${eaconfig.treat-pc-clang-as-vc??false}">
+        <commandline>
+          %defines%
+          %options%
+          %includedirs%
+          %system-includedirs%
+          -o "%objectfile%"           <!-- object file -->
+          -c "%sourcefile%"           <!-- source file -->
+        </commandline>
+        <commandline-clanguage>
+          %defines%
+          %options%
+          %includedirs%
+          %system-includedirs%
+          -o "%objectfile%"           <!-- object file -->
+          -c "%sourcefile%"           <!-- source file -->
+        </commandline-clanguage>
+      </do>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <system-includedir>-I "%system-includedir%"</system-includedir>
+    </template>
+  </compiler>
+
+  <assembler
+    path="${as}"
+    path-clanguage="${as-clanguage??${as}}"
+    version="${eaconfig.msvc.version}"
+    >
+    <common-defines>
+      ${as.defines??}
+    </common-defines>
+    <common-options>
+      ${as.options??}
+    </common-options>
+    <system-includedirs>
+      ${package.VisualStudio.includedirs??${package.eaconfig.vc.includedirs}}
+      ${package.WindowsSDK.includedirs??${eaconfig.PlatformSDK.includedirs}}
+      ${package.GDK.includedirs??}
+    </system-includedirs>
+    <template>
+      <!-- 
+          VisualStudio proxy package defined as.options to include -Fo"%objectfile%" "%sourcefile%" which make this non-standard with
+          above compiler commandline to include switch for output file and include switchs for input source file.
+      -->
+      <do if="${eaconfig.treat-pc-clang-as-vc??false}">
+        <commandline>
+          %defines%
+          %includedirs%
+          %system-includedirs%
+          %options%
+          -Fo"%objectfile%"
+          "%sourcefile%"
+        </commandline>
+        <commandline-clanguage>
+          %defines%
+          %includedirs%
+          %system-includedirs%
+          %options%
+          -Fo"%objectfile%"
+          "%sourcefile%"
+        </commandline-clanguage>
+      </do>
+      <do unless="${eaconfig.treat-pc-clang-as-vc??false}">
+        <commandline>
+          %defines%
+          %includedirs%
+          %system-includedirs%
+          %usingdirs%
+          %options%
+        </commandline>
+        <commandline-clanguage>
+          %defines%
+          %includedirs%
+          %system-includedirs%
+          %usingdirs%
+          %options%
+        </commandline-clanguage>
+      </do>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <system-includedir>-I "%system-includedir%"</system-includedir>
+    </template>
+  </assembler>
+
+  <librarian
+    path="${lib}"
+    path-clanguage="${lib-clanguage??${lib}}"
+    version="${eaconfig.msvc.version}"
+    >
+    <common-options>
+      ${lib.options??}
+    </common-options>
+    <template>
+      <!-- VisualStudio proxy package defined lib.options which include /OUT:X switches to specify output file -->
+      <commandline>
+        %options%
+        %objectfiles%
+      </commandline>
+      <commandline-clanguage>
+        %options%
+        %objectfiles%
+      </commandline-clanguage>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </librarian>
+
+  <linker
+    path="${link}"
+    path-clanguage="${link-clanguage??${link}}"
+    version="${clang_version}"
+    >
+    <common-options>
+      ${link.options??}
+    </common-options>
+    <system-librarydirs>
+      ${link.librarydirs??}
+      ${eaconfig.PlatformSDK.librarydirs}
+    </system-librarydirs>
+    <system-libs>
+      ${package.VisualStudio.libraries??}
+      ${package.WindowsSDK.libraries??}
+    </system-libs>
+    <template>
+      <!-- The output switch is added to link.options during builtset generate optionset! -->
+      <commandline>
+        %options%
+        %librarydirs%
+        %objectfiles%
+        %libraryfiles%
+      </commandline>
+      <commandline-clanguage>
+        %options%
+        %librarydirs%
+        %objectfiles%
+        %libraryfiles%
+      </commandline-clanguage>
+      <librarydir>-libpath:"%librarydir%"</librarydir>
+      <libraryfile>"%libraryfile%"</libraryfile>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </linker>
+
+</project>

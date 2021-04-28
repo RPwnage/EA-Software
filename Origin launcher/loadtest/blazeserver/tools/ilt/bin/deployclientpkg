@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# relative path of script relative to launch location
+srcDir=$(dirname ${BASH_SOURCE[0]})
+
+set -e
+
+source $srcDir/clientdeploy.cfg
+source $srcDir/util
+
+if [ -z "$runname" ]; then 
+    echo "Usage: $0 runname"
+    exit 1
+fi
+
+if [ -z "$clientpath" ]; then
+    echo "Please specify clientpath variable in deployment-config."
+    exit 1
+fi
+
+makeSudoStr $clientuser
+
+pushd $stressBuildDir
+for clienthost in ${clienthost[@]};
+do
+    echo "Deploying to host: ${clienthost}..."
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost} "$sudoStr rm -rf $clientpath/*; $sudoStr mkdir -p $clientpath; $sudoStr chmod a+rwx $clientpath";
+    scp stress-client-$runname.tar.gz ${clienthost}:$clientpath;
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${clienthost} "chmod a+rw $clientpath/stress-client-$runname.tar.gz; cd $clientpath; $sudoStr tar -xvzf stress-client-$runname.tar.gz"
+    echo "Done."
+done
+
+popd
+

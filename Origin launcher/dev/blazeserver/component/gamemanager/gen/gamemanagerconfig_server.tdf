@@ -1,0 +1,712 @@
+/*! ************************************************************************************************/
+/*!
+    \file gamemanagerconfig_server.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+[headername="gamemanager/tdf/externalsessiontypes_server.h"]
+#include "gamemanager/gen/externalsessiontypes_server.tdf"
+
+[headername="gamemanager/tdf/externalsessionconfig_server.h"]
+#include "gamemanager/gen/externalsessionconfig_server.tdf"
+
+[headername="gamemanager/tdf/gamebrowser.h"]
+#include "gamemanager/gen/gamebrowser.tdf"
+
+[headername="gamemanager/tdf/gamemanager_server.h"]
+#include "gamemanager/gen/gamemanager_server.tdf"
+
+[headername="gamemanager/tdf/retenetwork_config_server.h"]
+#include "gamemanager/gen/retenetwork_config_server.tdf"
+
+[headername="gamemanager/tdf/matchmaker_config_server.h"]
+#include "gamemanager/gen/matchmaker_config_server.tdf"
+
+[headername="gamemanager/tdf/gamepacker_config_server.h"]
+#include "gamemanager/gen/gamepacker_config_server.tdf"
+
+[headername="gamemanager/tdf/matchmaking_properties_config_server.h"]
+#include "gamemanager/gen/matchmaking_properties_config_server.tdf"
+
+[headername="framework/tdf/networkaddress.h"]
+#include "framework/gen/networkaddress.tdf"
+
+[headername="framework/tdf/frameworkconfigtypes_server.h"]
+#include "framework/gen/frameworkconfigtypes_server.tdf"
+
+[headername="gamemanager/tdf/rules.h"]
+#include "gamemanager/gen/rules.tdf"
+
+[headername="gamemanager/tdf/gamebrowser_scenarios_config_server.h"]
+#include "gamemanager/gen/gamebrowser_scenarios_config_server.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+
+    [description="Enumeration of queue methodologies the server supports"]
+    enum GameSessionQueueMethod
+    {
+        GAME_QUEUE_BLAZE_MANAGED,
+        GAME_QUEUE_ADMIN_MANAGED
+    };
+
+    enum QueueChangeNotificationsMethod
+    {
+        HOST_AND_QUEUED,
+        INGAME_AND_QUEUED   
+    };
+
+    typedef list<GameState> GameStateList;
+
+    typedef string(32) GameModeName;
+    [description = "The ccs mode setting for a game mode" ]
+    class GameModeCCSSetting
+    {
+      [tag="desc", description="Information on mapping."]
+      string(-1) mDescription;
+
+      [tag="ccmd", default=CCS_MODE_INVALID, description="The CCS mode to be used."]
+      CCSMode mCCSMode;
+
+      [tag="pool", description="The CCS pool to use for this particular game mode."]
+      string(64) mCCSPool;
+    };
+
+    typedef map<GameModeName, GameModeCCSSetting> GameModeToCCSModeMap;
+
+
+    typedef list<GameAction::Actions> GameActionList; 
+    class GamePermissionSystem
+    {
+        [tag="eaas", default = false, description="If set, the game host is an ADMIN and, when he leaves, the next oldest player becomes the admin.  Otherwise no admins will be set by default."]
+        bool mEnableAutomaticAdminSelection;
+
+        [tag="gpsh", description="List of actions accessible by the host of the game session."]
+        GameActionList mHost;
+        [tag="gpsa", description="List of actions accessible by admins of the game session."]
+        GameActionList mAdmin;
+        [tag="gpsp", description="List of actions accessible by participants of the game session."]
+        GameActionList mParticipant;
+        [tag="gpss", description="List of actions accessible by spectators of the game session."]
+        GameActionList mSpectator;
+    };
+ 
+    typedef map<GamePermissionSystemName, GamePermissionSystem> GamePermissionSystemByNameMap;
+
+    class GameSessionServerConfig
+    {
+        [tag="mode", default="mode", description="The key of the game attribute that determines game mode."]
+        Collections::AttributeName gameModeAttributeName;
+
+        [tag="mdtp", default="mode_type", description="The key of the game attribute that determines game mode type"]
+        Collections::AttributeName PINGameModeTypeAttributeName;
+
+        [tag="gmtp", default="game_type", description="The key of the game attribute that determines game type"]
+        Collections::AttributeName PINGameTypeAttributeName;
+
+        [tag="map", default="map", description="The key of the game attribute that determines game map."]
+        Collections::AttributeName PINGameMapAttributeName;
+
+        [tag="time", default="30s", description="The timeout period in seconds for join player."]
+        TimeValue joinTimeout;
+        
+        [tag="qmax", default=0, description="The largest queue size allowed for any game."]
+        uint16_t queueCapacityMax;
+        
+        [tag="bmax", default=100, description="The maximum number of players allowed in a Game's ban list."]
+        uint16_t banListMax;
+
+        [tag="dmax", default=300, description="The maximum number of players stored in a DNF player list."]
+        uint16_t dnfListMax;
+        
+        [tag="host", default="10s", description="The timeout configuration for host migration in seconds."]
+        TimeValue hostMigrationTimeout;
+        
+        [tag="gams", default=false, description="The Game protocol version or Game protocol version- String."]
+        bool evaluateGameProtocolVersionString;
+        
+        [tag="hinj", default=true, description="Should the Blaze server allow a virtual game to have a host from a random ping site if none are available in the matching datacenter."]
+        bool allowMismatchedPingSiteForVirtualizedGames;
+        
+        [tag="dsr", default=false, description="Validate player reports?"]
+        bool trustedDedicatedServerReports;
+        
+        [tag="pkto", default="15s", description="The timeout value for how long players remain in the pending kick state before being removed from the game."]
+        TimeValue pendingKickTimeout;
+        
+        [tag="hkto", default="5s", description="The timeout value for how long the host has to respond to a pending kick state before being removed from the game."]
+        TimeValue hostPendingKickTimeout;        
+
+        [tag="idle", default=true, description="Should the blaze server clear the banned list on resetting a dedicated server?"]
+        bool clearBannedListWithReset;
+        
+        [tag="mprs", default="60s", description="The timeout value for player's reservation."]
+        TimeValue playerReservationTimeout;
+
+        [tag="drto", default="60s", description="The timeout value for disconnect reservation."]
+        TimeValue disconnectReservationTimeout;
+        
+        [tag="esdr", default=true, description="Enable the creation of disconnect reservations for spectator players."]
+        bool enableSpectatorDisconnectReservations;
+
+        [tag="eqdr", default=true, description="Enable the creation of disconnect reservations for queued players."]
+        bool enableQueuedDisconnectReservations;
+
+        [tag="gsqm", default=GAME_QUEUE_BLAZE_MANAGED, description="The GameSessionQueueMethod."]
+        GameSessionQueueMethod gameSessionQueueMethod;
+    
+        [tag="rete", reconfigurable="no", default=false, description="Skip inserting games closed to browsing and matchmaking into the RETE tree?"]
+        bool hideClosedGamesFromRETE;
+        
+        [tag="qcnm", default=HOST_AND_QUEUED, description="The QueueChangeNotificationsMethod."]
+        QueueChangeNotificationsMethod queueChangeNotifications;        
+    
+        [tag="t2pt", default=false, description="For 2 player peer connected games, if false, and pending kick timer goes off, and the host hasn't reported to blazeserver, host is removed from game. Otherwise if true non-host is removed."]
+        bool trustHostForTwoPlayerPeerTimeout;
+
+        [tag="pflt", default="0s", description="The timeout value in seconds for how long games remain locked for preferred joins. Locking games for preferred joins is disabled if lockGamesForPreferredJoinsTimeout is 0s (the default)."]
+        TimeValue lockGamesForPreferredJoinsTimeout;
+
+        [tag="uedb", default=true, description="Whether or not game manager uses Blaze's stored off User Extended Data (UED) from the database for UED providers like stats, for players who are not logged into the title's blaze server."]
+        bool useDatabaseUedForOfflinePlayers;
+
+        [tag="egue", reconfigurable="yes", default=false, description="Enable the sending of the GameUpdateEvent."]
+        bool enableGameUpdateEvents;
+
+        [tag="syrp", reconfigurable="yes", default=true, description="To ensure unexpected members are removed from a game's external session, at each replay, switch this setting to true."]
+        bool syncExternalSessionsAtReplay;
+     
+        [tag="exti", reconfigurable="yes", description="Whitelist for allowable external ips.  If the list is not empty and a host's external ip does not match it, game creation will fail."]
+        NetworkFilterConfig externalHostIpWhitelist;
+        
+        [tag="inti", reconfigurable="yes", description="Whitelist for allowable internal ips.  If the list is not empty and a host's internal ip does not match it, the ip will be set to invalid."]
+        NetworkFilterConfig internalHostIpWhitelist;
+
+        [tag="fcex", reconfigurable="yes", default=false, description="If true the external address is forced to the connection address for the server."]
+        bool forceExternalAddressToConnAddress;
+
+        [tag="ecfg", reconfigurable="yes", description="External sessions configuration."]
+        ExternalSessionServerConfigMap externalSessions;
+
+        [tag="telm", default="20s", reconfigurable="yes", description="The interval at which game players will be asked to report p2p telemetry."]
+        TimeValue qosTelemetryInterval;
+
+        [tag="jwti", default="3000ms", description="Calls to joinGame methods while the target game is in one of the joinBusyGameStates list's closed-to-joins GameState's, or while the game's lockedAsBusy game setting is set, will have their join attempts internally suspended by GameManager for up to joinWaitTimeOnBusy milliseconds, before they actually get executed."]
+        TimeValue joinWaitTimeOnBusy;
+        
+        [tag="jbgs", description="List of closed-to-join GameState's, which GameManager does the suspending of join attempts during, based on the joinWaitTimeOnBusy setting (see)."]
+        GameStateList joinBusyGameStates;
+
+        [tag="labt", reconfigurable="yes", default="30s", description="Max amount of time a game can be locked as busy.  Afterwards, it switches back to non-locked.  (Use to avoid stuck servers)"]
+        TimeValue lockedAsBusyTimeout;
+        
+        [tag="umct", default="40s", description="To support connectivity metrics, when a player is removed from a game, he remains in the PlayerConnectionDetailsMap of any player with whom he is still establishing a connection. We remove him from the map when we receive an updateMeshConnection request for the connection, or when this timeout expires (if this timeout expires, metrics are not collected for the connection)."]
+        TimeValue updateMeshConnectionTimeout;
+
+        [tag="gmcm", description="The mapping of the game mode to ccs mode"]
+        GameModeToCCSModeMap gameModeToCCSModeMap;
+
+        [tag="crfd", default="0ms", description="The time delay in issuing the ccs request. This allows for the bulk request optimization. A value of 0 effectively disables it."]
+        TimeValue ccsRequestIssueDelay;
+
+        [tag="cfrd", default="1s", description="Time delay specifically for the free request when a Game is destroyed.  This avoids timing issues where ccs is processing the server"]
+        TimeValue ccsFreeRequestDelay;
+
+        [tag="clet", default="15m", description="The duration for which we are leasing the hosted server."]
+        TimeValue ccsLeaseTime;
+
+        [tag="timo", default="10s", description="For a given connection pair, after blazeserver recives the first connection lost, this timeout is the max time blazeserver will wait for 2nd connection lost to arrive."]
+        TimeValue ccsBidirectionalConnLostUpdateTimeout;
+
+        [tag="pssm", default=AVERAGE_FOR_ALL_PLAYERS, description="Method for choosing the ping site based on the pings of all the players in the game."]
+        PingSiteSelectionMethod ccsPingSiteSelectionMethod;
+
+        [tag="enap", reconfigurable="yes", default=true, description="If true the network address of players is not shared with other players in Game Groups or CSD Games (without VoIP or with Dedicated Server VoIP)."]
+        bool enableNetworkAddressProtection;
+
+        [tag="dgps", reconfigurable="yes", description="Default Game Permission System Config."]
+        GamePermissionSystem mDefaultGamePermissionSystem;
+
+        [tag="gpsc", reconfigurable="yes", description="Game Permission System Config."]
+        GamePermissionSystemByNameMap mGamePermissionSystemConfig;
+
+        [tag="rhst", reconfigurable="yes", default=true, description="If false, no topology host will be assigned for NETWORK_DISABLED game sessions."]
+        bool assignTopologyHostForNetworklessGameSessions;
+
+        [tag="mpgg", reconfigurable="yes", default=1, description="The maximum active matchmaking sessions per user group. The startMatchmakingScenario RPC will return error when exceeded."]
+        uint32_t maxActiveSessionsPerUserGroup;
+
+        [tag="ttlb", reconfigurable="yes", default="30s", description="The buffer time for matchmaking scenario sesssion timeout, used for setting TTL."]
+        TimeValue scenarioTTLBufferTime;
+
+        [tag="ttry", default=2, reconfigurable="yes", description="For tournament games, if a send tournament game event call fails, Blaze may back off and retry up to this number of times."]
+        uint8_t mSendTournamentEventRetryLimit;
+
+        [tag="asph", reconfigurable="yes", default=true, description="If false, players joining a dedicated server game session won't be assigned as a platform host when Blaze is managing 1st party presence sessions."]
+        bool assignPlatformHostForDedicatedServerGames;
+
+        [tag="tmap", description="The mapping of the TeamIds to a string name for the team."]
+        TeamNameByTeamIdMap teamNameByTeamIdMap;
+    };
+    
+    class CensusDataServerConfig
+    {       
+        typedef map<Collections::AttributeName, Collections::AttributeValueList, ignorecase> CensusGameAttribMap;
+            
+        [tag="mcga", description="Game Attribute Map."]
+        CensusGameAttribMap gameAttributes;     
+        
+        [tag="ittm", reconfigurable="yes", default=true, description="If false, census data will omit estimated time to match informaton."]
+        bool includeTimeToMatchEstimates;
+
+        [tag="ingd", reconfigurable="yes", default=false, description="If true, census data will send non-grouped versions to the clients (assumes only one group is used)."]
+        bool includeNonGroupedData;
+    }; 
+    
+        
+        
+        
+    [description="Enumeration of options for downloading the games roster for a game browser list"]
+    enum GameBrowserRosterType
+    {
+        GAMEBROWSER_ROSTER_ALL,
+        GAMEBROWSER_ROSTER_ACTIVE,
+        GAMEBROWSER_ROSTER_NONE
+    };
+
+    [description="Enumeration of options for sorting the games for a game browser list"]
+    enum GameBrowserSortType
+    {
+        SORTED_LIST,
+        UNSORTED_LIST
+    };
+
+    class GameBrowserListConfig
+    {
+        [tag="lt", default=SORTED_LIST, description="The list type."]
+        GameBrowserSortType sortType;
+
+    // Types of data to download:
+        [tag="dogi", default=false, description="Download only the Game ID? No other data will be downloaded."]
+        bool downloadOnlyGameId;
+
+        [tag="dpgi", default=false, description="Download Persisted Game ID?"]
+        bool downloadPersistedGameId;
+
+        [tag="daga", default=true, description="Download all Game Attributes?"]
+        bool downloadAllGameAttributes;
+        
+        [tag="dapa", default=true, description="Download all Player attributes?"]
+        bool downloadAllPlayerAttributes;
+        
+        [tag="dga", description="Download named attributes, if downloadAllGameAttributes is false."]
+        Collections::AttributeNameList downloadGameAttributes;
+
+        [tag="dpa", description="Download named attributes, if downloadAllPlayerAttributes is false."]
+        Collections::AttributeNameList downloadPlayerAttributes;
+
+    // Types of data to search for:
+        [tag="dprt", default=GAMEBROWSER_ROSTER_NONE , description=""]
+        GameBrowserRosterType downloadPlayerRosterType;
+
+        [tag="gtwl", description="The game types to include as matches for this game browser list."]
+        GameTypeList downloadGameTypes;
+
+        [tag="wlst", description="The game states to include as matches for this game browser list. This list defaults to RESETABLE, IN_GAME, PRE_GAME & INACTIVE_VIRTUAL, if empty."]
+        GameStateList gameStateWhitelist;
+        
+        [tag="igjm", default=false, description="Ignore the game join method?"]
+        bool ignoreGameJoinMethod;
+
+        [tag="cap", default=UINT32_MAX, description="Server side override of the requested list size.  If list size is greater than this, it will be capped to this size."]
+        uint32_t maxListCapacityOverride;
+
+        [tag="gbsc", default=MATCHMAKING_CONTEXT_GAMEBROWSER, description="Matchmaking context to use. Can be changed to allow for dedicated server searching."]
+        MatchmakingContextEnum gameBrowserSearchContext;
+
+        [tag="upin", default="60s", description="The frequency with which empty update notifications will be sent even if no game updates have occurred"]
+        TimeValue mMaxUpdateInterval;
+    };
+    
+    typedef map<GameBrowserListConfigName, GameBrowserListConfig, ignorecase> GameBrowserListConfigMap;
+    
+    class GameBrowserServerConfig
+    {
+    
+        [tag="dip", default="50ms", description="The idle period in milliseconds."]
+        TimeValue defaultIdlePeriod; // default idle period in milliseconds
+                
+        [tag="gpln", default=50, description="The max number of games in a notification."]
+        uint32_t maxGamesPerListUpdateNotification;
+        
+        [tag="glss", default=50, description="The max number of games in a sync transfer."]
+        uint32_t maxGameListSyncSize;        
+        
+        [tag="munp", default=5, description="The max number of update notifications to send for an individual list per idle."]
+        uint32_t maxListUpdateNotificationsPerIdle;
+        
+        [tag="mslc", default=UINT32_MAX, description="The max list capacity."]
+        uint32_t maxSortedListCapacityServerOverride;
+        
+        [tag="uslc", default=200, description="The max list capacity."]
+        uint32_t userSetListCapacity;
+        
+        [tag="mrsl", default=100, description="The max Reserve sorted list capacity."]
+        uint32_t maxReserveSortedListCapacity;
+        
+        [tag="lcmo", description="ListConfig object."]
+        GameBrowserListConfigMap listConfig;
+
+        [tag="ilcf", description="ListConfig object containing the internal list configs."]
+        GameBrowserListConfigMap internalListConfig;
+        
+        [tag="lcsf", default=1.0, description="1.0 - full correctness with performance impact, 0.0 - high performance with low correctness"]
+        float listContainerSizeFactor;
+        
+        [tag="glpu", default=10, reconfigurable="yes", description="Game list count limit per user. When exceeded, Game Browser will fail creation of new lists until one of the old ones is destroyed."]
+        uint32_t maxGameListsPerUser;
+    
+        [tag="mdsl", default=100, description="The max number of dedicated servers that we will get when searching."]
+        uint32_t maxDedicatedServerListSizeOverride;
+
+        [tag="trls", description="The list config name used for returning tournament game status info.", default="csFullGameList"]
+        GameBrowserListConfigName mTournamentGameStatusListConfigName;
+    };   
+    
+    class GameManagerServerPreconfig
+    {
+        [tag="ram", reconfigurable="yes", description="The attributes available to the rules."]
+        ScenarioRuleAttributeMap mRuleAttributeMap;
+    };
+
+
+    class PercentValue
+    {
+        [tag="pct", description="What percent use this value (normalized before usage).", default=1.0]
+        float percent;
+
+        [tag="val", description="The value to use."]
+        generic value;
+    };
+    typedef list<PercentValue> PercentValueList;
+
+    class VariableVariant
+    {
+        // Randomly choose from the list, percentage distribution.
+        [tag="dlst", description="List of defaults with percentages to use when creating the game."]
+        PercentValueList defaults;
+
+        // These ranges can also be used to make random strings.  
+        [tag="mini", description="Alternative to default list, creates the value from a range. Only used if min != max.", default=0]
+        int64_t minRangeInt;
+        [tag="maxi", description="Alternative to default list, creates the value from a range. Only used if min != max.", default=0]
+        int64_t maxRangeInt;
+        [tag="minf", description="Alternative to default list, creates the value from a range. Only used if min != max.", default=0.0]
+        float minRangeFloat;
+        [tag="maxf", description="Alternative to default list, creates the value from a range. Only used if min != max.", default=0.0]
+        float maxRangeFloat;
+        [tag="rpre", description="Value to put in front of range #. Useful if you want stuff like 'game_#' as the game name."]
+        string(-1) rangePrefix;    
+    };
+
+    const uint32_t VARIABLE_NAME_LENGTH = 256;
+    typedef string(VARIABLE_NAME_LENGTH) VariableName;  
+    typedef map<VariableName, VariableVariant> VariableVariantValueMap;
+
+    class PseudoGameVariantConfig
+    {
+        [tag="bcfg", description="Optionally base this config on another one. The other config's values will be overridden if new values are provided. Inheritance is only one level deep."]
+        PseudoGameVariantName baseConfig;
+
+        [tag="ming", description="Min limit on how many games of this type are used.", default=0]
+        uint32_t minGameCount;
+        [tag="maxg", description="Limit on how many games of this type are used. Defaults to minGameCount if < minGameCount.", default=0]
+        uint32_t maxGameCount;
+
+        // All this stuff gets loaded into the CreateGameRequest (sans PlayerJoinData)
+        [tag="cgv", description="Variant values that will be loaded into the CreateGameRequest."]
+        VariableVariantValueMap createGameValues;
+    
+        // Player Attributes: 
+        [tag="minp", description="Min limit on how many players will be used, per-game.", default=0]
+        uint32_t minPlayerCount;
+        [tag="maxp", description="Limit on how many players of this type are used. Defaults to minPlayerCount if < minPlayerCount.", default=0]
+        uint32_t maxPlayerCount;
+
+        // This is harder. We need to have the stuff that goes in the PlayerJoinData.
+        [tag="ppv", description="Variant values that will be loaded into the CreateGameRequest."]
+        VariableVariantValueMap perPlayerValues;
+    };
+    typedef map<PseudoGameVariantName, PseudoGameVariantConfig> PseudoGameConfigMap;
+
+    class PseudoGamesConfig
+    {
+        [tag="upgc", default=false, description="If enabled, then the pseudo games will be created using the following config"]
+        bool usePseudoGamesConfig;
+
+        [tag="pgdr", default=100, description="How many pseudo games are removed per cycle. (Sleep 0 is used between each removal operation.)"]
+        uint32_t pseudoGamesDeleteRate;
+
+        [tag="pgcm", description="Config map containing all the psuedo game information needed."]
+        PseudoGameConfigMap pseudoGameConfigMap;
+    };
+
+    class CCSServerConfig
+    {
+        [tag="ccvr", default="v1", description="The API version of the Connection Concierge service."]
+        string(16) ccsAPIVer; 
+        
+        [tag="ccpl", default="global", description="The client selected pool"]
+        string(16) ccsPool;
+    };
+
+    class CreateGameTemplate
+    {
+        enum CreateGameType
+        {
+            CREATE_GAME, 
+            CREATE_OR_JOIN_GAME,
+            RESET_GAME
+        };
+
+        [tag="crqt", default=CREATE_GAME, reconfigurable="yes", description="Will this request call createGame, createOrJoinGame, or resetDedicatedServer."]
+        CreateGameType createRequestType;
+        [tag="bsrq", reconfigurable="yes", description="The createGameRequest to use."]
+        CreateGameRequest baseRequest;
+        [tag="edso", reconfigurable="yes", description="List of external data sources api's used to override this scenario."]
+        DataSourceNameList mExternalDataSourceApiList;
+        [tag="attr", reconfigurable="yes", description="Client-sent attributes."]
+        TemplateAttributeMapping attributes;
+        [tag="find", description="Dedicated server attribute rules used for searching"]
+        FindDedicatedServerRulesMap mFindDedicatedServerRulesMap;
+        [tag="gnsn", description="The game browser scenario name to use."]
+        ScenarioName mHostSelectionGameBrowserScenario;
+        [tag="pack", description=""]
+        PackerConfig mPackerConfig;
+    };
+
+    typedef map<TemplateName, CreateGameTemplate> CreateGameTemplateMap;
+
+    class CreateGameTemplatesConfig
+    {
+        [tag="cgtp", reconfigurable="yes", description="Client-sent attributes."]
+        CreateGameTemplateMap mCreateGameTemplates;
+    };
+
+    class ExternalDataSourceParameter
+    {
+        [tag="attr", reconfigurable="yes", description="Name of Parameter"]
+        string(128) mName;
+
+        [tag="opt", reconfigurable="yes", default=false, description="Indicates if a missing value (with no default set) should fail the request or not"]
+        bool mIsOptional;
+
+        [tag="defv", reconfigurable="yes", description="Default value of Parameter"]
+        string(128) mDefaultValue;
+
+        [tag="mrgl", reconfigurable="yes", default=false, description="If set, the output list will attempt to merge with any existing list."]
+        bool mMergeLists;
+
+        [tag="scal", reconfigurable="yes", description="If the response parameter is a number, it will be scaled by a factor of (10 ^ scalingFactor).  This is primarily used to avoid truncating all of the fractional part of floating-point numbers when converting them to the int64_t UED type."]
+        int32_t mScalingFactor;
+    };
+
+    typedef string(128) ParamKey;
+    typedef map<ParamKey, ExternalDataSourceParameter> UrlPathParametersMap;
+    typedef map<ParamKey, ExternalDataSourceParameter> UrlQueryParametersMap;
+    typedef map<ParamKey, ExternalDataSourceParameter> HeadersMap;
+    typedef map<ParamKey, ExternalDataSourceParameter> RequestOverrideKeyMap;
+
+    class ExternalDataSourceApiDefinition
+    {
+        [tag="exds", reconfigurable="yes", description="Name of http service used by this API."]
+        HttpServiceName mExternalDataSource;
+
+        [tag="suri", reconfigurable="yes", description="URL of the API"]
+        string(-1) mUrl;
+
+        [tag="urio", reconfigurable="yes", description="A map of path parameters to the start scenario matchmaking request object. This allows, for the overriding over the base url path."]
+        UrlPathParametersMap mUrlPathParameters;
+
+        [tag="urip", reconfigurable="yes", description="A map of query parameters to the start scenario matchmaking request object. This allows, for the addition of query parameters when make the external request."]
+        UrlQueryParametersMap mUrlQueryParameters;
+    
+        [tag="hema", reconfigurable="yes", description="A map of headers to the start scenario matchmaking request object. This allows, for the addition of headers when make the external request."]
+        HeadersMap mHeaders;
+
+        [tag="mout", reconfigurable="yes", description="A map of RequestOverrideKey to external response object. This specifies how the external response is decoded into the request being overriden."]
+        RequestOverrideKeyMap mOutput;
+    };
+    typedef map<ExternalApiName, ExternalDataSourceApiDefinition> ExternalDataSourceApiDefinitionMap;
+
+    typedef map<ParamKey, ExternalDataSourceParameter> GrpcRequestParameterMap;
+    typedef map<ParamKey, ExternalDataSourceParameter> GrpcResponseParameterMap;
+    class ExternalDataSourceGrpcDefinition
+    {
+        enum GrpcCommandType
+        {
+            INVALID,
+            UNARY,
+            CLIENT,
+            SERVER,
+            BIDIRECTIONAL,
+        };
+
+        [tag="exds", reconfigurable="yes", description="Name of outbound gRPC service configured in framework.cfg."]
+        GrpcServiceName mExternalDataSource;
+
+        [tag="srvc", reconfigurable="yes", description="The specific gRPC service as defined in the proto file."]
+        string(-1) mService;
+
+        [tag="cmd", reconfigurable="yes", description="The asynchronous gRPC command to execute."]
+        string(-1) mCommand;
+
+        [tag="cmdt", reconfigurable="yes", description="The type of asynchronous gRPC command.", default=INVALID]
+        GrpcCommandType mCommandType;
+
+        [tag="req", reconfigurable="yes", description="The fully qualified protobuf request name."]
+        string(-1) mRequestType;
+
+        [tag="urio", reconfigurable="yes", description="Defines a mapping of CG/Scenario template attribute to gRPC request field."]
+        GrpcRequestParameterMap mRequestAttributes;
+    
+        [tag="hema", reconfigurable="yes", description="Defines a mapping of CG/Scenario template attribute to gRPC client context headers."]
+        HeadersMap mHeaders;
+
+        [tag="mout", reconfigurable="yes", description="A map of RequestOverrideKey to external response object. This specifies how the external response is decoded into the request being overriden."]
+        RequestOverrideKeyMap mOutput;
+    };
+    typedef map<ExternalApiName, ExternalDataSourceGrpcDefinition> ExternalDataSourceGrpcDefinitionMap;
+
+    typedef map<TemplateAttributeName, TemplateAttributeTdfMemberName> TemplateAttributeToTdfMemberMap;
+    typedef map<UserExtendedDataName,  TemplateAttributeTdfMemberName> UedAttributeToTdfMemberMap;
+    class RpcResponseAttributes
+    {
+        [tag="tmpa", reconfigurable="yes", description="Mapping of the template attributes from the Tdf response."]
+        TemplateAttributeToTdfMemberMap mTemplateAttributes;
+
+        [tag="ueda", reconfigurable="yes", description="Mapping of the ued attributes from the Tdf response."]
+        UedAttributeToTdfMemberMap mUedAttributes;
+    };
+    
+    class RpcDataSourceDefinition
+    {
+        [tag="cmpt", reconfigurable="yes", description="Name of Component."]
+        ComponentName mComponent;
+
+        [tag="cmd", reconfigurable="yes", description="Name of mCommand."]
+        string(64) mCommand;
+
+        [tag="reqa", reconfigurable="yes", description="Attributes that will be mapped into the RPC request."]
+        TemplateAttributeMapping mRequestAttributes;
+
+        [tag="rspa", reconfigurable="yes", description="Attributes and Ued Values that will be parsed from the command."]
+        RpcResponseAttributes mResponseAttributes;
+    };
+    typedef map<DataSourceName, RpcDataSourceDefinition> RpcDataSourceDefinitionMap;
+
+    class DataSourceConfig
+    {
+        [tag="edsa", reconfigurable="yes", description="Map of API definitions"]
+        ExternalDataSourceApiDefinitionMap mApiConfigMap;
+
+        [tag="grpc", reconfigurable="yes", description="Map of gRPC definitions"]
+        ExternalDataSourceGrpcDefinitionMap mGrpcConfigMap;
+
+        [tag="ccm", reconfigurable="yes", description="Map of RPC definitions"]
+        RpcDataSourceDefinitionMap mComponentConfigMap;
+    };
+    
+    typedef map<UserExtendedDataName, uint16_t> GameManagerUserExtendedDataByKeyIdMap;
+
+    class GameManagerServerConfig
+    {
+        typedef list<uint32_t> MetricQuantileList;
+
+        [tag="gses",  reconfigurable="yes", description="GameSessionServerConfig object."]
+        GameSessionServerConfig gameSession;
+        
+        [tag="cdat",  reconfigurable="yes", description="CensusDataServerConfig object."]
+        CensusDataServerConfig censusData;
+
+        [tag="uedv", reconfigurable="no", description="Map of UED Name to Key Ids which are registered under the GameManager Component."]
+        GameManagerUserExtendedDataByKeyIdMap mGameManagerUserExtendedDataConfig;
+        
+        [tag="gbsb", description="GameBrowserServerConfig object."]
+        GameBrowserServerConfig gameBrowser;
+        
+        [tag="mmsc", description="MatchmakingServerConfig object."]
+        MatchmakingServerConfig matchmakerSettings;
+
+        [tag="rnc", description="ReteNetworkConfig object."]
+        ReteNetworkConfig rete;
+        
+        [tag="namp", reconfigurable="no", description="The DB names per platform (used for user connection metrics)."]
+        DbNameByPlatformTypeMap mDbNamesByPlatform;
+
+        [tag="aexp", description="Interval for how often to check for expired audits.", default="1h"]
+        TimeValue mCheckAuditExpirationInterval;
+
+        [tag="maxe", description="The maximum allowed expiration time for an audit.", default="15d"]
+        TimeValue mMaxAuditExpiration;
+
+        [tag="maxa", description="The maximum number of users that can be audited at one time.", default=50]
+        uint32_t mMaxAuditedUsers;
+
+        [tag="ddcs", description="If set, the connections stats will not be saved in Redis or sent to PIN.  (Normal connnection stats will remain.)", default=false]
+        bool mDisableDetailedConnectionStats;
+
+        [tag="fdcs", description="If set, the connections stats will sent to PIN when an export (ZDT) event occurs.  May be disabled if large number of concurrent events causes issues.", default=true]
+        bool mFlushDetailedConnectionStatsOnExport;
+
+        [tag="rsme", description="How many events we track before pushing the event to PIN.  Not a hard limit. (Should be 'EventSize * Count' < 30kb)", default=100]
+        uint32_t mConnStatsMaxEntries;
+
+        [tag="sncg", reconfigurable="yes", description="Configuration used for matchmaking scenarios."]
+        ScenariosConfig mScenariosConfig;
+
+        [tag="gbse", reconfigurable="yes", description="Configuration used for gamebrowser scenarios."]
+        GameBrowserScenariosConfig mGameBrowserScenariosConfig;
+
+        [tag="sanm", reconfigurable="yes", description="This defines the input sanitizers used by the scenarios and other components."]
+        SanitizerDefinitionMap mInputSanitizers;
+
+        [tag="mftm", reconfigurable="yes", description="This defines the filters used."]
+        MatchmakingFilterMap mFilters;
+
+        [tag="prop", reconfigurable="yes", description="Properties config."]
+        PropertyConfig mProperties;
+
+        [tag="edsc", reconfigurable="yes", description="External Data Source Configuration."]
+        DataSourceConfig mExternalDataSourceConfig;
+
+        [tag="cgtc", reconfigurable="yes", description="Configuration used for create game templates."]
+        CreateGameTemplatesConfig mCreateGameTemplatesConfig;
+
+        [tag="time", default="30s", description="Expiry time for a member ConnectionGroupJoinFailureMap. Once expired, the connection group is removed from map."]
+        TimeValue mConnectionGroupJoinFailureMapExpiry;
+
+        [tag="pseu", reconfigurable="no", default=false, description="If true, Redis will be used to load pseudo games for testing purposes. (Not for use in PROD)"]
+        bool loadRedisAsPseudoGames;
+
+        [tag="pgc", reconfigurable="no", description="Config file for all the pseudo games created at startup."]
+        PseudoGamesConfig pseudoGamesConfig;
+
+        [tag="ccfg", description="CCS configuration."]
+        CCSServerConfig ccsConfig;
+
+        [tag="lmqt", reconfigurable="yes", description="Used to restrict latency dimension in output metrics to nearest values defined in this list. Must be sorted in ascending order. No quantization when empty.", advanced=true]
+        MetricQuantileList latencyMetricQuantiles;
+
+        [tag="plqt", reconfigurable="yes", description="Used to restrict packet loss dimension in output metrics to nearest values defined in this list. Must be sorted in ascending order. No quantization when empty.", advanced=true]
+        MetricQuantileList packetLossMetricQuantiles;
+    };
+
+
+ 
+} // namespace GameManager
+} // namespace Blaze

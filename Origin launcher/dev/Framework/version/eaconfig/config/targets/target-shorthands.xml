@@ -1,0 +1,88 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<optionset name="eaconfig.shorthand-targets" append="true"> <!-- allow user extension of optionset -->	
+
+		<!-- runtime group targets -->
+		<option name="b"		value="build"/>
+		<option name="sr"		value="slnruntime"/>
+		<option name="srb"		value="slnruntime visualstudio"/>
+		<option name="srbr"		value="slnruntime visualstudio run-fast"/>
+		<option name="srcb"		value="slnruntime visualstudio-clean visualstudio"/>
+		<option name="srm"		value="slnruntime msbuild"/>
+		<option name="srmr"		value="slnruntime msbuild-rebuild"/>
+		<option name="sro"		value="slnruntime visualstudio-open"/>
+		<option name="r"		value="run"/>
+		<option name="rf"		value="run-fast"/>
+
+		<!-- test group targets -->
+		<option name="tb"		value="test-build"/>
+		<option name="st"		value="slntest"/>
+		<option name="stb"		value="slntest visualstudio-test"/>
+		<option name="stbr"		value="slntest visualstudio-test test-run-fast"/>
+		<option name="stcb"		value="slntest visualstudio-test-clean visualstudio-test"/>
+		<option name="stm"		value="slntest msbuild-test"/>
+		<option name="stmr"		value="slntest msbuild-rebuild-test"/>
+		<option name="sto"		value="slntest visualstudio-test-open"/>
+		<option name="tr"		value="test-run"/>
+		<option name="trf"		value="test-run-fast"/>
+
+		<!-- example group targets -->
+		<option name="xb"		value="example-build"/>
+		<option name="sx"		value="slnexample"/>
+		<option name="sxb"		value="slnexample visualstudio-example"/>
+		<option name="sxbr"		value="slnexample visualstudio-example example-run-fast"/>
+		<option name="sxcb"		value="slnexample visualstudio-example-clean visualstudio-example"/>
+		<option name="sxm"		value="slnexample msbuild-example"/>
+		<option name="sxmr"		value="slnexample msbuild-rebuild-example"/>
+		<option name="sxo"		value="slnexample visualstudio-example-open"/>
+		<option name="xr"		value="example-run"/>
+		<option name="xrf"		value="example-run-fast"/>
+
+		<!-- tool group targets -->
+		<option name="lb"		value="tool-build"/>
+		<option name="sl"		value="slntool"/>
+		<option name="slb"		value="slntool visualstudio-tool"/>
+		<option name="slbr"		value="slntool visualstudio-tool tool-run-fast"/>
+		<option name="slcb"		value="slntool visualstudio-tool-clean visualstudio-tool"/>
+		<option name="slm"		value="slntool msbuild-tool"/>
+		<option name="slmr"		value="slntool msbuild-rebuild-tool"/>
+		<option name="slo"		value="slntool visualstudio-tool-open"/>
+		<option name="lr"		value="tool-run"/>
+		<option name="lrf"		value="tool-run-fast"/>
+
+		<!-- solution groupall targets -->
+		<option name="sg"		value="slngroupall"/>
+		<option name="sgb"		value="slngroupall visualstudio"/>
+		<option name="sgcb"		value="slngroupall visualstudio-clean visualstudio"/>
+		<option name="sgm"		value="slngroupall msbuild"/>
+		<option name="sgmr"		value="slngroupall msbuild-rebuild"/>
+		<option name="sgo"		value="slngroupall visualstudio-open"/>
+
+		<!-- package server targets -->
+		<option name="pp"		value="package upload-to-packageserver"/>
+	</optionset>
+
+	<createtask name="define-shorthand-target">
+		<parameters>
+			<option name="shorthand-name" value="Required"/>		<!-- name of shorthand target to define -->
+			<option name="shorthand-targets" value="Required"/>		<!-- whitespace delimited list of targets to map to this short hand in order they should be executed -->
+		</parameters>
+		<code>
+			<!-- create boolean property, true if all sub targets are not excluded by targets optionset -->
+			<property name="all-sub-targets-included" value="true" local="true"/>
+			<foreach item="String" in="define-shorthand-target.shorthand-targets" property="sub-target">
+				<property name="all-sub-targets-included" value="false" if="@{OptionSetGetValue('eaconfig.targets', ${sub-target})} == 'exclude'" local="true"/>
+			</foreach>
+
+			<!-- define short hand by declaring new target that depends on subtargets, allow override so users can repurpose if they wish -->
+			<target name="${define-shorthand-target.shorthand-name}" depends="${define-shorthand-target.shorthand-targets}" if="${all-sub-targets-included}" allowoverride="true" description="Shorthand for the following targets: ${define-shorthand-target.shorthand-targets}"/>
+		</code>
+	</createtask>
+
+	<foreach item="OptionSet" in="eaconfig.shorthand-targets" property="option">	
+		<task name="define-shorthand-target" shorthand-name="${option.name}" shorthand-targets="${option.value}"/>
+	</foreach>
+</project>

@@ -1,0 +1,993 @@
+group tdfheaderfile : servercommon;
+
+
+file(fileNode, defTable) ::= <<
+<includeFiles()>
+
+<fileNode.Defs:{<defineHelper(node=it)>};  separator="\n\n">
+>>
+
+namespace(node) ::= <<
+namespace <node.Name>
+{
+<node.Defs:{<defineHelper(node=it)>};  separator="\n\n">
+
+<if(node.ExplicitRegistrationRequired)>
+void <fileNode.InputFile;format="baseFile">RegisterTdfs();
+void <fileNode.InputFile;format="baseFile">DeregisterTdfs();
+<\n>
+<endif>
+} //<node.Name>
+>>
+
+defineHelper(node) ::= "<if(node.Category)><({define<node.Category>})()><elseif(node.Filename)><includeFile(node=node)><else><namespace(node=node)><endif>"
+defineNAMESPACE() ::= "<namespace(...)>"
+defineENUM() ::= "<enum(...)>"
+defineBITFIELD() ::= "<bitfield(...)>"
+defineCLASS() ::= "<if(node.IsFwdDecl)>class <node.Name>;<else><class(...)><endif>"
+defineUNION() ::= "<union(...)>"
+defineCONST() ::= "<if(node.IsString)><stringConst(...)><else><const(...)><endif>"
+defineTYPEDEF() ::= "<typedef(...)>"
+defineCUSTOM_ATTRIBUTE() ::= "<customattribute(...)>"
+
+includeFiles() ::= <<
+#include "framework/tdf/tdf.h"
+
+extern char8_t *blaze_strnzcpy(char8_t *, const char8_t *, size_t);
+extern int32_t blaze_strcmp(const char8_t *, const char8_t *);
+>>
+
+//////////////////////////////////////////////
+/////////////customattribute Templates////////
+//////////////////////////////////////////////
+
+customattribute(node) ::= <<
+
+#ifdef BLAZE_ENABLE_CUSTOM_TDF_ATTRIBUTES
+// custom attribute <node.Name>
+class <node.Name>Attribute
+{
+    NON_COPYABLE(<node.Name>Attribute);
+public:
+
+    <node.Name>Attribute(uint32_t tdfId, uint32_t tag, <node.Members:customAttributeMemberConstructorHelper(member=it); separator=", ">)
+    :
+<node.Members:{        m<it.Name>(a<it.Name>)}; separator=",\n">
+      {
+          addAttributeToMap(tdfId, tag, *this);
+      };
+
+    //proposed to rename to find
+    static const <node.Name>Attribute* get<node.Name>Attribute(const Tdf& tdf, uint32_t tag);
+
+    <node.Members:{<customAttributeMemberRefHelper(member=it)>}; separator="\n\n">
+
+private:
+    typedef eastl::vector_map\<uint64_t,<node.Name>Attribute*\> <node.Name>AttributeMap;
+
+    static void addAttributeToMap(uint32_t tdfId, uint32_t tag, <node.Name>Attribute &attr);
+    static <node.Name>AttributeMap& getMap();
+
+};  //class <node.Name>Attribute
+#endif //BLAZE_ENABLE_CUSTOM_TDF_ATTRIBUTES
+
+>>
+
+customAttributeMemberConstructorHelper(member) ::= "<({customAttributeMemberConstructor<member.TypeRef.Symbol.ActualCategory>})()>"
+
+customAttributeMemberConstructorINT_PRIMITIVE() ::= "<printTypeRef(member)> a<member.Name>"
+customAttributeMemberConstructorSTRING() ::= "const char8_t* a<member.Name>"
+
+customAttributeMemberRefHelper(member) ::= "<({customAttributeMemberRef<member.TypeRef.Symbol.ActualCategory>})()>"
+
+customAttributeMemberRefINT_PRIMITIVE() ::= <<
+<printTypeRef(member)> m<member.Name>;
+inline <printTypeRef(member)> get<member.Name>() const { return m<member.Name>; }
+>>
+
+customAttributeMemberRefSTRING() ::= <<
+const char8_t* m<member.Name>;
+inline const char8_t* get<member.Name>() const { return m<member.Name>; }
+>>
+
+//////////////////////////////////////////////
+/////////////Include Declaration//////////////
+//////////////////////////////////////////////
+includeFile(node) ::= <<#include "<node.headername>">>
+
+//////////////////////////////////////////////
+/////////////Constant Templates///////////////
+//////////////////////////////////////////////
+
+const(node) ::= <<
+<if(node.description)>
+/*! \brief <node.description> */
+
+<endif>
+<if(!node.Scope.CategoryNamespace)>static <endif>const <printTypeRef(node)> <node.Name> = <if(!node.ValueRef)><node.Value><node.ValueString><else><printTypeRef(node.ValueRef)><endif>;
+>>
+
+stringConst(node) ::= <<
+<if(node.description)>
+/*! \brief <node.description> */
+
+<endif>
+<if(!node.Scope.CategoryNamespace)>static<else>extern<endif> const char8_t *<node.Name>;
+>>
+
+//////////////////////////////////////////////
+/////////////Enum Templates//////////////////
+//////////////////////////////////////////////
+
+enum(node) ::= <<
+/*! ***************************************************************/
+/*!    \brief <if(node.description)><node.description><else>Needs a description.<endif>
+<if(node.details)>
+        <node.details>
+
+<endif>
+
+*******************************************************************/
+enum <node.Name>
+{
+    <trunc(node.Members):enumMember(member=it, comma=","); separator="\r\n">
+    <enumMember(member=last(node.Members))>
+};
+
+/*! \cond INTERNAL_DOCS */
+<if(!node.Scope.CategoryNamespace)>static <endif>const char8_t *<node.Name>ToString(<node.Name> value);
+<if(!node.Scope.CategoryNamespace)>static <endif>bool8_t Parse<node.Name>(const char8_t* name, <node.Name> &result);
+<if(!node.Scope.CategoryNamespace)>static <endif>const Blaze::TdfEnumMap& Get<node.Name>EnumMap();
+<if(!node.Scope.CategoryNamespace)>static<else>extern<endif> const Blaze::TdfEnumMap s<node.NonNamespaceScope:{<it>};separator="_">_EnumMapRef;
+
+/*! \endcond INTERNAL_DOCS */
+
+>>
+
+enumMember(member, comma) ::= <<
+<member.Name><if(member.Value)> = <member.Value; format="hex"><endif><comma><if(member.description)> ///\< <member.description><endif>
+>>
+
+//////////////////////////////////////////////
+/////////////Bitfield Templates///////////////
+//////////////////////////////////////////////
+
+bitfield(node) ::= <<
+/*! ***************************************************************/
+/*! \class <node.Name>
+    \brief <if(node.description)><node.description><else>Needs a description.<endif>
+
+<if(node.details)>    <node.details><endif>
+*******************************************************************/
+class <node.Name> : public Blaze::TdfBitfield
+{
+public:
+    <node.Members:bitfieldMemberHelper(member=it); separator="\n\n">
+
+    <getValueByField()>
+};
+>>
+
+bitfieldMemberHelper(member) ::= "<if(member.Bool)><bitfieldBoolMember()><else><bitfieldMember()><endif>"
+
+bitfieldBoolMember() ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name; format="pascal">
+    \brief <if(member.description)><member.description><else>Field needs a description.<endif>
+*******************************************************************/
+inline void set<member.Name; format="pascal">() { mBits |= <member.BitMask; format="hex">; }
+inline void clear<member.Name; format="pascal">() { mBits &= ~(<member.BitMask; format="hex">); }
+inline bool8_t get<member.Name; format="pascal">() const { return ((mBits & <member.BitMask; format="hex">) == <member.BitMask; format="hex">); }
+>>
+
+bitfieldMember() ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name>
+    \brief <if(member.description)><member.description><else>Field needs a description.<endif>
+
+    \note Only the first <member.BitSize> bits of this value are valid.
+*******************************************************************/
+inline void set<member.Name>(uint32_t value) { mBits |= ((value \<\< <member.BitStart>) & <member.BitMask; format="hex">); }
+inline uint32_t get<member.Name>() const { return ((mBits & <member.BitMask; format="hex">) \>\> <member.BitStart>); }
+>>
+
+getValueByField() ::= <<
+/*! ***************************************************************/
+/*! \name get<node.Name>ByFieldName
+    \brief Get the <node.Name> value by the field name.
+
+    \param fieldName The field name.
+    \param fieldValue The field value. If the field size is 1, the value is "true" or "false".Otherwise, the value is bit value.
+    \param len The field value string length.
+    \return true on success.
+*******************************************************************/
+bool get<node.Name>ByFieldName(const char8_t *fieldName, char8_t *fieldValue, size_t len)
+{
+    <node.Members:bitfieldGetValueHelper(member=it); separator="\n">
+
+    blaze_snzprintf(fieldValue,len,"Unknow field name");
+
+    return false;
+}
+>>
+
+bitfieldGetValueHelper(member) ::= "<if(member.Bool)><bitfieldGetBoolValue()><else><bitfieldGetValue()><endif>"
+
+bitfieldGetBoolValue() ::= <<
+if (blaze_strcmp("<member.Name; format="pascal">", fieldName) == 0)
+{
+    blaze_snzprintf(fieldValue,len,"%s", get<member.Name; format="pascal">() ? "true" : "false");
+    return true;
+}
+>>
+
+bitfieldGetValue() ::= <<
+if (blaze_strcmp("<member.Name; format="pascal">", fieldName) == 0)
+{
+    blaze_snzprintf(fieldValue,len,"%u", get<member.Name; format="pascal">());
+    return true;
+}
+>>
+
+//////////////////////////////////////////////
+/////////////Typedef Templates////////////////
+//////////////////////////////////////////////
+
+//TODO DROP THE BLAZE:: nonsense for the string.
+typedef(node) ::= <<
+<if(node.description)>
+/*! \brief <node.description> */
+<else>
+/*! \brief Needs a description. */
+<endif>
+
+typedef <if(node.TypeRef.Symbol.CategoryString)>Blaze::<endif><printTypeRef(node.TypeRef)> <node.Name>;
+>>
+
+
+//////////////////////////////////////////////
+/////////////Class Templates//////////////////
+//////////////////////////////////////////////
+defaultMemGroup() ::= "DEFAULT_BLAZE_MEMGROUP"
+
+class(node) ::= <<
+/*! ***************************************************************/
+/*! \class <node.Name>
+    \brief <if(node.description)><node.description><else>Needs a description.<endif>
+
+<if(node.details)>    <node.details><endif>
+    \nosubgrouping
+*******************************************************************/
+class <node.Name> :
+<if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    public Blaze::TdfWithChangeTracking\<<length(node.Members)>\>
+#else
+    public Blaze::Tdf
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<else>
+    public Blaze::Tdf
+<endif>
+
+{
+public:
+    <node.Defs:{<defineHelper(node=it)>};  separator="\n\n">
+
+    static const Blaze::MemoryGroupId MEM_GROUP;
+
+    /*! ***************************************************************/
+    /*! \name Constructor/Destructor
+    *******************************************************************/
+    <node.Name>(Blaze::MemoryGroupId memGroupId = (<defaultMemGroup()>));
+#ifdef BLAZE_ENABLE_TDF_COPY_CONSTRUCTOR
+    <node.Name>(const <node.Name>& rhs) { rhs.copyInto(*this); }
+#endif
+
+    <node.Members:classMemberRefHelper(member=it); separator="\n\n">
+
+
+    /*! ***************************************************************/
+    /*! \name Type Helper Functions
+    *******************************************************************/
+    inline <printTypeRef(node)>* clone(Blaze::MemoryGroupId memGroupId = (<defaultMemGroup()>)) const
+    {
+        <node.Name>* newObj = BLAZE_NEW_MGID(memGroupId, "<node.Name>_CLONE_") <node.Name>(memGroupId);
+        copyInto(*newObj);
+        return newObj;
+    }
+
+    /*! ***************************************************************/
+    /*! \brief Replicate a (deep copy) of this object into the given object.
+
+        \param newObj the object to copy all of this object's data into
+    *******************************************************************/
+    inline void copyInto(<printTypeRef(node)>& newObj) const
+    {
+        Blaze::TdfCopier copier;
+        copier.visit(newObj, *this);
+        <if(node.trackChanges)>
+        #ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+            newObj.markSet();
+        #endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+        <endif>
+    }
+
+<if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    <node.Members:isSetHelper(member=it); separator="\n\n">
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif>
+
+<if(node.tdfid)>
+    static const Blaze::TdfId TDF_ID = (Blaze::TdfId)<node.tdfid>;
+    inline virtual Blaze::TdfId getTdfId() const { return TDF_ID; }
+    inline virtual bool8_t isRegisteredTdf() const { return true; }
+    static Tdf* create(Blaze::MemoryGroupId memGroupId) { return BLAZE_NEW_MGID(memGroupId, "<node.Name>") <node.Name>(memGroupId); }
+<endif>
+
+    inline const char8_t *getClassName() const { return "<node.Name>"; }
+    inline const char8_t *getFullClassName() const { return "<printTypeRefFullScope(node)>"; }
+
+    /*! \cond INTERNAL_DOCS */
+
+#if BLAZE_TDF_TAG_INFO_CHECK(<if(node.reflect)>1<else>0<endif>)
+    <if(node.Members)>
+    inline const Blaze::TdfTagInfoMap *getTagInfoMap() const { return &mTagInfoMap; }
+    <endif>
+
+#endif // BLAZE_TDF_TAG_INFO_CHECK
+
+protected:
+    <node.Members:classMemberDefHelper(member=it); separator="\n">
+
+private:
+<if(node.tdfid)>
+    <if(!node.ExplicitRegistration)>
+    static Blaze::TdfRegistration mTdfRegistration;
+    <endif>
+<endif>
+
+#ifndef BLAZE_ENABLE_TDF_COPY_CONSTRUCTOR
+    <node.Name>(const <node.Name>& rhs);
+#endif
+    <node.Name>& operator=(const <node.Name>& rhs);
+/*! \endcond*/
+
+<if(node.Members)>
+#if BLAZE_TDF_TAG_INFO_CHECK(<if(node.reflect)>1<else>0<endif>)
+    static const Blaze::TdfTagInfo mTagInfo[<length(node.Members)>];
+    static const Blaze::TdfTagInfoMap mTagInfoMap;
+#endif // BLAZE_TDF_TAG_INFO_CHECK
+<endif>
+
+<if(node.Members)>
+    struct TdfMemberInfoDefinition
+    {
+        <node.SortedMembers:classMemberTdfDefinitionHelper(member=it);separator="\n">
+    };
+    static const TdfMemberInfoDefinition <node.Name;format="toUpper">_TDF_MEMBER_INFO;
+    virtual const Blaze::TdfMemberInfo* getTdfMemberInfo() const;
+<endif>
+
+};
+>>
+
+classMemberTdfDefinitionHelper(member) ::= "<({memberTdfDefinitionType<member.TypeRef.Symbol.ActualCategory>})()> m<member.Name>Def;"
+memberTdfDefinitionType() ::= ""
+memberTdfDefinitionTypeMAP() ::= "Blaze::TdfMemberInfoMap"
+memberTdfDefinitionTypeLIST() ::= "Blaze::TdfMemberInfoList"
+memberTdfDefinitionTypeINT_PRIMITIVE() ::= "Blaze::TdfMemberInfo<({memberTdfDefinitionTypeINT_PRIMITIVE_<member.TypeRef.ActualSymbol.Name>})()>"
+memberTdfDefinitionTypeFLOAT_PRIMITIVE() ::= "Blaze::TdfMemberInfoFloat"
+memberTdfDefinitionTypeENUM() ::= "Blaze::TdfMemberInfoEnum"
+memberTdfDefinitionTypeSTRING() ::= "Blaze::TdfMemberInfoString"
+memberTdfDefinitionTypeSTRUCT() ::= "Blaze::TdfMemberInfo"
+memberTdfDefinitionTypeVARIABLE() ::= "Blaze::TdfMemberInfo"
+memberTdfDefinitionTypeBITFIELD() ::= "Blaze::TdfMemberInfo"
+memberTdfDefinitionTypeBLOB() ::= "Blaze::TdfMemberInfo"
+memberTdfDefinitionTypeUNION() ::= "Blaze::TdfMemberInfo"
+memberTdfDefinitionTypeCLASS() ::= "Blaze::TdfMemberInfoClass"
+memberTdfDefinitionTypeBLAZE_OBJECT_TYPE() ::= "Blaze::TdfMemberInfo"
+memberTdfDefinitionTypeBLAZE_OBJECT_ID() ::= "Blaze::TdfMemberInfo"
+memberTdfDefinitionTypeTIMEVALUE() ::= "Blaze::TdfMemberInfoTimeValue"
+memberTdfDefinitionTypeTYPEDEF() ::= ""
+
+memberTdfDefinitionTypeINT_PRIMITIVE_bool() ::= "UInt"
+memberTdfDefinitionTypeINT_PRIMITIVE_bool8_t() ::= "UInt"
+memberTdfDefinitionTypeINT_PRIMITIVE_char8_t() ::= "Int"
+memberTdfDefinitionTypeINT_PRIMITIVE_int8_t() ::= "Int"
+memberTdfDefinitionTypeINT_PRIMITIVE_uint8_t() ::= "UInt"
+memberTdfDefinitionTypeINT_PRIMITIVE_int16_t() ::= "Int"
+memberTdfDefinitionTypeINT_PRIMITIVE_uint16_t() ::= "UInt"
+memberTdfDefinitionTypeINT_PRIMITIVE_int32_t() ::= "Int"
+memberTdfDefinitionTypeINT_PRIMITIVE_uint32_t() ::= "UInt"
+memberTdfDefinitionTypeINT_PRIMITIVE_int64_t() ::= "Int64"
+memberTdfDefinitionTypeINT_PRIMITIVE_uint64_t() ::= "UInt64"
+memberTdfDefinitionTypeINT_PRIMITIVE_BlazeId() ::= "Int64"
+memberTdfDefinitionTypeINT_PRIMITIVE_ComponentId() ::= "Int"
+memberTdfDefinitionTypeINT_PRIMITIVE_EntityType() ::= "Int"
+memberTdfDefinitionTypeINT_PRIMITIVE_EntityId() ::= "Int"
+
+isSetHelper(member) ::= <<
+inline bool is<member.Name; format="pascal">Set() const { return <({isSet<member.TypeRef.Symbol.ActualCategory>})()>; }
+>>
+isSetPRIMITIVE() ::= "changes_bitset_type::test(<member.SortedMemberNumber>)"
+isSetSTRING() ::= "<isSetPRIMITIVE()>"
+isSetENUM() ::= "<isSetPRIMITIVE()>"
+isSetINT_PRIMITIVE() ::= "<isSetPRIMITIVE()>"
+isSetFLOAT_PRIMITIVE() ::= "<isSetPRIMITIVE()>"
+isSetUNION() ::= "get<member.Name>().isSet()"
+isSetBITFIELD() ::= "<isSetPRIMITIVE()>"
+isSetCLASS() ::= "get<member.Name>().isSet()"
+isSetVARIABLE() ::= "m<member.Name>.isSet()"
+isSetTYPEDEF() ::= ""
+isSetBLOB() ::= "get<member.Name>().isSet()"
+isSetCONST() ::= ""
+isSetBLAZE_OBJECT_TYPE() ::= "<isSetPRIMITIVE()>"
+isSetBLAZE_OBJECT_ID() ::= "<isSetPRIMITIVE()>"
+isSetTIMEVALUE() ::= "<isSetPRIMITIVE()>"
+isSetMAP() ::= "get<member.Name>().isSet()"
+isSetLIST() ::= "get<member.Name>().isSet()"
+
+classMemberGetterSetterComment() ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name>
+    \brief <if(member.description)><member.description><else>Field needs a description.<endif>
+*******************************************************************/
+>>
+
+classMemberRefHelper(member) ::= "<({classMemberRef<member.TypeRef.Symbol.ActualCategory>})()>"
+
+classMemberRefENUM() ::= "<classMemberRefPRIMITIVE(...)>"
+classMemberRefBLAZE_OBJECT_TYPE() ::= "<classMemberRefPRIMITIVE(...)>"
+classMemberRefBLAZE_OBJECT_ID() ::= "<classMemberRefPRIMITIVE(...)>"
+classMemberRefTIMEVALUE() ::= "<classMemberRefPRIMITIVE(...)>"
+
+classMemberRefFLOAT_PRIMITIVE() ::= "<classMemberRefPRIMITIVE(...)>"
+classMemberRefINT_PRIMITIVE() ::= "<classMemberRefPRIMITIVE(...)>"
+classMemberRefPRIMITIVE() ::= <<
+<classMemberGetterSetterComment()>
+inline <printTypeRef(member)> get<member.Name>() const { return m<member.Name>; }
+inline void set<member.Name>(<printTypeRef(member)> val)
+{
+    m<member.Name> = val;
+<if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    changes_bitset_type::set(<member.SortedMemberNumber>);
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif>
+
+}
+>>
+
+classMemberRefSTRING() ::= <<
+<classMemberGetterSetterComment()>
+inline const char8_t* get<member.Name>() const { return m<member.Name>.c_str(); }
+inline size_t get<member.Name>MaxStringLength() const { return <printTypeList(member.TypeRef.ActualScopedAttributes.SizeConstant)><if(!member.TypeRef.ActualScopedAttributes.GenConstant)> + 1<endif>; }
+
+inline void set<member.Name>(const char8_t* val)
+{
+    m<member.Name>.set(val);
+<if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    changes_bitset_type::set(<member.SortedMemberNumber>);   
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif>
+
+}
+>>
+
+classMemberRefLIST() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<classMemberRefSTRUCT()>
+<else>
+<classMemberGetterSetterComment()>
+<if(member.FirstDef)>typedef <printTypeRef(member)> <listTypeNameFromMember()>;<endif>
+<if(node.Parent.usePtrOption)>
+#if defined(BLAZE_USE_PTR) <blazeUsePtrHelper(node.Scope.FullNameList)>
+/*! **** DEPRECATED *****/
+inline <listTypeNameFromMember()>* get<member.Name>() { return <if(member.allowref)>m<member.Name>Ptr<else>&m<member.Name><endif>; }
+inline const <listTypeNameFromMember()>* get<member.Name>() const { return <if(member.allowref)>m<member.Name>Ptr<else>&m<member.Name><endif>; }
+<if(member.allowref)>inline void set<member.Name>(<listTypeNameFromMember()> & val) { m<member.Name>Ptr = &val; }<endif>
+#else
+
+<endif>
+inline <listTypeNameFromMember()>& get<member.Name>() { return <if(member.allowref)>*m<member.Name>Ptr<else>m<member.Name><endif>; }
+inline const <listTypeNameFromMember()>& get<member.Name>() const { return <if(member.allowref)>*m<member.Name>Ptr<else>m<member.Name><endif>; }
+<if(member.allowref)>inline void set<member.Name>(<listTypeNameFromMember()> & val) { m<member.Name>Ptr = &val; }<endif>
+<if(node.Parent.usePtrOption)>
+#endif
+<endif>
+<endif>
+>>
+
+listTypeNameFromMember() ::=  <<
+<if(member.TypeRef.Symbol.ValueType.ActualCategoryString)>String<if(member.TypeRef.Symbol.ValueType.CategoryString)><member.Name><else><member.TypeRef.Symbol.ValueType.Name; format="pascal"><endif><elseif(member.TypeRef.Symbol.ValueType.CategoryBlob)>TdfBlob<else><member.TypeRef.Symbol.ValueType.Name; format="pascal"><endif>List
+>>
+
+
+classMemberRefMAP() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<classMemberRefSTRUCT()>
+<else>
+<classMemberGetterSetterComment()>
+typedef <printTypeRef(member)> <mapTypeNameFromMember()>;
+<if(node.Parent.usePtrOption)>
+#if defined(BLAZE_USE_PTR) <blazeUsePtrHelper(node.Scope.FullNameList)>
+/*! **** DEPRECATED *****/
+inline <mapTypeNameFromMember()>* get<member.Name>() { return <if(member.allowref)>m<member.Name>Ptr<else>&m<member.Name><endif>; }
+inline const <mapTypeNameFromMember()>* get<member.Name>() const { return <if(member.allowref)>m<member.Name>Ptr<else>&m<member.Name><endif>; }
+<if(member.allowref)>inline void set<member.Name>(<mapTypeNameFromMember()> & val) { m<member.Name>Ptr = &val; }<endif>
+#else
+
+<endif>
+inline <mapTypeNameFromMember()>& get<member.Name>() { return <if(member.allowref)>*m<member.Name>Ptr<else>m<member.Name><endif>; }
+inline const <mapTypeNameFromMember()>& get<member.Name>() const { return <if(member.allowref)>*m<member.Name>Ptr<else>m<member.Name><endif>; }
+<if(member.allowref)>void set<member.Name>(<mapTypeNameFromMember()> & val) { m<member.Name>Ptr = &val; }<endif>
+<if(node.Parent.usePtrOption)>
+#endif
+<endif>
+<endif>
+>>
+
+mapTypeNameFromMember() ::=  <<
+<member.Name; format="pascal">Map
+>>
+
+
+classMemberRefUNION() ::= "<classMemberRefSTRUCT(...)>"
+classMemberRefBITFIELD() ::= "<classMemberRefSTRUCT(...)>"
+classMemberRefBLOB() ::= "<classMemberRefSTRUCT(...)>"
+classMemberRefCLASS() ::= "<classMemberRefSTRUCT(...)>"
+classMemberRefSTRUCT() ::= <<
+<classMemberGetterSetterComment()>
+<if(member.allowref)>
+<classMemberRefComplexIsRef()>
+<else>
+<classMemberRefComplexNoRef()>
+<endif>
+>>
+
+
+classMemberRefComplexNoRef() ::= <<
+<if(node.Parent.usePtrOption)>
+#if defined(BLAZE_USE_PTR) <blazeUsePtrHelper(node.Scope.FullNameList)>
+/*! **** DEPRECATED *****/
+<if(!member.IsConst)>
+inline <printTypeRef(member)>* get<member.Name>()
+{
+<if(member.TypeRef.Symbol.ActualCategoryBitField)><if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    changes_bitset_type::set(<member.SortedMemberNumber>);
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif><endif>
+
+    return &m<member.Name>;
+}
+<endif>
+
+inline const <printTypeRef(member)>* get<member.Name>() const { return &m<member.Name>; }
+#else
+<endif>
+
+<if(!member.IsConst)>
+inline <printTypeRef(member)>& get<member.Name>()
+{
+<if(member.TypeRef.Symbol.ActualCategoryBitField)><if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    changes_bitset_type::set(<member.SortedMemberNumber>);
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif><endif>
+
+    return m<member.Name>;
+}
+<endif>
+
+inline const <printTypeRef(member)>& get<member.Name>() const { return m<member.Name>; }
+<if(node.Parent.usePtrOption)>
+#endif
+<endif>
+
+
+>>
+
+classMemberRefComplexIsRef() ::= <<
+<if(node.Parent.usePtrOption)>
+#if defined(BLAZE_USE_PTR) <blazeUsePtrHelper(node.Scope.FullNameList)>
+/*! **** DEPRECATED *****/
+<if(member.IsConst)>
+inline const <printTypeRef(member)>* get<member.Name>() const { return m<member.Name>Ptr; }
+inline void set<member.Name>(const <printTypeRef(member)> & val) { m<member.Name>Ptr = const_cast\<<printTypeRef(member)> *>(&val); }
+<else>
+inline <printTypeRef(member)>* get<member.Name>()
+{
+<if(member.TypeRef.Symbol.ActualCategoryBitField)><if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    changes_bitset_type::set(<member.SortedMemberNumber>);
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif><endif>
+
+    return m<member.Name>Ptr;
+}
+inline const <printTypeRef(member)>* get<member.Name>() const { return m<member.Name>Ptr; }
+inline void set<member.Name>(<printTypeRef(member)> & val) { m<member.Name>Ptr = &val; }
+<endif>
+
+#else
+
+<endif>
+<if(member.IsConst)>
+inline const <printTypeRef(member)>& get<member.Name>() const { return *m<member.Name>Ptr; }
+void set<member.Name>(const <printTypeRef(member)> & val) { m<member.Name>Ptr = const_cast\<<printTypeRef(member)> *>(&val); }
+<else>
+inline <printTypeRef(member)>& get<member.Name>()
+{
+<if(member.TypeRef.Symbol.ActualCategoryBitField)><if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    changes_bitset_type::set(<member.SortedMemberNumber>);
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif><endif>
+
+    return *m<member.Name>Ptr;
+}
+inline const <printTypeRef(member)>& get<member.Name>() const { return *m<member.Name>Ptr; }
+void set<member.Name>(<printTypeRef(member)> & val) { m<member.Name>Ptr = &val; }
+<endif>
+<if(node.Parent.usePtrOption)>
+
+#endif
+<endif>
+>>
+
+classMemberRefVARIABLE() ::= <<
+<classMemberGetterSetterComment()>
+inline Tdf* get<member.Name>() { return m<member.Name>.get(); }
+inline const Tdf* get<member.Name>() const { return m<member.Name>.get(); }
+#ifdef BLAZE_CLIENT_SDK
+inline void set<member.Name>(Blaze::Tdf &val, Blaze::MemoryGroupId memGroupId, bool8_t takesOwnership = false) { m<member.Name>.set(val, takesOwnership, memGroupId); }
+#else
+inline void set<member.Name>(Blaze::Tdf &val, bool8_t takesOwnership = false) { m<member.Name>.set(val, takesOwnership, DEFAULT_BLAZE_MEMGROUP); }
+#endif
+inline bool is<member.Name>Owned() const { return m<member.Name>.isOwned(); }
+inline void clear<member.Name>() { m<member.Name>.clear(); }
+>>
+
+
+classMemberDefHelper(member) ::= "<({classMemberDef<member.TypeRef.Symbol.ActualCategory>})()>"
+
+classMemberDefLIST() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<classMemberDefSTRUCT()>
+<else>
+<listTypeNameFromMember()> m<member.Name>;<if(member.allowref)>
+
+<listTypeNameFromMember()> *m<member.Name>Ptr;<endif>
+<endif>
+
+/* this typedef is used by OFFSETOF_BASE() */
+typedef <printTypeRef(member)> <member.Name>_TYPE;
+>>
+
+classMemberDefMAP() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<classMemberDefSTRUCT()>
+<else>
+<mapTypeNameFromMember()> m<member.Name>;<if(member.allowref)>
+
+<mapTypeNameFromMember()> *m<member.Name>Ptr;<endif>
+<endif>
+
+/* this typedef is used by OFFSETOF_BASE() */
+typedef <printTypeRef(member)> <member.Name>_TYPE;
+>>
+
+
+classMemberDefVARIABLE() ::= <<
+Blaze::VariableTdfBase m<member.Name>;
+>>
+
+classMemberDefENUM() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefINT_PRIMITIVE() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefFLOAT_PRIMITIVE() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefSTRING() ::= "<if(member.TypeRef.Symbol.CategoryString)>Blaze::<endif><classMemberDefSTRUCT(...)>" //TODO Remove the Blaze::
+classMemberDefUNION() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefBITFIELD() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefBLOB() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefCLASS() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefBLAZE_OBJECT_TYPE() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefBLAZE_OBJECT_ID() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefTIMEVALUE() ::= "<classMemberDefSTRUCT(...)>"
+classMemberDefSTRUCT() ::= <<
+<printTypeRef(member)> m<member.Name>;<if(member.allowref)>
+
+<printTypeRef(member)> *m<member.Name>Ptr;<endif>
+>>
+
+
+
+union(node) ::= <<
+/*! ***************************************************************/
+/*! \class <node.Name>
+<if(node.description)>    \brief <node.description><endif>
+<if(node.details)>    <node.details><endif>
+
+    \nosubgrouping
+*******************************************************************/
+class <node.Name> : public Blaze::TdfUnion
+<if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+, public Blaze::TdfChangeTracker
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif>
+
+{
+public:
+    <node.Defs:{<defineHelper(node=it)>};  separator="\n\n">
+
+    static const Blaze::MemoryGroupId MEM_GROUP;
+
+    /*! ***************************************************************/
+    /*! \name Constructor/Destructor
+    *******************************************************************/
+    <node.Name>(Blaze::MemoryGroupId memGroupId = (<defaultMemGroup()>));
+    virtual ~<node.Name>();
+
+    typedef enum { MEMBER_<first(node.Members).Name; format="tu"> = 0<rest(node.Members):{, MEMBER_<it.Name>}; format="tu"><if(node.Members)>, <endif>MEMBER_UNSET = INVALID_MEMBER_INDEX } Member;
+
+    <node.Members:unionMemberGSHelper(member=it); separator="\n\n">
+
+    /*! ***************************************************************/
+    /*! \name getActiveMember
+    *******************************************************************/
+    inline Member getActiveMember() const { return mActiveMember; }
+    inline Member &getActiveMember() { return mActiveMember; }
+
+    void switchActiveMember(uint32_t memberType);
+    inline uint32_t getActiveMemberIndex() const { return mActiveMember; }
+
+    /*! ***************************************************************/
+    /*! \name Type Helper Functions
+    *******************************************************************/
+    void visit(Blaze::TdfVisitor& visitor, Tdf &rootTdf) { return visit(visitor, rootTdf, *this); }
+    void visit(Blaze::TdfVisitor& visitor, Tdf &rootTdf, const Tdf &referenceTdf);
+<if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    void visitIfSet(Blaze::TdfVisitor& visitor, Tdf &rootTdf, const Tdf &referenceTdf);
+
+    void clearIsSet();
+    bool isSet() const;
+    void markSet();
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif>
+
+    inline <printTypeRef(node)>* clone(Blaze::MemoryGroupId memGroupId = (<defaultMemGroup()>)) const
+    {
+        <node.Name>* newObj = BLAZE_NEW_MGID(memGroupId, "<node.Name>_CLONE_") <node.Name>(memGroupId);
+        copyInto(*newObj);
+        return newObj;
+    }
+
+    /*! ***************************************************************/
+    /*! \brief Replicate a (deep copy) of this object into the given object.
+
+        \param newObj the object to copy all of this object's data into
+    *******************************************************************/
+    inline void copyInto(<node.Name>& newObj) const
+    {
+        Blaze::TdfCopier copier;
+        copier.visit(newObj, *this);
+    <if(node.trackChanges)>
+    #ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+        newObj.mIsSet = true;
+    #endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    <endif>
+
+    }
+
+<if(node.Members)>
+    virtual bool getValueByTag(uint32_t tag, Blaze::TdfBaseTypeValue& value, const Blaze::TdfMemberInfo** memberInfo = NULL, bool* memberSet = NULL) const;
+<endif>
+
+<if(node.Members)>    inline const Blaze::TdfTagInfoMap *getTagInfoMap() const { return &mTagInfoMap; }<endif>
+    inline const char8_t *getClassName() const { return "<node.Name>"; }
+
+/*! \cond INTERNAL_DOCS */
+private:
+<if(node.allocInPlace)>
+    union MemberUnion
+    {
+        <node.Members:unionMemberDefInPlaceHelper(member=it); separator="\n">
+    };
+
+    // mBuffer type to a uint32_t instead of a char8_t so the alignment forces the mBuffer to a boundery of 32bit.
+    // Apparently, char8_t arrays don’t get alligned on uint32_t boundary
+    uint32_t mBuffer[sizeof(MemberUnion)/sizeof(uint32_t)+1];
+
+<endif>
+
+    union
+    {
+        <node.Members:unionMemberDefHelper(member=it); separator="\n">
+    } u;
+
+    Member mActiveMember;
+
+    <node.Name>(const <node.Name>& rhs);
+    <node.Name>& operator=(const <node.Name>& rhs);
+/*! \endcond*/
+
+<if(node.Members)>
+    static const Blaze::TdfTagInfo mTagInfo[<length(node.Members)>];
+    static const Blaze::TdfTagInfoMap mTagInfoMap;
+<endif>
+
+};
+>>
+
+
+unionMemberGetterSetterComment() ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name>
+<if(member.description)>    \brief <member.description><endif>
+*******************************************************************/
+>>
+
+
+//Print out the membername of a union - so union member "foo" is "mFoo"
+unionMemberDefName() ::= <<
+m<member.Name; format="pascal">
+>>
+
+unionMemberGSHelper(member) ::= "<({unionMemberGS<member.TypeRef.Symbol.ActualCategory>})()>"
+
+unionMemberGSENUM() ::= "<classMemberRefPRIMITIVE(...)>"
+unionMemberGSINT_PRIMITIVE() ::= "<unionMemberGSPRIMITIVE(...)>"
+unionMemberGSFLOAT_PRIMITIVE() ::= "<unionMemberGSPRIMITIVE(...)>"
+unionMemberGSPRIMITIVE() ::= <<
+<unionMemberGetterSetterComment()>
+inline <printTypeRef(member)> get<member.Name>() const { return u.<unionMemberDefName()>; }
+void set<member.Name>(<printTypeRef(member)> val)
+{
+<if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    markSet();
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif>
+
+    switchActiveMember(MEMBER_<member.Name; format="tu">);
+    u.<unionMemberDefName()> = val;
+}
+>>
+
+unionMemberGSSTRING() ::= <<
+<unionMemberGetterSetterComment()>
+const char8_t* get<member.Name>() const { return (mActiveMember==MEMBER_<member.Name; format="tu">) ? u.<unionMemberDefName()>->c_str() : NULL; }
+inline size_t get<member.Name>MaxStringLength() const { return <member.TypeRef.ActualScopedAttributes.SizeConstant><if(!member.TypeRef.ActualScopedAttributes.GenConstant)> + 1<endif>; }
+void set<member.Name>(const char8_t* val)
+{
+<if(node.trackChanges)>
+#ifdef BLAZE_ENABLE_TDF_CHANGE_TRACKING
+    markSet();
+#endif //BLAZE_ENABLE_TDF_CHANGE_TRACKING
+<endif>
+
+    switchActiveMember(MEMBER_<member.Name; format="tu">);
+    u.<unionMemberDefName()>->set(val);
+}
+>>
+
+unionMemberGSLIST() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<unionMemberGSSTRUCT()>
+<else>
+<unionMemberGetterSetterComment()>
+typedef <printTypeRef(member)> <member.TypeRef.Symbol.ValueType.Name>List;
+typedef <member.TypeRef.Symbol.ValueType.Name>List <member.Name>List; //! \deprecated use <member.TypeRef.Symbol.ValueType.Name>List instead
+<endif>
+<if(node.Parent.usePtrOption)>
+#if defined(BLAZE_USE_PTR) <blazeUsePtrHelper(node.Scope.FullNameList)>
+/*! **** DEPRECATED *****/
+<if(member.IsConst)>
+const <printTypeRef(member)>* get<member.Name>() const { return m<member.Name>Ptr; }
+void set<member.Name>(const <printTypeRef(member)> & val) { m<member.Name>Ptr = const_cast\<<printTypeRef(member)> *>(&val); }
+<else>
+<member.TypeRef.Symbol.ValueType.Name>List* get<member.Name>() {  return (mActiveMember==MEMBER_<member.Name; format="tu">) ? u.<unionMemberDefName()> : NULL;  }
+const <member.TypeRef.Symbol.ValueType.Name>List* get<member.Name>() const { return (mActiveMember==MEMBER_<member.Name; format="tu">) ? u.<unionMemberDefName()> : NULL; }
+void set<member.Name>(const <printTypeRef(member)>* val) { switchActiveMember(MEMBER_<member.Name; format="tu">); val->copyInto(*u.<unionMemberDefName()>); }
+#else
+
+<endif>
+<endif>
+<if(member.IsConst)>
+const <printTypeRef(member)>& get<member.Name>() const { return m<member.Name>Ptr; }
+void set<member.Name>(const <printTypeRef(member)> & val) { m<member.Name>Ptr = const_cast\<<printTypeRef(member)> *>(&val); }
+<else>
+<member.TypeRef.Symbol.ValueType.Name>List& get<member.Name>() {  return (mActiveMember==MEMBER_<member.Name; format="tu">) ? u.<unionMemberDefName()> : NULL;  }
+const <member.TypeRef.Symbol.ValueType.Name>List& get<member.Name>() const { return (mActiveMember==MEMBER_<member.Name; format="tu">) ? u.<unionMemberDefName()> : NULL; }
+void set<member.Name>(const <printTypeRef(member)>& val) { switchActiveMember(MEMBER_<member.Name; format="tu">); val->copyInto(*u.<unionMemberDefName()>); }
+
+<endif>
+<if(node.Parent.usePtrOption)>
+
+#endif
+<endif>
+>>
+
+
+unionMemberGSMAP() ::= "<unionMemberGSSTRUCT(...)>"
+unionMemberGSUNION() ::= "<unionMemberGSSTRUCT(...)>"
+unionMemberGSBITFIELD() ::= "unionMemberGSSTRUCT(...)>"
+unionMemberGSBLOB() ::= "<unionMemberGSSTRUCT(...)>"
+unionMemberGSCLASS() ::= "<unionMemberGSSTRUCT(...)>"
+unionMemberGSSTRUCT() ::= <<
+<unionMemberGetterSetterComment()>
+<if(!member.IsConst)>
+<printTypeRef(member)>* get<member.Name>() { return (mActiveMember==MEMBER_<member.Name; format="tu">) ? u.<unionMemberDefName()> : NULL; }
+<endif>
+
+const <printTypeRef(member)>* get<member.Name>() const { return (mActiveMember==MEMBER_<member.Name; format="tu">) ? u.<unionMemberDefName()> : NULL; }
+void set<member.Name>(const <printTypeRef(member)>* val) { switchActiveMember(MEMBER_<member.Name; format="tu">); val->copyInto(*u.<unionMemberDefName()>); }
+>>
+
+
+
+unionMemberDefHelper(member) ::= "<({unionMemberDef<member.TypeRef.Symbol.ActualCategory>})()>"
+
+unionMemberDefENUM() ::= "<unionMemberDefPRIMITIVE(...)>"
+unionMemberDefFLOAT_PRIMITIVE() ::= "<unionMemberDefPRIMITIVE(...)>"
+unionMemberDefINT_PRIMITIVE() ::= "<unionMemberDefPRIMITIVE(...)>"
+unionMemberDefPRIMITIVE() ::= <<
+<printTypeRef(member)> <unionMemberDefName()>;
+>>
+unionMemberDefSTRING() ::= "<unionMemberDefSTRUCT(...)>"
+unionMemberDefLIST() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<classMemberDefSTRUCT()>
+<else>
+<member.TypeRef.Symbol.ValueType.Name>List* <unionMemberDefName()>;
+<endif>
+>>
+unionMemberDefMAP() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<classMemberDefSTRUCT()>
+<else>
+<member.TypeRef.Symbol.ValueType.Name>Map* <unionMemberDefName()>;
+<endif>
+>>
+unionMemberDefUNION() ::= "<unionMemberDefSTRUCT(...)>"
+unionMemberDefBITFIELD() ::= "<unionMemberDefSTRUCT(...)>"
+unionMemberDefBLOB() ::= "<unionMemberDefSTRUCT(...)>"
+unionMemberDefCLASS() ::= "<unionMemberDefSTRUCT(...)>"
+unionMemberDefVARIABLE() ::= "<unionMemberDefSTRUCT(...)>"
+unionMemberDefSTRUCT() ::= <<
+<printTypeRef(member)>* <unionMemberDefName()>;
+>>
+
+unionMemberDefInPlaceHelper(member) ::= "<({unionMemberDefInPlace<member.TypeRef.Symbol.ActualCategory>})()>"
+
+unionMemberDefInPlaceENUM() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlaceFLOAT_PRIMITIVE() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlaceINT_PRIMITIVE() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlacePRIMITIVE() ::= <<
+char8_t <unionMemberDefName()>[sizeof(<printTypeRef(member)>)];
+>>
+unionMemberDefInPlaceSTRING() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlaceLIST() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<unionMemberDefInPlacePRIMITIVE()>
+<else>
+char8_t <unionMemberDefName()>[sizeof(<member.TypeRef.Symbol.ValueType.Name>List)];
+<endif>
+>>
+unionMemberDefInPlaceMAP() ::= <<
+<if(member.TypeRef.Symbol.CategoryTypedef)>
+<unionMemberDefInPlacePRIMITIVE()>
+<else>
+char8_t <unionMemberDefName()>[sizeof(<member.TypeRef.Symbol.ValueType.Name>Map)];
+<endif>
+>>
+unionMemberDefInPlaceUNION() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlaceBITFIELD() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlaceBLOB() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlaceCLASS() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlaceVARIABLE() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"
+unionMemberDefInPlaceSTRUCT() ::= "<unionMemberDefInPlacePRIMITIVE(...)>"

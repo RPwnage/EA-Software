@@ -1,0 +1,526 @@
+group commandheader : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+requestParam() ::= "<if(command.RequestType)>, <printTypeRefFullScope(command.RequestType)>* request<endif>"
+
+command(fileNode, command, component) ::= <<
+<standardFileHeader()>
+<openIncludeGuard()>
+
+/*** Include Files ********************************************************************************/
+#include "blazerpcerrors.h"
+#include "framework/component/command.h"
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="tl">_stub.h"
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="tl">_errorstub.h"
+
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+
+/*** Defines/Macros/Constants/Typedefs ************************************************************/
+
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+
+<if(component.grpcOnly)>
+<if(command.IsBidirectionalStreaming)>
+<printLocalBidirectionalStreamingCommandStub()>
+<elseif(command.IsServerStreaming)>
+<printLocalServerStreamingCommandStub()>
+<elseif(command.IsClientStreaming)>
+<printLocalClientStreamingCommandStub()>
+<else>
+<printLocalUnaryCommandStub()>
+<endif>
+<else>
+<printLegacyBlazeRpcCommandStub()>
+<endif>
+
+<component.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+
+<closeIncludeGuard()>
+<standardFileFooter()>
+>>
+
+
+printLegacyBlazeRpcCommandStub() ::=<<
+class <component.Name><component.Type>Stub;
+
+/**************************************************************************************************/
+/*!
+    \class <command.Name;format="pascal">CommandStub
+
+    Stub class for the <command.Name> command.
+*/
+/**************************************************************************************************/
+class <command.Name;format="pascal">CommandStub : public ::Blaze::Command, public <command.Name;format="pascal">Error
+{
+public:
+
+    typedef <command.Name;format="pascal">Error::Error Errors; 
+    
+    
+    static const ::Blaze::MemoryGroupId& COMPONENT_MEMORY_GROUP;
+    
+    virtual ~<command.Name;format="pascal">CommandStub() {}
+    
+    static <command.Name;format="pascal">CommandStub *create(::Blaze::Message* message<requestParam()>, <component.Name><component.Type>* component)<if(command.generate_command_class)>;<else>
+    {
+        return BLAZE_NEW_NAMED("<command.Name;format="pascal">CommandStub") <command.Name;format="pascal">CommandStub(message<if(command.RequestType)>, request<endif>, static_cast\<<component.Name><component.Type>Stub*\>(component));
+    }
+    <endif>
+
+    
+<if(command.RequestType)>
+    virtual <printTypeRefFullScope(command.RequestType)> *getRequest() { return &mRequest; }
+    
+<endif>  
+<if(command.ResponseType)>
+    virtual <printTypeRefFullScope(command.ResponseType)> *getResponse() { return &mResponse; }
+    
+<endif>  
+<if(command.errortype)>
+    virtual <printTypeRefFullScope(command.errortype)> *getErrorResponse() { return &mErrorResponse; }
+    
+<endif> 
+        
+    void setComponentStub(<component.Name><component.Type>Stub& componentStub) { mComponentStub = &componentStub; }
+    
+protected:
+    <command.Name;format="pascal">CommandStub(::Blaze::Message* message<requestParam()><if(!command.generate_command_class)>, <component.Name><component.Type>Stub* component<endif>)
+    :   Command(<component.Name><component.Type>::CMD_INFO_<command.Name; format="toUpper">, message)<if(command.RequestType)>,
+        mRequest(*request)<endif><if(!command.generate_command_class)>,
+        mComponentStub(component)<else>,
+        mComponentStub(nullptr)
+        <endif>
+    {
+    }
+   
+    <if(command.RequestType)>
+    virtual bool executeRequestHook(::Blaze::BlazeRpcError& err) 
+    {        
+        bool result = true;
+        if (mComponentStub != nullptr)
+        {
+            (mComponentStub->get<command.Name; format="pascal">RequestHook())(mRequest, err, result); 
+        }
+        return result;
+    }
+    <endif>
+    
+    
+    <if(command.ResponseType)>   
+    <if(command.errortype)>
+    virtual void executeResponseHook(::Blaze::BlazeRpcError& err) 
+    {
+        if (mComponentStub != nullptr)
+        {
+            (mComponentStub->get<command.Name; format="pascal">ResponseHook())(mResponse, err, mErrorResponse); 
+        }
+    }          
+    <else>
+    virtual void executeResponseHook(::Blaze::BlazeRpcError& err) 
+    { 
+        if (mComponentStub != nullptr)
+        {
+            (mComponentStub->get<command.Name; format="pascal">ResponseHook())(mResponse, err); 
+        }
+    }
+    <endif>
+    <elseif(command.errortype)>
+    virtual void executeResponseHook(::Blaze::BlazeRpcError& err) 
+    { 
+        if (mComponentStub != nullptr)
+        {
+            (mComponentStub->get<command.Name; format="pascal">ResponseHook())(err, mErrorResponse); 
+        }
+    }
+    <endif>
+        
+
+    virtual ::Blaze::BlazeRpcError executeInternal() 
+    {        
+        //Its possible to not use the CREATE macros below to not instantiate the class.  In that case the component stub may
+        //not be set properly, and thus we need to fetch the component stub before continuing.
+        if (EA_UNLIKELY(mComponentStub == nullptr))
+        {
+            <component.Name><component.Type>Stub* stub = (<component.Name><component.Type>Stub*) getComponentStub();
+            if (stub != nullptr)
+            {
+                setComponentStub(*stub);
+            }
+            else
+                return ERR_SYSTEM;
+        }
+
+        <if(command.generate_command_class)>        
+        return static_cast\<::Blaze::BlazeRpcError\>(execute()); 
+        <else>
+        <if(command.passthrough)>
+        ::Blaze::Component* master = mComponentStub->getMaster();
+        return (master != nullptr) ? ((<component.Master.Name><component.Master.Type>*) master)-><command.passthrough.Symbol.Name>(<commandSig(req="mRequest", resp="mResponse", err="mErrorResponse", sep=", ")>) : ::Blaze::ERR_COMPONENT_NOT_FOUND;
+        <else>
+        return static_cast\<::Blaze::BlazeRpcError\>(mComponentStub->process<command.Name;format="pascal">(<if(command.RequestType)>mRequest, <endif><if(command.ResponseType)>mResponse, <endif><if(command.errortype)>mErrorResponse, <endif>mMessage));
+        <endif>                
+        <endif>
+    }
+        
+    <if(command.generate_command_class)>
+    virtual <command.Name;format="pascal">CommandStub::Errors execute() = 0;
+    <endif>
+
+protected:
+    <if(command.RequestType)><printTypeRefFullScope(command.RequestType)>& mRequest;<endif>
+    <if(command.ResponseType)><printTypeRefFullScope(command.ResponseType)> mResponse;<endif>
+    <if(command.errortype)><printTypeRefFullScope(command.errortype)> mErrorResponse;<endif> 
+    
+    <component.Name><component.Type>Stub* mComponentStub;
+};
+
+<if(command.generate_command_class)>
+#define DEFINE_<command.Name;format="toUpper">_CREATE_COMPNAME(_componentImplName) \\
+<command.Name;format="pascal">CommandStub* <command.Name;format="pascal">CommandStub::create(::Blaze::Message* msg<requestParam()>, <component.Name><component.Type>* componentImpl) \\
+{\\
+    <command.Name;format="pascal">Command* result = BLAZE_NEW_NAMED("<command.Name;format="pascal">Command") <command.Name;format="pascal">Command(msg<if(command.RequestType)>, request<endif>, static_cast\<_componentImplName*\>(componentImpl));\\
+    result->setComponentStub(*static_cast\<<component.Name><component.Type>Stub*\>(componentImpl));\\
+    return result;\\
+}
+#define DEFINE_<command.Name;format="toUpper">_CREATE() DEFINE_<command.Name;format="toUpper">_CREATE_COMPNAME(<component.Name><component.Type>Impl) 
+<endif>
+
+>>
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Definition for a gRPC Unary command stub                                                                      //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+printLocalUnaryCommandStub() ::=<<
+/**************************************************************************************************/
+/*!
+    \class <command.Name;format="pascal">CommandStub
+
+    Stub class for the <command.Name> command.
+*/
+/**************************************************************************************************/
+<if(!component.generateProto)>
+#if 0
+// This command stub is for a gRPC *only* command (e.g. Unary, ServerStreaming, ClientStreaming, or BidirectionalStreaming)
+// But the component does not have the required generateProto attribute set to true in the .rpc file.  If this is a custom
+// component, you also need to add 'blazeserver.generate_custom_protos=true' to the 'globalproperties' section in the masterconfig file.
+<endif>
+
+class <command.Name;format="pascal">CommandStub : public <printGrpcCommandStubName(command)>, public <command.Name;format="pascal">Error
+{
+public:
+    using <printGrpcCommandStubName(command)>::<printGrpcCommandStubName(command)>;
+
+    virtual ~<command.Name;format="pascal">CommandStub() {}
+
+    typedef <command.Name;format="pascal">Error::Error Errors; 
+    static const ::Blaze::MemoryGroupId& COMPONENT_MEMORY_GROUP;
+
+    // This is the entry point for a Unary gRPC request.
+    virtual <command.Name;format="pascal">Error::Error onProcessRequest(<[{<if(command.RequestType)>const ::<printTypeRefFullScope(command.RequestType)>& request<endif>},{<if(command.ResponseType)>::<printTypeRefFullScope(command.ResponseType)>& response<endif>},{<if(command.errortype)>::<printTypeRefFullScope(command.errortype)>& errorResponse<endif>}]; separator=", ">) = 0;
+
+    // This is the finalization point for a Unary gRPC request.
+    virtual void onCleanup(bool cancelled) = 0;
+
+private:
+    void processRequest(const google::protobuf::Message* request) override
+    {
+        if (request != nullptr)
+        {
+            <if(command.RequestType)>            const ::<printTypeRefFullScope(command.RequestType)>& requestTdf = *static_cast\<const ::<printTypeRefFullScope(command.RequestType)>*\>(request);<endif>
+            <if(command.ResponseType)>            ::<printTypeRefFullScope(command.ResponseType)> response;<endif>
+            <if(command.errortype)>            ::<printTypeRefFullScope(command.errortype)> errorResponse;<endif>
+
+            <command.Name;format="pascal">Error::Error err = onProcessRequest(<commandSig(req="requestTdf", resp="response", err="errorResponse", sep=", ")>);
+
+            if (err == ERR_OK)
+                obfuscatePlatformInfo(response);
+
+            EA::TDF::Tdf* finalResponse = (err == ERR_OK ? (EA::TDF::Tdf*)<if(command.ResponseType)>&response<else>nullptr<endif> : (EA::TDF::Tdf*)<if(command.errortype)>&errorResponse<else>nullptr<endif>);
+            getCommandInfo().sendGrpcResponse(*this, finalResponse, err);
+        }
+    }
+
+    void processDone(bool cancelled) override
+    {
+        onCleanup(cancelled);
+    }
+};
+
+#define DEFINE_<command.Name;format="toUpper">_CREATE() \\
+<printGrpcCommandCreatorDecl(command)> \\
+{ \\
+    BLAZE_NEW_NAMED("<command.Name;format="pascal">Command") <command.Name;format="pascal">Command(static_cast\<<printGrpcServiceType(component)>::AsyncService*\>(service), cq, &create<command.Name;format="pascal">Grpc, &::Blaze::Grpc::processIncomingRequestHandler, &<printGrpcServiceType(component)>::AsyncService::Request<command.Name>, <component.Name><component.Type>::CMD_INFO_<command.Name; format="toUpper">, endpoint); \\
+}
+
+<if(!component.generateProto)>
+#endif<\n>
+<endif>
+>>
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Definition for a gRPC Server Streaming command stub                                                                      //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+printLocalServerStreamingCommandStub() ::=<<
+/**************************************************************************************************/
+/*!
+    \class <command.Name;format="pascal">CommandStub
+
+    Stub class for the <command.Name> command.
+*/
+/**************************************************************************************************/
+<if(!component.generateProto)>
+#if 0
+// This command stub is for a gRPC *only* command (e.g. Unary, ServerStreaming, ClientStreaming, or BidirectionalStreaming)
+// But the component does not have the required generateProto attribute set to true in the .rpc file.  If this is a custom
+// component, you also need to add 'blazeserver.generate_custom_protos=true' to the 'globalproperties' section in the masterconfig file.
+<endif>
+
+class <command.Name;format="pascal">CommandStub : public <printGrpcCommandStubName(command)>, public <command.Name;format="pascal">Error
+{
+public:
+    using <printGrpcCommandStubName(command)>::<printGrpcCommandStubName(command)>;
+
+    virtual ~<command.Name;format="pascal">CommandStub() {}
+
+    typedef <command.Name;format="pascal">Error::Error Errors; 
+    static const ::Blaze::MemoryGroupId& COMPONENT_MEMORY_GROUP;
+
+    // This is the entry point for a ServerStreaming gRPC request.
+    virtual void onProcessRequest(<if(command.RequestType)>const ::<printTypeRefFullScope(command.RequestType)>& request<endif>) = 0;
+
+    // This is the finalization point for a ServerStreaming gRPC request.
+    virtual void onCleanup(bool cancelled) = 0;
+
+    <if(command.ResponseType)>
+    bool sendResponse(::<printTypeRefFullScope(command.ResponseType)>& response)
+    {
+        obfuscatePlatformInfo(response);
+        return getCommandInfo().sendGrpcResponse(*this, &response, ::Blaze::ERR_OK);
+    }
+    <endif>
+
+    <if(command.errortype)>
+    bool sendErrorResponse(const ::<printTypeRefFullScope(command.errortype)>& errorResponse, <command.Name;format="pascal">Error::Error err)
+    {
+        return getCommandInfo().sendGrpcResponse(*this, &errorResponse, err);
+    }
+    <endif>
+
+    bool signalDone()
+    {
+        return <printGrpcCommandStubName(command)>::sendResponse(nullptr);
+    }
+
+private:
+    void processRequest(const google::protobuf::Message* request) override
+    {
+        onProcessRequest(<if(command.RequestType)>*static_cast\<const ::<printTypeRefFullScope(command.RequestType)>*\>(request)<endif>);
+    }
+
+    void processDone(bool cancelled) override
+    {
+        onCleanup(cancelled);
+    }
+};
+
+#define DEFINE_<command.Name;format="toUpper">_CREATE() \\
+<printGrpcCommandCreatorDecl(command)> \\
+{ \\
+    BLAZE_NEW_NAMED("<command.Name;format="pascal">Command") <command.Name;format="pascal">Command(static_cast\<<printGrpcServiceType(component)>::AsyncService*\>(service), cq, &create<command.Name;format="pascal">Grpc, &::Blaze::Grpc::processIncomingRequestHandler, &<printGrpcServiceType(component)>::AsyncService::Request<command.Name>, <component.Name><component.Type>::CMD_INFO_<command.Name; format="toUpper">, endpoint); \\
+}
+
+<if(!component.generateProto)>
+#endif<\n>
+<endif>
+>>
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Definition for a gRPC Client Streaming command stub                                                                      //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+printLocalClientStreamingCommandStub() ::=<<
+/**************************************************************************************************/
+/*!
+    \class <command.Name;format="pascal">CommandStub
+
+    Stub class for the <command.Name> command.
+*/
+/**************************************************************************************************/
+<if(!component.generateProto)>
+#if 0
+// This command stub is for a gRPC *only* command (e.g. Unary, ServerStreaming, ClientStreaming, or BidirectionalStreaming)
+// But the component does not have the required generateProto attribute set to true in the .rpc file.  If this is a custom
+// component, you also need to add 'blazeserver.generate_custom_protos=true' to the 'globalproperties' section in the masterconfig file.
+<endif>
+
+class <command.Name;format="pascal">CommandStub : public <printGrpcCommandStubName(command)>, public <command.Name;format="pascal">Error
+{
+public:
+    using <printGrpcCommandStubName(command)>::<printGrpcCommandStubName(command)>;
+
+    virtual ~<command.Name;format="pascal">CommandStub() {}
+
+    typedef <command.Name;format="pascal">Error::Error Errors; 
+    static const ::Blaze::MemoryGroupId& COMPONENT_MEMORY_GROUP;
+
+    // This is the entry point for a ClientStreaming gRPC request.
+    virtual void onProcessRequest(<if(command.RequestType)>const ::<printTypeRefFullScope(command.RequestType)>& request<endif>) = 0;
+
+    // This is called when the client has told gRPC that it has finished sending all requests/messages. A response from the server can now be sent.
+    virtual <command.Name;format="pascal">Error::Error onClientFinished(<if(command.ResponseType)>::<printTypeRefFullScope(command.ResponseType)>& response<if(command.errortype)>, <endif><endif><if(command.errortype)>::<printTypeRefFullScope(command.errortype)>& errorResponse<endif>) = 0;
+
+    // This is the finalization point for a ClientStreaming gRPC request.
+    virtual void onCleanup(bool cancelled) = 0;
+
+    // Call this to terminate the streaming channel prior to the onClientFinished() method being called.
+    // Calling this method prevents onClientFinished() from ever being called, and queues the call to onCleanup(true).
+    // The client will received a CANCELLED status code from gRPC, and the BidirectionalStreaming request will be done.
+    bool signalCancelled()
+    {
+        return <printGrpcCommandStubName(command)>::finishWithError(grpc::Status::CANCELLED);
+    }
+
+private:
+    void processRequest(const google::protobuf::Message* request) override
+    {
+        if (request != nullptr)
+        {
+            onProcessRequest(<if(command.RequestType)>*static_cast\<const ::<printTypeRefFullScope(command.RequestType)>*\>(request)<endif>);
+
+            // Tell gRPC we're ready for the next request.
+            readNextRequest();
+        }
+        else
+        {
+            // The client has finished sending all requests. The server can now return a response.
+            <if(command.ResponseType)>            ::<printTypeRefFullScope(command.ResponseType)> response;<endif>
+            <if(command.errortype)>            ::<printTypeRefFullScope(command.errortype)> errorResponse;<endif>
+            <command.Name;format="pascal">Error::Error err = onClientFinished(<if(command.ResponseType)>response<if(command.errortype)>, <endif><endif><if(command.errortype)>errorResponse<endif>);
+
+            if (err == ERR_OK)
+                obfuscatePlatformInfo(response);
+
+            EA::TDF::Tdf* finalResponse = (err == ERR_OK ? (EA::TDF::Tdf*)<if(command.ResponseType)>&response<else>nullptr<endif> : (EA::TDF::Tdf*)<if(command.errortype)>&errorResponse<else>nullptr<endif>);
+            getCommandInfo().sendGrpcResponse(*this, finalResponse, err);
+        }
+    }
+
+    void processDone(bool cancelled) override
+    {
+        onCleanup(cancelled);
+    }
+};
+
+#define DEFINE_<command.Name;format="toUpper">_CREATE() \\
+<printGrpcCommandCreatorDecl(command)> \\
+{ \\
+    BLAZE_NEW_NAMED("<command.Name;format="pascal">Command") <command.Name;format="pascal">Command(static_cast\<<printGrpcServiceType(component)>::AsyncService*\>(service), cq, &create<command.Name;format="pascal">Grpc, &::Blaze::Grpc::processIncomingRequestHandler, &<printGrpcServiceType(component)>::AsyncService::Request<command.Name>, <component.Name><component.Type>::CMD_INFO_<command.Name; format="toUpper">, endpoint); \\
+}
+
+<if(!component.generateProto)>
+#endif<\n>
+<endif>
+>>
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Definition for a gRPC Bidirectional Streaming command stub                                                                      //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+printLocalBidirectionalStreamingCommandStub() ::=<<
+/**************************************************************************************************/
+/*!
+    \class <command.Name;format="pascal">CommandStub
+
+    Stub class for the <command.Name> command.
+*/
+/**************************************************************************************************/
+<if(!component.generateProto)>
+#if 0
+// This command stub is for a gRPC *only* command (e.g. Unary, ServerStreaming, ClientStreaming, or BidirectionalStreaming)
+// But the component does not have the required generateProto attribute set to true in the .rpc file.  If this is a custom
+// component, you also need to add 'blazeserver.generate_custom_protos=true' to the 'globalproperties' section in the masterconfig file.
+<endif>
+
+class <command.Name;format="pascal">CommandStub : public <printGrpcCommandStubName(command)>, public <command.Name;format="pascal">Error
+{
+public:
+    using <printGrpcCommandStubName(command)>::<printGrpcCommandStubName(command)>;
+
+    virtual ~<command.Name;format="pascal">CommandStub() {}
+
+    typedef <command.Name;format="pascal">Error::Error Errors; 
+    static const ::Blaze::MemoryGroupId& COMPONENT_MEMORY_GROUP;
+
+    // This is the entry point for a BidirectionalStreaming gRPC request.
+    virtual void onProcessRequest(<if(command.RequestType)>const ::<printTypeRefFullScope(command.RequestType)>& request<endif>) = 0;
+
+    // This is called when the client has told gRPC that it has finished sending all requests/messages.
+    virtual void onClientFinished() = 0;
+
+    // This is the finalization point for a BidirectionalStreaming gRPC request.
+    virtual void onCleanup(bool cancelled) = 0;
+
+    <if(command.ResponseType)>
+    bool sendResponse(::<printTypeRefFullScope(command.ResponseType)>& response)
+    {
+        obfuscatePlatformInfo(response);
+        return getCommandInfo().sendGrpcResponse(*this, &response, ::Blaze::ERR_OK);
+    }
+    <endif>
+
+    <if(command.errortype)>
+    bool sendErrorResponse(const ::<printTypeRefFullScope(command.errortype)>& errorResponse, <command.Name;format="pascal">Error::Error err)
+    {
+        return getCommandInfo().sendGrpcResponse(*this, &errorResponse, err);
+    }
+    <endif>
+
+    // Call this to tell the client that the server is done sending responses (if any) to the client.
+    // Note, this does not prevent the client from continuing to send requests to the server.
+    bool signalDone()
+    {
+        return <printGrpcCommandStubName(command)>::sendResponse(nullptr);
+    }
+
+    // Call this to terminate the streaming channel prior to the onClientFinished() method being called.
+    // Calling this method prevents onClientFinished() from ever being called, and queues the call to onCleanup(true).
+    // The client will received a CANCELLED status code from gRPC, and the BidirectionalStreaming request will be done.
+    bool signalCancelled()
+    {
+        return <printGrpcCommandStubName(command)>::finishWithError(grpc::Status::CANCELLED);
+    }
+
+private:
+    void processRequest(const google::protobuf::Message* request) override
+    {
+        if (request != nullptr)
+        {
+            onProcessRequest(<if(command.RequestType)>*static_cast\<const ::<printTypeRefFullScope(command.RequestType)>*\>(request)<endif>);
+
+            // Tell gRPC we're ready for the next request.
+            readNextRequest();
+        }
+        else
+        {
+            // The client has finished sending all requests. The server can now return a response.
+            onClientFinished();
+        }
+    }
+
+    void processDone(bool cancelled) override
+    {
+        onCleanup(cancelled);
+    }
+};
+
+#define DEFINE_<command.Name;format="toUpper">_CREATE() \\
+<printGrpcCommandCreatorDecl(command)> \\
+{ \\
+    BLAZE_NEW_NAMED("<command.Name;format="pascal">Command") <command.Name;format="pascal">Command(static_cast\<<printGrpcServiceType(component)>::AsyncService*\>(service), cq, &create<command.Name;format="pascal">Grpc, &::Blaze::Grpc::processIncomingRequestHandler, &<printGrpcServiceType(component)>::AsyncService::Request<command.Name>, <component.Name><component.Type>::CMD_INFO_<command.Name; format="toUpper">, endpoint); \\
+}
+
+<if(!component.generateProto)>
+#endif<\n>
+<endif>
+>>

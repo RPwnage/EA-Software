@@ -1,0 +1,110 @@
+set print pretty on
+set pagination off
+
+printf "\n\n"
+
+printf "{noformat}\n"
+show version
+printf "{noformat}\n"
+
+printf "\nbasic info\n"
+printf "----------\n"
+printf "{noformat}\n"
+
+printf "mVersion: %s\n", Blaze::gProcessController->mVersion.mVersion->mTdfStringPointer
+printf "mBuildLocation: %s\n", Blaze::gProcessController->mVersion.mBuildLocation->mTdfStringPointer
+printf "mP4DepotLocation: %s\n", Blaze::gProcessController->mVersion.mP4DepotLocation->mTdfStringPointer
+printf "mBuildTime: %s\n", Blaze::gProcessController->mVersion.mBuildTime->mTdfStringPointer
+printf "mBuildTarget: %s\n", Blaze::gProcessController->mVersion.mBuildTarget->mTdfStringPointer
+printf "_BlazeChangelist: %s\n", (char8_t*)&_BlazeChangelist
+
+printf "\nmInstanceUuid: %s\n", Blaze::gProcessController->mInstanceUuid
+
+printf "mAllocatorType: "
+p AllocatorManager::msInstance->mAllocatorType
+
+printf "ExceptionHandlingEnabled: "
+p Blaze::gProcessController->mExceptionConfig.mExceptionHandlingEnabled
+
+printf "TotalExceptionsEncountered: "
+p Blaze::gProcessController->mTotalExceptionsEncountered
+
+printf "TotalFiberExceptionsAllowed: "
+p Blaze::gProcessController->mExceptionConfig.mTotalFiberExceptionsAllowed
+
+if (Blaze::gProcessController->mCoreFileWriterThread.mLastContext != 0)
+   printf "ExceptionThreadId: "
+   p (('Blaze::BlazeThread'*)Blaze::gProcessController->mCoreFileWriterThread.mLastContext)->mPid
+   printf "ExceptionThreadType: "
+   p (('Blaze::BlazeThread'*)Blaze::gProcessController->mCoreFileWriterThread.mLastContext)->mThreadType
+end
+
+printf "{noformat}\n"
+printf "\n"
+
+printf "controller info\n"
+printf "---------------\n"
+printf "{noformat}\n"
+
+# --find the controller
+
+set $i = 0
+while ($i < 'Blaze::sThreadLocalInfoCount')
+    if ((*'Blaze::sThreadLocalInfo'[$i].mCurrentThread)->mThreadType == 'Blaze::BlazeThread::SERVER' )
+       set $gController=('Blaze::Controller'*)(*'Blaze::sThreadLocalInfo'[$i].mController)
+    end
+    set $i = $i + 1
+end
+
+printf "Controller state: \n"
+p $gController->mState
+if ( $gController->mState == 'Blaze::ComponentStub::SHUTTING_DOWN' )
+    printf "ShutdownReason: \n"
+    p $gController->mShutdownReason
+end
+
+set $serviceNames = $gController->mServerEventData->mServiceNames
+if ($serviceNames.mpBegin != $serviceNames.mpEnd)
+    printf "service name: %s\n", $serviceNames.mpBegin->mTdfStringPointer
+else
+    printf "Can't find service name: unknown\n"
+end
+
+# --workaround bug in older gdb versions which try printing the memory at the beginning of the controller
+# --rather than the desired char arrays, taking the address of and dereferencing (while essentially a no-op)
+# --appears to be enough to convince gdb to print the character array members properly
+
+printf "instance name: %s\n",*(&($gController->mInstanceName))
+printf "host instance id: %d\n", $gController->mInstanceId
+printf "base name: %s\n", *(&($gController->mBaseName))
+printf "{noformat}\n"
+
+printf "\nbacktrace\n"
+printf "---------\n"
+printf "{noformat}\n"
+bt
+printf "{noformat}\n"
+
+printf "\ncanonical backtrace\n"
+printf "-------------------\n"
+printf "{noformat}\n"
+set print frame-arguments none
+set print address off
+bt
+set print address on
+set print frame-arguments scalar
+printf "{noformat}\n"
+
+printf "\nfull backtrace\n"
+printf "--------------\n"
+printf "{noformat}\n"
+bt full
+printf "{noformat}\n"
+
+printf "\ninfo threads\n"
+printf "--------------\n"
+printf "{noformat}\n"
+info threads
+printf "{noformat}\n"
+
+printf "\n\n"

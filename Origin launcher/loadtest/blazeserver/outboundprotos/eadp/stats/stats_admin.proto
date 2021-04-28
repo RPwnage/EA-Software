@@ -1,0 +1,234 @@
+syntax = "proto3";
+
+package eadp.stats;
+
+import "google/api/annotations.proto";
+import "google/rpc/status.proto";
+
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
+
+import "eadp/annotations.proto";
+
+import "eadp/stats/contexts.proto";
+import "eadp/stats/categories.proto";
+import "eadp/stats/views.proto";
+import "eadp/stats/entity_stats.proto";
+
+option java_package = "com.ea.gs.stats.grpc";
+option java_outer_classname = "StatsCoreAdminProto";
+option java_multiple_files = true;
+
+message UpsertConfigurationResponse {
+    google.rpc.Status status = 1;
+    //hash of certain configuration properties
+    string version = 2;
+}
+
+message DeleteConfigurationResponse {
+    google.rpc.Status status = 1;
+}
+
+message ValidateConfigurationResponse {
+    google.rpc.Status status = 1;
+}
+
+message UpsertContextRequest {
+    string context_id = 1;
+    //if configuration already exists, must specify current version for upsert to succeed
+    string existing_version = 2;
+
+    ContextRequest context = 3;
+
+    Creator creator = 4;
+}
+
+message DeleteContextRequest {
+    string context_id = 1;
+    //must specify current version of configuration for delete to succeed
+    string existing_version = 2;
+}
+
+message UpsertCategoryRequest {
+    string context_id = 1;
+    string category_id = 2;
+    //if configuration already exists, must specify current version for upsert to succeed
+    string existing_version = 3;
+
+    CategoryRequest category = 4;
+}
+
+message DeleteCategoryRequest {
+    string context_id = 1;
+    string category_id = 2;
+    //must specify current version of configuration for delete to succeed
+    string existing_version = 3;
+}
+
+message UpsertViewRequest {
+    string view_id = 1;
+    string context_id = 2;
+    //if configuration already exists, must specify current version for upsert to succeed
+    string existing_version = 3;
+
+    ViewRequest view = 5;
+}
+
+message DeleteViewRequest {
+    string view_id = 1;
+    string context_id = 2;
+    //must specify current version of configuration for delete to succeed
+    string existing_version = 3;
+}
+
+message SetEntityStatsRequest {
+    message StatisticValue {
+        google.protobuf.DoubleValue value = 1;
+    }
+
+    string update_id = 1;
+    string context_id = 2;
+    string category_id = 3;
+    string entity_id = 4;
+
+    //map of stats values to be updated. Each key is stat id, value is value of the stat
+    map<string, StatisticValue> stats = 5;
+
+    // Map of dimensioned statistic values. Each key represents stat id and value is the list of dimension vaues.
+    // @see DimensionedStatisticList for more information.
+    map<string, DimensionedStatisticList> dim_stats = 7;
+}
+
+/*
+* Service to update/delete configuration for Stats Contexts, Categories, and Views
+*/
+service ConfigurationUpdater {
+
+    option (eadp.grpc.service_mapping) = {
+        ports: [ S2S_ADMIN ]
+        scopes: {
+            key: "S2S_ADMIN"
+            value:"gs_stats_admin"
+        }
+    };
+
+    // CONTEXTS
+
+    /*
+     * Upsert context definition
+    */
+    rpc UpsertContext (UpsertContextRequest) returns (UpsertConfigurationResponse) {
+        option (google.api.http) = {
+            put: "/v2/contexts/{context_id}"
+            body: "context"
+        };
+    };
+
+    /*
+     * Validate context definition without actually upserting
+    */
+    rpc ValidateContext (UpsertContextRequest) returns (ValidateConfigurationResponse) {
+        option (google.api.http) = {
+            post: "/v2/contexts/{context_id}/validate"
+            body: "context"
+        };
+    };
+
+    /*
+     * Delete context which will cascading delete the views and categories under this context
+    */
+    rpc DeleteContext (DeleteContextRequest) returns (DeleteConfigurationResponse) {
+        option (google.api.http) = {
+            delete: "/v2/contexts/{context_id}"
+        };
+    };
+
+    // CATEGORIES
+
+    /*
+     * Upsert category definition
+    */
+    rpc UpsertCategory (UpsertCategoryRequest) returns (UpsertConfigurationResponse) {
+        option (google.api.http) = {
+            put: "/v2/contexts/{context_id}/categories/{category_id}"
+        };
+    };
+
+    /*
+     * Validate category definition without actually upserting
+    */
+    rpc ValidateCategory (UpsertCategoryRequest) returns (ValidateConfigurationResponse) {
+        option (google.api.http) = {
+            post: "/v2/contexts/{context_id}/categories/{category_id}/validate"
+            body: "category"
+        };
+    };
+
+    /*
+     * Delete category which will delete all stats data within this category
+    */
+    rpc DeleteCategory (DeleteCategoryRequest) returns (DeleteConfigurationResponse) {
+        option (google.api.http) = {
+            delete: "/v2/contexts/{context_id}/categories/{category_id}"
+        };
+    };
+
+    // VIEWS
+
+    /*
+     * Upsert view definition
+    */
+    rpc UpsertView (UpsertViewRequest) returns (UpsertConfigurationResponse) {
+        option (google.api.http) = {
+            put: "/v2/contexts/{context_id}/views/{view_id}"
+            body: "view"
+        };
+    };
+
+    /*
+     * Delete view definition.  This will not affect stats data referenced by the view.
+    */
+    rpc DeleteView (DeleteViewRequest) returns (DeleteConfigurationResponse) {
+        option (google.api.http) = {
+            delete: "/v2/contexts/{context_id}/views/{view_id}"
+        };
+    };
+
+    /*
+     * Validate view definition without actually upserting
+    */
+    rpc ValidateView (UpsertViewRequest) returns (ValidateConfigurationResponse) {
+        option (google.api.http) = {
+            post: "/v2/contexts/{context_id}/views/{view_id}/validate"
+            body: "view"
+        };
+    };
+
+}
+
+/*
+* Service for administrators to set the value for entity statistics directly
+*/
+service EntityStatisticsAdmin {
+
+    option (eadp.grpc.service_mapping) = {
+        ports: [ S2S_ADMIN ]
+        scopes: {
+            key: "S2S_ADMIN"
+            value: "gs_stats_limited_admin gs_stats_admin"
+        } };
+
+    /*
+     * Set stats data values. Features idempotency based on required updateId such that the same request
+     * (identified by the same unique updateId) can be sent multiple times but the actual updates are
+     * guaranteed to be applied at most once. Recommended error handling is retry with exponential back-off.
+    */
+    rpc SetStats (SetEntityStatsRequest) returns (UpdateEntityStatsResponse) {
+        option (google.api.http) = {
+            put: "/v2/contexts/{context_id}/categories/{category_id}/entities/{entity_id}/stats"
+            body: "*"
+        };
+    };
+}
+
+

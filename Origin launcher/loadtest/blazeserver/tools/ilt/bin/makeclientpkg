@@ -1,0 +1,66 @@
+#!/bin/bash
+
+echo "Note: To run this script successfully current working directory should be the one that *contains* etc directory."
+
+# relative path of script relative to launch location
+srcDir=$(dirname ${BASH_SOURCE[0]})
+
+source $srcDir/clientdeploy.cfg
+
+if [ -z "$runname" ]; then 
+    echo "Usage: $0 runname"
+    exit 1
+fi
+
+clientBuildDir=$stressBuildDir/$clientName
+
+rm -rf $clientBuildDir
+echo "Gathering files..."
+
+mkdir -p $clientBuildDir/etc
+mkdir -p $clientBuildDir/etc.ilt.sports
+mkdir -p $clientBuildDir/bin
+mkdir -p $clientBuildDir/lib
+mkdir -p $clientBuildDir/log
+mkdir -p $clientBuildDir/init
+echo "main = { nodes = [ dummy:6379 ] }" > $clientBuildDir/init/redis.cfg
+rsync --exclude=/component/geoip --exclude=/core.* -a $configDir/etc/ $clientBuildDir/etc
+rsync -a $configDir/etc.ilt.sports/ $clientBuildDir/etc.ilt.sports
+cp $buildDir/blazeserver/*/unix64-clang-debug/bin/stress_stripped $clientBuildDir/bin/stress
+rsync -a $buildDir/blazeserver/*/unix64-clang-debug/container_lib/* $clientBuildDir/lib
+rsync -a $srcDir/runstressclients $srcDir/clientdeploy.cfg  $clientBuildDir/
+
+echo "Build the list of servers..."
+
+rm -f $clientBuildDir/etc.ilt.sports/stress/stress-integrated-servers.cfg
+cnt=0
+while [ $cnt -lt ${#tcpserverports[@]} ] || [ $cnt -lt ${#sslserverports[@]} ]
+do
+  if [ $cnt -lt ${#tcpserverports[@]} ]
+  then
+      echo "tcp-$cnt = \"${tcpserverports[$cnt]}\"" >> $clientBuildDir/etc.ilt.sports/stress/stress-integrated-servers.cfg
+  fi
+  if [ $cnt -lt ${#sslserverports[@]} ]
+  then
+      echo "ssl-$cnt = \"${sslserverports[$cnt]}\"" >> $clientBuildDir/etc.ilt.sports/stress/stress-integrated-servers.cfg
+  fi
+  let cnt=cnt+1
+done
+
+if [ "$clientUsesRedirector" = "1" ]; 
+then 
+    #put rdir + serviceName here
+    echo "serviceName = \"$runname\"" >> $clientBuildDir/etc.ilt.sports/stress/stress-integrated-servers.cfg
+    echo "redirectorAddress = \"$redirectorAddress\"" >> $clientBuildDir/etc.ilt.sports/stress/stress-integrated-servers.cfg
+fi    
+
+cat $clientBuildDir/etc.ilt.sports/stress/stress-integrated-servers.cfg
+
+echo "Creating archive..."
+
+
+pushd $clientBuildDir
+tar czf ../$clientName.tar.gz ./
+popd
+
+echo "Done."

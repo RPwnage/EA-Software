@@ -1,0 +1,101 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<!-- TODO: WindowsSDKName was used when there was a separate sdk for windows phone. This should be removed eventually. -->
+	<property name="WindowsSDKName" value="WindowsSDK"/>
+
+	<dependent name="WindowsSDK" />
+	
+	<do if="${gdk.enabled??false}">
+		<dependent name="GDK"/>
+	</do>
+
+	<property name="default-lib-prefix"     value="" />
+	<property name="default-lib-suffix"     value=".lib" />
+	<property name="default-dll-suffix"     value=".dll"/>
+	<property name="default-exe-suffix"     value=".exe"/>
+
+	<property name="exe-suffix"     value="${exe-suffix.${config-system}??${exe-suffix??${default-exe-suffix}}}"/>
+	<property name="lib-prefix"     value="${lib-prefix.${config-system}??${lib-prefix??${default-lib-prefix}}}"/>
+	<property name="lib-suffix"     value="${lib-suffix.${config-system}??${lib-suffix??${default-lib-suffix}}}"/>
+	<property name="dll-suffix"     value="${dll-suffix.${config-system}??${dll-suffix??${default-dll-suffix}}}"/>
+	
+	<optionset name="config-build-layout-entrypoint-common">
+		<option name="exe" value="%output%"/>
+	</optionset>
+
+	<property name="cc.std.${config-system}.default" value="${cc.std.${config-system}.default??c++17}"/>
+
+	<!-- define platform SDK directories.  Note that the property 'eaconfig.PlatformSDK.dir' also 
+       get used in Framework to setup WindowsSdkDir envrionment variable when necessary. Framework probably should
+       have used properties provided by WindowsSDK.  It uses eaconfig.PlatformSDK.dir probably to deal with backward
+       compatibility issues? -->
+	<choose>
+		<do if="${package.WindowsSDK.MajorVersion??0} lt 8">
+			<!-- This part should only get used by Windows SDK 7.x and older as the paths are not valid for newer Windows SDK. -->
+			<do unless="@{PropertyExists('package.WindowsSDK.libdir')}">
+				<property name="package.WindowsSDK.libdir" value="${package.WindowsSDK.appdir}/lib/x64" if="${config-processor} == 'x64'"/>
+				<property name="package.WindowsSDK.libdir" value="${package.WindowsSDK.appdir}/lib" unless="${config-processor} == 'x64'"/>
+			</do>
+			<property name="eaconfig.PlatformSDK.dir" value="${package.WindowsSDK.appdir}"/>
+			<property name="eaconfig.PlatformSDK.dir.lib" value="${package.WindowsSDK.libdir}"/>
+		</do>
+		<do>
+			<!-- define library directory for Windows 8 SDK (Note that for WindowsPhoneSDK, we let the proxy package define the kitlibdir property.)  
+				We probably should do the same for WindowsSDK -->
+			<property name="eaconfig.PlatformSDK.dir" value="${package.WindowsSDK.kitdir}"/>
+			<choose>
+				<!--
+					Package versions of WindowsSDK older than 8.0.50727-4 does not have this property defined.
+					All released packages of WindowsPhoneSDK has this property defined. -->
+				<do if="@{PropertyExists('package.WindowsSDK.kitlibdir')}">
+					<property name="eaconfig.PlatformSDK.dir.lib" value="${package.WindowsSDK.kitlibdir}"/>
+				</do>
+				<do>
+					<!-- Note that for Windows SDK 8.1, the folder is lib\winv6.3\um\, 
+					another good reason why we should put this in WindowsSDK proxy package and we shouldn't add these logics here! -->
+					<property name="eaconfig.PlatformSDK.um.dir" value="${eaconfig.PlatformSDK.dir}\lib\win8\um\"/>
+					<property name="eaconfig.PlatformSDK.dir.lib" value="${eaconfig.PlatformSDK.um.dir}\${config-processor}"/>
+				</do>
+			</choose>
+		</do>
+	</choose>
+
+	<choose>
+		<do if="@{PropertyExists('package.WindowsSDK.includedirs')} and @{PropertyExists('package.WindowsSDK.librarydirs')}">
+			<!--
+        In the future, please just let Windows SDK handle the list by using the .includedirs and .librarydirs properties! 
+        We really shouldn't have eaconfig being cluttered with script testing for different versions of WindowsSDK and do something different!
+        For future release of WindowsSDK, please just setup those 2 properties. -->
+			<property name="eaconfig.PlatformSDK.includedirs">
+				${package.WindowsSDK.includedirs}
+			</property>
+			<property name="eaconfig.PlatformSDK.librarydirs">
+				${package.WindowsSDK.librarydirs}
+			</property>
+		</do>
+		<do if="${package.WindowsSDK.MajorVersion??0} lt 8">
+			<property name="eaconfig.PlatformSDK.includedirs">
+				${eaconfig.PlatformSDK.dir}\include
+				${package.eaconfig.sdkdir??}
+			</property>
+			<property name="eaconfig.PlatformSDK.librarydirs">
+				${eaconfig.PlatformSDK.dir.lib}
+				${eaconfig.PlatformSDK.dir.lib}\prerelease
+			</property>
+		</do>
+		<!-- Following is for allowing backward compatibility with existing WindowsSDK 8 packages. -->
+		<do>
+			<property name="eaconfig.PlatformSDK.includedirs">
+				${eaconfig.PlatformSDK.dir}\Include\shared
+				${eaconfig.PlatformSDK.dir}\Include\um
+			</property>
+			<property name="eaconfig.PlatformSDK.librarydirs">
+				${eaconfig.PlatformSDK.dir.lib}
+				${eaconfig.PlatformSDK.dir.lib}\prerelease
+			</property>
+		</do>
+	</choose>
+</project>

@@ -1,0 +1,149 @@
+// Defines the RPCs and async notifications used in the example component.
+//  RPC classes are compiled with RPCComp, generating C++ classes (or class stubs) that the component must implement.
+//
+// We assume that all request and response types are valid and just use them
+// directly in the code generation.
+//
+// The compiler should ensure that all commands within a component have a unique ID.
+// The compiler should ensure that all components within a file have a unique ID.
+// Zero is not a valid component or command ID
+// Enforce that method names must start with lowercase letter.
+// Enforce C++ rules for method names and TDF type names.
+// Allow C++ style comments.
+//
+
+[ headername="example/tdf/exampletypes.h" ]
+#include "example/gen/exampletypes.tdf"
+
+[ 
+  client_include = false,
+  headername="example/tdf/exampletypes_server.h" 
+]
+#include "example/gen/exampletypes_server.tdf"
+
+
+namespace Blaze
+{
+namespace Example
+{
+
+[
+  id = core/3,
+  description = "A component used strictly as a template.",
+  details = "This component will compile.  It will not be configured to run by default.",
+  configurationType=ExampleConfig //Configuration TDF that describes what the component configuration looks like.
+]
+component Example
+{
+    errors
+    {
+        [ description = "An unknown error occurred." ]
+        EXAMPLE_ERR_UNKNOWN = 1;
+    }
+
+    [isSharded=true, shardingKey="exampleItemId", useSlivers=true]
+    slave
+    {           
+        methods
+        {
+            [
+                id = 1,
+                errors = {EXAMPLE_ERR_UNKNOWN},
+                errortype = ExampleError,
+                description = "This command will poke the Blaze server and return a response.",
+                details = "If a negative number is passed in the num field, this command will return an error.",
+                ignoreShardingKey = true
+            ]
+            ExampleResponse poke(ExampleRequest);
+
+            [
+                id = 2,
+                blocking = false,
+                client_export = false,
+                generate_command_class = false,
+                requires_authentication = true,
+                requiresUserSession = true,
+                setCurrentUserSession = true,
+                passthrough = rpcPassthroughMaster,
+                ignoreShardingKey = true
+            ]
+            void rpcPassthrough();
+
+            [
+                id = 3,
+                blocking = true,
+                client_export = false,
+                generate_command_class = false,
+                requires_authentication = true,
+                requiresUserSession = true,
+                setCurrentUserSession = true,
+                ignoreShardingKey = true
+            ]
+            void requestToUserSessionOwner();
+
+
+            [
+                id = 101,
+                ignoreShardingKey = true
+            ]
+            CreateExampleItemResponse createExampleItem(CreateExampleItemRequest);
+
+            [
+                id = 102
+            ]
+            ExampleItemState readExampleItem(ReadExampleItemRequest);
+
+            [
+                id = 103
+            ]
+            void updateExampleItem(UpdateExampleItemRequest);
+
+            [
+                id = 104
+            ]
+            void pinExampleItem(PinExampleItemRequest);
+
+            [
+                id = 105
+            ]
+            void deleteExampleItem(DeleteExampleItemRequest);
+
+        } // methods
+
+        // slave -> client notifications
+        notifications
+        { 
+            [
+              id = 1,
+              description = "A broadcast notification sent to any ExampleItem subscribers."
+            ]
+            NotifyExampleItemBroadcast(ExampleItemState);
+        }
+    } // slave
+
+    master
+    {
+        methods
+        {
+            [
+              id = 1,
+              errors = {EXAMPLE_ERR_UNKNOWN} 
+            ]
+            ExampleResponse pokeMaster(ExampleRequest);
+
+            [
+                id = 2,
+                blocking = true,
+                client_export = false,
+                generate_command_class = false,
+                requires_authentication = true,
+                requiresUserSession = true,
+                setCurrentUserSession = true
+            ]
+            void rpcPassthroughMaster();
+        } // methods
+    } // master
+}
+
+}
+}

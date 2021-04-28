@@ -1,0 +1,138 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <compiler
+		path="${package.VisualStudio.compiler}"
+		path-clanguage="${package.VisualStudio.c-compiler}"
+		version="${eaconfig.msvc.version}"
+    >
+    <common-defines>
+      WIN32
+      <do if="${gdk.enabled??false}">
+        EA_PLATFORM_GDK
+        _GAMING_DESKTOP
+      </do>
+      <do if="'${config-processor}' == 'arm'">
+        _M_ARM
+        __ARM_NEON
+        __ARM_NEON__
+        __ARM_ARCH_7A__
+        __ARM_ARCH_7__
+      </do>
+      <do if="'${config-processor}' == 'arm64'">
+        _M_ARM64
+        __ARM_NEON
+        __ARM_NEON__
+        __ARM_ARCH_8__
+        __aarch64__
+      </do>
+    </common-defines>
+    <common-options>
+      /FS
+      -bigobj
+      -Zc:inline
+    </common-options>
+    <system-includedirs>
+      ${package.VisualStudio.includedirs}
+      ${package.GDK.includedirs??}
+      ${package.WindowsSDK.includedirs??${eaconfig.PlatformSDK.includedirs}}
+    </system-includedirs>
+    <template>
+      <commandline>
+        %defines%
+        %includedirs%
+        %system-includedirs%
+        %usingdirs%
+        %options%
+        -Fo"%objectfile%"
+        "%sourcefile%"
+        %forceusing-assemblies%
+      </commandline>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <system-includedir>-I "%system-includedir%"</system-includedir>
+      <usingdir>-AI "%usingdir%"</usingdir>
+      <forceusing-assembly>-FU "%forceusing-assembly%"</forceusing-assembly>
+    </template>
+  </compiler>
+
+  <assembler 
+		path="${package.VisualStudio.assembler}"
+		version="${eaconfig.msvc.version}"
+    >
+    <common-options>
+      -nologo <!-- turn off MS copyright message -->
+      -c <!-- compile only -->
+      -W2 <!-- warning level 2 -->
+      -WX <!-- warning are errors -->
+      -Fo"%objectfile%"
+      "%sourcefile%"
+    </common-options>
+    <system-includedirs>
+      ${package.VisualStudio.includedirs}
+      ${package.GDK.includedirs??}
+      ${package.WindowsSDK.includedirs??${eaconfig.PlatformSDK.includedirs}}
+    </system-includedirs>
+    <template>
+      <!-- 
+          VisualStudio proxy package defined as.options to include -Fo"%objectfile%" "%sourcefile%" which make this non-standard with
+          above compiler commandline to include switch for output file and include switchs for input source file.
+      -->
+      <commandline>
+        %defines%
+        %includedirs%
+        %system-includedirs%
+        %options%
+      </commandline>
+      <define>-D "%define%"</define>
+      <includedir>-I "%includedir%"</includedir>
+      <system-includedir>-I "%system-includedir%"</system-includedir>
+    </template>
+  </assembler>
+
+  <librarian
+    path="${package.VisualStudio.archiver}"
+    version="${eaconfig.msvc.version}"
+    >
+    <template>
+      <!-- VisualStudio proxy package defined lib.options which include /OUT:X switches to specify output file -->
+      <commandline>
+        %options%
+        %objectfiles%
+      </commandline>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </librarian>
+
+  <linker
+    path="${package.VisualStudio.linker}"
+    version="${eaconfig.msvc.version}"
+    >
+    <system-librarydirs>
+      ${package.VisualStudio.librarydirs}
+      ${eaconfig.PlatformSDK.librarydirs}
+      ${package.GDK.librarydirs??}
+    </system-librarydirs>
+    <system-libs>
+      ${package.VisualStudio.libraries??}
+      ${package.WindowsSDK.libraries??}
+      ${package.GDK.libraries??}
+      <do if="${gdk.enabled??false}">
+        xgameplatform.lib
+        xgameruntime.lib
+      </do>
+    </system-libs>
+    <template>
+      <!-- The output switch is added to link.options during builtset generate optionset! -->
+      <commandline>
+        %options%
+        %librarydirs%
+        %objectfiles%
+        %libraryfiles%
+      </commandline>
+      <librarydir>-libpath:"%librarydir%"</librarydir>
+      <libraryfile>"%libraryfile%"</libraryfile>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </linker>
+
+</project>

@@ -1,0 +1,111 @@
+<!--
+   Define XML schema to enable intellisense in Visual Studio. 
+   Framework Intellisense needs to be installed first using target "install-intellisense:
+   
+       nant install-intellisense
+-->
+<project default="build" xmlns="schemas/ea/framework3.xsd">
+
+  <package name="GamePacker" targetversion="ML" />
+
+  <Library name="GamePacker">
+    <dependencies>
+      <build>
+        coreallocator
+        EAAssert
+        EABase
+        EAThread
+        EAStdC
+        EASTL
+      </build>
+    </dependencies>
+    <includedirs>
+      include
+    </includedirs>
+    <sourcefiles>
+      <includes name="source/*.cpp" />
+      <includes name="source/factors/*.cpp" />
+    </sourcefiles>
+  </Library>
+  
+  <tools>
+    <Program name="GamePackerTool">
+      <dependencies>
+        <build>
+          coreallocator
+          EAAssert
+          EABase
+          EAThread
+          EAStdC
+          EASTL
+          EAMain
+          EAIO
+          GamePacker/GamePacker
+        </build>
+      </dependencies>
+      <sourcefiles>
+        <includes name="source/tool/*.cpp" />
+        <includes name="source/tool/*.h" />
+      </sourcefiles>
+      <visualstudio>
+        <excludedbuildfiles>
+          <includes name="${package.dir}/etc/**.cfg"/>
+        </excludedbuildfiles>
+      </visualstudio>
+    </Program>
+  </tools>
+
+  <tests>
+    <Program name="GamePackerTest">
+      <dependencies>
+        <build>
+          coreallocator
+          EAAssert
+          EABase
+          EAThread
+          EAStdC
+          EASTL
+          EAMain
+          EAIO
+          GamePacker/GamePacker
+          gtest
+        </build>
+      </dependencies>
+      <sourcefiles>
+        <includes name="source/test/*.cpp" />
+        <includes name="source/test/*.h" />
+      </sourcefiles>
+    </Program>
+  </tests>
+  
+  <!-- GUI currently can't break on Blaze Server asserts, for debugging, only enable it for opt -->
+  <do if="'${config-name}'=='dev-opt'">
+      <property name="runtime.GamePackerTest.commandprogram" value="${package.dir}/bin/gtest-runner/gtest-runner.exe"/>
+      <property name="runtime.GamePackerTest.commandargs" value="-r -a $(TargetPath)"/>
+      <property name="runtime.GamePackerTest.workingdir" value="${package.dir}"/>
+  </do>
+
+  <!-- Invoke vcproj user template rewrite step -->
+  <property name="backend.VisualStudio.postgenerate" value="rewritevcprojusertemplate"/>
+  
+  <!-- Set the default debug working directory and command args -->
+  <target name="rewritevcprojusertemplate">
+    <property name="vcproj.user.template" fromfile="${package.dir}/scripts/template.user"/>
+    <property name="vcproj.user.template" value="@{StrReplace('${vcproj.user.template}','%CMDARGS%','-config etc/gpsettings.cfg')}"/>
+
+    <!-- Check dependencies -->
+    <property name="rewrite_user_template" local="true"/>
+    <depends property="rewrite_user_template">
+        <inputs>
+            <includes name="${package.dir}/scripts/template.user"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.builddir}/GamePackerTool.vcxproj.user"/>
+        </outputs>
+    </depends>
+
+    <echo message="${vcproj.user.template}" file="${package.builddir}/GamePackerTool.vcxproj.user" if="${rewrite_user_template} == true"/>
+    
+  </target>
+
+</project>

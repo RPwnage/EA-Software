@@ -1,0 +1,239 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <target name="generate-framework-schema" description="Intellisense xsd file generator." hidden="true">
+    <!-- generate the schema file -->
+    <property name="framework-schema-output" value="${framework-schema-output??${nant.project.temproot}\framework3.xsd}" local="true"/>
+    <nantschema outputfile="${framework-schema-output}"/>
+    <fail unless="@{FileExists('${framework-schema-output}')}" message="${framework-schema-output} not found"/>
+  </target>
+  
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  
+  <target name="install-visualstudio-intellisense" description="Intellisense xsd file generator and installer." hidden="true">
+    <call target="generate-framework-schema"/>
+    
+    <echo message="Copying framework3.xsd to visual studio Schemas location"/>
+    <property name="framework-schema-output" value="${framework-schema-output??${nant.project.temproot}\framework3.xsd}" local="true"/>
+    <nantschemainstall inputfile="${framework-schema-output}" />
+
+    <!-- A fix for Visual Studio 2013, sharepoint schemas have been auto-enable for all file with *.xml extensions
+    and this interferes with the framework intellisense schema. So we replace it with this catalog file. -->
+    <do if="@{FileExists('${package.Framework.dir}/data/WssSchemaCatalog64.xml')}">
+      <echo message="Patching sharepoint schema catalog (fix for visualstudio 2013)"/>
+      <nantschemainstall inputfile="${package.Framework.dir}/data/WssSchemaCatalog64.xml" />
+    </do>
+    
+    <echo message="Please restart Visual Studio for intellisense to work with .build file extensions"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <!-- This is a faster more light weight intellisense installation target that copies a prebuilt schema to a known location -->
+  <!-- this is meant to be run in conjunction with other framework actions in order to install the schema without the users knowing -->
+  <target name="intellisense-quick-install">
+    <!-- the whole thing is wrapped in a try-catch just to be safe, because we don't want a failure of this to fail the whole target -->
+    <trycatch>
+      <try>
+        <!-- the record to swallow all output from this target since we don't want users to be bothered if they see messages from this -->
+        <record property="intellisense-copy-output" silent="true">
+          <dependent name="VisualStudio"/>
+          <property local="true" name="vs-schema-dir" value="${package.VisualStudio.appdir}/Xml/Schemas"/>
+          <do if="@{DirectoryExists('${vs-schema-dir}')}">
+
+            <!-- catalog file contains .build file extension association, only need to copy this if it doesn't exist -->
+            <property local="true" name="catalogfile" value="${package.Framework.dir}/data/nant_intellisense.xml"/>
+            <do if="@{FileExists('${catalogfile}')}">
+              <do unless="@{FileExists('${vs-schema-dir}/nant_intellisense.xml')}">
+                <copy file="${catalogfile}" tofile="${vs-schema-dir}/nant_intellisense.xml" clobber="true" failonerror="false"/>
+              </do>
+            </do>
+
+            <property local="true" name="schemafile" value="${package.Framework.dir}/data/framework3.xsd"/>
+
+            <!-- prefer the frostbite schema file if it exists -->
+            <do if="@{PropertyExists('frostbite.TNT_ROOT')}">
+              <do if="@{FileExists('${frostbite.TNT_ROOT}/bin/CM/fbcli/framework3.xsd')}">
+                <property local="true" name="schemafile" value="${frostbite.TNT_ROOT}/bin/CM/fbcli/framework3.xsd"/>
+              </do>
+            </do>
+
+            <!-- copy the schema file if it is newer -->
+            <do if="@{FileExists('${schemafile}')}">
+              <!-- copy the schema file, framework's copy task only overwrites if newer -->
+              <copy file="${schemafile}" tofile="${vs-schema-dir}/framework3.xsd" clobber="true" failonerror="false"/>
+            </do>
+
+          </do>
+        </record>
+      </try>
+      <finally>
+        <echo message="[Intellisense Copy Step] ${intellisense-copy-output}" loglevel="Diagnostic"/>
+      </finally>
+    </trycatch>
+
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  
+  <!-- It is recommended that you call the 'doc' target rather than the doxygen target directly -->
+  <target name="eaconfig-doxygen" hidden="true" >
+
+    <dependent name="Doxygen"/>
+
+    <mkdir dir="${package.builddir}/doc" unless="@{DirectoryExists('${package.builddir}/doc')}" />
+
+    <!-- Use a default fileset for doxygen files if not specified -->
+    <fileset name="package.doxygenfiles" unless="@{FileSetExists('package.doxygenfiles')}">
+      <includes name="${package.dir}/source/doc/*.dxy"/>
+    </fileset>
+
+    <delete dir="${package.builddir}/doc"/>
+    
+    <!-- Users can override doxygen settings by defining the optionset eaconfig.doxygen.options 
+    ex. If you want to generate a CHM file:
+    <optionset name="eaconfig.doxygen.options">
+      <option name='GENERATE_HTMLHELP' value='YES'/>
+    </optionset>
+    -->
+    <optionset name="eaconfig.doxygen.options" unless="@{OptionSetExists('eaconfig.doxygen.options')}"/>
+
+    <fileset name="doxygen-include-dirs-fileset"/>
+
+    <!-- Many projects don't use the headerfiles fileset, so we need to search the include directories. -->
+    <do if ="${eaconfig.doxygen.include_dirs??false}">
+      <foreach item="String" in="${runtime.buildmodules}" property="buildmodules">
+        <foreach item="String" in="${runtime.${buildmodules}.includedirs??}" property="incdir">
+          <fileset name="doxygen-include-dirs-fileset" append="true">
+            <includes name="${incdir}\**\*.h"/>
+            <includes name="${incdir}\**\*.cpp"/>
+          </fileset>
+        </foreach>
+      </foreach>
+    </do>
+
+    <!-- Allow users to include and exclude directories with their own global properties -->
+    <do if="@{PropertyExists('eaconfig.doxygen.include_directories')}">
+      <foreach item="String" in="${eaconfig.doxygen.include_directories}" property="include_directory">
+        <fileset name="doxygen-include-dirs-fileset" append="true">
+          <includes name="${include_directory}"/>
+        </fileset>
+      </foreach>
+    </do>
+    <do if="@{PropertyExists('eaconfig.doxygen.exclude_directories')}">
+      <foreach item="String" in="${eaconfig.doxygen.exclude_directories}" property="exclude_directory">
+        <fileset name="doxygen-include-dirs-fileset" append="true">
+          <excludes name="${exclude_directory}"/>
+        </fileset>
+      </foreach>
+    </do>
+
+    <!-- For more complete include graphs you can add the include dirs of build dependencies (More files means longer generation time) -->
+    <do if="${eaconfig.doxygen.dependent_includes??false}">
+      <foreach item="String" in="${runtime.buildmodules}" property="buildmodules">
+        <foreach item="String" in="${runtime.${buildmodules}.builddependencies??} ${runtime.${buildmodules}.usedependencies??}" property="builddep">
+          <foreach item="String" in="${package.${builddep}.includedirs??}" property="incdir">
+            <fileset name="doxygen-include-dirs-fileset" append="true">
+              <includes name="${incdir}\**\*.h"/>
+              <includes name="${incdir}\**\*.cpp"/>
+            </fileset>
+          </foreach>
+        </foreach>
+      </foreach>
+    </do>
+
+    <!-- Remove any files larger than 1 MB to prevent doxygen from crashing -->
+    <script language="C#" mainclass="FileSizeScript">
+      <code><![CDATA[
+      private static Project _project;
+      
+      public static void ScriptMain(Project project) 
+      {
+        _project = project;
+        FileSet includedirs = project.NamedFileSets["doxygen-include-dirs-fileset"];
+        System.Collections.Generic.List<FileItem> files_to_exclude = includedirs.FileItems.FindAll(GreaterThanOneMegaByte);
+        foreach (FileItem item in files_to_exclude) 
+        {
+          EA.Eaconfig.FileSetUtil.FileSetExclude(includedirs, item.FullPath);
+        }
+      }
+      
+      private static bool GreaterThanOneMegaByte(FileItem fileitem)
+      {
+        const int bytes_in_a_megabyte = 1048576;
+        long filesize_mb = new FileInfo(fileitem.FullPath).Length / bytes_in_a_megabyte;
+        if (filesize_mb >= 1) 
+        {
+          _project.Log.Warning.WriteLine(fileitem.FileName + ": is larger than 1 MB! Doxygen can't handle large files so this file will be ignored.");
+          return true;
+        }
+        return false;
+      }
+      ]]></code>
+    </script>
+    
+    <echo message="Files Found: @{FileSetCount('doxygen-include-dirs-fileset')}"/>
+
+    <!-- Global properties for overriding doxygen settings -->
+    <optionset name="eaconfig.doxygen.options" append="true">
+      <!-- Changing the default font to Calibri since the other default doesn't exist and throws a warning -->
+      <option name='DOT_FONTNAME' value='${eaconfig.doxygen.font_name}' if="@{PropertyExists('eaconfig.doxygen.font_name')}"/>
+      <!-- change the format of the graphs generated by graphviz (png, svg, jpg, gif), default is 'png', using 'svg' is usually faster on large projects -->
+      <option name='DOT_IMAGE_FORMAT' value='${eaconfig.doxygen.graph_format}' if="@{PropertyExists('eaconfig.doxygen.graph_format')}"/>
+      <!-- searchings the include path everytime a #include is found in a file, turning this off can speed up generation -->
+      <option name='SEARCH_INCLUDES' value='${eaconfig.doxygen.search_includes}' if="@{PropertyExists('eaconfig.doxygen.search_includes')}"/>
+      <!-- the size of the look up cache, determined by the formula: 2^(16+LOOKUP_CACHE_SIZE) -->
+      <option name='LOOKUP_CACHE_SIZE' value='${eaconfig.doxygen.lookup_cache_size}' if="@{PropertyExists('eaconfig.doxygen.lookup_cache_size')}"/>
+    </optionset>
+    
+    <!-- Call the doxygen task (defined in the doxygen package) to build the documentation -->
+    <doxygen extractall="true" outdir="${package.builddir}/doc" verbose="${eaconfig.doxygen.verbose??false}">
+      <inputs>
+        <!--
+        eaconfig assumes all your documentation is in the headers and source files for your project.
+        -->
+        <includes fromfileset="doxygen-include-dirs-fileset"/>
+        <includes fromfileset="runtime.${build.module}.headerfiles" if="@{FileSetExists('runtime.${build.module}.headerfiles')}"/>
+        <includes fromfileset="runtime.${build.module}.sourcefiles" if="@{FileSetExists('runtime.${build.module}.sourcefiles')}"/>
+      </inputs>
+      <options fromoptionset="eaconfig.doxygen.options"/>
+    </doxygen>
+
+    <!-- copy the built documentation to the package directory -->
+    <do if="@{OptionSetGetValue('eaconfig.doxygen.options', 'GENERATE_HTMLHELP')} == 'YES'">
+      <copy file="${package.builddir}/doc/html/index.chm" tofile="${package.dir}/doc/${package.name}.chm"/>
+    </do>
+    <do unless="@{OptionSetGetValue('eaconfig.doxygen.options', 'GENERATE_HTMLHELP')} == 'YES'">
+
+      <!-- Not building a CHM file, copy all HTML files to package directory -->
+      <delete dir="${package.dir}/doc/html" failonerror='false'/>
+      <mkdir dir="${package.dir}/doc/html"/>
+
+      <copy todir="${package.dir}/doc/html">
+        <fileset basedir="${package.builddir}/doc/html">
+          <includes name="**/*"/>
+        </fileset>
+      </copy>
+    </do>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'doc')}' == 'exclude'">
+    <target name="doc" style="use" description="Generate documentation"  allowoverride="true">
+
+      <call target="doc.prebuildtarget" force="true" if="@{TargetExists('doc.prebuildtarget')}" />
+
+      <property name="doc.type" value="Doxygen" unless="@{PropertyExists('doc.type')}" />
+      <property name="eaconfig.build.target" value="eaconfig-doxygen" if="${doc.type} == 'Doxygen'"/>
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig-build-caller.supportmodules" value="false" />
+      
+      <call target="eaconfig-build-caller" force="true" />
+
+      <call target="doc.postbuildtarget" force="true" if="@{TargetExists('doc.postbuildtarget')}" />
+    </target>
+  </do>
+
+</project>

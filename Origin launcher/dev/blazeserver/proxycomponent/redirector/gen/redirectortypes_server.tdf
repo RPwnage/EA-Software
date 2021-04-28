@@ -1,0 +1,304 @@
+
+[headername="redirector/tdf/redirectortypes.h"]
+#include "redirector/gen/redirectortypes.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+namespace Blaze
+{
+namespace Redirector
+{
+
+const uint32_t MESSAGE_TYPE_MAX_LENGTH = 64;
+const uint32_t MESSAGE_MAX_LENGTH = 256;
+
+// Note that several types defined in this file are explicitly duplicated from previously
+// defined types in the Blaze framework code.  This is to provide isolation between the
+// redirector and the blaze instances.  Since there will be a single rdir instance running
+// supporting many blaze servers (with differing versions), it is important that API and type
+// changes are closely monitored.  Duplicating types already used in the framework allows a
+// given blaze instance to provide the necessary translation as changes are made without
+// affecting compatibility with the rdir.
+
+class UpdateServerInfoRequest
+{
+    [tag="info"] ServerInfoData mInfo;
+};
+
+class UpdateServerInfoErrorResponse
+{
+    [tag="addr"] IpAddress mConflictingServerAddress;
+    [tag="svcn"] ServiceName mConflictingServiceName;
+};
+
+enum DowntimeType
+{
+    PARTIAL_OUTAGE,
+    MAINTENANCE_EVENT
+};
+
+[tdfid = "hash", trackChanges = true]
+class DowntimeData
+{
+    [tag="name"] ServiceName mServiceName;
+    [tag="msg"] string(MESSAGE_TYPE_MAX_LENGTH) mMessageType;
+    [tag="strt"] uint32_t mStart;
+    [tag="dur"] uint32_t mDuration;
+    [tag="dtyp"] DowntimeType mDowntimeType;
+    [tag="tid", default=0, description="Unused for scheduleServerDowntime"] uint64_t mTaskId;
+    [tag="warn", default=14400, description="The number of seconds before the scheduled downtime that the warning message will be displayed to clients."] uint32_t mPreDowntimeWarning;
+};
+
+class ScheduleInfo
+{
+    [tag="tid"] uint64_t mTaskId;
+};
+
+typedef list<DowntimeData> DowntimeDataList;
+
+class DowntimeListRequest
+{
+    [tag="name"] ServiceName mServiceName;
+};
+
+class DowntimeListResponse
+{
+    [tag="dlst"] DowntimeDataList mDowntimeList;
+};
+
+class DowntimeMessageData
+{
+    [tag="mtyp"] string(MESSAGE_TYPE_MAX_LENGTH) mMessageType;
+    [tag="mess"] string(MESSAGE_MAX_LENGTH) mLocalizedMessage;
+    [tag="warn"] string(MESSAGE_MAX_LENGTH) mLocalizedWarnMsg;
+};
+
+typedef list<DowntimeMessageData> DowntimeMessageDataList;
+
+class DowntimeMessageRequest
+{
+    [tag="loc"]  uint32_t mLocale;   
+};
+
+class DowntimeMessageResponse
+{
+    [tag="dlst"] DowntimeMessageDataList mMessageList;   
+};
+
+class ServerAddressMapData
+{
+    [tag="addr"] ServerAddressInfo mServerAddressInfo;
+    [tag="load"] int32_t mLoad;
+};
+
+typedef map<string(256), ServerAddressMapData, ignorecase> InstanceNameAddressMap;
+class ServerAddressMapResponse  
+{  
+    [tag="addr"] InstanceNameAddressMap mAddressMap;  
+};  
+
+class ServerAddressMapRequest  
+{  
+    [tag="name"] string(256) mName;  
+    [tag="type"] InstanceType mInstanceType;  
+    [tag="chan"] string(32) mChannel;  
+    [tag="prot"] string(32) mProtocol;  
+    [tag="atyp"] ServerAddressType mAddressType;
+};  
+
+const char8_t* ATTRIBUTE_VERSION = "version";
+const char8_t* ATTRIBUTE_CONFIG_VERSION = "configVersion";
+const char8_t* ATTRIBUTE_BUILD_TIME = "buildTime";
+const char8_t* ATTRIBUTE_BUILD_LOCATION = "buildLocation";
+const char8_t* ATTRIBUTE_BUILD_TARGET = "buildTarget";
+const char8_t* ATTRIBUTE_DEPOT_LOCATION = "depotLocation";
+const char8_t* ATTRIBUTE_SANDBOX_ID = "sandboxId";
+ 
+[trackChanges = true]
+class StaticServerInstance
+{
+    [tag="id"] uint32_t mInstanceId;            // Unclear why this is uint32_t not uint16_t like InstanceId.  Not changing to avoid potential issue with redirector. 
+    [tag="type"] InstanceType mInstanceType;
+    [tag="name"] string(256) mInstanceName;
+    [tag="endp"] list<ServerEndpointInfo> mEndpoints;
+    [tag="cwd"] string(256) mCurrentWorkingDirectory;
+    [tag="cltp"] ClientTypeList mClientTypes;
+};
+
+typedef map<ServiceName, ServiceName> TrialServiceNameRemapMap;
+ 
+[trackChanges = true]
+class ServerInstanceStaticData
+{
+    [tag="inst"] StaticServerInstance mInstance;
+    [tag="dflt"] ServiceName mDefaultServiceName;
+    [tag="snms"] ServiceNameInfoMap mServiceNames;
+    [tag="attr"] map<string(256),string(256)> mAttributeMap;
+    [tag="cver"] ClientVersionList mCompatibleClientVersions;
+    [tag="iver"] ClientVersionList mIncompatibleClientVersions;
+    [tag="amap"] AddressRemapList mAddressRemaps;
+    [tag="nmap"] NameRemapList mNameRemaps;
+    [tag="tmap"] TrialServiceNameRemapMap mTrialServiceNameRemaps;
+    [tag="xdns"] uint32_t mDefaultDnsAddress;
+    [tag="svid"] uint32_t mDefaultServiceId;
+};
+
+[trackChanges = true]
+class DynamicServerEndpointInfo
+{
+    [tag="ccon", default=UINT32_MAX] uint32_t mCurrentConnections;
+    [tag="mcon", default=UINT32_MAX] uint32_t mMaxConnections;
+};
+ 
+[trackChanges = true]
+class ServerInstanceDynamicData
+{
+    typedef map<string(256), int64_t, ignorecase> LoadStatisticsMap;
+
+
+    // **** Any time new values are added below that will be reported by a blazeserver, please
+    // **** ensure that the STATS_VERSION constant is bumped up.  This will allow the
+    // **** redirector to use different load formulas based on what values are reported.
+    const char8_t* LOAD_STATS_VERSION = "statsVers";
+    const char8_t* LOAD_CONNECTION_COUNT = "conns";
+    const char8_t* LOAD_CPU_PCT = "cpuPct";
+    const char8_t* LOAD_MEM_BOX_TOTAL = "memBoxTotal";
+    const char8_t* LOAD_MEM_BOX_FREE = "memBoxFree";
+    const char8_t* LOAD_MEM_USED = "memUsed";
+    const char8_t* LOAD_MEM_USED_RSS = "memUsedRSS";
+    const char8_t* LOAD_MEM_TOTAL = "memTotal";
+    const char8_t* LOAD_SYSTEM_INSTANCES = "instancesOnBox";
+    const char8_t* LOAD_UPTIME = "uptime";
+
+    // This defines the current version of the stats that get reported to the redirector.  Any
+    // time these values change or new fields are added this version must be bumped up.
+    const int64_t STATS_VERSION = 1;
+
+    [tag="load"] int32_t mLoad;
+    [tag="sver", default=0] int64_t mLoadStatsVersion;
+    [tag="lmap"] LoadStatisticsMap mLoadMap;
+    [tag="svc", default=true] bool mInService;
+
+    [tag="dsei"] list<DynamicServerEndpointInfo> mEndpoints;
+}; 
+ 
+[tdfid = "hash", trackChanges = true]
+class ServerInstanceInfoData
+{
+    [tag="data"] ServerInstanceStaticData mStaticData;
+    [tag="inst"] ServerInstanceDynamicData mDynamicData;  
+};
+
+
+typedef uint64_t RegistrationId;
+const RegistrationId INVALID_REGISTRATION_ID = 0;
+class PublishServerInstanceInfoRequest
+{
+    [tag="stic"] ServerInstanceInfoData mInfo;
+    [tag="id", default=INVALID_REGISTRATION_ID] RegistrationId mRegistrationId; 
+    [tag="vers"] uint64_t mVersion; 
+    [tag="chan",description="channel type of peer connection info to get back"] string(32) mChannel;  
+    [tag="prot",description="protocol of peer connection info to get back"] string(32) mProtocol;  
+    [tag="atyp",description="address type of peer connection info to get back"] ServerAddressType mAddressType;  
+    [tag="bind",description="bind type of the peer endpoint connection info to get back"] BindType mBindType;  
+    [tag="issc", description="when this value is true, that means we already knew it's not spam.", default=false] bool mIsSkipSpamCheck;
+    [tag="ctyp", description="connection type of the peer endpoint connection info to get back.  Optional.  Defaults to match-all with empty string", default=""] string(64) mConnectionTypeString;
+};
+
+class UpdateServerInstanceInfoRequest
+{
+    [tag="dyna"] ServerInstanceDynamicData mDynamicData;
+    [tag="id", default=INVALID_REGISTRATION_ID] RegistrationId mRegistrationId;
+    [tag="vers"] uint64_t mVersion;
+    [tag="chan",description="channel type of peer connection info to get back"] string(32) mChannel;  
+    [tag="prot",description="protocol of peer connection info to get back"] string(32) mProtocol;  
+    [tag="atyp",description="address type of peer connection info to get back"] ServerAddressType mAddressType;    
+    [tag="bind",description="bind type of the peer endpoint connection info to get back"] BindType mBindType;  
+    [tag="ctyp", description="connection type of the peer endpoint connection info to get back.  Optional.  Defaults to match-all with empty string.", default=""] string(64) mConnectionTypeString;
+};
+
+class GetPeerServerAddressRequest
+{
+    [tag="name"] string(256) mName;   
+    [tag="chan"] string(32) mChannel;  
+    [tag="prot"] string(32) mProtocol;  
+    [tag="atyp"] ServerAddressType mAddressType;    
+    [tag="bind",description="bind type of the peer endpoint connection info to get back"] BindType mBindType;  
+    [tag="ctyp", description="connection type of the peer endpoint connection info to get back.  Optional.  Defaults to match-all with empty string.", default=""] string(64) mConnectionTypeString;
+};
+
+typedef list<ServerAddressInfo> ServerAddressInfoList;
+class PeerServerAddressInfo
+{
+    [tag="addr", description="map of address info for all other server instances in the same cluster by instanceId"] ServerAddressInfoList mAddressList;
+    [tag="vers"] uint64_t mVersion;
+};
+
+class UpdateServerInstanceInfoResponse
+{
+    [tag="addr"] PeerServerAddressInfo mPeerServerAddressInfo;
+    [tag="id", default=INVALID_REGISTRATION_ID] RegistrationId mRegistrationId; // this is the unique id that corresponds to the replicated entry for this blaze server instance.
+    [tag="time"] TimeValue mNextUpdate;
+};
+ 
+class PublishServerInstanceInfoErrorResponse
+{
+    [tag="addr"] IpAddress mConflictingServerAddress;
+    [tag="svcn"] string(64) mConflictingServiceName;
+    [tag="inst"] string(64) mConflictingInstanceName;
+};
+
+typedef map<uint32_t, ServerInstanceInfoData> ServerInstanceInfoMap;
+class ServerClusterInfoData
+{
+    [tag="name"] ServiceName mName;    
+    [tag="inst"] ServerInstanceInfoMap mInstanceMap;
+};
+ 
+class ServerList2Response
+{
+    [tag="list"] list<ServerClusterInfoData> mServers;
+};
+
+class CAResolverMetrics
+{
+    class Counts
+    {
+        [tag="s", default=0] uint64_t success;
+        [tag="f", default=0] uint64_t fail;
+    };
+
+    typedef map<ServiceName, Counts, ignorecase> RequestsByServiceName;
+    typedef map<string(256), RequestsByServiceName, ignorecase> RequestsByX509Subject;
+
+    [tag="req"] RequestsByX509Subject requests;
+};
+
+union PurgeCriteria
+{
+    [tag="name"] ServiceName mServiceName;
+    [tag="reg"] RegistrationId mRegistrationId;
+};
+
+class PurgeServerRegistrationRequest
+{
+    [tag="crit"] PurgeCriteria mPurgeCriteria;
+};
+
+class NotifyPurgeRegistration
+{
+    [tag="crit"] PurgeCriteria mPurgeCriteria;
+};
+
+} // namespace Redirector
+} // namespace Blaze
+
+
+
+
+
+
+
+
+

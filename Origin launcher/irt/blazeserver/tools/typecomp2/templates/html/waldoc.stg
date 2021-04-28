@@ -1,0 +1,235 @@
+group waldoc : servercommon;
+
+rootComponent(fileNode, component) ::= <<>>
+component(fileNode, component) ::= <<>>
+masterComponent(fileNode, component) ::= ""
+
+
+slaveComponent(fileNode, component) ::= <<
+$standardFileHeader()$
+<head>
+  <title>$component.Name$</title>
+  <link rel="stylesheet" type="text/css" name="wadl" href="wadl.css" />
+</head>
+<body>
+  <h1><a href="index.html">Blaze WAL</a>::$component.Name$</h1>
+  <p><i>This document serves as a reference for the Web Application Layer.
+For a full guide to using the Web Application Layer,
+<a href="https://developer.ea.com/display/blaze/Web+Access+Layer+-+Getting+Started"> see Confluence</a></i></p>
+<p>  $component.Description$  </p>
+<p><b>Base URI: </b><tt>http://hostname:port/$component.Name;format="toLower"$</tt></p>
+
+<ul>
+
+<li><a href="#resources"><b>RPC's</b></a><ul>
+$component.Commands:{<li><a href="#$it.Name$">$it.Name$</a></li>}$
+</ul>
+
+<li><a href="#notifications"><b>Notifications</b></a><ul>
+$component.Notifications:{<li><a href="#$it.Name$">$it.Name$</a></li>}$
+</ul>
+
+<li><a href="#representations"><b>TDF's</b></a><ul>
+$component.AllTypes:{<li><a href="#$it.Symbol.Name$">$it.Symbol.Name$</a></li>}$
+</ul>
+
+</ul>
+
+<h2 id="representations">TDF's</h2>
+$if(component.AllTypes)$
+$component.AllTypes:printTdf(class=it)$
+$else$
+None
+$endif$
+
+<h2 id="resources">RPC's</h2>
+$if(component.Commands)$
+$component.Commands:printCommand(command=it)$
+$else$
+None
+$endif$
+
+<h2 id="notifications">Notifications</h2>
+$if(component.Notifications)$
+$component.Notifications:printNotification(notification=it)$
+$else$
+None
+$endif$
+
+</body>
+$standardFileFooter()$
+>>
+
+printCommand(command) ::= <<
+<div class="resource">
+<h3 id="$command.Name$">$command.Name$
+$if(command.RequestType)$
+$if(command.RequestType.Symbol.Members)$
+<span class="optional">?<span class="optional">$first(command.RequestType.Symbol.Members).tag$</span>$rest(command.RequestType.Symbol.Members):printParams(member=it)$
+$endif$
+$endif$
+</h3>
+<div class="methods">
+<div class="method">
+<h4 id="http://hostname:port/$component.Name;format="toLower"$#$command.name;format="toLower"$">HTTP Method: GET</h4>
+$command.description$
+
+$if(command.RequestType)$
+<h5>Input Params</h5>
+<table><tr><th>Parameters</th><th>Type</th><th>Description</th></tr>
+$command.RequestType.Symbol.Members:printMember(member=it)$
+</table>
+$endif$
+
+$if(command.ResponseType)$
+<h5>Response Representation</h5>
+<p><a href="#$command.ResponseType.Symbol.Name$">$command.ResponseType.Symbol.Name$ (application/xml)</a></p>
+$command.ResponseType.Symbol.description$
+<table><tr><th>Element</th><th>Type</th><th>XPath</th><th>Description</th></tr>
+$command.ResponseType.Symbol.Members:printMemberResponse(member=it, symbol=command.ResponseType.Symbol)$
+</table>
+$endif$
+
+$if(command.errors)$
+<h5>Potential Faults</h5>
+<table><tr><th>Error Code</th><th>Description</th></tr>
+$command.ResolvedErrors:{<tr><td>$it.Name$</td><td><p>$it.description$</p></td></tr>}$
+</table>
+$endif$
+</div></div></div>
+>>
+
+printParams(member) ::= <<
+<span class="optional">&amp;$member.tag$</span>
+>>
+
+printTdf(class) ::= <<
+<h6 id="$class.Symbol.Name$">$class.Symbol.Name$</h6>
+<div class="tdf">
+<table><tr><th>Elements</th><th>Type</th><th>Description</th></tr>
+$class.Symbol.Members:printMember(member=it)$
+</table>
+</div>
+>>
+
+printNotification(notification) ::= <<
+<h6 id="$notification.Name$">$notification.Name$</h6>
+<div class="notification">
+$if(notification.id)$<p><b>ID =</b>$notification.id$</p>$endif$
+<p>$notification.description$</p>
+$if(notification.NotificationType)$
+<h5>Response Representation</h5>
+<p><a href="#$notification.NotificationType.Symbol.Name$">$notification.NotificationType.Symbol.Name$ (application/xml)</a></p>
+$notification.NotificationType.Symbol.description$ 
+<table><tr><th>Element</th><th>Type</th><th>XPath</th><th>Description</th></tr>
+$notification.NotificationType.Symbol.Members:printMemberResponse(member=it, symbol=notification.NotificationType.Symbol)$
+</table>
+$endif$
+</div>
+>>
+
+printMemberResponse(member, symbol) ::= <<
+<tr><td><p><strong>$member.Name;format="toLower"$</strong></p></td>
+<td><p>$getType(member)$</p></td>
+<td><tt>$symbol.Name;format="toLower"$/$member.Name;format="toLower"$</tt></td>
+<td><p>
+$member.description$
+</p></td></tr>
+>>
+
+printMember(member) ::= <<
+<tr><td><p><strong>$member.tag$</strong></p></td>
+<td><p>$getType(member)$</p></td>
+<td><p>
+$member.description$
+
+$if(member.TypeRef.Symbol.ActualCategoryEnum)$
+<dl>
+$member.TypeRef.Symbol.Members:printEnum()$
+</dl>
+$endif$
+
+$if(member.TypeRef.Symbol.ActualCategoryBitField)$
+<dl>
+$member.TypeRef.Symbol.Members:printBitfield()$
+</dl>
+$endif$
+</p></td></tr>
+>>
+
+printEnum(enumMember) ::= <<
+<dt><tt>$enumMember.Name$</tt> $if(enumMember.Value)$:= $enumMember.Value$</dt>$endif$
+<dd><p>$enumMember.description$</p></dd>
+>>
+
+printBitfield(member) ::= <<
+<dt><tt>$member.Name$</tt> $member.BitStart$</dt>
+<dd><p>$member.description$</p></dd>
+>>
+
+getType(node) ::= "$({getType$node.TypeRef.Symbol.ActualCategory$})()$"
+getTypeENUM() ::= "enum $node.TypeRef.Symbol.Name$"
+getTypeBITFIELD() ::= "TdfBitfield $node.TypeRef.Symbol.Name$"
+getTypeSTRING() ::= "string"
+getTypeINT_PRIMITIVE() ::= "$({getTypeINT_PRIMITIVE_$node.TypeRef.ActualSymbol.Name$})()$"
+getTypeINT_PRIMITIVE_bool8_t() ::= "bool8_t"
+getTypeINT_PRIMITIVE_bool() ::= "bool"
+getTypeINT_PRIMITIVE_char8_t() ::= "char8_t"
+getTypeINT_PRIMITIVE_int8_t() ::= "int8_t"
+getTypeINT_PRIMITIVE_uint8_t() ::= "uint8_t"
+getTypeINT_PRIMITIVE_int16_t() ::= "int16_t"
+getTypeINT_PRIMITIVE_uint16_t() ::= "uint16_t"
+getTypeINT_PRIMITIVE_int32_t() ::= "int32_t"
+getTypeINT_PRIMITIVE_uint32_t() ::= "uint32_t"
+getTypeINT_PRIMITIVE_int64_t() ::= "int64_t"
+getTypeINT_PRIMITIVE_uint64_t() ::= "uint64_t"
+getTypeINT_PRIMITIVE_ComponentId() ::= "ComponentId"
+getTypeINT_PRIMITIVE_EntityType() ::= "EntityType"
+getTypeINT_PRIMITIVE_EntityId() ::= "EntityId"
+getTypeFLOAT_PRIMITIVE() ::= "float"
+getTypeBLOB() ::= "TdfBlob"
+getTypeOBJECT_TYPE() ::= "ObjectType"
+getTypeOBJECT_ID() ::= "ObjectId"
+getTypeTIMEVALUE() ::= "TimeValue"
+getTypeVARIABLE() ::= "variable TDF"
+getTypeGENERIC() ::= "generic value"
+
+getTypeCLASS() ::= <<
+<a href="#$node.TypeRef.ActualSymbol.Name$">$node.TypeRef.ActualSymbol.Name$</a>
+>>
+getTypeUNION() ::= <<
+TdfUnion (<a href="#$node.TypeRef.Symbol.Name$">$node.TypeRef.Symbol.Name$</a>)
+>>
+
+getTypeMAP() ::= <<
+map&lt;$node.TypeRef.ActualSymbol.KeyType.ActualSymbol.Name$,&nbsp;$getType2(node=node.TypeRef.ActualSymbol.ValueType.ActualSymbol)$&gt;
+>>
+
+getTypeLIST() ::= <<
+list&lt;$getType2(node=node.TypeRef.ActualSymbol.ValueType.ActualSymbol)$&gt;
+>>
+
+getType2(node) ::= "$({getType2$node.ActualCategory$})()$"
+getType2ENUM() ::= "enum $node.Name$"
+getType2BITFIELD() ::= "TdfBitfield $node.Name$"
+getType2STRING() ::= "string"
+getType2INT_PRIMITIVE() ::= "$({getTypeINT_PRIMITIVE_$node.Name$})()$"
+getType2FLOAT_PRIMITIVE() ::= "float"
+getType2BLOB() ::= "TdfBlob"
+getType2OBJECT_TYPE() ::= "ObjectType"
+getType2OBJECT_ID() ::= "ObjectId"
+getType2TIMEVALUE() ::= "TimeValue"
+getType2LIST() ::= "list&lt;$getType2(node=node.ValueType.ActualSymbol)$&gt;"
+getType2VARIABLE() ::= "variable TDF"
+getType2GENERIC() ::= "generic value"
+getType2MAP() ::= <<
+map&lt;$node.KeyType.ActualSymbol.Name$,&nbsp;$getType2(node=node.ValueType.ActualSymbol)$&gt;
+>>
+
+getType2CLASS() ::= <<
+<a href="#$node.Name$">$node.Name$</a>
+>>
+
+getType2UNION() ::= <<
+TdfUnion (<a href="#$node.Name$">$node.Name$</a>)
+>>

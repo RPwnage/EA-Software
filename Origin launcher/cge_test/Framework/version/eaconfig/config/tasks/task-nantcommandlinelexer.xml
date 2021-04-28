@@ -1,0 +1,78 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <do unless="@{TargetExists('NantCommandLineLexer')}">
+
+    <target name="NantCommandLineLexer" style="use">
+      <task name="NantCommandLineLexer" />
+    </target>
+
+    <!-- Parse the NAnt command line to remove unwanted arguments and prevent some conflicts. -->
+    <createtask name="NantCommandLineLexer">
+
+      <parameters>
+        <option name="nantCommandLine" />
+        <option name="outputFormat" value="" />
+        <option name="outputTag" value="[lexer]" />
+        <option name="parsedNantArguments" />
+      </parameters>
+
+      <code>
+        <choose>
+          <do unless="@{PropertyExists('nant.commandline')}">
+            <script language="C#" mainclass="Scriptlet">
+              <code>
+                <![CDATA[
+							public static void ScriptMain(Project p)
+							{
+								p.Properties["nant.commandline"] = System.Environment.CommandLine;
+							}
+						]]>
+              </code>
+            </script>
+          </do>
+          <do>
+            <property name="nant.commandline" value="${NantCommandLineLexer.nantCommandLine}" />
+          </do>
+        </choose>
+        <!--echo message="${nant.commandline}" /-->
+
+        <dependent name="ActivePython" />
+        <property name="required.ActivePython.version" value="2.7.1" />
+        <fail message="The version of package 'ActivePython' must be greater or equal to '${required.ActivePython.version}'." if="@{StrCompareVersions('${package.ActivePython.version}', '${required.ActivePython.version}')} lt 0" />
+
+        <dependent name="EAMSDKTools" if="${package.name} != EAMSDKTools" /> <!-- Prevent package from depending on itself. -->
+        <property name="buildrootTag" value="#buildroot#" />
+
+        <record property="NantCommandLineLexerOutput">
+          <exec program="${package.ActivePython.exe}" workingdir="${package.EAMSDKTools.dir}">
+            <env>
+              <!--
+                The Nant buildroot is inserted in the Python path
+                so it can be retrieved before the arguments parsing is done.
+                This value will be used to set the log file directory.
+                The build root tag is used to easily identify
+                the right value in the path list.
+              -->
+              <!-- Add the EAMSDKTools directory to the Python search path so common libraries can be imported. -->
+              <option name="PYTHONPATH" value="${package.builddir}/${config}${buildrootTag}${nant.env.path.separator}${package.EAMSDKTools.dir}" />
+            </env>
+            <args>
+              <arg value="${package.EAMSDKTools.dir}/NantCommandLineLexer.py" />
+              <arg value="--outputFormat ${NantCommandLineLexer.outputFormat}" unless="@{StrLen(${NantCommandLineLexer.outputFormat})} == 0" />
+              <arg value="--outputTag ${NantCommandLineLexer.outputTag}" unless="@{StrLen(${NantCommandLineLexer.outputTag})} == 0" />
+              <arg value="${nant.commandline}" />
+            </args>
+          </exec>
+        </record>
+
+        <do unless="@{StrLen(${NantCommandLineLexer.outputFormat})} == 0">
+          <property name="parsedArgumentsIndex" value="@{MathAdd(@{StrLastIndexOf(${NantCommandLineLexerOutput}, ${NantCommandLineLexer.outputTag})}, @{StrLen(${NantCommandLineLexer.outputTag})})}" />
+          <property name="${NantCommandLineLexer.parsedNantArguments}" value="@{StrSubstring(${NantCommandLineLexerOutput}, ${parsedArgumentsIndex})}" />
+        </do>
+      </code>
+
+    </createtask>
+
+  </do>
+
+</project>

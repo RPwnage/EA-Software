@@ -1,0 +1,80 @@
+<!--
+   Define XML schema to enable intellisense in Visual Studio. 
+   Framework Intellisense needs to be installed first using target "install-intellisense:
+   
+       nant install-intellisense
+-->
+<project default="build" xmlns="schemas/ea/framework3.xsd">
+
+  <package name="ExCSharpDependsNativeLibPkg"/>
+
+  <choose>
+    <!-- We do this check in case the current config is already a dll config. -->
+    <!-- If you have different config package and use different config name, you may need to modify this slightly. -->
+    <do if="${Dll??false} or @{StrStartsWith('${config-name}','dll-')}">
+      <property name="local_dll_config" value="${config}" local="true"/>
+    </do>
+    <do>
+      <property name="local_dll_config" value="${config-platform}-dll-${config-name}" local="true"/>
+    </do>
+  </choose>
+
+  <!-- 
+      Using a build wrapper module to trigger a package build in a different DLL config. We need to use a wrapper module because
+      we don't want to have accidental impact to other modules that actually need to build that package as regular lib as shown
+      in the following HelloWorldCpp module.
+  -->
+  <dependent name="ExNativeLibPkg"/>
+  <MakeStyle name="ExNativeLibPkg_DLL_BuildWrapper">
+    <MakeBuildCommand>
+      &quot;${nant.location}\nant.exe&quot; -buildfile:&quot;${package.ExNativeLibPkg.dir}/ExNativeLibPkg.build&quot; -masterconfigfile:&quot;${nant.project.masterconfigfile}&quot; -buildroot:&quot;${nant.project.buildroot}&quot; -D:config=${local_dll_config} build
+      &quot;${nant.copy}&quot; -t -o &quot;${package.ExNativeLibPkg.builddir}/${local_dll_config}/bin/NativeLib.dll&quot; ${package.ExCSharpDependsNativeLibPkg.builddir}/${config}/bin/NativeLib.dll
+    </MakeBuildCommand>
+    <MakeCleanCommand>
+      &quot;${nant.location}\nant.exe&quot; -buildfile:&quot;${package.ExNativeLibPkg.dir}/ExNativeLibPkg.build&quot; -masterconfigfile:&quot;${nant.project.masterconfigfile}&quot; -buildroot:&quot;${nant.project.buildroot}&quot; -D:config=${local_dll_config} clean
+    </MakeCleanCommand>
+    <!-- The followings is only needed if you want to have the header files and source files being shown in Visual Studio. -->
+    <headerfiles>
+      <includes name="${package.ExNativeLibPkg.dir}/include/**"/>
+    </headerfiles>
+    <sourcefiles>
+      <includes name="${package.ExNativeLibPkg.dir}/source/**"/>
+    </sourcefiles>
+  </MakeStyle>
+
+  <CSharpProgram name="HelloWorld">
+    <dependencies>
+      <build>
+        ExCSharpDependsNativeLibPkg/runtime/ExNativeLibPkg_DLL_BuildWrapper
+      </build>
+    </dependencies>
+    <sourcefiles>
+      <includes name="source/HelloWorld/*.cs" />
+    </sourcefiles>
+  </CSharpProgram>
+
+  <Program name="HelloWorldCpp">
+    <config>
+      <!-- 
+        If we are building native DLL config, we still need the define needed by the dependent package so that the 
+        dependent package header file has the correct preprocessor defines as well.
+      -->
+      <defines if="${Dll??false}">
+        EX_NATIVE_LIB_DLL_BUILD=1
+      </defines>
+    </config>
+    <dependencies>
+      <!-- 
+        This time, we have normal build dependency to ExNativeLibPkg, 
+        where we want ExNativeLibPkg to be built as lib instead of DLL. 
+      -->
+      <build>
+        ExNativeLibPkg
+      </build>
+    </dependencies>
+    <sourcefiles>
+      <includes name="source/HelloWorldCpp/*.cpp" />
+    </sourcefiles>
+  </Program>
+
+</project>

@@ -1,0 +1,208 @@
+syntax = "proto3";
+
+package eadp.stats;
+
+import "google/protobuf/wrappers.proto";
+import "google/rpc/status.proto";
+
+option java_package = "com.ea.gs.stats.grpc";
+option java_outer_classname = "EntityStatsProto";
+option java_multiple_files = true;
+
+/* Must have the same ordinals as the Thrift's version */
+enum Consistency {
+    EVENTUAL = 0;
+    STRONG = 1;
+}
+
+enum CollectionOperator {
+    OPERATION_UNDEFINED = 0;
+    OPERATION_SUM = 1;
+    OPERATION_DECREMENT = 2;
+    OPERATION_MIN = 3;
+    OPERATION_MAX = 4;
+    OPERATION_REPLACE = 5;
+}
+
+enum GetEntityStatsFlags {
+    NONE = 0x00;
+    GET_PREVIOUS_VALUE = 0x01;
+}
+
+message TargetInstant {
+    oneof target {
+        string commit_id = 1;
+    }
+}
+
+message GetEntityStatsRequest {
+    string context_id = 1;
+    string category_id = 2;
+    string entity_id = 3;
+
+    repeated string stat_ids = 4;
+    /*PeriodType period_type = 5;
+    uint32 period_offset = 6;*/
+    Consistency consistency_level = 7; /* Consistency (from thrift) - EVENTUAL (default), STRONG */
+
+    TargetInstant target_instant = 8;
+    // Map of dimension filters for this request. If not empty, dimensioned stats returned in the response wil have only dimensions declared in this map.
+    // Regular, non-dimensioned stats is not affected by this field.
+    map<string, string> dimensions = 9;
+
+    // bitmask of GetEntityStatsFlags
+    int32 flags = 15;
+}
+
+/*
+* This is representation of dimensioned stats returned by getEntityStats/getStats by view requests.
+* Stats with the same id may have different dimension combinations where each combination has own stat value. Example:
+* kills_by_weapon:
+*   Dimensions:
+*       weapon: rifle = 1
+*       weapon: gun = 2
+* kills_by_weapon_and_map:
+*   Dimensions:
+*       weapon: rifle, map: deathstar = 1
+*       weapon: rifle, map: hoth = 2
+*/
+message DimensionedStatisticList {
+    // List of dimensions combinations and values for the stat. Each etry will have a unique combination of dimensions and a value associated with it.
+    repeated DimensionedStatisticValue dimensioned_statistic_values = 1;
+
+    /*
+    * Structure for a single dimensions combination and a value associated with it.
+    */
+    message DimensionedStatisticValue {
+        // Stat value for this dimensions combination.
+        double value = 1;
+        // Previous value
+        google.protobuf.DoubleValue previous_value = 2;
+        // Operator which will be used onlt when this instance of DimensionedStatisticValue is used in stats update request.
+        // It won't be present in the getEntityStats/getStatsByView responses.
+        CollectionOperator operator = 3;
+        // Collection of dimension names and values for this instance.
+        map<string, string> dimensions = 4;
+    }
+}
+
+message GetEntityStatsResponse {
+    message StatisticValue {
+        double value = 1;
+        google.protobuf.DoubleValue previous_value = 2;
+    }
+    google.rpc.Status status = 1;
+
+    string context_id = 4;
+    string category_id = 5;
+    string entity_id = 2;
+
+    map<string, StatisticValue> stat_values = 3;
+
+    // Map of dimensioned statistic values. Each key represents stat id and value is the list of dimension vaues.
+    // @see DimensionedStatisticList for more information.
+    map<string, DimensionedStatisticList> dim_stat_values = 7;
+}
+
+message GetStatsByViewResponse {
+    message CategoryStatValue {
+        string category_id = 1;
+        map<string, GetEntityStatsResponse.StatisticValue> values = 2;
+
+        // Map of dimensioned statistic values. Each key represents stat id and value is the list of dimension vaues.
+        // @see DimensionedStatisticList for more information.
+        map<string, DimensionedStatisticList> dim_values = 10;
+    }
+
+    google.rpc.Status status = 1;
+    string context_id = 2;
+    string entity_id = 3;
+
+    repeated CategoryStatValue stats = 4;
+}
+
+message UpdateEntityStatsRequest {
+    message StatisticValue {
+        google.protobuf.DoubleValue value = 1;
+        CollectionOperator operator = 2;
+    }
+
+    string update_id = 1;
+    string context_id = 2;
+    string category_id = 3;
+    string entity_id = 4;
+
+    map<string, StatisticValue> stats = 5;
+
+    // Map of dimensioned statistic values. Each key represents stat id and value is the list of dimension vaues.
+    // @see DimensionedStatisticList for more information.
+    map<string, DimensionedStatisticList> dim_stats = 7;
+}
+
+message UpdateEntityStatsResponse {
+    google.rpc.Status status = 1;
+    string update_id = 2;
+    string entity_id = 3;
+
+    // UUID returned by the underlying storage layer to identify the commit
+    string commit_id = 45;
+}
+
+/*
+* Configuration for dimensions filter used in view definition and ListStatsByViewRequest request.
+*/
+message ViewDimensionsFilter {
+    // Stat category id for which this filter will be aplied.
+    string category_id = 1;
+    // Stat id for which this filter will be aplied.
+    string stat_id = 2;
+    // Map of requred dimension names and values.
+    map<string, string> dimensions = 3;
+}
+
+message ListStatsByViewRequest {
+    string context_id = 1;
+    string view_id = 2;
+
+    repeated string entity_ids = 3;
+    Consistency consistency_level = 4;
+
+    // Dimension filter per stats which should be used in this request.
+    // If a stat has a dimension filter in the view definition and the same dimension is provided here, the exception will be thrown.
+    repeated ViewDimensionsFilter dimension_filters = 5;
+
+    // bitmask of GetEntityStatsFlags
+    int32 flags = 15;
+}
+
+message GetStatsByViewRequest {
+    string context_id = 1;
+    string view_id = 2;
+    string entity_id = 3;
+
+    Consistency consistency_level = 4;
+
+    // Dimension filter per stats which should be used in this request.
+    // If a stat has a dimension filter in the view definition and the same dimension is provided here, the exception will be thrown.
+    repeated ViewDimensionsFilter dimension_filters = 5;
+
+    // bitmask of GetEntityStatsFlags
+    int32 flags = 15;
+}
+
+
+message DeleteEntityStatsRequest {
+    string update_id = 1;
+    string context_id = 2;
+    string category_id = 3;
+    string entity_id = 4;
+}
+
+message DeleteEntityStatsResponse {
+    google.rpc.Status status = 1;
+    string entity_id = 2;
+    string update_id = 3;
+
+    // UUID returned by the underlying storage layer to identify the commit
+    string commit_id = 4;
+}

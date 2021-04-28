@@ -1,0 +1,240 @@
+group rpcclientcomponentsource : servercommon;
+
+component(fileNode, component) ::= <<
+<centralFileHeader()>
+
+/****** Include Files ********************************************************************************/
+#include "BlazeSDK/internal/internal.h"
+#include "BlazeSDK/blazehub.h"
+#include "EATDF/tdf.h"
+#include "framework/protocol/shared/tdfdecoder.h"
+#include "framework/protocol/shared/heat2decoder.h"
+#include "framework/protocol/shared/protocoltypes.h"
+#include "framework/util/shared/rawbuffer.h"
+#include "<if(fileNode.InputParams.HeaderPrefix)><fileNode.InputParams.HeaderPrefix>/<endif><fileNode.RelativeOutputFilename;format="basePath">.h"
+
+/****** Defines/Macros/Constants/Typedefs ************************************************************/
+
+<openCompNamespace(component=component)>
+
+<componentTypes(component=component)>
+
+<component.Commands: httpStaticDefines(component=component, command=it); separator="\n\n" >
+
+
+Component *<clientName(...)>::createInstance(ComponentManager *manager)
+{
+     return BLAZE_NEW(MEM_GROUP_FRAMEWORK, "<component.Name; format="tu">Instance") <clientName(...)>(manager);
+}
+
+void <clientName(...)>::createComponent(BlazeHub *hub)
+{
+    for (uint32_t counter = 0; counter \< hub->getNumUsers(); counter++)
+    {
+        hub-\>getComponentManager(counter)-\>createComponent(<clientIdSymbol(component=component)>, &createInstance);
+    }
+}
+
+void <clientName(...)>::createComponent(BlazeHub *hub, const BlazeSender::ServerConnectionInfo& addr, Encoder::Type encoderType, const char8_t* certData, const char8_t* keyData, size_t certDataSize, size_t keyDataSize)
+{
+    for (uint32_t counter = 0; counter \< hub->getNumUsers(); counter++)
+    {
+        hub-\>getComponentManager(counter)-\>createComponent(<clientIdSymbol(component=component)>, &createInstance, addr, encoderType, certData, keyData, certDataSize, keyDataSize);
+    }
+}
+
+// Deprecated
+void <clientName(...)>::createComponent(ComponentManager* componentManager)
+{
+    componentManager->createComponent(<clientIdSymbol(component=component)>, &createInstance);
+}
+
+<clientName(...)>::<clientName(...)>(Blaze::ComponentManager *manager) :
+    Blaze::Component(manager, <clientIdSymbol(component=component)>)
+{
+}
+
+const char8_t* <clientName(...)>::getCommandName(uint16_t commandId) const
+{
+    <if(component.Commands)>
+    switch(commandId)
+    {
+        <component.Commands:{ command | <if(command.client_export)>case CMD_<command.Name; format="tu">: return "<command.Name>"; <endif>}; separator="\n">
+        default: return "";
+    }
+    <else>
+    return ""; // This component has no commands.
+    <endif>
+}
+
+const char8_t* <clientName(...)>::getErrorName(BlazeError errorCode) const
+{
+    <if(component.Errors)>
+    BlazeAssert(BLAZE_COMPONENT_FROM_ERROR(errorCode) == <clientIdSymbol(component)>);
+    switch(errorCode)
+    {
+        <component.Errors:{ error | case <error.Name>: return "<error.Name>";}; separator="\n">
+        default: return "";
+    }
+    <else>
+    return ""; // This component has no errors.
+    <endif>
+}
+
+
+const RestResourceInfo* <clientName(...)>::getRestInfo(uint16_t commandId) const
+{
+
+    <component.Commands:{ command | <if(command.http)>if (commandId == CMD_<command.Name; format="tu">) return &s<component.Name><component.Type>_<command.Name>RestInfo;<endif> }; separator="\n">
+
+    return nullptr;
+}
+
+
+const char8_t* <clientName(...)>::getNotificationName(uint16_t notificationId) const
+{
+    <if(component.Notifications)>
+    switch(notificationId)
+    {
+        <component.Notifications:{ notification | case NTF_<notification.Name; format="tu">: return "<notification.Name>";}; separator="\n">
+        default: return "";
+    }
+    <else>
+    return ""; // This component has no notifications.
+    <endif>
+}
+
+void <clientName(...)>::handleNotification(uint16_t command, const uint8_t *buf, size_t bufSize, uint32_t userIndex)
+{
+    <if(component.Notifications)>
+    Blaze::RawBuffer rawBuffer(const_cast\<uint8_t *\>(buf), bufSize);
+    rawBuffer.put(bufSize);
+    Blaze::Heat2Decoder decoder;
+    switch(command)
+    {
+        <component.Notifications:handleNotifications(it); separator="\n">
+        default:
+            BLAZE_SDK_DEBUGF("<clientName(...)> could not handle unknown notification type %i.\n", command);
+        break;
+    };
+    <else>
+    BLAZE_SDK_DEBUGF("<clientName(...)> could not handle unknown notification type %i.\n", command);
+    <endif>
+} /*lint !e1961 - Avoid lint to check whether virtual member function could be made const*/
+
+<component.Notifications:printNotificationHandlers(it); separator="\n\n">
+
+#ifdef BLAZE_ENABLE_TDF_CREATION_BY_ID
+EA::TDF::Tdf* <clientName(...)>::createRequestTdf(uint16_t commandId)
+{
+<if(component.Commands)>
+    switch (commandId)
+    {
+        <component.Commands:processRequestTdfCase();separator="\n">
+    }
+<endif>
+    return nullptr;
+}
+
+EA::TDF::Tdf* <clientName(...)>::createResponseTdf(uint16_t commandId)
+{
+<if(component.Commands)>
+    switch (commandId)
+    {
+        <component.Commands:processResponseTdfCase();separator="\n">
+    }
+<endif>
+    return nullptr;
+}
+
+EA::TDF::Tdf* <clientName(...)>::createErrorTdf(uint16_t commandId)
+{
+<if(component.Commands)>
+    switch (commandId)
+    {
+        <component.Commands:processErrorTdfCase();separator="\n">
+    }
+<endif>
+    return nullptr;
+}
+
+EA::TDF::Tdf* <clientName(...)>::createNotificationTdf(uint16_t notificationId)
+{
+<if(component.Notifications)>
+    switch (notificationId)
+    {
+        <component.Notifications:processNotificationTdfCase();separator="\n">
+    }
+<endif>
+    return nullptr;
+}
+#endif // BLAZE_ENABLE_TDF_CREATION_BY_ID
+
+<closeCompNamespace(component=component)>
+
+<standardFileFooter()>
+
+>>
+
+handleNotifications(notification) ::= <<
+case NTF_<notification.Name; format="tu">:
+{
+    <if(notification.NotificationType)>
+    <printTypeRefFullScope(notification.NotificationType)> tdf;
+    decoder.decode(rawBuffer, tdf);
+    <endif>
+    BlazeSender::logMessage(mManager, true, true, "async", <if(notification.NotificationType)>&tdf<else>nullptr<endif>, 0, getComponentId(), command, ERR_OK, bufSize);
+    const <notification.Name>Cb *castCb = static_cast\<const <notification.Name>Cb *\>(&mNotificationTable[<notification.HandlerIndex>]);
+    castCb->operator()(<if(notification.NotificationType)>&tdf,<endif> userIndex);
+    break;
+}
+>>
+
+printNotificationHandlers(notification) ::= <<
+void <clientName(...)>::set<notification.Name>Handler(const <notification.Name>Cb &handler)
+{
+    mNotificationTable[<notification.HandlerIndex>] = handler;
+}
+
+void <clientName(...)>::clear<notification.Name>Handler()
+{
+    mNotificationTable[<notification.HandlerIndex>].clear();
+}
+>>
+
+processRequestTdfCase(command) ::= <<
+case <clientName(component)>::CMD_<command.Name;format="toUpper">:
+<if(command.RequestType)>
+    return BLAZE_NEW(MEM_GROUP_FRAMEWORK_TEMP, "<command.RequestType>") <printTypeRefFullScope(command.RequestType)>();
+<else>
+    return nullptr;
+<endif>
+>>
+
+processResponseTdfCase(command) ::= <<
+case <clientName(component)>::CMD_<command.Name;format="toUpper">:
+<if(command.ResponseType)>
+    return BLAZE_NEW(MEM_GROUP_FRAMEWORK_TEMP, "<command.ResponseType>") <printTypeRefFullScope(command.ResponseType)>();
+<else>
+    return nullptr;
+<endif>
+>>
+
+processErrorTdfCase(command) ::= <<
+case <clientName(component)>::CMD_<command.Name;format="toUpper">:
+<if(command.errortype)>
+    return BLAZE_NEW(MEM_GROUP_FRAMEWORK_TEMP, "<command.errortype>") <printTypeRefFullScope(command.errortype)>();
+<else>
+    return nullptr;
+<endif>
+>>
+
+processNotificationTdfCase(notification) ::= <<
+case <clientName(component)>::NTF_<notification.Name;format="toUpper">:
+<if(notification.NotificationType)>
+    return BLAZE_NEW(MEM_GROUP_FRAMEWORK_TEMP, "<notification.NotificationType>") <printTypeRefFullScope(notification.NotificationType)>();
+<else>
+    return nullptr;
+<endif>
+>>
+

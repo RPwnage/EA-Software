@@ -1,0 +1,314 @@
+/*! ************************************************************************************************/
+/*!
+    \file matchmaking_properties_config_server.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+
+[headername="framework/tdf/userextendeddatatypes.h"]
+#include "framework/gen/userextendeddatatypes.tdf"
+
+// for TemplateAttributeTdfMemberName & replicated data
+[headername="gamemanager/tdf/gamemanager_types.h"]
+#include "gamemanager/gen/gamemanager_types.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+
+[description="Max mm filter expression length."]
+const uint32_t FILTER_EXPRESSION_LENGTH = 128;
+
+// common property names
+const char8_t *PROPERTY_NAME_GPVS = "gameProtocolVersionString";
+const char8_t *PROPERTY_NAME_CREATE_TEMPLATE_NAME  = "createTemplateName";
+const char8_t *PROPERTY_NAME_PARTICIPANT_COUNT  = "participantCount";
+const char8_t *PROPERTY_NAME_UED_VALUES  = "uedValues";
+const char8_t *PROPERTY_NAME_IP_ADDRESS = "ipAddress";
+const char8_t *PROPERTY_NAME_PORT = "port";
+//const char8_t *PROPERTY_NAME_MEMBER_COUNT  = "memberCount"; // unused
+//const char8_t *PROPERTY_NAME_ROLES_LIST  = "rolesList"; // unused
+
+// game property names
+const char8_t *PROPERTY_NAME_PINGSITE = "pingSite";
+const char8_t *PROPERTY_NAME_NETWORK_TOPOLOGY = "networkTopology";
+const char8_t *PROPERTY_NAME_GAME_ATTRIBUTES = "attributes";
+const char8_t *PROPERTY_NAME_GAME_MODE_ATTRIBUTE = "mode";
+const char8_t *PROPERTY_NAME_GAME_SETTINGS  = "settings";
+const char8_t *PROPERTY_NAME_GAME_STATE  = "state";
+const char8_t *PROPERTY_NAME_GAME_ID  = "id";
+const char8_t *PROPERTY_NAME_GAME_VERSION  = "version";
+const char8_t *PROPERTY_NAME_GAME_NAME  = "name";
+const char8_t *PROPERTY_NAME_GAME_TYPE  = "type";
+const char8_t *PROPERTY_NAME_GAME_STATE_OPEN_TO_MATCHMAKING = "stateOpenToMatchmaking"; // candate for conversion to 'derived' properties. Equivalent to: ((game.settings & OpenForMatchmaking) == OpenForMatchmaking && game.state == PRE_GAME) || ((game.settings & OpenForMatchmaking|JoinInProgressSupported) == OpenForMatchmaking|JoinInProgressSupported && game.state == IN_GAME)
+const char8_t *PROPERTY_NAME_GEOLOCATION  = "geoLocation";
+const char8_t *PROPERTY_NAME_PARTICIPANT_CAPACITY  = "participantCapacity";
+const char8_t *PROPERTY_NAME_PERCENT_FULL  = "percentFull";
+const char8_t *PROPERTY_NAME_PARTICIPANT_IDS  = "participantIds";
+const char8_t *PROPERTY_NAME_USER_SESSION_IDS  = "userSessionIds";
+const char8_t *PROPERTY_NAME_USER_GROUP_IDS  = "userGroupIds";
+const char8_t *PROPERTY_NAME_TEAMS = "teams";
+const char8_t *PROPERTY_NAME_TEAM_CAPACITY = "teamCapacity";
+const char8_t *PROPERTY_NAME_TEAM_COUNT = "teamCount";
+const char8_t *PROPERTY_NAME_TEAM_INDEXES = "teamIndexes";
+const char8_t *PROPERTY_NAME_QUALITY_FACTORS_HASH = "qualityFactorsHash";
+
+// caller property names
+const char8_t *PROPERTY_NAME_FACTION  = "faction";
+const char8_t *PROPERTY_NAME_ROLE_MEMBERS  = "roleMembers";
+const char8_t *PROPERTY_NAME_PING_SITE_LATENCIES  = "pingSiteLatencies";
+const char8_t *PROPERTY_NAME_BEST_PING_SITE = "bestPingSite";
+const char8_t *PROPERTY_NAME_LEADER_BEST_PING_SITE = "leaderBestPingSite";
+const char8_t *PROPERTY_NAME_LEADER_GEOLOCATION  = "leaderGeoLocation";
+const char8_t *PROPERTY_NAME_SCENARIO_ATTRIBUTES = "attributes";
+const char8_t *PROPERTY_NAME_DEDICATED_SERVER_OVERRIDE_GAME_ID = "dedicatedServerOverrideGameId";
+
+// player (game member) property names
+const char8_t *PLAYER_PROPERTY_NAME_PLAYER_ID = "playerId";
+const char8_t *PLAYER_PROPERTY_NAME_PING_SITE_LATENCIES  = "pingSiteLatencies";
+const char8_t *PLAYER_PROPERTY_NAME_GEOLOCATION  = "geoLocation";
+
+// ued calculation formula name
+const char8_t *PROPERTY_NAME_UED_FORMULA_MAX = "max";
+const char8_t *PROPERTY_NAME_UED_FORMULA_MIN = "min";
+const char8_t *PROPERTY_NAME_UED_FORMULA_AVG = "avg";
+const char8_t *PROPERTY_NAME_UED_FORMULA_SUM = "sum";
+
+const char8_t* GAME_PROPERTY_PREFIX = "game.";
+const char8_t* PLAYERS_PROPERTY_PREFIX = "players.";
+
+class TeamUEDValue
+{
+    [tag="maxr", description="Range of maximum team UED values."]
+    UserExtendedDataValue mMaxRange;
+    [tag="minr", description="Range of minimum team UED values."]
+    UserExtendedDataValue mMinRange;
+    [tag="avgr", description="Range of average team UED values."]
+    UserExtendedDataValue mAvgRange;
+    [tag="sumr", description="Range of sum team UED values."]
+    UserExtendedDataValue mSumRange;
+};
+
+typedef map<UserExtendedDataName, TeamUEDValue, ignorecase> TeamUEDValueMap;
+
+class MemberCountValues
+{
+    [tag="mins", description="Smallest team size."]
+    uint16_t mMin;
+    [tag="maxs", description="Largest team size."]
+    uint16_t mMax;
+    [tag="diff", description="Difference between largest and smallest team size."]
+    uint16_t mRange;
+};
+
+typedef map<RoleName, MemberCountValues, ignorecase> RoleMemberCountsMap;
+
+class FactionCountValues
+{
+    [tag="mfcp", description="Max available free slots for faction of this id."]
+    uint16_t mMaxFreeCapacity;
+    
+    [tag="totl", description="Number of factions of this id present in the game."]
+    uint16_t mCount;
+};
+
+typedef map<TeamId, FactionCountValues> FactionCountValuesMap;
+
+typedef map<PropertyName, int64_t, ignorecase> PropertyValueMap;
+typedef list<PropertyValueMap> PropertyValueMapList;
+
+// Helper class that exists so that templates can be instanciated 
+class PackerDummyTemplateClass
+{
+    [tag="dmy1"] PropertyValueMap mPropertyValueMap;                
+    [tag="dmy2"] PropertyValueMapList mPropertyValueMapList;        // For "players.pingSiteLatencies"
+    [tag="dmy3"] UserExtendedDataMapList mUserExtendedDataMapList;  // For "players.uedValues"
+};
+
+class GeoLocation
+{
+    [tag="long"]
+    int32_t mLongitude;
+
+    [tag="lati"]
+    int32_t mLatitude;
+};
+
+[description = "Referenced by PROPERTY_NAME_TEAMS"]
+class TeamProperties
+{
+    [tag="fact", description=""]
+    FactionCountValuesMap mFaction;
+    [tag="mect", description=""]
+    MemberCountValues mMemberCount;
+    [tag="rcri", description=""]
+    RoleCriteriaMap mRoles;
+    [tag="rmct", description=""]
+    RoleMemberCountsMap mRoleMembers;
+    [tag="tued", description=""]
+    TeamUEDValueMap mUedValue;
+};
+
+
+typedef string(64) PropertyExpression;
+typedef map<PropertyName, TemplateAttributeTdfMemberName> PropertyTdfMemberMap;
+
+[reconfigurable="yes", description = "Configuration for game packer silo"]
+class PropertyConfig
+{
+    [tag="ds", description="Mapping of TDF data types to the Properties."]
+    map<TemplateAttributeTdfName, PropertyTdfMemberMap>  mTdfDataSources;
+
+    [tag="dp", description="Properties that have a derived value."]
+    map<PropertyName, PropertyExpression> mDerivedProperties;
+
+
+// PACKER_TODO - Make a real (global) Packer config section, and move these to the Packer Config itself:
+    [tag="inpt", description="Properties that are required by Packer, even if not included in the config."]
+    PropertyNameList mRequiredPackerInputProperties;
+
+    [tag="fpfp", description="Properties that are required by Packer, even if not included in the config."]
+    PropertyNameList mRequiredFilterPropertiesForPacker;
+
+    [tag="gbpk", description="Properties that Packer requests from the Game Browser."]
+    TemplateAttributeTdfMapping mGameBrowserPackerProperties;
+    
+    [tag="popr", description="Properties that can be outputted from packer game properties.  Uses the GameCreationData in tdfDataSources to indicate where values are set."]
+    PropertyNameList mPackerOutputProperties;
+};
+
+
+// ******************************
+// FILTERS
+// ******************************
+
+class IntRangeFilter
+{
+    [tag="min", default=0, reconfigurable="yes", description="Minimum accepted value."]
+    int64_t mMin;
+    [tag="max", default=0, reconfigurable="yes", description="Maximum accepted value."]
+    int64_t mMax;
+    [tag="cntr", default=0, reconfigurable="yes", description="Min and max are relative to the center value."]
+    int64_t mCenter;
+};
+
+enum SetFilterOperation
+{
+    INCLUDE,
+    EXCLUDE
+};
+
+class IntSetFilter
+{
+    [tag="list", reconfigurable="yes", description="Values to filter out of the match."]
+    list<int64_t> mValues;
+    [tag="bito", reconfigurable="yes", description="Set operation to perform."]
+    SetFilterOperation mOperation;
+};
+class StringSetFilter
+{
+    [tag="list", reconfigurable="yes", description="Values to filter out of the match."]
+    list<string(-1)> mValues;
+    [tag="bito", reconfigurable="yes", description="Set operation to perform."]
+    SetFilterOperation mOperation;
+};
+
+
+enum EqualityFilterOperation
+{
+    EQUAL,
+    UNEQUAL
+};
+
+class IntEqualityFilter
+{
+    [tag="list", reconfigurable="yes", description="Values to filter out of the match."]
+    int64_t mValue;
+
+    [tag="bito", reconfigurable="yes", description="Set operation to perform."]
+    EqualityFilterOperation mOperation;
+};
+class StringEqualityFilter
+{
+    [tag="list", reconfigurable="yes", description="Values to filter out of the match."]
+    string(-1) mValue;
+
+    [tag="bito", reconfigurable="yes", description="Set operation to perform."]
+    EqualityFilterOperation mOperation;
+};
+
+
+enum BitTestOperation
+{
+    SET_BITS_MATCH, // game must have set bits from mTestBits set (gameProperty ^ mTestBits) & mBitMask == 0
+    UNSET_BITS_MATCH, // game cannot have unset bits from mTestBits set (gameProperty & ~mTestBits) & mBitMask == 0
+    ANY_SET_BITS_MATCH // game must have at least one bit from mTestBits set (gameProperty & mTestBits) & mBitMask != 0
+};
+
+class UIntBitwiseFilter
+{
+    [tag="test", default=0, reconfigurable="yes", description="Bitset to test against."]
+    uint64_t mTestBits;
+    [tag="mask", default=-1, reconfigurable="yes", description="Bitmask to apply in operation, defaults to testing all bits."]
+    uint64_t mBitMask;
+    [tag="bito", default=SET_BITS_MATCH, reconfigurable="yes", description="Bitwise operation to perform."]
+    BitTestOperation mOperation;
+};
+
+// Filter for use by Crossplay functionality. (Duplicates old PlatformRuleCriteria)
+class PlatformFilter
+{
+    [tag="cpov", description="Used to set the platform, when searching from a platform that doesn't have one.  If set to 'common', all platforms will be searched for. (Equivalent to Allowed list)"]
+        ClientPlatformTypeList mClientPlatformListOverride;
+
+    [tag="cpmm", description="If set, the Game's Override List must match the ClientPlatformListOverride setting provided. (Not used internally, mRequiredPlatformList is used instead.)"]
+        bool mCrossplayMustMatch;
+
+    [tag="reqp", description="Internal list of platforms that are required, based on the crossplay settings of the users and must match value.  Do not set directly."]
+        ClientPlatformTypeList mRequiredPlatformList;
+};
+
+
+
+class MatchmakingFilterDefinition
+{
+    [tag="prop", reconfigurable="yes", description="The game property this filter tests against."]
+    PropertyName mGameProperty;
+
+    [tag="ipsf", reconfigurable="yes", description="Indicates that the rule will only be used for PackerSilo creation"]
+    bool mIsPackerSiloFilter;
+/*
+    [tag="mrgo", reconfigurable="yes", description="Operation to apply to the Property."]
+    MergeOp mMergeOp;
+
+    [tag="gtpy", reconfigurable="yes", description="Group holding the 'game' property (player/team/game/role/etc.)."]
+    PropertyGroupType mPropertyGroup;
+
+    [tag="gpop", reconfigurable="yes", description="Operation to apply to the Group holding the Property."]
+    MergeOp mGroupMergeOp;
+*/
+    [tag="reqm", reconfigurable="yes", description="The requirement as mapped for this filter."]
+    TemplateAttributeTdfMapping mRequirement;
+
+    [tag="scri", reconfigurable="yes", description="Text description of this filter's intent and behavior."]
+    string(256) mDescription;
+};
+
+typedef map<MatchmakingFilterName, MatchmakingFilterDefinition, ignorecase> MatchmakingFilterMap;
+typedef list<MatchmakingFilterName> MatchmakingFilterList;
+
+// Holds mapping of FilterName to the parsed FilterData.  Similar to GameAttributeCriteria, or other maps where the criteria varies (could use variable instead of generic, since all values are Tdfs).
+typedef map<MatchmakingFilterName, generic, ignorecase> MatchmakingFilterCriteriaMap;
+
+class MatchmakingFilterCriteria
+{
+    [tag="fcmp", description="Map of filters for a matchmaking session. Map values are empty when sent from the Scenarios (functions as a FilterName list), and filled in by PackerMaster."]
+    MatchmakingFilterCriteriaMap mMatchmakingFilterCriteriaMap;
+};
+
+} // namespace GameManager
+} // namespace Blaze

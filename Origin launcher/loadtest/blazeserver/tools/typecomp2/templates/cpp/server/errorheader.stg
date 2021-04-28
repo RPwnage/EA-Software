@@ -1,0 +1,61 @@
+group errorheader : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+rootComponent(fileNode, node) ::= <<
+<standardFileHeader()>
+<openIncludeGuard()>
+/*** Include Files ********************************************************************************/
+#include \<EABase/eabase.h\>
+
+/*** Defines/Macros/Constants/Typedefs ************************************************************/
+
+namespace Blaze
+{
+
+#define BLAZE_SYSTEM_ERROR_FLAG (0x4000)
+#define BLAZE_ERROR_CODE_MASK (0x3FFF)
+#define BLAZE_COMPONENT_CUSTOM_ERROR_BASE (0x3F00)
+#define BLAZE_SYSTEM_ERROR(code) ((code | BLAZE_SYSTEM_ERROR_FLAG) \<\< 16)
+#define BLAZE_COMPONENT_ERROR(component, code) ((code \<\< 16) | (component & ~(RPC_MASK_MASTER)))
+#define BLAZE_CODE_FROM_ERROR(err) (static_cast\<uint16_t\>(err \>\> 16))
+#define BLAZE_COMPONENT_FROM_ERROR(err) (static_cast\<uint16_t\>(err & 0xFFFF))
+#define BLAZE_ERROR_IS_SYSTEM_ERROR(err) (((err \>\> 16) & BLAZE_SYSTEM_ERROR_FLAG) != 0)
+#define BLAZE_CODE_IS_SYSTEM_ERROR(err) ((err & BLAZE_SYSTEM_ERROR_FLAG) != 0)
+#define BLAZE_ERROR_FROM_CODE(component, code) (static_cast\<::Blaze::BlazeRpcError\>((code != 0) ? (BLAZE_CODE_IS_SYSTEM_ERROR(code) ? BLAZE_SYSTEM_ERROR(code) : BLAZE_COMPONENT_ERROR(component, code)) : 0))
+#define BLAZE_COMPONENT_CUSTOM_ERROR(component, code) (static_cast\<::Blaze::BlazeRpcError\>(BLAZE_COMPONENT_ERROR(component, (BLAZE_COMPONENT_CUSTOM_ERROR_BASE + code))))
+
+typedef uint32_t BlazeRpcError;                                                                                                           
+const BlazeRpcError ERR_OK  = 0; //No error
+
+typedef uint32_t HttpStatusCode;
+const HttpStatusCode DEFAULT_HTTP_STATUS_CODE = 400;
+
+<node.Errors:{e|const BlazeRpcError <e.Name; format="@%1$-80s">= BLAZE_SYSTEM_ERROR(<e.Value>);             //\<\< <e.FullValue; format="hex"> | <e.FullValue>  | <e.description>}; separator="\n">
+
+
+/**************************************************************************************************/
+/*!
+    \class ErrorHelp
+
+    Class with commands for translating error codes to useful strings.
+
+*/
+/**************************************************************************************************/
+
+class ErrorHelp
+{
+public:
+    static const char8_t* getErrorName(BlazeRpcError error);
+    static const char8_t* getErrorDescription(BlazeRpcError error);
+    static HttpStatusCode getHttpStatusCode(BlazeRpcError error);
+};
+
+#define LOG_ENAME(blazeRpcError) ErrorHelp::getErrorName(blazeRpcError)
+
+} // Blaze
+<closeIncludeGuard()>
+<standardFileFooter()>
+>>
+

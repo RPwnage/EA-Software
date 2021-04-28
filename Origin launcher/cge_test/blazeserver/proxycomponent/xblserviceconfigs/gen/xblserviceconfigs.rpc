@@ -1,0 +1,252 @@
+[ headername="xblserviceconfigs/tdf/xblserviceconfigs.h" ]
+#include "xblserviceconfigs/gen/xblserviceconfigs.tdf"
+
+
+namespace Blaze
+{
+namespace XBLServices
+{
+
+[
+    id = core/1024,
+    description = "Proxy component used to define xbl services session directory",
+    details = "xbl session directory",
+    proxyOnly = true,
+    http = {
+        payloadEncoderSubType = "NORMAL"
+    }
+]
+component XBLServiceConfigs
+{
+    errors
+    {
+        [ description = "Exernal session authentication error, possibly due to invalid/expired token" ]
+        XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED = 1;
+        [ description = "The specified scid, or session template was invalid, or the service config may not configured for sessions." ]
+        XBLSERVICECONFIGS_RESOURCE_NOT_FOUND = 2; //http 404
+        [ description = "Requested service config or operation cannot be accessed. May be due to caller's account not having access to sandbox or having 'multiplayer' privilege disabled, a certificate error, server or client using a title id that's incorrect or not having access to scid, invalid attempt to access a private session by non-member, or attempt to directly join others as non-reserved." ]
+        XBLSERVICECONFIGS_ACCESS_FORBIDDEN = 3; //http 403
+        [ description = "Invalid or malformed request parameters. Invalid parameters may be caused by mismatched contract versions, an attempt to join an external session which is already at its max cap, or a badly configured session template (invalidly enabling managed initializations requirements etc)." ]
+        XBLSERVICECONFIGS_BAD_REQUEST = 4; //http 400
+        [ description = "The request's parameters conflict with other parameters or existing constants or settings already on the session." ]
+        XBLSERVICECONFIGS_CONFLICTING_REQUEST = 5; //http 409
+        [ description = "An exernal session with the specified scid, session template, name, already exists for the create attempt." ]
+        XBLSERVICECONFIGS_EXTERNALSESSION_ALREADY_EXISTS = 6;
+        [ description = "The external session service is currently unavailable, possibly due to momentary downtime, updates or service maintenance." ]
+        XBLSERVICECONFIGS_SERVICE_UNAVAILABLE = 7; //http 503
+        [ description = "The external session service call failed due to possible bad gateway." ]
+        XBLSERVICECONFIGS_BAD_GATEWAY = 8; //http 502
+        [ description = "The external session service had an unspecified internal error. Check with Microsoft for potential issues." ]
+        XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR = 9; //http 500
+        [ description = "The requested external session template name is not supported by the server. This session template name is validated internally. This error is not mapped to an actual xbl error." ]
+        XBLSERVICECONFIGS_SESSION_TEMPLATE_NOT_SUPPORTED = 10;
+        [ description = "The requested join failed because of external session Closed flag. This error is not mapped to an actual xbl error." ]
+        XBLSERVICECONFIGS_EXTERNALSESSION_CLOSED = 11;                  //http 403
+        [ description = "The requested join failed because of external session Visibility. This error is not mapped to an actual xbl error." ]
+        XBLSERVICECONFIGS_EXTERNALSESSION_VISIBILITY_VISIBLE = 12;      //http 403
+        [ description = "The requested join failed because of external session Visibility. This error is not mapped to an actual xbl error." ]
+        XBLSERVICECONFIGS_EXTERNALSESSION_VISIBILITY_PRIVATE = 13;      //http 403
+        [ description = "The requested join failed because of external session JoinRestriction. This error is not mapped to an actual xbl error." ]
+        XBLSERVICECONFIGS_EXTERNALSESSION_JOINRESTRICTION_LOCAL = 14;   //http 403
+        [ description = "The requested join failed because of external session JoinRestriction. This error is not mapped to an actual xbl error." ]
+        XBLSERVICECONFIGS_EXTERNALSESSION_JOINRESTRICTION_FOLLOWED = 15;//http 403
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+                id = 1,
+                description = "Create session",
+                details = "Create and join session",
+                requires_authentication = false,
+                client_export = false,
+                errortype = MultiplayerSessionErrorResponse,
+                errors = { XBLSERVICECONFIGS_EXTERNALSESSION_ALREADY_EXISTS, XBLSERVICECONFIGS_BAD_REQUEST, XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED, XBLSERVICECONFIGS_ACCESS_FORBIDDEN, XBLSERVICECONFIGS_RESOURCE_NOT_FOUND, XBLSERVICECONFIGS_CONFLICTING_REQUEST, XBLSERVICECONFIGS_SERVICE_UNAVAILABLE, XBLSERVICECONFIGS_SERVICE_UNAVAILABLE, XBLSERVICECONFIGS_BAD_GATEWAY, XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "serviceconfigs/{scid}/sessiontemplates/{sessionTemplateName}/sessions/{sessionName}",
+                    method = "PUT",
+                    custom_request_headers = {
+                        "x-xbl-contract-version" = "header.contractVersion",
+                        "Authorization"          = "header.authToken",
+                        "X-Xbl-OnBehalfOf-Title" = "header.onBehalfOfTitle",
+                        "x-sim-outage"           = "header.simOutage"
+                    },
+                    custom_error_headers = {
+                        "Retry-After" = "retryAfter"
+                    },
+                    url_params = {
+                        "nocommit" = "noCommit"
+                    },
+                    status_code_errors = {
+                        200 = XBLSERVICECONFIGS_EXTERNALSESSION_ALREADY_EXISTS,
+                        400 = XBLSERVICECONFIGS_BAD_REQUEST,
+                        401 = XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED,
+                        403 = XBLSERVICECONFIGS_ACCESS_FORBIDDEN,
+                        404 = XBLSERVICECONFIGS_RESOURCE_NOT_FOUND,
+                        409 = XBLSERVICECONFIGS_CONFLICTING_REQUEST,
+                        503 = XBLSERVICECONFIGS_SERVICE_UNAVAILABLE,
+                        500 = XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR,
+                        502 = XBLSERVICECONFIGS_BAD_GATEWAY
+                    },
+                    requestPayloadMember = "body"
+                }
+            ]
+            MultiplayerSessionResponse putMultiplayerSessionCreate(PutMultiplayerSessionCreateRequest);
+
+            [
+                id = 2,
+                description = "join session",
+                details = "join session",
+                requires_authentication = false,
+                client_export = false,
+                errortype = MultiplayerSessionErrorResponse,
+                errors = { XBLSERVICECONFIGS_BAD_REQUEST, XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED, XBLSERVICECONFIGS_ACCESS_FORBIDDEN, XBLSERVICECONFIGS_RESOURCE_NOT_FOUND, XBLSERVICECONFIGS_CONFLICTING_REQUEST, XBLSERVICECONFIGS_SERVICE_UNAVAILABLE, XBLSERVICECONFIGS_BAD_GATEWAY, XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "serviceconfigs/{scid}/sessiontemplates/{sessionTemplateName}/sessions/{sessionName}",
+                    method = "PUT",
+                    custom_request_headers = {
+                        "x-xbl-contract-version" = "header.contractVersion",
+                        "Authorization"          = "header.authToken",
+                        "X-Xbl-OnBehalfOf-Title" = "header.onBehalfOfTitle",
+                        "X-Xbl-Deny-Scope"       = "header.denyScope",
+                        "X-Xbl-Accept-Log"       = "header.acceptLog",
+                        "x-sim-outage"           = "header.simOutage"
+                    },
+                    custom_error_headers = {
+                        "Retry-After" = "retryAfter",
+                        "X-Xbl-Log" = "xblLog"
+                    },
+                    url_params = {
+                        "nocommit" = "noCommit"
+                    },
+                    status_code_errors = {
+                        400 = XBLSERVICECONFIGS_BAD_REQUEST,
+                        401 = XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED,
+                        403 = XBLSERVICECONFIGS_ACCESS_FORBIDDEN,
+                        404 = XBLSERVICECONFIGS_RESOURCE_NOT_FOUND,
+                        409 = XBLSERVICECONFIGS_CONFLICTING_REQUEST,
+                        503 = XBLSERVICECONFIGS_SERVICE_UNAVAILABLE,
+                        500 = XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR,
+                        502 = XBLSERVICECONFIGS_BAD_GATEWAY
+                    },
+                    requestPayloadMember = "body"
+                }
+            ]
+            MultiplayerSessionResponse putMultiplayerSessionJoin(PutMultiplayerSessionJoinRequest);
+
+            [
+                id = 3,
+                description = "join session with reserved members",
+                details = "join session with reserved members",
+                requires_authentication = false,
+                client_export = false,
+                errortype = MultiplayerSessionErrorResponse,
+                errors = { XBLSERVICECONFIGS_BAD_REQUEST, XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED, XBLSERVICECONFIGS_ACCESS_FORBIDDEN, XBLSERVICECONFIGS_RESOURCE_NOT_FOUND, XBLSERVICECONFIGS_CONFLICTING_REQUEST, XBLSERVICECONFIGS_SERVICE_UNAVAILABLE, XBLSERVICECONFIGS_BAD_GATEWAY, XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "serviceconfigs/{scid}/sessiontemplates/{sessionTemplateName}/sessions/{sessionName}",
+                    method = "PUT",
+                    custom_request_headers = {
+                        "x-xbl-contract-version" = "header.contractVersion",
+                        "Authorization"          = "header.authToken",
+                        "X-Xbl-OnBehalfOf-Title" = "header.onBehalfOfTitle",
+                        "X-Xbl-Deny-Scope"       = "header.denyScope",
+                        "X-Xbl-Accept-Log"       = "header.acceptLog",
+                        "x-sim-outage"           = "header.simOutage"
+                    },
+                    custom_error_headers = {
+                        "Retry-After" = "retryAfter",
+                        "X-Xbl-Log" = "xblLog"
+                    },
+                    url_params = {
+                        "nocommit" = "noCommit"
+                    },
+                    status_code_errors = {
+                        400 = XBLSERVICECONFIGS_BAD_REQUEST,
+                        401 = XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED,
+                        403 = XBLSERVICECONFIGS_ACCESS_FORBIDDEN,
+                        404 = XBLSERVICECONFIGS_RESOURCE_NOT_FOUND,
+                        409 = XBLSERVICECONFIGS_CONFLICTING_REQUEST,
+                        503 = XBLSERVICECONFIGS_SERVICE_UNAVAILABLE,
+                        500 = XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR,
+                        502 = XBLSERVICECONFIGS_BAD_GATEWAY
+                    },
+                    requestPayloadMember = "body"
+                }
+            ]
+            MultiplayerSessionResponse putMultiplayerSessionJoinReserve(PutMultiplayerSessionJoinReserveRequest);
+
+            [
+                id = 4,
+                description = "Set the user's current joinable activity to the multiplayer session",
+                details = "Set the user's current joinable activity to the multiplayer session",
+                requires_authentication = false,
+                client_export = false,
+                errortype = HandlesErrorResponse,
+                errors = { XBLSERVICECONFIGS_BAD_REQUEST, XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED, XBLSERVICECONFIGS_ACCESS_FORBIDDEN, XBLSERVICECONFIGS_RESOURCE_NOT_FOUND, XBLSERVICECONFIGS_SERVICE_UNAVAILABLE, XBLSERVICECONFIGS_BAD_GATEWAY, XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "handles",
+                    method = "POST",
+                    custom_request_headers = {
+                        "x-xbl-contract-version" = "header.contractVersion",
+                        "Authorization"          = "header.authToken",
+                        "X-Xbl-OnBehalfOf-Title" = "header.onBehalfOfTitle"
+                    },
+                    custom_error_headers = {
+                        "Retry-After" = "retryAfter"
+                    },
+                    status_code_errors = {
+                        400 = XBLSERVICECONFIGS_BAD_REQUEST,
+                        401 = XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED,
+                        403 = XBLSERVICECONFIGS_ACCESS_FORBIDDEN,
+                        404 = XBLSERVICECONFIGS_RESOURCE_NOT_FOUND,
+                        503 = XBLSERVICECONFIGS_SERVICE_UNAVAILABLE,
+                        500 = XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR,
+                        502 = XBLSERVICECONFIGS_BAD_GATEWAY
+                    },
+                    requestPayloadMember = "body"
+                }
+            ]
+            PostHandlesSetActivityResponse postHandlesSetActivity(PostHandlesSetActivityRequest);
+
+            [
+                id = 5,
+                description = "Clear the user's current joinable activity",
+                details = "Clear the user's current external session advertised as joinable",
+                requires_authentication = false,
+                client_export = false,
+                errortype = HandlesErrorResponse,
+                errors = { XBLSERVICECONFIGS_BAD_REQUEST, XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED, XBLSERVICECONFIGS_ACCESS_FORBIDDEN, XBLSERVICECONFIGS_RESOURCE_NOT_FOUND, XBLSERVICECONFIGS_SERVICE_UNAVAILABLE, XBLSERVICECONFIGS_BAD_GATEWAY, XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "handles/{handleId}",
+                    method = "DELETE",
+                    custom_request_headers = {
+                        "x-xbl-contract-version" = "header.contractVersion",
+                        "Authorization"          = "header.authToken",
+                        "X-Xbl-OnBehalfOf-Title" = "header.onBehalfOfTitle"
+                    },
+                    custom_error_headers = {
+                        "Retry-After" = "retryAfter"
+                    },
+                    status_code_errors = {
+                        400 = XBLSERVICECONFIGS_BAD_REQUEST,
+                        401 = XBLSERVICECONFIGS_AUTHENTICATION_REQUIRED,
+                        403 = XBLSERVICECONFIGS_ACCESS_FORBIDDEN,
+                        404 = XBLSERVICECONFIGS_RESOURCE_NOT_FOUND,
+                        503 = XBLSERVICECONFIGS_SERVICE_UNAVAILABLE,
+                        500 = XBLSERVICECONFIGS_SERVICE_INTERNAL_ERROR,
+                        502 = XBLSERVICECONFIGS_BAD_GATEWAY
+                    },
+                    addEncodedPayload = false // No payload
+                }
+            ]
+            void deleteHandlesClearActivity(DeleteHandlesClearActivityRequest);
+
+        }
+    }
+}
+
+
+}
+}

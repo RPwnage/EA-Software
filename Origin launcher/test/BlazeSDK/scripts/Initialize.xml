@@ -1,0 +1,82 @@
+<project>
+  <!-- Copyright 2007-2016 Electronic Arts Inc.  All rights reserved. -->
+
+  <property name="BlazeSDKBuildType" value="Library"/>
+  <property name="BlazeSDKBuildType" value="DynamicLibrary" if="${Dll??false}"/>
+
+  <publicdata packagename="BlazeSDK">
+    <module name="BlazeSDK" buildtype="${BlazeSDKBuildType}">
+      <includedirs>
+        ${package.BlazeSDK.dir}/include
+        ${package.BlazeSDK.dir}/source/include
+        ${package.BlazeSDK.dir}/source/include/shared
+        ${package.BlazeSDK.builddir}/gen/include
+      </includedirs>
+
+      <defines>
+        <!--- Set this if you provide an implementation of EA::Allocator::ICoreAllocator::GetDefaultAllocator to provide a custom allocator to EATDF 
+              instead of using the Blaze default allocator -->
+        <do unless="${blazesdk_disable_default_eatdf_allocator??false}">
+          EA_TDF_GET_DEFAULT_ICOREALLOCATOR="*Blaze::Allocator::getAllocator()"
+          EATDF_USER_CONFIG_HEADER=&lt;BlazeSDK/alloc.h&gt;
+        </do>
+
+        <do if="${config-system} == 'pc64' or ${config-system} == 'pc'">
+          EA_PLATFORM_WINDOWS=1
+        </do>
+        
+        <do if="${blazesdk_tdf_creation_by_id??false}">
+          BLAZE_ENABLE_TDF_CREATION_BY_ID
+        </do>
+
+        <!-- expose the logging defines -->
+        <do if="${blazesdk_debug_enable??false}">
+          ENABLE_BLAZE_SDK_LOGGING=1
+        </do>
+        <do if="${blazesdk_debug_disable??false}">
+          ENABLE_BLAZE_SDK_LOGGING=0
+        </do>
+      </defines>
+
+      <publicdependencies>
+        coreallocator
+        DirtySDK
+        EABase
+        EASTL
+        TelemetrySDK
+        PinTaxonomySDK
+      </publicdependencies>
+
+      <!-- Since EATDF is used as part of the Blaze build process, we set it to the build dependencies here. -->
+      <publicbuilddependencies>
+        EATDF
+      </publicbuilddependencies>
+    </module>
+  </publicdata>
+
+  <include file="generate-code.xml" />
+
+  <createtask name="AddBlazeSDKNetworkManifest">
+      <parameters>
+        <option name="module" value="Required"/>
+        <!-- Need to pass in the group name as well.  That is pass in <group> or <group>.<module_name> for this variable. -->
+      </parameters>
+      <code>
+        <do if="${config-system} == 'capilano'">
+          <dependent name="DirtySDK"/>
+          <task name="AddDirtySDKNetworkManifest" module="${AddBlazeSDKNetworkManifest.module}"/>
+          <property name="${AddBlazeSDKNetworkManifest.module}.networking-manifest-files">
+            ${property.value}
+            <!--Add anything required for Blaze here-->
+          </property>
+        </do>
+      </code>
+  </createtask>
+
+  <!-- These files are needed for the code gen tasks.  So when creating a prebuilt package, these files need to be packaged up as well. -->
+  <fileset name="package.BlazeSDK.PrebuiltIncludeSourceFiles">
+    <includes name="${package.BlazeSDK.dir}\gen\**.tdf"/>
+    <includes name="${package.BlazeSDK.dir}\tools\**"/>
+  </fileset>
+  
+</project>

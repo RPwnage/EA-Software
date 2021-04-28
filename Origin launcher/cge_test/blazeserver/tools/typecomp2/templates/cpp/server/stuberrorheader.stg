@@ -1,0 +1,45 @@
+group stuberrorheader : stubsourcecommon;
+
+masterComponent(fileNode, component) ::= << 
+<doComponent(fileNode=fileNode, component=component)>
+>>
+
+slaveComponent(fileNode, component) ::= <<
+<doComponent(fileNode=fileNode, component=component)>
+>>
+
+doComponent(fileNode, component) ::= <<
+<standardFileHeader()>
+<openIncludeGuard()>
+/*** Include Files ********************************************************************************/
+
+/*** Defines/Macros/Constants/Typedefs ************************************************************/
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+
+<component.Commands:commandErrorStruct()>
+
+<component.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+<closeIncludeGuard()>
+<standardFileFooter()>
+>>
+
+commandErrorStruct(command) ::= <<
+struct <command.Name;format="pascal">Error
+{
+    enum Error
+    {
+        ERR_OK = ::Blaze::ERR_OK,
+        ERR_SYSTEM = ::Blaze::ERR_SYSTEM,
+        ERR_TIMEOUT = ::Blaze::ERR_TIMEOUT,
+        ERR_MOVED = ::Blaze::ERR_MOVED,
+        ERR_GUEST_SESSION_NOT_ALLOWED = ::Blaze::ERR_GUEST_SESSION_NOT_ALLOWED,
+        ERR_AUTHORIZATION_REQUIRED = ::Blaze::ERR_AUTHORIZATION_REQUIRED<if(command.requires_authentication)>,
+        ERR_AUTHENTICATION_REQUIRED = ::Blaze::ERR_AUTHENTICATION_REQUIRED<endif><if(command.errors)>,<endif>
+        <command.errors:{<it> = ::Blaze::<it>}; separator=",\n">
+    };
+
+    static <command.Name;format="pascal">Error::Error commandErrorFromBlazeError(::Blaze::BlazeRpcError blazeError);
+};
+
+
+>>

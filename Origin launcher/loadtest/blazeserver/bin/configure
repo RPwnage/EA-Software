@@ -1,0 +1,62 @@
+#!/bin/bash
+
+#
+# This script can be run before doing a build to setup default build parameters
+#
+
+usage()
+{
+    echo "Usage: $1 [-debug | -release] [-outdir=dir] [-customdir=dir]"
+    echo "    -debug     : Build the debug version (default)"
+    echo "    -release   : Build the optimized release version"
+    echo "    -outdir    : Set the output directory where all obj, exe, lib, etc files go"
+    echo "    -customdir : The name of directories containing custom code (default: \"custom\")"
+    exit 1
+}
+
+BLAZE_ROOT=$(dirname $0)/..
+CONFIG_FILE=$BLAZE_ROOT/make/config.mak
+CONFIGURE_ARGS="$0 $*"
+
+changes=0
+build_changed=0
+outdir_changed=0
+customdir_changed=0
+while [ $# -gt 0 ]
+do
+    arg=$1;
+    shift
+    case $arg in
+        -debug)
+            BUILD=debug; build_changed=1; changes=1;;
+        -release)
+            BUILD=release; build_changed=1; changes=1;;
+        -outdir=*)
+            OUTDIR=$(echo $arg | awk -F= '{print $2}')
+            outdir_changed=1
+            changes=1;;
+        -customdir=*)
+            CUSTOMDIR=$(echo $arg | awk -F= '{print $2}')
+            customdir_changed=1
+            changes=1;;
+        *) usage;;
+    esac
+done
+
+if [ $changes == 1 ]; then
+    echo "# $CONFIGURE_ARGS" > $CONFIG_FILE
+    if [ $build_changed == 1 ]; then
+        echo BUILD = $BUILD >> $CONFIG_FILE
+    fi
+    if [ $outdir_changed == 1 ]; then
+        echo OUTDIR = $OUTDIR >> $CONFIG_FILE
+    fi
+    if [ $customdir_changed == 1 ]; then
+        echo CUSTOMDIR = $CUSTOMDIR >> $CONFIG_FILE
+    fi
+else
+    # No changes from the defaults so remove config.mak
+    echo "Using defaults; removing $CONFIG_FILE"
+    rm -f $CONFIG_FILE
+fi
+

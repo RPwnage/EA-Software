@@ -1,0 +1,319 @@
+[headername="arson/tdf/arson.h"]
+#include "arson/gen/arson.tdf"
+
+[headername="framework/tdf/usersessiontypes_server.h"]
+#include "framework/gen/usersessiontypes_server.tdf"
+
+//server side only (for REST calls to xbl):
+[ headername="xblserviceconfigs/tdf/xblserviceconfigs.h" ]
+#include "xblserviceconfigs/gen/xblserviceconfigs.tdf"
+
+[headername="framework/tdf/externalsessiontypes.h"] // for MAX_EXTERNAL_ID_CHAR_LEN in GetRestXblUsersPeopleRequest
+#include "framework/gen/externalsessiontypes.tdf"
+
+//server side only (for REST calls to xbl):
+[ headername="psnsessionmanager/tdf/psncommondefines.h" ]//for PsnWebApiHeader, PsnOnlineId etc
+#include "psnsessionmanager/gen/psncommondefines.tdf"
+
+namespace Blaze
+{
+namespace Arson
+{
+
+[tdfid = "hash"]
+class ExceptionReplicationReason
+{
+    enum Reason
+    {
+        MAP_CREATED = 0,
+        MAP_DESTROYED,
+        OBJECT_CREATED,
+        OBJECT_UPDATED,
+        OBJECT_DESTROYED
+    };
+    
+    [tag="rsn"] Reason mReason;
+};
+
+class GetUsersRequest   
+{
+    typedef list<uint32_t> IdsList;
+    [tag="usrs"] IdsList mIds;
+};
+
+class GetUsersResponse
+{
+    [tag="usrs"] list<Blaze::UserInfoData> mUsers;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      External Session Retrieve session Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+//      For Server side only RESTful proxy interface.
+//      (side: we have this in ARSON, because blazeserver xblservicesconfigs.rpc doesn't actually have a 'get' external session method/rpc)
+//      (note: also these tdfs cannot be reused for client, as they contain blaze server side only tdfs as members).
+
+class GetRestXblSessionRequestHeader
+{
+    [tag="cvrn", description=""]
+    string(-1) mContractVersion;
+
+    [tag="atkn", description=""]
+    string(-1) mAuthToken;
+};
+
+class GetRestXblSessionRequest
+{
+    [tag="scid", description="The scid of the REST request"]
+    Blaze::XblScid mScid;
+
+    [tag="stnm", description="The session template name of the REST request"]
+    Blaze::XblSessionTemplateName mSessionTemplateName;
+
+    [tag="snam", description="The session name of the REST request"]
+    Blaze::XblSessionName mSessionName;
+
+    [tag="prjh", description="REST request's headers"]
+    GetRestXblSessionRequestHeader mGetRestXblSessionRequestHeader;
+};
+
+class GetRestXblSessionResponse
+{
+    [tag="prop", description="The properties element of the REST response"]
+    Blaze::XBLServices::MultiplayerSessionProperties mProperties;
+
+    [tag="cons", description="The constants element of the REST response"]
+    Blaze::XBLServices::MultiplayerSessionConstants mConstants;
+
+    [tag="memb", description="The members element of the REST response"]
+    Blaze::XBLServices::Members mMembers;
+    
+    [tag="key", description=""]
+    string(256) mKey;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      External Session Users Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+//      For Server side only RESTful proxy interface.
+//      (side: we have this in ARSON, because blazeserver doesn't actually have a proxy component for the xbl users serrvice for Xbox.
+
+class GetRestXblUsersPeopleRequestHeader
+{
+    [tag="cvrn", description=""]
+    string(-1) mContractVersion;
+
+    [tag="atkn", description=""]
+    string(-1) mAuthToken;
+};
+
+class GetRestXblUsersPeopleRequest
+{
+    [tag="xuid", description="The xuid of the REST request"]
+    Blaze::ExternalId mExternalId;
+
+    [tag="prjh", description="REST request's headers"]
+    GetRestXblUsersPeopleRequestHeader mHeader;
+};
+
+class RestXblUserPerson
+{
+    [tag="xuid", description=""]
+    string(Blaze::MAX_EXTERNAL_ID_CHAR_LEN) mXuid;
+
+    [tag="fold", description="Whether the caller is following the user."]
+    bool isFollowedByCaller;
+
+    [tag="folg", description="Whether the user is following the caller."]
+    bool isFollowingCaller;
+};
+typedef list<RestXblUserPerson> RestXblUsersPeople;
+
+class GetRestXblUsersPeopleResponse
+{
+    [tag="ppl", description="people of the REST response"]
+    RestXblUsersPeople mPeople;
+};
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      External Session Handles Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+//      For Server side only RESTful proxy interface.
+//      (side: we have this in ARSON, because blazeserver doesn't actually have a proxy component for the xbl users serrvice for Xbox.
+
+class PostRestXblGetActivityRequestHeader
+{
+    [tag="cvrn", description="", default="105"]
+    string(-1) mContractVersion;
+
+    [tag="atkn", description=""]
+    string(-1) mAuthToken;
+};
+
+class PostRestXblGetActivityRequestBodyOwners
+{
+    [tag="xuid", description=""]
+    list<string(Blaze::MAX_EXTERNAL_ID_CHAR_LEN)> mXuids;
+};
+
+class PostRestXblGetActivityRequestBody
+{
+    [tag="scid", description="The scid of the REST request"]
+    Blaze::XblScid mScid;
+
+    [tag="ownr", description=""]
+    PostRestXblGetActivityRequestBodyOwners mOwners;
+    
+    [tag="type", description="valid values: activity"]
+    string(5) mType;
+};
+
+class PostRestXblGetActivityRequest
+{
+    [tag="prjh", description="REST request's headers"]
+    PostRestXblGetActivityRequestHeader mHeader;
+
+    [tag="body"]
+    PostRestXblGetActivityRequestBody mBody;
+};
+
+class PostRestXblActivityForUserResultSessionRef
+{
+    [tag="scid", description=""]
+    Blaze::XblScid mScid;
+
+    [tag="snam", description=""]
+    Blaze::XblSessionName mName;
+
+    [tag="stnm", description=""]
+    Blaze::XblSessionTemplateName mTemplateName;
+};
+
+class PostRestXblActivityForUserResult
+{
+    [tag="sess", description=""]
+    PostRestXblActivityForUserResultSessionRef mSessionRef;
+    
+    [tag="hand", description=""]
+    XblActivityHandleId mId;
+};
+typedef list<PostRestXblActivityForUserResult> PostRestXblActivityForUserResultList;
+
+class PostRestXblGetActivityResponse
+{
+    [tag="rslt", description="results of the REST response"]
+    PostRestXblActivityForUserResultList mResults;
+};
+
+
+class TdfStringMap
+{
+    [tag="smap"] map<string(64),string(4096), ignorecase> mStrings;
+};
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//       PS5 PlayerSessions Send Invites
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Send PSN PlayerSession Invitation Params", trackChanges = true]
+class SendPlayerSessionInvitationsRequestItem
+{
+    [trackChanges = true]
+    class SendPlayerSessionInvitationsRequestItemTo
+    {
+        [tag="acid"] Blaze::PSNServices::PsnAccountId mAccountId;
+    };
+    [tag="tos", description="rosters"]
+    SendPlayerSessionInvitationsRequestItemTo mTo;
+};
+
+[description="Send PSN PlayerSession Invitations request body.", trackChanges = true]
+class SendPlayerSessionInvitationsRequestBody
+{
+    [tag="invs"] list<SendPlayerSessionInvitationsRequestItem> mInvitations;
+};
+
+[trackChanges = true]
+class SendPlayerSessionInvitationsRequest
+{
+    [tag="head", description="Request header"]
+    Blaze::PSNServices::PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    Blaze::PsnPlayerSessionId mSessionId;
+
+    [tag="body", description="The payload data"]
+    SendPlayerSessionInvitationsRequestBody mBody;
+};
+
+[description="Send PSN PlayerSession Invitations response invite id container.", trackChanges = true]
+class SendPlayerSessionInvitationsResponseItem
+{
+    [tag="inid", description="The InvitationId."]
+    string(-1) mInvitationId;
+};
+[trackChanges = true]
+class SendPlayerSessionInvitationsResponse
+{
+    [tag="invs"] list<SendPlayerSessionInvitationsResponseItem> mInvitations;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//       PS5 PlayerSessions Get Invites (PSN S2S Call)
+//       See https://p.siedev.net/resources/documents/WebAPI/1/Session_Manager_WebAPI-Reference/0015.html
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[trackChanges = true]
+class GetPlayerSessionInvitationsRequest
+{
+    [tag="head", description="Request header"]
+    Blaze::PSNServices::PsnWebApiHeader mHeader;
+
+    [tag="acid"] Blaze::PSNServices::PsnAccountId mAccountId;
+};
+
+[trackChanges = true]
+class GetPlayerSessionInvitationsResponseItemFrom
+{
+    [tag="acct", description="PSN Account ID."]
+    string(-1) mAccountId;
+};
+
+[description="Get PSN PlayerSession Invitations response invite id container.", trackChanges = true]
+class GetPlayerSessionInvitationsResponseItem
+{
+    [tag="iid", description="PSN Invitation ID. (1-396231988968875)"]
+    string(-1) mInvitationId;
+
+    [tag="from", description="Sender information"]
+    GetPlayerSessionInvitationsResponseItemFrom mFrom;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    Blaze::PsnPlayerSessionId mSessionId;
+
+    [tag="aplt", description="session supported platforms."]
+    list<string(-1)> mSupportedPlatforms;
+
+    [tag="time", description="Date and time of receiving (Unix Timestamp) ms"]
+    string(-1) mReceivedTimestamp;
+
+    [tag="invl", description="Flag for whether the invitation is valid or invalid. If the session to which the invitation belongs does not exist, or if the sender of the invitation has left the Player Session, the invitation will be invalid."]
+    bool mInvitationInvalid;
+};
+
+[trackChanges = true]
+class GetPlayerSessionInvitationsResponse
+{
+    [tag="invs"] list<GetPlayerSessionInvitationsResponseItem> mInvitations;
+};
+
+
+} //namespace Arson
+} //namespace Blaze

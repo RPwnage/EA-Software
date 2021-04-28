@@ -1,0 +1,371 @@
+<project name="blazeserver_grpc_tools" default="build">
+  <package name="blazeserver_grpc_tools" initializeself="true"/>
+
+  <dependent name="protobuf"/>
+  <dependent name="grpc"/>
+
+  <property name="vc.warnings.disable">
+    -wd4065 <!-- switch statement contains 'default' but no 'case' labels -->
+    -wd4125 <!-- decimal digit terminates octal escape sequence -->
+    -wd4200 <!-- nonstandard extension used: zero-sized array in struct/union -->
+    -wd4242 <!--  conversion from 'int' to 'char', possible loss of data -->
+    -wd4244 <!-- 'initializing': conversion from 'double' to 'int', possible loss of data -->
+    -wd4267 <!-- conversion from 'size_t' to 'int', possible loss of data -->
+    -wd4245 <!-- 'return': conversion from 'int' to 'std::size_t', signed/unsigned mismatch -->
+    -wd4296 <!-- '>=': expression is always true -->
+    -wd4389 <!-- signed/unsigned mismatch -->
+    -wd4456 <!-- declaration of 'i' hides previous local declaration -->
+    -wd4457 <!-- declaration of 'leading' hides function parameter -->
+    -wd4505 <!-- 'function' : unreferenced local function has been removed --> <!-- prevent warns in protobuf code. -->
+    -wd4701 <!-- potentially uninitialized local variable '' used (The VS is getting confused with some grpc code which uses branching and only uses the code in the correct branch.) -->
+    -wd4702 <!-- unreachable code -->
+    -wd4706 <!-- assignment within conditional expression -->
+    -wd4800 <!-- 'uint32_t': forcing value to bool 'true' or 'false'-->
+    -wd4946 <!-- reinterpret_cast used between related classes:-->
+    -wd5026 <!-- move constructor was implicitly defined as deleted because a base class move constructor is inaccessible or deleted -->
+    -wd5027 <!-- move assignment operator was implicitly defined as deleted because a base class move assignment operator is inaccessible or deleted -->
+  </property>
+
+  <property name="global.defines">
+    _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
+    _SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING
+  </property>
+
+  <!-- Generate code out of the proto files in gRPC package-->
+  <target name="generate.gRPC.protos">
+    <include file="${package.blazeserver_grpc_tools.dir}/scripts/cpp_code_gen.xml"/>
+
+    <!-- The key name needs to be unique across all the packages in the build so it is recommended to start it with <packagename>-->
+    <do.once key="blazeserver_grpc_tools.gRPC.protos" blocking="true" unless="${mastertarget.name} == 'clean-default'">
+      <echo message="generatecode: grpc in-built protos"/>
+
+      <property name="proto.cplusplus.grpcinbuiltdir" value="${package.grpc.builddir}/gen/protogen/grpcinbuilt"/>
+      <mkdir dir="${proto.cplusplus.grpcinbuiltdir}"/>
+
+      <property name="proto.dependencies.grpcinbuiltdir" value="${package.grpc.builddir}/gen/protodependencies/grpcinbuiltdir" />
+      <mkdir dir="${proto.dependencies.grpcinbuiltdir}"/>
+
+      <eval code="@{DirectoryGetDirectoriesRecursive('${package.grpc.dir}/src/proto', '*', ' ')}" property="proto.grpcinbuilt.directories" type="Function" />
+      <property name="proto.grpcinbuilt.directories" value="${package.grpc.dir}/src/proto ${proto.grpcinbuilt.directories}"/>
+
+      <property name="proto.grpcinbuilt.additional_paths">
+        .
+        ${package.protobuf.dir}/src
+      </property>
+
+      <foreach item="String" in="${proto.grpcinbuilt.directories}" property="proto.grpcinbuilt.directory" delim=" ">
+        <eval code="@{DirectoryGetFiles('${proto.grpcinbuilt.directory}', '*.proto', ' ')}" property="proto.grpcinbuilt.files" type="Function" />
+
+        <parallel.foreach item="String" in="${proto.grpcinbuilt.files}" property="proto.grpcinbuilt.file" delim=" ">
+          <property name="proto.grpcinbuilt.file" value="@{PathGetRelativePath(${proto.grpcinbuilt.file}, '${package.grpc.dir}')}"/>
+
+          <property name="message.dep.file" local="true" value="${proto.dependencies.grpcinbuiltdir}/messages/@{StrReplace('@{StrReplace('@{StrReplace('${proto.grpcinbuilt.file}', '.proto', '.d')}', '\\', '_')}', '/', '_')}"/>
+          <task name="message.gen.cpp" compiler="${protoc.exe}" workingdir="${package.grpc.dir}" protofile="${proto.grpcinbuilt.file}" outputdir="${proto.cplusplus.grpcinbuiltdir}" depfile="${message.dep.file}" protopaths="${proto.grpcinbuilt.additional_paths}" verbose="false"/>
+
+          <property name="service.dep.file" local="true" value="${proto.dependencies.grpcinbuiltdir}/services/@{StrReplace('@{StrReplace('@{StrReplace('${proto.grpcinbuilt.file}', '.proto', '.d')}', '\\', '_')}', '/', '_')}"/>
+          <task name="service.gen.cpp" workingdir="${package.grpc.dir}" protofile="${proto.grpcinbuilt.file}" outputdir="${proto.cplusplus.grpcinbuiltdir}" depfile="${service.dep.file}" protopaths="${proto.grpcinbuilt.additional_paths}" verbose="false"/>
+        </parallel.foreach>
+      </foreach>
+
+    </do.once>
+  </target>
+
+  <tools>
+    <property name="code.generation.dir" value="${package.builddir}/gen"/>
+
+    <target name="target.blazeextensions.gen">
+      <do.once key="blazeserver_grpc_tools.blazeextensions" blocking="true" unless="${mastertarget.name} == 'clean-default'">
+        <echo message="Generate blaze extensions code...."/>
+        <mkdir dir="${code.generation.dir}"/>
+        <exec program="${protoc.exe}" workingdir="${package.dir}/protos">
+          <args>
+            <arg value="--proto_path=."/>
+            <arg value="--proto_path=${package.protobuf.dir}/src"/>
+            <arg value="--cpp_out=${code.generation.dir}"/>
+            <arg value="eadp/blaze/protobuf/blazeextensions.proto"/>
+          </args>
+        </exec>
+        <echo message="Done." />
+      </do.once>
+    </target>
+
+    <Library name="libprotoc-blaze" if="${config-system} == 'pc64' or ${config-system} == 'unix64' or ${config-system} == 'osx'">
+      <buildtype name="DynamicLibrary" if="${Dll??false}"/>
+
+      <sourcefiles>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/code_generator.cc"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/command_line_interface.cc"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/plugin.cc"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/plugin.pb.cc"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/subprocess.cc"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/zip_writer.cc"/>
+
+        <!-- These files don't need to live in google/protobuf/... path but we use that for easy hierarchy comparison and code generator tool update as a result of the diff. -->
+        <includes name="src/google/protobuf/compiler/blaze/cpp_enum.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_enum_field.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_extension.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_field.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_file.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_generator.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_helpers.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_map_field.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_message.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_message_field.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_primitive_field.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_service.cc"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_string_field.cc"/>
+
+        <!-- This file is included "asis" because during the solution generation this file does not exist and build framework will fail as a result. This file will be present due to a prebuild 
+        step when the time to build it comes.-->
+        <includes name="${code.generation.dir}/eadp/blaze/protobuf/blazeextensions.pb.cc" asis="true"/>
+      </sourcefiles>
+
+      <includedirs>
+        ${code.generation.dir}
+        ${package.dir}/src
+      </includedirs>
+
+      <headerfiles>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/code_generator.h"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/command_line_interface.h"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/plugin.h"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/plugin.pb.h"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/subprocess.h"/>
+        <includes name="${package.protobuf.dir}/src/google/protobuf/compiler/zip_writer.h"/>
+
+        <includes name="src/google/protobuf/compiler/blaze/cpp_enum.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_enum_field.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_extension.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_field.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_file.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_generator.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_helpers.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_map_field.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_message.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_message_field.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_primitive_field.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_service.h"/>
+        <includes name="src/google/protobuf/compiler/blaze/cpp_string_field.h"/>
+      </headerfiles>
+
+      <dependencies>
+        <auto>
+          protobuf/protobuf
+        </auto>
+        <!-- libprotoc-blaze (this module) depends on protoc bin (which is part of this package itself) in such a way that it doesn't need to build/link against protoc but the protoc is already built by the time 
+        libprotoc-blaze needs it(protoc is needed for generating blazeextensions.proto)-->
+        <build interface="false" link="false">
+          protobuf/tool/protoc
+        </build>
+      </dependencies>
+
+      <config>
+        <defines>
+          <do if="${config-system} == 'pc64'">
+            _SCL_SECURE_NO_WARNINGS
+          </do>
+
+          <do if="${Dll??false}">
+            PROTOBUF_USE_DLLS
+            LIBPROTOC_EXPORTS
+          </do>
+        </defines>
+
+        <warningsuppression>
+          <!-- VC Common suppressions -->
+          <do if="${config-compiler} == 'vc'">
+            ${vc.warnings.disable}
+          </do>
+
+          <!-- GCC / Clang common suppressions -->
+          <do if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+            -Wno-unused-function
+          </do>
+
+          <!-- GCC suppression -->
+          <do if="${config-compiler} == 'gcc'">
+            -Wno-sign-compare
+          </do>
+        </warningsuppression>
+      </config>
+
+      <buildsteps>
+        <prebuild-step>
+          <target>
+            <copy file="${package.protobuf.builddir}/${config}/bin/tool/protoc${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <call target="target.blazeextensions.gen"/>
+          </target>
+        </prebuild-step>
+      </buildsteps>
+    </Library>
+
+    <Program name="protoc-blaze" if="${config-system} == 'pc64' or ${config-system} == 'unix64' or ${config-system} == 'osx'">
+      <sourcefiles>
+        <includes name="src/google/protobuf/compiler/main.cc"/>
+      </sourcefiles>
+
+      <dependencies>
+        <auto>
+          protobuf/protobuf
+          blazeserver_grpc_tools/tool/libprotoc-blaze
+        </auto>
+      </dependencies>
+
+      <config>
+        <warningsuppression>
+          <do if="${config-compiler} == 'vc'">
+            ${vc.warnings.disable}
+          </do>
+        </warningsuppression>
+      </config>
+
+      <buildsteps>
+        <postbuild-step>
+          <target>
+            <copy file="${package.configbindir}/tool/protoc-blaze${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+          </target>
+        </postbuild-step>
+      </buildsteps>
+    </Program>
+
+    <!-- this mimic's grpc's own reflection library.  Maybe some day we put this inside grpc library, but for now, code gen of proto files is handled here -->
+    <Library name="grpc++_reflection">
+      <sourcefiles>
+        <includes name="${package.grpc.dir}/src/cpp/ext/proto_server_reflection.cc"/>
+        <includes name="${package.grpc.dir}/src/cpp/ext/proto_server_reflection_plugin.cc"/>
+        <includes name="${package.grpc.builddir}/gen/protogen/grpcinbuilt/src/proto/grpc/reflection/v1alpha/reflection.grpc.pb.cc" asis="true"/>
+        <includes name="${package.grpc.builddir}/gen/protogen/grpcinbuilt/src/proto/grpc/reflection/v1alpha/reflection.pb.cc" asis="true"/>
+      </sourcefiles>
+
+      <headerfiles>
+        <includes name="${package.grpc.builddir}/gen/protogen/grpcinbuilt/src/proto/grpc/reflection/v1alpha/reflection.grpc.pb.h" asis="true"/>
+        <includes name="${package.grpc.builddir}/gen/protogen/grpcinbuilt/src/proto/grpc/reflection/v1alpha/reflection.pb.h" asis="true"/>
+      </headerfiles>
+
+      <includedirs>
+        ${package.grpc.builddir}/gen
+        ${package.grpc.builddir}/gen/protogen/grpcinbuilt
+        ${package.grpc.dir}
+        ${package.dir}/include
+        ${package.dir}
+      </includedirs>
+
+      <dependencies>
+        <auto>
+          grpc/grpc
+          grpc/gpr
+          grpc/grpc++
+          protobuf/protobuf
+        </auto>
+        <build interface="false" link="false">
+          grpc/tool/grpc_cpp_plugin
+          protobuf/tool/protoc
+
+          <!-- Following are not really needed for the grpc++_reflection but we stick them in here for easy prebuild/postbuild operations.-->
+          grpc/tool/grpc_python_plugin
+          grpc/tool/grpc_csharp_plugin
+          grpc/tool/grpc_php_plugin
+          grpc/tool/grpc_node_plugin
+          grpc/tool/grpc_ruby_plugin
+          grpc/tool/grpc_objc_plugin
+        </build>
+      </dependencies>
+
+      <config>
+        <buildoptions>
+          <option name="warninglevel" value="low" if="${config-compiler} == 'vc'"/>
+        </buildoptions>
+        <warningsuppression>
+          <!-- Clang suppressions -->
+          <do if="${config-compiler} == 'clang'">
+            -Wno-deprecated
+          </do>
+        </warningsuppression>
+      </config>
+
+      <buildsteps>
+        <prebuild-step>
+          <target>
+            <copy file="${package.grpc.builddir}/${config}/bin/tool/grpc_cpp_plugin${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <copy file="${package.grpc.builddir}/${config}/bin/tool/grpc_python_plugin${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <copy file="${package.grpc.builddir}/${config}/bin/tool/grpc_csharp_plugin${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <copy file="${package.grpc.builddir}/${config}/bin/tool/grpc_php_plugin${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <copy file="${package.grpc.builddir}/${config}/bin/tool/grpc_node_plugin${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <copy file="${package.grpc.builddir}/${config}/bin/tool/grpc_ruby_plugin${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <copy file="${package.grpc.builddir}/${config}/bin/tool/grpc_objc_plugin${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <copy file="${package.protobuf.builddir}/${config}/bin/tool/protoc${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+
+            <call target="generate.gRPC.protos"/>
+          </target>
+        </prebuild-step>
+      </buildsteps>
+    </Library>
+
+    <Program name="grpc_cli">
+      <sourcefiles>
+        <includes name="${package.grpc.dir}/test/cpp/util/grpc_cli.cc"/>
+        <includes name="${package.grpc.dir}/test/cpp/util/grpc_tool.cc"/>
+        <includes name="${package.grpc.dir}/test/cpp/util/cli_credentials.cc"/>
+        <includes name="${package.grpc.dir}/test/cpp/util/cli_call.cc"/>
+        <includes name="${package.grpc.dir}/test/cpp/util/test_config_cc.cc"/>
+        <includes name="${package.grpc.dir}/test/cpp/util/proto_file_parser.cc"/>
+        <includes name="${package.grpc.dir}/test/cpp/util/proto_reflection_descriptor_database.cc"/>
+        <includes name="${package.grpc.dir}/test/cpp/util/service_describer.cc"/>
+      </sourcefiles>
+
+      <includedirs>
+        ${package.grpc.dir}/include
+        ${package.grpc.dir}
+        ${package.grpc.builddir}/gen
+        ${package.grpc.builddir}/gen/protogen/grpcinbuilt
+      </includedirs>
+
+      <dependencies>
+        <auto copylocal="true">
+          grpc/grpc
+          grpc/gpr
+          grpc/grpc++
+          protobuf/protobuf
+          blazeserver_grpc_tools/tool/grpc++_reflection
+          gflags/gflags
+          zlib/zlib
+          libopenssl
+        </auto>
+
+        <!-- Stuff we want to get built as part of the project but otherwise have no direct dependencies. -->
+        <build interface="false" link="false">
+          grpc/tool/grpc_cpp_plugin
+          protobuf/tool/protoc
+        </build>
+      </dependencies>
+
+      <libraries append="true">
+        <includes name="ws2_32.lib" asis="true" if="${config-system} == 'pc64'"/>
+        <includes name="shlwapi.lib" asis="true" if="${config-system} == 'pc64'"/>
+      </libraries>
+
+      <config>
+        <buildoptions>
+          <option name="warninglevel" value="low" if="${config-compiler} == 'vc'"/>
+          <option name="buildset.link.options" if="${config-system}==unix64">
+            ${option.value}
+            -pthread
+          </option>
+        </buildoptions>
+      </config>
+
+      <buildsteps>
+        <postbuild-step>
+          <target>
+            <copy file="${package.configbindir}/tool/grpc_cli${exe-suffix}" todir="${package.dir}/bin" flatten="true" />
+            <copy todir="${package.dir}/bin" flatten="true">
+              <fileset basedir="${package.configbindir}/tool">
+                <includes name="*${dll-suffix}"/>
+              </fileset>
+            </copy>
+          </target>
+        </postbuild-step>
+      </buildsteps>
+    </Program>
+  </tools>
+</project>

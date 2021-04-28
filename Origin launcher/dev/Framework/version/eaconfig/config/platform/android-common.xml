@@ -1,0 +1,377 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<property name="android.support-shared-pch" value="false"/>
+
+	<!-- previously, this file belonged to android_config so some of the subsequent scripts assumed android_config is resolved, force resolve here
+	to not break this assumption -->
+	<dependent name="android_config"/>
+	
+	<!-- resolve SDK as early as possible -->
+	<dependent name="AndroidSDK"/>
+
+	<!-- just need these to exist to keep some Framework internals happy - all java build settings are controlled by .gradle files -->
+	<optionset name="AndroidApk"/>
+	<optionset name="JavaLibrary"/>
+	<optionset name="AndroidAar"/>
+
+	<!-- despite being built into Framework now - we still <taskdef> some of the android C# wiring because of the dependency on AndroidSDK which we don't want to involve
+	in regular Framework build -->
+	<taskdef assembly="android_config.dll">
+		<sources>
+			<includes name="${package.android_config.dir}/tasks/**.cs"/>
+		</sources>
+		<references>
+			<includes name="${package.AndroidSDK.sdk-tasks-path}"/>
+			<includes name="${nant.location}\eaconfig.dll"/>
+		</references>
+	</taskdef>
+
+	<!-- throw warnings for a whole ton of legacy stuff that has been removed in the new gradle based android_config -->
+	<warn if="@{PropertyExists('android-use-vs-android')}" message="Generating solutions for vs-android is no longer supported. Please don't set property 'android-use-vs-android'."/>
+	<warn if="@{PropertyExists('android-use-nvidia-tegra')}" message="Property 'android-use-nvidia-tegra' is deprecated and has no effect. Tegra solutions are currently the only supported way to build android."/>
+	<warn if="@{PropertyExists('android.libOpenSLES')}" message="Property 'android.libOpenSLES' is deprecated and has no effect. Use -lOpebSLES as a library dependency for your module."/>
+	<warn if="@{PropertyExists('android.packaging')}" message="Property 'android.packaging' is deprecated and has no effect. Only Gradle packaging through Visual Studio is now supported."/>
+	<warn if="@{PropertyExists('march')}" message="Property 'march' is deprecated and has no effect. Architecture is now controlled by config."/>
+	<warn if="@{PropertyExists('package.AndroidSDK.aaptargs')}" message="Property 'package.AndroidSDK.aaptargs' is deprecated and has no effect. Android package is controlled entirely by Gradle setup."/>
+	<warn if="@{PropertyExists('package.AndroidSDK.EnableOpenSLES')}" message="Property 'package.AndroidSDK.EnableOpenSLES' is deprecated and has no effect. Use -lOpenSLES as a library dependency for your module."/>
+	<warn if="@{PropertyExists('package.AndroidSDK.libOpenSLES')}" message="Property 'package.AndroidSDK.libOpenSLES' is deprecated and has no effect. Use -lOpenSLES as a library dependency for your module."/>
+	<warn if="@{PropertyExists('package.android_config.solib-search-path')}" message="Property 'package.android_config.solib-search-path' is deprecated and has no effect. Use -lOpenSLES as a library dependency for your module."/>
+	<choose>
+		<do if="@{PropertyExists('package.AndroidSDK.targetSDKVersion')}">
+			<warn if="@{PropertyExists('android_api')}" message="Property 'android_api' and is instead superceded by package.AndroidSDK.targetSDKVersion. Please don't set 'android_api'."/>
+		</do>
+		<do if="@{PropertyExists('android_api')}">
+			<warn message="Property 'android_api' and is instead superceded by 'package.AndroidSDK.targetSDKVersion'. Setting package.AndroidSDK.targetSDKVersion to the value of 'android_api'."/>
+			<property name="package.AndroidSDK.targetSDKVersion" value="${android_api}"/>
+		</do>
+		<!-- GRADLE-TODO: at some point later we should check targetSDKVersion has a value, this might happen organically or we may want to code an explicit early check -->
+	</choose>
+	<choose>
+		<do if="@{PropertyExists('package.AndroidSDK.minimumSDKVersion')}">
+			<warn if="@{PropertyExists('android_min_api')}" message="Property 'android_min_api' and is instead superceded by package.AndroidSDK.minimumSDKVersion. Please don't set 'android_min_api'."/>
+		</do>
+		<do if="@{PropertyExists('android_min_api')}">
+			<warn message="Property 'android_min_api' and is instead superceded by 'package.AndroidSDK.minimumSDKVersion'. Setting package.AndroidSDK.minimumSDKVersion to the value of 'android_min_api'."/>
+			<property name="package.AndroidSDK.minimumSDKVersion" value="${android_min_api}"/>
+		</do>
+		<!-- GRADLE-TODO: at some point later we should check minimumSDKVersion has a value, this might happen organically or we may want to code an explicit early check -->
+	</choose>
+	
+	<!-- default c++ standard -->
+	<property name="cc.std.android.default" value="${cc.std.android.default??c++17}"/>
+
+	<!-- file extensions and narming conventions -->
+	<property name="lib-prefix" value="lib"/>
+	<property name="lib-suffix" value=".a"/>
+	<property name="exe-suffix" value=".so"/>
+	<property name="dll-suffix" value=".so"/>
+	<property name="packaging-suffix" value=".apk"/>
+
+	<!-- defaults -->
+	<property name="package.android_config.build-system" value="${package.android_config.build-system??msvs-android}"/>
+
+	<!-- VS Android -->
+	<do if="'${package.android_config.build-system}' == 'msvs-android'">
+		<property name="${config-platform}-visualstudio-extension" value="android-visualstudio-extension"/>
+		<property name="package.VisualStudio.platformtoolset" value="Clang_5_0"/>
+	</do>
+
+	<!-- NSight Tegra -->
+	<do if="'${package.android_config.build-system}' == 'tegra-android'">
+		<dependent name="NsightTegra"/>
+
+		<!-- certain versions of tegra don't correctly check registry keys in 32/64 nodes when running inder 64 bit msbuild -->
+		<property name="eaconfig.msbuild.use32bit" value="true"/>
+ 
+		<property name="${config-platform}-visualstudio-extension" value="android-NsightTegra-visualstudio-extension"/>
+		<property name="visualstudio.msbuild-options.file" value="ntegra_android_options_msbuild.xml"/>
+		<property name="backend.pregenerate">
+			${property.value}
+			nsight-tegra-pregenerate 
+			<!-- GRADLE-TODO: find out why this is needed then add comment why this is needed -->
+		</property>
+		<property name="package.VisualStudio.platformtoolset" value="DefaultClang"/>
+	</do>
+
+
+
+	<!-- =================================== -->
+	<!-- tool chain setup -->
+	<!-- =================================== -->
+	<dependent name="AndroidNDK"/>
+	<fail unless="${package.NDK.gradle-overhaul-compatible??false}" message="AndroidNDK ${package.AndroidNDK.version} is not compatible with this version of android_config! Compatible versions use a version number (e.g 1.1.1) rather than a revision (e.g r12b)."/>
+
+	<!-- - - - - - - - -->
+	<!-- COMPILER      -->
+	<!-- - - - - - - - -->
+	<compiler path="${package.AndroidNDK.compiler}" path-clanguage="${package.AndroidNDK.c-compiler}" version="${package.AndroidNDK.android_llvm_version}">
+		<common-defines>
+			<!-- a lot of these defines are known compiler internal defines - but expressing them explicitly here puts them where VS intellisense can find them -->
+			ANDROID
+			ANDROID_NDK
+			EA_ANDROID_SDK_LEVEL=${package.AndroidNDK.apiVersion}
+			EA_COMPILER_CLANG
+			EA_PLATFORM_ANDROID
+			_USING_LIBCXX
+			__ANDROID_API__=${package.AndroidNDK.apiVersion}
+			__ANDROID__
+			__llvm__
+			__STDC_INT64__
+			__WCHAR_MIN__=0
+			BIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD
+
+			<!-- GRADLE-TODO: this kinda specific to fixing some problems with include order of stdint.h and EABase - should this really be in config package? -->
+			__STDC_LIMIT_MACROS
+			__STDC_CONSTANT_MACROS
+		</common-defines>
+		<common-defines if="'${package.AndroidNDK.architecture}' == 'armv7-a'">
+			__ARM_NEON
+			__ARM_NEON__
+			__ARM_ARCH_7A__
+			__ARM_ARCH_7__
+		</common-defines>
+		<common-defines if="'${package.AndroidNDK.architecture}' == 'armv8-a'">
+			__ARM_ARCH_8__
+			__aarch64__
+		</common-defines>
+		<common-defines if="'${package.AndroidNDK.architecture}' == 'x86_64'">
+			__x86_64__
+		</common-defines>
+		<common-options if="'${package.AndroidNDK.architecture}' == 'armv7-a'">
+			-mfpu=neon
+		</common-options>
+		<common-options>
+			-target ${package.AndroidNDK.compiler-target}
+				
+			<!-- required due to a compiler bug in AndroidNDK-13b involving invoking
+			  function static variable constructors multiple times in a single-threaded
+			  environment (i.e. the function static variable constructor is invoked
+			  everytime the given function is called, not just the first time) -->
+			-fno-threadsafe-statics
+
+			<!-- Used for shared libraries. http://gcc.gnu.org/onlinedocs/gcc/Code-Gen-Options.html#Code-Gen-Options -->
+			-fPIC
+
+			<!-- requried for _Unwind_Backtrace to work on certain targets, this is
+			  unrelated to -fexceptions settings (despite what some docs say)
+			  http://stackoverflow.com/questions/3398664/how-to-get-a-call-stack-backtrace-deeply-embedded-no-library-support -->
+			-funwind-tables
+			
+			<!-- don't export symbols to symbol table by default - helps with binary size and wihout it we have run into relocation errors on large links -->
+			-fvisibility=hidden	
+
+			<!-- put functions and data in their own sections, link time -gc-sections can then cull function by function reducing binary size -->
+			-ffunction-sections
+			-fdata-sections
+
+			<!-- don't expand symbolic links -->
+			-no-canonical-prefixes
+
+			<!-- warnings we just can't stand -->
+			-Wno-implicit-exception-spec-mismatch
+			-Wno-overloaded-virtual
+			-Wno-reserved-user-defined-literal
+			-Wno-tautological-constant-out-of-range-compare
+			-Wno-unused-function
+			-Wno-unused-private-field
+
+			<!-- don't search for includes in the standard places, only
+			  places we specify: -isystem, -I, -iquote, -idirafter -->
+			-nostdinc
+		</common-options>
+		
+		<!-- setting architecture flags -->
+		<common-options if="'${package.AndroidNDK.architecture}'=='armv7-a'">
+			-march=armv7-a+crypto+crc
+		</common-options>
+		<common-options if="'${package.AndroidNDK.architecture}'=='armv8-a'">
+			-march=armv8-a+crypto+crc
+		</common-options>
+		<common-options if="'${package.AndroidNDK.architecture}' == 'x86_64'">
+			<!-- required for 128 bit atomic intrinsics -->
+			-mcx16 
+		</common-options>
+		<system-includedirs>
+			${package.AndroidNDK.std-includedirs}
+			${package.AndroidNDK.system-includedirs}
+		</system-includedirs>
+		<template>
+			<commandline>
+				%defines%
+				%includedirs%
+				%system-includedirs%
+				%options%
+				-o "%objectfile%"
+				-c "%sourcefile%"
+			</commandline>
+			<define>-D%define%</define>
+			<includedir>-I "%includedir%"</includedir>
+			<system-includedir>-isystem "%system-includedir%"</system-includedir>
+		</template>
+	</compiler>
+
+	<!-- - - - - - - - -->
+	<!-- ASSEMBLER     -->
+	<!-- - - - - - - - -->
+	<assembler path="${package.AndroidNDK.assembler}" version="${package.AndroidNDK.android_llvm_version}">
+		<common-options>
+			-target ${package.AndroidNDK.target}
+		</common-options>
+		<template>
+			<commandline>
+				%defines%
+				%includedirs%
+				%system-includedirs%
+				%options%
+				-o "%objectfile%"
+				-c "%sourcefile%"
+			</commandline>
+			<define>-D%define%</define>
+			<includedir>-I "%includedir%"</includedir>
+			<system-includedir>-isystem "%system-includedir%"</system-includedir>
+		</template>
+	</assembler>
+
+	<!-- - - - - - - - -->
+	<!-- LIBRARIAN     -->
+	<!-- - - - - - - - -->
+	<librarian path="${package.AndroidNDK.archiver}" version="$[package.AndroidNDK.toolchain-version}">
+		<template>
+			<!-- VisualStudio proxy package defined lib.options which include /OUT:X switches to specify output file -->
+			<commandline>
+				%options%
+				%objectfiles%
+			</commandline>
+			<objectfile>"%objectfile%"</objectfile>
+		</template>
+	</librarian>
+
+
+	<!-- - - - - - - - -->
+	<!-- LINKER        -->
+	<!-- - - - - - - - -->
+	<linker path="${package.AndroidNDK.linker}" version="${package.AndroidNDK.android_llvm_version}">
+
+		<!-- http://linux.die.net/man/1/ld Report unresolved symbol references from regular object files. This is done even if the linker is creating a non-symbolic shared library. -->
+		<!-- http://linux.die.net/man/1/ld Allows (the default) or disallows undefined symbols in shared libraries. This switch is similar to no-undefined except that it determines the behaviour when the undefined symbols are in a shared library rather than a regular object file. It does not affect how undefined symbols in regular object files are handled. -->
+		<!-- GRADLE-TODO: do we need this? possibly yes when linking .so -> .so dependency -->
+		<common-options>
+			--sysroot=${package.AndroidNDK.linker-sysroot}
+			-shared
+			-Wl,--allow-shlib-undefined
+			-Wl,--no-undefined
+			-Wl,--gc-sections
+			-Wl,--no-wchar-size-warning
+		</common-options>
+		<common-options if="'package.android_config.build-system' == 'tegra-android'">
+			-fuse-ld=gold.exe
+		</common-options>
+		<system-libs>
+			${package.AndroidNDK.system-libs}
+			${package.AndroidNDK.std-libs}
+		</system-libs>
+		<system-librarydirs>
+			${package.AndroidNDK.system-libdirs}
+			${package.AndroidNDK.std-libdirs}
+		</system-librarydirs>
+		<template>
+		<!-- The output switch is added to link.options during builtset generate optionset! -->
+			<commandline>
+				%options%
+				%objectfiles%
+				%librarydirs%
+				-Wl,--start-group
+				%libraryfiles%
+				-Wl,--end-group
+			</commandline>
+			<librarydir>-L "%librarydir%"</librarydir>
+			<libraryfile>"%libraryfile%"</libraryfile>
+			<objectfile>"%objectfile%"</objectfile>
+		</template>
+	</linker>
+
+	<!-- GRADLE-TODO: move this later, in fact - why do we need to repeat this in every config? -->
+	<optionset name="config-options-common">
+		<!-- cc -->
+		<option name="buildset.cc.options">
+			${option.value}
+			${cc.common-options}
+		</option>
+		<option name="buildset.cc.defines">
+			${option.value}
+			${cc.common-defines}
+		</option>
+		<option name="buildset.cc.system-includedirs">
+			${option.value}
+			${cc.system-includedirs}
+		</option>
+		<option name="buildset.cc.usingdirs">
+			${option.value}
+		</option>
+
+		<!--- as -->
+		<option name="buildset.as.options">
+			${option.value}
+			${as.common-options}
+		</option>
+		<option name="buildset.as.includedirs">
+			${option.value}
+			${as.system-includedirs}
+		</option>
+		<option name="buildset.as.usingdirs">
+			${option.value}
+			${as.usingdirs??}
+		</option>
+
+		<!--- link -->
+		<option name="buildset.link.options">
+			${option.value}
+			${link.common-options}
+		</option>
+		<option name="buildset.link.librarydirs">
+			${option.value}
+			${link.system-librarydirs}
+		</option>
+		<option name="buildset.link.libraries">
+			${option.value}
+			${link.system-libs}
+		</option>
+	</optionset>
+
+	<optionset name="config-options-dynamiclibrary">
+		<option name="buildset.name" value="DynamicLibrary"/>
+		<option name="buildset.tasks" value="asm cc link"/>
+		<option name="buildset.cc.defines" value="EA_DLL"/>
+		<option name="linkoutputname" value="%outputdir%/${lib-prefix}%outputname%${dll-suffix}"/>
+		<option name="impliboutputname" value="%outputdir%/${lib-prefix}%outputname%${dll-suffix}"/>
+	</optionset>
+
+	<optionset name="config-options-program">
+		<option name="linkoutputname" value="%outputdir%/${lib-prefix}%outputname%${dll-suffix}"/>
+	</optionset>
+
+	<!-- have to define these to let c# be define on platforms even where we don't support it -->
+	<optionset name="config-options-csharplibrary">
+		<option name="buildset.name" value="CSharpLibrary"/>
+		<option name="buildset.tasks" value="csc"/>
+		<option name="buildset.csc.target" value="library"/>
+	</optionset>
+
+	<optionset name="config-options-csharpprogram">
+		<option name="buildset.name" value="CSharpProgram"/>
+		<option name="buildset.tasks" value="csc"/>
+		<option name="buildset.csc.target" value="exe"/>
+	</optionset>
+
+	<optionset name="config-options-csharpwindowsprogram">
+		<option name="buildset.name" value="CSharpWindowsProgram"/>
+		<option name="buildset.tasks" value="csc"/>
+		<option name="buildset.csc.target" value="winexe"/>
+	</optionset>
+
+	<optionset name="config-build-layout-entrypoint-common">
+		<option name="apk" value="%output%"/>
+	</optionset>
+
+
+</project>

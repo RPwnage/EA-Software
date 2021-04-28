@@ -1,0 +1,54 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- setup mono environment properties -->
+  <include file="mono-buildtools.xml"/>
+
+  <!-- Set up xcode environment properties -->
+
+  <do unless="@{PropertyExists('xcode-application-directory')}">
+    <do if="@{PlatformIsWindows()}">
+      <property name="xcode-application-directory" value="/Applications/Xcode.app"/>
+    </do>
+
+    <do if="@{PlatformIsOSX()}">
+      <eval code="@{DirectoryGetDirectories('/Applications', 'Xcode*', '|')}"
+            property="xcode-directories" type="Function" />
+
+      <fail if="@{StrContains('${xcode-directories}', '|')}"
+            message="This system has more than one version of Xcode installed.  Please specify which version to use by setting a property called xcode-application-directory to the value of the version of Xcode to be used."/>
+
+      <property name="xcode-application-directory" value="${xcode-directories}"/>
+    </do>
+  </do>
+
+  <choose>
+    <do if="@{StrStartsWith('${xcode-application-directory}','/')}">
+      <eval property="xcode-app-developer-dir" code="@{StrReplace('${xcode-application-directory}/Contents/Developer','//','/')}" type="Function"/>
+    </do>
+    <do>
+      <eval property="xcode-app-developer-dir" code="@{StrReplace('/Applications/${xcode-application-directory}/Contents/Developer','//','/')}" type="Function"/>
+    </do>
+  </choose>
+
+  <do if="@{PlatformIsOSX()}">
+    <fail unless="@{DirectoryExists('${xcode-app-developer-dir}')}"
+          message="Xcode could not be found at location ${xcode-app-developer-dir} on that system."/>
+  </do>
+
+  <property name="package.xcode.toolbindir" value="${xcode-app-developer-dir}/usr/bin/"/>
+  <property name="package.xcode.toolchainbindir" value="${xcode-app-developer-dir}/Toolchains/XcodeDefault.xctoolchain/usr/bin/"/>
+
+  <property name="package.xcode.compiler"     value="${package.xcode.toolchainbindir}clang++"/>
+  <property name="package.xcode.c-compiler"   value="${package.xcode.toolchainbindir}clang"/>
+  <property name="package.xcode.assembler"    value="${package.xcode.toolchainbindir}as"/>
+  <property name="package.xcode.archiver"     value="${package.xcode.toolchainbindir}libtool"/>
+  <property name="package.xcode.linker"       value="${package.xcode.toolchainbindir}clang++"/>
+
+  <do.once context="project" key="SetXcodeVersion">
+    <SetXcodeVersion VersionPropertyName="package.xcode.version" />
+  </do.once>
+
+</project>

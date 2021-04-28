@@ -1,0 +1,65 @@
+<project>
+
+    <createtask name="messages.gen.php">
+        <parameters>
+            <option name="rootdir"      value="Required"/> <!-- The root directory where all the proto files are located. ProtoC needs the files to be processed from same directory structure so we create a common root. -->
+            <option name="inputdir"     value="Required"/> <!-- The directory whose proto files you want to process. All proto files (including subdirectories) are processed. Normally, same as rootdir but can be different if you want to process input proto files in different directories separately. -->
+            <option name="outputdir"    value="Required"/> <!-- The directory where you want to output the generated code. -->
+            <option name="depfilename"  value="Required"/> <!-- The dependency file name to use.-->
+        </parameters>
+
+        <code>
+            <mkdir dir="${messages.gen.php.outputdir}"/>
+            <task name="generate_relative_proto_paths" inputdir="${messages.gen.php.inputdir}" rootdir="${messages.gen.php.rootdir}"/>
+
+            <exec program="${protoc.exe}" workingdir="${messages.gen.php.rootdir}">
+                <args>
+                    <arg value="--proto_path=."/>
+                    <arg value="--proto_path=${package.protobuf.dir}/src"/>
+                    <arg value="--php_out=${messages.gen.php.outputdir}"/>
+                    <arg value="${proto.files.relative}"/>
+                </args>
+                <inputs>
+                    <includes name="${messages.gen.php.inputdir}/**.proto"/>
+                    <includes name="${protoc.exe}"/>
+                </inputs>
+                <outputs>
+                    <includes name="${messages.gen.php.outputdir}/${messages.gen.php.depfilename}" />
+                </outputs>
+            </exec>
+            <touch file="${messages.gen.php.outputdir}/${messages.gen.php.depfilename}"/>
+        </code>
+    </createtask>
+
+    <createtask name="services.gen.php">
+        <parameters>
+            <option name="rootdir"      value="Required"/> <!-- The root directory where all the proto files are located. ProtoC needs the files to be processed from same directory structure so we create a common root. -->
+            <option name="inputdir"     value="Required"/> <!-- The directory whose proto files you want to process. All proto files (including subdirectories) are processed. Normally, same as rootdir but can be different if you want to process input proto files in different directories separately. -->
+            <option name="outputdir"    value="Required"/> <!-- The directory where you want to output the generated code. -->
+            <option name="depfilename"  value="Required"/> <!-- The dependency file name to use.-->
+        </parameters>
+        <code>
+            <mkdir dir="${services.gen.php.outputdir}"/>
+            <task name="generate_relative_proto_paths" inputdir="${services.gen.php.inputdir}" rootdir="${services.gen.php.rootdir}"/>
+
+            <exec program="${protoc.exe}" workingdir="${services.gen.php.rootdir}">
+                <args>
+                    <arg value="--proto_path=."/>
+                    <arg value="--proto_path=${package.protobuf.dir}/src"/>
+                    <arg value="--grpc_out=${services.gen.php.outputdir}"/>
+                    <arg value="--plugin=protoc-gen-grpc=${grpc_php_plugin.exe}"/>
+                    <arg value="${proto.files.relative}"/>
+                </args>
+                <inputs>
+                    <includes name="${services.gen.php.inputdir}/**.proto"/>
+                    <includes name="${protoc.exe}"/>
+                    <includes name="${grpc_php_plugin.exe}"/>
+                </inputs>
+                <outputs>
+                    <includes name="${services.gen.php.outputdir}/${services.gen.php.depfilename}" />
+                </outputs>
+            </exec>
+            <touch file="${services.gen.php.outputdir}/${services.gen.php.depfilename}"/>
+        </code>
+    </createtask>
+</project>

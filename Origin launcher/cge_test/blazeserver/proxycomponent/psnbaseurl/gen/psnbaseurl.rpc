@@ -1,0 +1,82 @@
+[ headername="psnbaseurl/tdf/psnbaseurl.h" ]
+#include "psnbaseurl/gen/psnbaseurl.tdf"
+
+namespace Blaze
+{
+namespace PSNServices
+{
+
+[
+    id = core/3000,
+    description = "PSN Base URL service proxy",
+    details = "Proxy component for the PSN Base URL REST service",
+    proxyOnly = true,
+    http = {
+        payloadEncoderSubType = "NORMAL"
+    }
+]
+component PSNBaseUrl
+{
+    errors
+    {
+        [ description = "External session authentication error, possibly due to invalid/expired token." ]
+        PSNBASEURL_AUTHENTICATION_REQUIRED = 1; //http 401
+        [ description = "The specified resource does not exist." ]
+        PSNBASEURL_RESOURCE_NOT_FOUND = 2; //http 404
+        [ description = "Request was refused." ]
+        PSNBASEURL_ACCESS_FORBIDDEN = 3; //http 403
+        [ description = "Invalid or malformed request parameters." ]
+        PSNBASEURL_BAD_REQUEST = 4; //http 400
+        [ description = "The external service's rate limit was exceeded." ]
+        PSNBASEURL_TOO_MANY_REQUESTS = 5; //http 429
+        [ description = "The external session service is currently unavailable, possibly due to momentary downtime, updates or service maintenance." ]
+        PSNBASEURL_SERVICE_UNAVAILABLE = 6; //http 503
+        [ description = "The external session service had an unspecified internal error. Check with Sony for potential issues." ]
+        PSNBASEURL_SERVICE_INTERNAL_ERROR = 7; //http 500
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+                id = 1,
+                description = "Get Base URL for the PSN service",
+                details = "Get Base URL for the PSN web api",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNBASEURL_BAD_REQUEST, PSNBASEURL_AUTHENTICATION_REQUIRED, PSNBASEURL_ACCESS_FORBIDDEN, PSNBASEURL_RESOURCE_NOT_FOUND, PSNBASEURL_TOO_MANY_REQUESTS, PSNBASEURL_SERVICE_UNAVAILABLE, PSNBASEURL_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "asm/v1/apps/me/baseUrls/{apiGroup}",
+                    method = "GET",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNBASEURL_BAD_REQUEST,
+                        401 = PSNBASEURL_AUTHENTICATION_REQUIRED,
+                        403 = PSNBASEURL_ACCESS_FORBIDDEN,
+                        404 = PSNBASEURL_RESOURCE_NOT_FOUND,
+                        429 = PSNBASEURL_TOO_MANY_REQUESTS,
+                        500 = PSNBASEURL_SERVICE_INTERNAL_ERROR,
+                        503 = PSNBASEURL_SERVICE_UNAVAILABLE
+                    },
+                    addEncodedPayload = false // No payload
+                }
+            ]
+            GetBaseUrlResponse getBaseUrl(GetBaseUrlRequest);
+        }
+    }
+}
+
+
+}
+}

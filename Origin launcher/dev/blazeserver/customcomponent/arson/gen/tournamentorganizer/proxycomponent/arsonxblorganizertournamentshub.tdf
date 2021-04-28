@@ -1,0 +1,341 @@
+/*! ************************************************************************************************/
+/*!
+    \file arsonxblorganizertournamentshub.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+[headername="gamemanager/tdf/externalsessiontypes_server.h"]
+#include "gamemanager/gen/externalsessiontypes_server.tdf"
+
+// for TournamentOrganizer, TournamentId
+[headername="gamemanager/tdf/gamemanager_types.h"]
+#include "gamemanager/gen/gamemanager_types.tdf"
+
+[headername="arson/tournamentorganizer/tdf/arsontournamentorganizer.h"]
+#include "arson/gen/tournamentorganizer/arsontournamentorganizer.tdf" // for ArsonExternalTournamentInfo/ArenaTournamentInfoResponse in CreateArenaTournamentRequestBody
+
+[ headername="xblserviceconfigs/tdf/xblsessiondirectorycommontypes.h" ]
+#include "xblserviceconfigs/gen/xblsessiondirectorycommontypes.tdf"
+
+[ headername="xbltournamentshub/tdf/xbltournamentshub.h" ]
+#include "xbltournamentshub/gen/xbltournamentshub.tdf"
+
+[headername="arson/tournamentorganizer/proxycomponent/tdf/arsonxblsessiondirectory_arena.h"]
+#include "arson/gen/tournamentorganizer/proxycomponent/arsonxblsessiondirectory_arena.tdf"
+
+namespace Blaze
+{
+
+namespace ArsonXBLServices
+{
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Create Tournament Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class CreateArenaTournamentRequest
+{
+    [tag="toid", description="XDP configured Tournament Organizer Id"]
+    TournamentOrganizer mOrganizerId;
+
+    [tag="trid", description="Tournament Id"]
+    TournamentId mTournamentId;
+
+    [tag="head", description="header"]
+    XBLServices::TournamentsHubRequestHeader mHeader; //poss todo: decouple from XBLServices
+
+    [tag="body", description="body"]
+    Arson::ArsonExternalTournamentInfo mBody;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Update Tournament Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class UpdateArenaTournamentRequest
+{
+    [tag="toid", description="XDP configured Tournament Organizer Id"]
+    TournamentOrganizer mOrganizerId;
+
+    [tag="trid", description="Tournament Id"]
+    TournamentId mTournamentId;
+
+    [tag="head", description="header"]
+    XBLServices::TournamentsHubRequestHeader mHeader;
+
+    [tag="body", description="body"]
+    Arson::ArsonExternalTournamentInfo mBody;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get Tournament Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class GetArenaTournamentRequest
+{
+    [tag="toid", description="XDP configured Tournament Organizer Id"]
+    TournamentOrganizer mOrganizerId;
+
+    [tag="trid", description="Tournament Id"]
+    TournamentId mTournamentId;
+
+    [tag="head", description="header"]
+    XBLServices::TournamentsHubRequestHeader mHeader;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Create Tournament Team Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+
+[description="Arena Match info. Required: label", trackChanges = true]
+class ArsonArenaCommonMatchInfo
+{
+    // The following fields are used for CurrentMatches only:
+
+    [tag="game", description="The game session for the current match.", trackChanges = true]
+    XBLServices::MultiplayerSessionRef mGameSessionRef; //poss todo: decouple from XBLServices
+    
+    // The following fields are used for PreviousMatches only:
+    [tag="etim", trackChanges = true] UtcTimeString mEndTime;
+    [tag="rslt", trackChanges = true] Arson::ArsonArenaResult mResult;
+    
+
+    // The following fields are information common to both current and previous Arena match infos:
+    
+    [tag="frmt", description="A label that describes the match. This generic formatted string provides organizers the flexibility to label the match with richer text such as Final or Heat 1. This is required. This was previously round which was just a number.", trackChanges = true]
+    Arson::ArsonArenaFormattedString mLabel;
+
+    [tag="strt", description="The time at which this match is scheduled to start. This is in UTC. Now optional"]
+    UtcTimeString mStartTime;
+    
+    [tag="bye", description="True if the match is a bye."]
+    bool mBye;
+
+    [tag="otms", description="The team IDs of all the opposing teams. This should be absent if 'bye' is true, and present if 'bye' is false. The strings are the ID of a team that is already registered in this tournament. It is case insensitive and has a maximum length of 80. Valid characters are alphanumeric, '.', '-' and '_'."]
+    list<string(-1)> mOpposingTeamIds;
+
+    [tag="plys", description="The member ids of the team members playing in this match. Optional"]
+    list<string(-1)> mPlayers;
+};
+
+
+[description="Team info fetched from XBL. Required fields: id, name, registrationDate, standing, members. For Blaze, other than the name and id, other fields are mainly for extra logging and debugging currently.", trackChanges = true]
+class ArsonArenaTournamentTeamInfo
+{
+    // TeamRequest fields common to both create/update requests and get responses:
+
+    [tag="tmid", description="The ID of the team. It is case insensitive and has a maximum length of 80. Valid characters are alphanumeric, '.', '-' and '_'. It is an opaque string specified by the tournament organizer."]
+    string(-1) mId;
+    
+    [tag="name", description="The display name of the team. Has a maximum length of 64."]
+    string(-1) mName;
+
+    [tag="rgdt", description="The time at which the team was registered. Used to determine ordering if the team is waitlisted. This value is provided by the organizer."]
+    UtcTimeString mRegistrationDate;
+    
+    [tag="stat", description="The state of the team. The team's state is updated within TournamentsHub when the Tournament Organizer would like clients to be aware of it. The state is 'Registered' by default. Possible values: Registered, Waitlisted, Standby, CheckedIn, Playing, Completed"]
+    string(-1) mState;
+    
+    [tag="cmrs", description="The reason why the team is in the Completed state. Required when state is 'Completed'. Possible values: Rejected, Eliminated, Evicted, Completed"]
+    string(-1) mCompletedReason;
+    
+    [tag="stnd", description="A formatted string that describes the team's standing in the tournament. For example 1W - 0L." ]
+    Arson::ArsonArenaFormattedString mStanding;
+    
+    [tag="rank", description="The team's final rank within the tournament, if it is available. Must be a long greater than or equal to 0."]
+    uint64_t mRanking;
+    
+    [tag="cmat", description="Information about the team's current or upcoming match. Absent if the team does not have an current or upcoming match.", trackChanges = true]
+    ArsonArenaCommonMatchInfo mCurrentMatch;
+    
+    [tag="pmat", description="Information about the previously played match. Absent if the player has not played any matches. This information was moved out of the team session and into the Hub. Required: result", trackChanges = true]
+    ArsonArenaCommonMatchInfo mPreviousMatch;
+    
+    [tag="frmt", description="A formatted string that describes the team."]
+    Arson::ArsonArenaFormattedString mFormattedString;
+    
+    [tag="mbrs", description="The members for this team. Must not exceed the maxTeamSize or be smaller than the minTeamSize."]
+    XBLServices::ArenaMemberDetailsList mMembers; //poss todo: decouple from XBLServices
+    
+    // TeamDetails fields only in XBL responses (not requests):
+    
+    [tag="rtas", description="Tournament team RTA subscription"]
+    string(-1) mRtaSubscription;
+};
+
+class CreateArenaTournamentTeamRequest
+{
+    [tag="toid", description="XDP configured Tournament Organizer Id"]
+    TournamentOrganizer mOrganizerId;
+
+    [tag="trid", description="Tournament Id"]
+    TournamentId mTournamentId;
+    
+    [tag="team", description="Tournament team Id"]
+    string(-1) mTeamId;
+
+    [tag="head", description="header"]
+    XBLServices::TournamentsHubRequestHeader mHeader;
+
+    [tag="body", description="body"]
+    ArsonArenaTournamentTeamInfo mBody;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get Tournament Team Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+class ArsonGetArenaTeamRequest
+{
+    [tag="toid", description="XDP configured Tournament Organizer Id"]
+    TournamentOrganizer mOrganizerId;
+
+    [tag="trid", description="Tournament Id"]
+    TournamentId mTournamentId;
+    
+    [tag="team", description="Tournament team Id"]
+    string(-1) mTeamId;
+
+    [tag="head", description="header"]
+    XBLServices::TournamentsHubRequestHeader mHeader;
+};
+
+[description="Team info fetched from XBL. Similar to ArsonArenaTournamentTeamInfo except the standing is a single string."]
+class ArsonGetArenaTeamResponse
+{
+    // TeamRequest fields common to both create/update requests and get responses:
+
+    [tag="tmid", description="The ID of the team. It is case insensitive and has a maximum length of 80. Valid characters are alphanumeric, '.', '-' and '_'. It is an opaque string specified by the tournament organizer."]
+    string(-1) mId;
+    
+    [tag="name", description="The display name of the team. Has a maximum length of 64."]
+    string(-1) mName;
+
+    [tag="rgdt", description="The time at which the team was registered. Used to determine ordering if the team is waitlisted. This value is provided by the organizer."]
+    UtcTimeString mRegistrationDate;
+    
+    [tag="stat", description="The state of the team. The team's state is updated within TournamentsHub when the Tournament Organizer would like clients to be aware of it. The state is 'Registered' by default. Possible values: Registered, Waitlisted, Standby, CheckedIn, Playing, Completed"]
+    string(-1) mState;
+    
+    [tag="cmrs", description="The reason why the team is in the Completed state. Required when state is 'Completed'. Possible values: Rejected, Eliminated, Evicted, Completed"]
+    string(-1) mCompletedReason;
+    
+    [tag="stnd", description="A formatted string that describes the team's standing in the tournament. For example 1W - 0L." ]
+    string(-1) mStanding;
+    
+    [tag="rank", description="The team's final rank within the tournament, if it is available. Must be a long greater than or equal to 0."]
+    uint64_t mRanking;
+    
+    [tag="cmat", description="Information about the team's current or upcoming match. Absent if the team does not have an current or upcoming match."]
+    ArsonArenaCommonMatchInfo mCurrentMatch;
+    
+    [tag="pmat", description="Information about the previously played match. Absent if the player has not played any matches. This information was moved out of the team session and into the Hub. Required: result"]
+    ArsonArenaCommonMatchInfo mPreviousMatch;
+    
+    [tag="frmt", description="A formatted string that describes the team."]
+    Arson::ArsonArenaFormattedString mFormattedString;
+    
+    [tag="mbrs", description="The members for this team. Must not exceed the maxTeamSize or be smaller than the minTeamSize."]
+    XBLServices::ArenaMemberDetailsList mMembers;
+    
+    // TeamDetails fields only in XBL responses (not requests):
+    
+    [tag="rtas", description="Tournament team RTA subscription"]
+    string(-1) mRtaSubscription;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get Tournament Teams Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[trackChanges = true]
+class ArsonGetArenaTeamForUserRequest
+{
+    [tag="toid", description="XDP configured Tournament Organizer Id"]
+    TournamentOrganizer mOrganizerId;
+
+    [tag="trid", description="Tournament Id"]
+    TournamentId mTournamentId;
+    
+    [tag="xuid", description="xuid of the member to fetch for"]
+    string(Blaze::MAX_EXTERNAL_ID_CHAR_LEN) mMemberId;
+
+    [tag="head", description="header"]
+    XBLServices::TournamentsHubRequestHeader mHeader;
+};
+
+
+[trackChanges = true]
+class ArsonGetArenaTeamsForUserResponse
+{
+    [tag="valu", description="returned teams"]
+    list<ArsonGetArenaTeamResponse> mValue;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get Tournaments Request & response objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Info for a tournament in query result. This is the JSON response contract for the tournament details API. This contract is a nicer response contract for clients that just want to display a tournament.", trackChanges = true]
+typedef Arson::ArsonExternalTournamentDetails ArsonTournamentDetails;
+
+[description="A team in an tournament query result.", trackChanges = true]
+class ArsonTournamentQueryResultTeam
+{
+    [tag="tmid", description="The ID of the team. It is case insensitive and has a maximum length of 80. Valid characters are alphanumeric, '.', '-' and '_'. It is an opaque string specified by the tournament organizer."]
+    string(-1) mId;
+    [tag="stat", description="The state of the team. The team's state is updated within TournamentsHub when the Tournament Organizer would like clients to be aware of it. The state is 'Registered' by default. Possible values: Registered, Waitlisted, Standby, CheckedIn, Playing, Completed"]
+    string(-1) mState;
+    [tag="rank", description="The team's final rank within the tournament, if it is available. Must be a long greater than or equal to 0."]
+    uint64_t mRanking;
+};
+
+[description="An item in the tournament query result list.", trackChanges = true]
+class ArsonTournamentQueryResult
+{
+    [tag="tour"] ArsonTournamentDetails mTournament;
+
+    [tag="team", description="Present only if the teamForMember parameter is specified and that user participated in this tournament. If the user participated, this will be some information about the team the user was a member of."]
+    ArsonTournamentQueryResultTeam mTeam;
+};
+
+[description="Get Tournaments Request", trackChanges = true]
+class ArsonGetArenaTournamentsRequest
+{
+    [tag="ttid", description="The XBL title ID of the title to be played for this tournament. This is a base 10 integer. It must be associated with a scid and a sandbox."]
+    TitleId mTitleId;
+    
+    [tag="toid", description="Tournament Organizer Id URL query param, of form &organizer={organizerId}. Will be omitted, as needed"]
+    string(-1) mOrganizerIdQueryString;
+    
+    [tag="stat", description="Tournament state filter URL query param, of form &state={state}. Will be omitted, as needed"]
+    string(-1) mStateQueryString;
+    
+    [tag="mbrs", description="Tournament members filter URL query param, of form &memberId={xuid}. Will be omitted, as needed"]
+    string(-1) mMemberFilterQueryString;
+    
+    [tag="club", description="Tournament clubId filter URL query param, of form &clubId={clubId}. Will be omitted, as needed"]
+    string(-1) mClubIdQueryString;
+
+    [tag="cont", description="Continuation token URL query param, of form &continuationToken={tokenNumber}. Will be omitted, as needed, and only specified if there was extra continuations."]
+    string(-1) mContinuationTokenQueryString;
+
+    [tag="head", description="header"]
+    XBLServices::TournamentsHubRequestHeader mHeader;
+};
+
+[description="Get Tournaments response", trackChanges = true]
+class ArsonGetArenaTournamentsResponse
+{
+    [tag="valu", description="returned teams"]
+    list<ArsonTournamentQueryResult> mValue;
+
+    [tag="next", nameoverride="@nextLink", description="The URL to the next page of results. Clients must treat this as an opaque URL, which means the query options may not be changed. The absence of this property means there are no more results."]
+    string(-1) mNextLink;
+};
+
+}
+}

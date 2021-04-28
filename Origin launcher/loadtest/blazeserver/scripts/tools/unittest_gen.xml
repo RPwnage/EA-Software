@@ -1,0 +1,71 @@
+<project xmlns="schemas/ea/framework3.xsd">
+ 
+  <!-- Include this file with your ${TestProgramName} <tests>, to generate the common test helper protobufs for your gtest build.-->
+  <!-- If included before that section, ensure your properties include ${property.value}, and FileSets use 'append' attribute -->
+  <!-- ********************* -->
+
+  <include file ="${package.dir}/scripts/tools/unittest.xml" />
+  <property name="TestProgramName"  value="${package.name}Test" unless="@{PropertyExists('TestProgramName')}"/>
+  
+
+  <!-- Pre-build target -->
+  <property name="testsprebuildtaskname" value="test.${TestProgramName}.testsprebuildtask" />
+  <target name="testsprebuild">
+    <!-- For framework3, ensure task runs at most once to avoid parallel builds stepping on the same files -->
+    <do.once key="prebuildTestCodeGenDoOnceKey" blocking="true">
+      <task name="${testsprebuildtaskname}"/>
+    </do.once>
+  </target>
+  <createtask name="${testsprebuildtaskname}">
+    <parameters/>
+    <code>
+      <echo message="Tests Pre Build for ${testsprebuildtaskname}.."/>
+      <call target="generatetestcode"/>
+    </code>
+  </createtask>
+  
+  
+  <!-- Add values to package's properties as needed -->
+  <property name="test.${TestProgramName}.preprocess">
+    ${property.value}
+    testsprebuild
+  </property>
+
+  <!-- Enable auto-regenerating code in vstudio also -->
+  <property name="test.${TestProgramName}.prebuildtarget">
+    ${property.value}
+    generatetestcode
+  </property>
+  <property name="test.${TestProgramName}.prebuildtarget.generatetestcode.nantbuildonly" value="false"/>
+
+  <fileset name="test.${TestProgramName}.vcproj.excludedbuildfiles" append="true">
+    <includes name="${TestGenInputRoot}/**.proto"/>
+  </fileset>  
+  <fileset name="test.${TestProgramName}.headerfiles" append="true">
+    <includes name="${TestGenBuildRoot}/**.h"/>
+  </fileset>
+  <fileset name="test.${TestProgramName}.sourcefiles" append="true">
+    <includes name="${TestGenBuildRoot}/**.cpp"/>
+    <includes name="${TestGenBuildRoot}/**.cc"/>
+  </fileset>
+  <property name="test.${TestProgramName}.includedirs">
+    ${property.value}
+    <!--For protoc's output test classes to compile:-->
+    ${TestGenBuildRoot} 
+    <!--For protoc's output test classes include paths to easily compile/be found-->
+    ${GenBuildRoot}
+    ${package.dir}
+  </property>
+  <property name="test.${TestProgramName}.dependencies">
+    ${property.value}
+    protobuf
+  </property>
+  <property name="test.${TestProgramName}.warningsuppression" if="${config-system} == 'pc64'">
+    ${property.value}
+    -wd4800 <!-- in protobuf: forcing value to bool 'true' or 'false' (performance warning) -->
+    -wd4125 <!-- in protobuf: decimal digit terminates octal escape sequence -->
+    -wd4456 <!-- in protobuf: declaration of 'size' hides previous local declaration -->
+    -wd4505 <!-- in protobuf: unreferenced local function has been removed -->
+  </property>
+
+</project>

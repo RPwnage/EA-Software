@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# usage: c_rehash filename [filename ...]
+#
+# In order for OpenSSL to recognize/verify a CA certificate,
+# there must be a symlink or copy of the certificate named using the OpenSSL hash of the file
+#    http://www.madboa.com/geek/openssl/#verify-new
+#
+# On Linux this is handled for us
+# On Windows, the hash file must be created manually
+#  (since we don't have symlinks a copy of the file has to do.)
+
+for CERTFILE in $*; do
+  # make sure file exists and is a valid cert
+  test -f "$CERTFILE" || continue
+  HASH=$(openssl x509 -noout -hash -in "$CERTFILE")
+  test -n "$HASH" || continue
+
+  # use lowest available iterator for symlink
+  for ITER in 0 1 2 3 4 5 6 7 8 9; do
+    test -f "${HASH}.${ITER}" && continue
+    cp "$CERTFILE" "${HASH}.${ITER}"
+    test -L "${HASH}.${ITER}" && break
+  done
+done
+

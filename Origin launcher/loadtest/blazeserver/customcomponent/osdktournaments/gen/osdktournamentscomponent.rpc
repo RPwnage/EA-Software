@@ -1,0 +1,213 @@
+[
+  client_include = false,
+  headername="osdktournaments/tdf/osdktournamentstypes_server.h" 
+]
+#include "osdktournaments/gen/osdktournamentstypes_server.tdf"
+
+[ headername="osdktournaments/tdf/osdktournamentstypes.h" ]
+#include "osdktournaments/gen/osdktournamentstypes.tdf"
+
+namespace Blaze
+{
+namespace OSDKTournaments
+{
+[
+  id = custom/223,
+  description = "Implementation of the OSDKTournaments feature.",
+  details = "Provides functionality to create and manage tournaments.",
+  configurationType = OsdkTournamentsConfig,
+  strictConfigParsing = true
+]
+component OSDKTournaments
+{
+    types
+    {
+        [ name = "tournament" ]
+        ENTITY_TYPE_TOURNAMENT              = 1;
+        [
+          name = "attribute",
+          has_identity = false 
+        ]
+        ENTITY_TYPE_TOURNAMENT_ATTRIBUTE    = 2;
+    }
+
+    errors
+    {
+        [ description = "Unknown error." ]
+        OSDKTOURN_ERR_TOURNAMENT_GENERIC        = 1;
+        [ description = "The specified tournament was not found." ]
+        OSDKTOURN_ERR_TOURNAMENT_NOT_FOUND      = 2;
+        [ description = "The member is already in a tournament.  A member cannot be in more than one tournament per mode." ]
+        OSDKTOURN_ERR_ALREADY_IN_TOURNAMENT     = 3;
+        [ description = "The specified member is in not in the given tournament" ]
+        OSDKTOURN_ERR_MEMBER_NOT_IN_TOURNAMENT  = 4;
+        [ description = "The specified member was not found." ]
+        OSDKTOURN_ERR_MEMBER_NOT_FOUND          = 5;
+        [ description = "The specified tournament has been disabled." ]
+        OSDKTOURN_ERR_TOURNAMENT_DISABLED       = 6;
+        [ description = "Ties are not supported for tournament matches." ]
+        OSDKTOURN_ERR_TIES_NOT_SUPPORTED        = 7;
+		[ description = "Can not get the database connection for the component." ]
+        OSDKTOURN_ERR_NO_DB_CONNECTION          = 8;
+    }
+
+    [ clientname = "OSDKTournamentsComponent" ]
+    slave
+    {
+        notifications  
+        {
+               [
+                 id = 1,
+                 description = "Attempts to join the given tournament",
+                 client_export = false
+               ]
+               JoinTournamentNotification(JoinTournamentNotification);    
+
+               [
+                 id = 2,
+                 description = "Attempts to leave the given tournament",
+                 client_export = false
+               ]
+               LeaveTournamentNotification(LeaveTournamentNotification); 
+ 
+               [
+                 id = 3,
+                 description = "Tournament member logged in",
+                 client_export = false
+               ]
+               TournamentMemberLoginNotification(TournamentMemberLoginNotification);   
+        }   
+
+        methods
+        {
+               [
+                 id = 1,
+                 description = "Retrieves a list of all available tournaments for the specified mode including all data configured for each tournament as specified on the server.",
+                 generate_command_class = false 
+               ]
+               GetTournamentsResponse getTournaments(GetTournamentsRequest);
+
+               [
+                 id = 2,
+                 description = "Retrieves a list of all available tournaments including all data configured for each tournament as specified on the server.",
+                 generate_command_class = false 
+               ]
+               GetAllTournamentsResponse getAllTournaments();
+
+               [
+                 id = 3,
+                 description = "Retrieves the number of active members in the given tournament.",
+                 generate_command_class = false,
+                 errors = {
+                       OSDKTOURN_ERR_TOURNAMENT_NOT_FOUND
+                   } 
+               ]
+               GetMemberCountsResponse getMemberCounts(GetMemberCountsRequest);
+
+               [
+                 id = 4,
+                 description = "Retrieves the top n most recent trophies for a member",
+                 errors = {
+                       OSDKTOURN_ERR_MEMBER_NOT_FOUND
+                   } 
+               ]
+               GetTrophiesResponse getTrophies(GetTrophiesRequest);
+
+               [
+                 id = 5,
+                 description = "Retrieves the id for the tournament that the member is in",
+                 details = "Not intended for use when a member can be in multiple tournaments for the mode as it will only return the first tournament found",
+                 errors = {
+                       OSDKTOURN_ERR_MEMBER_NOT_IN_TOURNAMENT
+                   } 
+               ]
+               GetMyTournamentIdResponse getMyTournamentId(GetMyTournamentIdRequest);
+
+               [
+                 id = 6,
+                 requiresUserSession = false,
+                 description = "Attempts to join the given tournament",
+                 errors = {
+                       OSDKTOURN_ERR_TOURNAMENT_NOT_FOUND,
+                       OSDKTOURN_ERR_ALREADY_IN_TOURNAMENT,
+                       OSDKTOURN_ERR_MEMBER_NOT_FOUND,
+                       OSDKTOURN_ERR_TOURNAMENT_GENERIC,
+                       OSDKTOURN_ERR_TOURNAMENT_DISABLED
+                   } 
+               ]
+               JoinTournamentResponse joinTournament(JoinTournamentRequest);
+
+               [
+                 id = 7,
+                 description = "Attempts to leave the given tournament",
+                 errors = {
+                       OSDKTOURN_ERR_TOURNAMENT_NOT_FOUND,
+                       OSDKTOURN_ERR_MEMBER_NOT_IN_TOURNAMENT,
+                       OSDKTOURN_ERR_TOURNAMENT_GENERIC
+                   } 
+               ]
+               void leaveTournament(LeaveTournamentRequest);
+
+               [
+                 id = 8,
+                 description = "Resets the current member's tournament after a member has lost or won the entire tournament.
+                    It returns the member to tier 1 and wipes the previous tournament data for the player.",
+                 errors = {
+                       OSDKTOURN_ERR_MEMBER_NOT_IN_TOURNAMENT
+                   } 
+               ]
+               void resetTournament(ResetTournamentRequest);
+
+               [
+                 id = 9,
+                 description = "Retrieves the details of the current member's tournament, including the tree",
+                 errors = {
+                       OSDKTOURN_ERR_MEMBER_NOT_IN_TOURNAMENT,
+                       OSDKTOURN_ERR_TOURNAMENT_GENERIC,
+                       OSDKTOURN_ERR_TOURNAMENT_NOT_FOUND
+                   } 
+               ]
+               GetMyTournamentDetailsResponse getMyTournamentDetails(GetMyTournamentDetailsRequest);
+               
+               [
+                 id = 10,
+                 requiresUserSession = false,
+                 description = "Resets the tournament for all members of a given tournament ID.
+                    It returns the member to tier 1 and wipes the previous tournament data for the players.
+                    Also sets the status of the players to active or inactive after the reset.",
+                 errors = {
+                       OSDKTOURN_ERR_TOURNAMENT_NOT_FOUND
+                   }
+               ]
+               void resetAllTournamentMembers(ResetAllTournamentMembersRequest);
+			   
+			   [
+                 id = 11,
+                 requiresUserSession = false,
+                 client_export = false,
+                 description = "Report tournament match result between two members.",
+                 errors = {
+                       OSDKTOURN_ERR_TOURNAMENT_NOT_FOUND,
+                       OSDKTOURN_ERR_MEMBER_NOT_IN_TOURNAMENT,
+                       OSDKTOURN_ERR_TIES_NOT_SUPPORTED
+                   }
+               ]
+               void reportMatchResult(ReportMatchResultRequest);
+			   
+			   [
+                 id = 12,
+                 requiresUserSession = false,
+                 client_export = false,
+                 description = "Get tournament member status.",
+                 errors = {
+                       OSDKTOURN_ERR_NO_DB_CONNECTION
+                   }
+               ]
+               TournamentMemberData getMemberStatus(GetMemberStatusRequest);
+
+        } //methods
+    } // slave
+
+}
+}
+}

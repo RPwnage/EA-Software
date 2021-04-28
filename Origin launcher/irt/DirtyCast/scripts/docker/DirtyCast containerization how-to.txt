@@ -1,0 +1,37 @@
+Detailed guidelines on Confluence: https://developer.ea.com/display/GOSInternal/How+to+create+DirtyCast+containers
+
+Quick guidelines:
+    * Create the BASE container image
+        cd <...>\DirtyCast\scripts\docker\base
+        docker build -t dirtycast/base:active .
+
+    * Create the BUILD container image
+        cd <...>\DirtyCast\scripts\docker\build
+        docker build -t dirtycast/build:active .
+
+    * Run the BUILD container to build the source code
+        option 1 - with internally-synced code:
+            docker run --name <container name> -e P4USER=<p4 username ex: EAMONTREAL\\mclouatre> -it dirtycast/build:active ./syncandbuild.sh
+
+        option 2 - with pre-synced code:
+            docker run --name <container name> -v <host source code dir ex: ~/p4/gos-stream/ml>:/tmp/EAGS/gos-stream/ml -it dirtycast/build:active ./build.sh
+
+    * Create the BUILDOUTPUT container image
+        docker commit -a <you@ea.com> <container name> dirtycast/buildoutput:active
+
+    * Create the PACKAGING container image
+        cd <...>\DirtyCast\scripts\docker\packaging
+        docker build -t dirtycast/packaging:active .
+
+    * Create the RUNBASE container image
+        cd <...>\DirtyCast\scripts\docker\runbase
+        docker build -t dirtycast/runbase:active .
+
+    * Run the PACKAGING container to create the container of your choice
+        docker run --name <container name> -v /var/run/docker.sock:/var/run/docker.sock -it dirtycast/packaging:active <app arg: voipserver|gameserver> <build arg: debug|final> <mode arg: cc|otp|qos> {optional container's tag ("latest" is used if not specified)}
+        example: docker run --name my_container -v /var/run/docker.sock:/var/run/docker.sock -it dirtycast/packaging:active voipserver debug cc 1.1.1 
+
+
+
+
+

@@ -1,0 +1,254 @@
+<project default="build">
+  <!-- Note: all target overrides now specified as overrides at the target (as of FW8)! -->
+  <optionset name="config.targetoverrides" if="${nant.version} lt 8.00.00">
+    <!-- Override the package target to build separate zips for libs, samples, etc -->
+    <option name="package" value="exclude"/>
+    <!-- Override clean target so that autobuildclean cleans generated code -->
+    <option name="clean" value="exclude"/>
+    <!-- Override cleanall target to clean zips, generated code -->
+    <option name="cleanall" value="exclude"/>
+  </optionset>
+
+  <package name="BlazeSDK" initializeself="true"/>
+  <!-- Declare the public properties that effect the build (use print-property-declarations target to view) -->
+  <declare-public-properties>
+    <property name="package.BlazeSDK.ExcludeClubs">
+      Exclude generating files for the clubs component
+    </property>
+    <property name="package.BlazeSDK.ExcludeExample">
+      Exclude generating files for the example component
+    </property>
+    <property name="package.BlazeSDK.ExcludeGameReportingCustom">
+      Exclude generating files for custom gamereporting
+    </property>
+    <property name="package.BlazeSDK.ExcludeDynamicInetFilter">
+      Exclude generating files for dynamic inet filter
+    </property>
+  </declare-public-properties>
+
+  <!-- For release builds only: the folder in blaze-latest to which generated docs are published -->
+  <property name="BlazeSDK.publishdocs.dir" value="DEV"/> 
+
+  <property name="package.sln.startupproject" value="Ignition"/>
+
+  <!-- create the generate code target, more information see package.preprocess property -->
+  <target name="preprocess">
+    <do.once key="package.BlazeSDK.preprocess_once" blocking="true" unless="${mastertarget.name} == 'clean-default'">
+        <echo message="${package.name}: Generate ${package.name} components' TDF types"/>
+        <task name="GenTDFTask2" extraArgs="-D:DllApiMacro=BLAZESDK_API -D:FirstHeaderName=BlazeSDK/blazesdk.h" />
+        <echo message="${package.name}: Generate ${package.name}'s RPC commands"/>
+        <task name="GenRPCTask2" extraArgs="-D:DllApiMacro=BLAZESDK_API" />    
+    </do.once>
+  </target>
+
+  <!-- Before we specify our package sourcefiles, we need to run our generatecode target to compile rpc/tdf files -->
+  <!-- The follow two subtasks must be executed with a separate nant invocation, otherwise, the task is executed with the current config -->
+  <!-- These are win32 tools only which are used during the "pre build" step 
+      NOTE:  We call them globally because they generate cpp files which are part of our SDK sourcefiles list
+      Below these tasks. we populate our sourcefiles list using fw2 wildcard **/*.cpp, at which point these generated files need to exist, else they wont be included as part of this package source tree
+      If we were to generate these cpp's in a nant prebuild target, they wouldnt be picked up for nant2vstools sln generation -->
+  <property name="package.preprocess" value="preprocess"/>
+
+  <!-- define targets for BlazeSDK packages -->
+  <include file="scripts/package-targets.xml" />
+
+  <!-- define target for BlazeSDK doxygen -->
+  <include file="scripts/doxygen-target.xml" />
+
+  <!-- Library Declaration -->
+  <Library name="BlazeSDK">
+    <buildtype name="DynamicLibrary" if="${Dll??false}"/>
+
+    <sourcefiles basedir="${package.dir}/source">
+      <includes name="**/*.cpp"/>
+
+      <do unless="${config-system} == 'kettle'">
+        <excludes name="**/ps4/*.cpp"/>
+        <excludes name="**/*ps4.cpp"/>
+      </do>
+      <do unless="${config-system} == 'ps5'">
+        <excludes name="**/ps5/*.cpp"/>
+        <excludes name="**/*ps5.cpp"/>
+      </do>
+        <do unless="${config-system} == 'capilano' and ${gsdk.enabled??false} == false">
+          <excludes name="**/xboxone/*.cpp"/>
+          <excludes name="**/*xboxone.cpp"/>
+        </do>
+        <do unless="(${config-system} == 'capilano' and ${gsdk.enabled??false} == true) OR (${config-system} == 'xbsx')">
+          <excludes name="**/xboxgdk/*.cpp"/>
+          <excludes name="**/*xboxgdk.cpp"/>
+        </do>
+
+      <includes name="${package.builddir}/gen/source/**/*.cpp"/>
+    </sourcefiles>
+
+    <includedirs>
+      ${package.dir}/include
+      ${package.dir}/source/include
+      ${package.dir}/source/include/shared
+      ${package.builddir}/gen/include
+    </includedirs>
+
+    <headerfiles>
+      <includes name="${package.dir}/include/BlazeSDK/**/*.h"/>
+      <includes name="${package.dir}/source/include/**/*.h" />
+      <includes name="${package.dir}/source/include/shared/**/*.h" />
+      <includes name="${package.builddir}/gen/include/**/*.h" />
+
+    </headerfiles>
+
+    <dependencies>
+      <auto>
+        EABase
+        coreallocator
+        DirtySDK
+        TelemetrySDK
+        PinTaxonomySDK
+        EAThread
+        EASTL
+        EATDF
+        EAStdC
+        EAAssert
+        EAJson
+        zlib
+        EAIO
+        UTFXml
+        EACrypto
+        zlib
+      </auto>
+    </dependencies>
+
+    <sdkreferences if="${config-system} == 'capilano' and ${gsdk.enabled??false} == false">
+      Xbox Services API, Version=8.0
+    </sdkreferences>
+    <copylocal>true</copylocal>
+
+    <config>
+      <defines>
+        EA_TDF_GET_DEFAULT_ICOREALLOCATOR="*Blaze::Allocator::getAllocator()"
+        BLAZE_CLIENT_SDK
+
+        <do if="${blazesdk_tdf_creation_by_id??false}">
+          BLAZE_ENABLE_TDF_CREATION_BY_ID
+        </do>
+
+        <do if="${blazesdk_debug_enable??false}">
+            ENABLE_BLAZE_SDK_LOGGING=1
+        </do>
+        <do if="${blazesdk_debug_disable??false}">
+            ENABLE_BLAZE_SDK_LOGGING=0
+        </do>
+        <do if="${Dll??false}">
+            BLAZESDK_API=__declspec(dllexport)
+        </do>
+        <do if="@{OptionSetGetValue('config-options-common', 'usedebuglibs')} == 'on' and ${samples??false}">
+            CORE_ALLOCATOR_DEBUGPARAMS_LEVEL=2
+        </do>
+      </defines>
+
+      <buildoptions>
+        <option name="buildset.cc.options" if="${Dll??false} and ${config-system} == 'pc64'">
+          ${option.value}
+          /bigobj
+        </option>
+        <option name="buildset.cc.options" if="${config-system} == 'kettle'">
+          ${option.value}
+          -Wall
+        </option>
+      </buildoptions>
+
+      <warningsuppression>
+        <!-- =================  iOS warning suppression  ============== -->
+        <do if="${config-system} == 'iphone' or ${config-system} == 'iphonesim'">
+          -Wno-format <!-- $$TODO - FIXME$$; required to suppress printf warnings with '%d' used with a size_t argument, because iOS size_t is typedef'd to long unsigned int -->
+        </do>
+
+        <!-- =================  VisualStudio warning suppression  =================== -->
+        <do if="${config-compiler} == 'vc'">
+          -wd4365 <!-- 'argument' : conversion from 'LONG64' to 'DWORD64', signed/unsigned mismatch -->
+          -wd4371 <!-- layout of class may have changed from a previous version of the compiler due to better packing of member -->
+          -wd4625 <!-- copy constructor could not be generated because a base class copy constructor is inaccessible -->
+          -wd4626 <!-- assignment operator could not be generated because a base class assignment operator is inaccessible -->
+
+          <do if="${config-vs-version??} == '14.0'">
+            -wd5026 <!-- move constructor was implicitly defined as deleted because a base class move constructor is inaccessible or deleted -->
+            -wd5027 <!-- move assignment operator was implicitly defined as deleted because a base class move assignment operator is inaccessible or deleted -->
+          </do>
+
+          <do if="${Dll??false}">
+            -wd4251   <!-- class 'X' needs to have dll-interface to be used by clients of class 'Y' -->
+          </do>
+        </do>
+
+        <!-- =================  GCC / Clang warning suppression  ============== -->
+        <do if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+          -Wno-multichar
+        </do>
+        <!-- =================  GCC warning suppression  ============== -->
+        <do if="${config-compiler} == 'gcc'">
+          -Wno-nonnull-compare
+          -Wno-format
+        </do>
+      </warningsuppression>
+    </config>
+
+    <!-- Specify how bulkbuild groups the files together
+         Each sourcefiles directive will split by directory using the follow pattern:
+            BB_runtime.BlazeSDK_{name}.Auto{N}.cpp where N is the index of the directory
+         Any directories that do not contain more than 1 file do not generate any bulkbuild
+         files. The source file will just be built individually.
+
+        It would be nicer if it would just take the directory name but this beats
+        having to generate these filesets by hand -->
+    <bulkbuild enable="true" SplitByDirectories="true">
+      <!-- non-generated files -->
+      <sourcefiles name="main" basedir="${package.dir}/source">
+        <includes name="**/*.cpp"/>
+        <do unless="${config-system} == 'kettle'">
+          <excludes name="**/ps4/*.cpp"/>
+          <excludes name="**/*ps4.cpp"/>
+        </do>
+        <do unless="${config-system} == 'ps5'">
+          <excludes name="**/ps5/*.cpp"/>
+          <excludes name="**/*ps5.cpp"/>
+        </do>
+        <do unless="${config-system} == 'capilano' and ${gsdk.enabled??false} == false">
+          <excludes name="**/xboxone/*.cpp"/>
+          <excludes name="**/*xboxone.cpp"/>
+        </do>
+        <do unless="(${config-system} == 'capilano' and ${gsdk.enabled??false} == true) OR (${config-system} == 'xbsx')">
+          <excludes name="**/xboxgdk/*.cpp"/>
+          <excludes name="**/*xboxgdk.cpp"/>
+        </do>
+      </sourcefiles>
+
+      <!-- generated tdf/rpc files -->
+      <sourcefiles name="gen" basedir="${package.builddir}/gen/source">
+        <includes name="**/*.cpp"/>
+      </sourcefiles>
+    </bulkbuild>
+  </Library>
+
+  <!-- bring in the build files for the samples -->
+  <do if="${samples??false}">
+    <!-- Define a rigid order for building sample modules (include only one sample on iphone to avoid symbols duplication errors in XCode)-->
+    <fileset name="sample-modules" basedir="scripts/sample/">
+      <includes name="ignition-build.xml"/>
+    </fileset>
+
+    <!-- only add all-samples fileset if not generating XCode project -->
+    <!-- when generating XCode project, include only one sample (SampleJoinGame) to avoid multiple main() link errors when building from XCode -->
+    <fileset name="sample-modules" basedir="scripts/sample/" unless="${xcode-projectize??false}">
+      <includes fromfileset="sample-modules" />
+    </fileset>
+
+    <fileset name="sample-modules" basedir="scripts/sample/" append="true">
+      <includes name="dedicatedserver-build.xml"/>
+      <includes name="testharness-build.xml"/>
+    </fileset>
+
+    <foreach item="FileSet" property="package.blazeSDK.forloop.sample" in="sample-modules">
+      <include file="${package.blazeSDK.forloop.sample}" />
+    </foreach>
+  </do>
+</project>

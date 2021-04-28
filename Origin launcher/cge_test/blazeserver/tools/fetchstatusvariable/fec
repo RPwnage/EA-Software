@@ -1,0 +1,274 @@
+#!/bin/bash
+
+# fetch error counts
+
+relative_path=$0
+let last_slash=-1
+for (( i=0;i<${#relative_path};i++ )) 
+do
+  if [ "${relative_path:i:1}" = "/" ]; then
+    let last_slash=i+1
+  fi
+done
+if [ $last_slash -gt -1 ]; then
+  relative_path=${relative_path:0:$last_slash}
+else
+  relative_path="./"
+fi
+
+source $relative_path/common
+
+function usage {
+  echo "Usage: $0 servicename environment platform instance targetsuccessrate_percent [options] [skip_rpc ...]"
+  echo "options:"
+  echo "  --fastfail     terminate report after first instance that fails target requirements"
+  echo "  --summary      print summary across all instances "
+  echo "  --noinstance   print only summary "
+  echo "  --noheader     do not print headers "
+  echo "  --help         print help (this information) "
+  echo "argument values:"
+  echo "  environment: prod | test | dev"
+  echo "  platform: pc | xbl2 | ps3"
+  echo "  targetsuccessrate_precent: percantage of successfull RPC executions"
+  echo "  skip_rpc: RPC to exclude from testing in component.command format"
+}
+
+function headerborder {
+  if [ "$printheader" = "yes" ]; then
+    local i
+    let c=171
+    for (( i=0;i<c;i++ ))
+    do
+      printf "%c" $1
+    done
+    printf "\n"
+  fi
+}
+
+function infoheader {
+  if [ "$printheader" = "yes" ]; then
+    headerborder "-"
+    printf "%-30s %-50s %5s %10s %10s %-50s %10s\n" "component" "command" "sr[%]" "count" "fail cnt" "error" "rate [%]"
+    headerborder "-"
+  fi
+}
+
+function addtotals {
+  local paramcomponent=$1
+  local paramcommand=$2
+  local paramcount=$3
+  local paramfailcount=$4
+
+  local val vname
+  eval "val=\$fecsco_$paramcomponent"
+  let fecsco_$paramcomponent=$val+$paramcount
+  vname="$paramcomponent"_"$paramcommand"
+  eval "val=\$fecscd_$vname"
+  let fecscd_$vname=$val+$paramcount
+  eval "val=\$fecscof_$paramcomponent"
+  let fecscof_$paramcomponent=$val+$paramfailcount
+  eval "val=\$fecscdf_$vname"
+  let fecscdf_$vname=$val+$paramfailcount
+}
+
+param_service_name=$1
+param_env=$2
+param_plat=$3
+param_instance=$4
+param_targetsuccess_percent=$5
+args=("$@")
+
+if [ $# -lt 5 ]; then
+  usage
+  exit 1
+fi
+
+fastfail="no"
+printsummary="no"
+noinstance="no"
+printheader="yes"
+
+let excludecnt=0
+if [ $# -gt 5 ]; then
+  for (( i=5;i<$#;i++ )) do
+    argval=${args[$i]} 
+    if [ "$argval" = "--fastfail" ]; then
+      fastfail="yes"
+      continue
+    elif [ "$argval" = "--summary" ]; then
+      printsummary="yes" 
+      continue
+    elif [ "$argval" = "--noinstance" ]; then
+      printsummary="yes"
+      noinstance="yes"
+      fastfail="no"
+      continue
+    elif [ "$argval" = "--noheader" ]; then
+      printheader="no" 
+      continue
+    elif [ "$argval" = "--help" ]; then
+      usage
+      exit 0
+    fi
+    
+    if [ "${argval:0:1}" = "-" ]; then
+      echo "Unkonw option: $argval" >&2
+      exit 1
+    fi
+
+    excluderpcs[$excludecnt]=${args[$i]}
+    let excludecnt=excludecnt+1
+  done
+fi
+
+redirector=$(getredirector $param_env)
+
+oldIFS=$IFS
+IFS=$'\n'
+
+servers=$(getservers $redirector $param_service_name $param_env $param_plat $param_instance "httpxml" 1)
+for server in ${servers[*]}
+do
+  servername=$(echo $server | awk '{ print $1 }')
+  addr=$(echo $server | awk '{ print $2 }')
+  curl ${curlOpts[*]} "http://$addr/blazecontroller/getComponentMetrics" | xsltproc $relative_path/geterrorcounts.xslt - | grep -v xml >/tmp/errmetrics_"$servername"_$$.txt &
+done
+
+wait
+
+failed="no"
+
+for server in $servers
+do
+  servername=$(echo $server | awk '{ print $1 }')
+  addr=$(echo $server | awk '{ print $2 }')
+  filename=/tmp/errmetrics_"$servername"_$$.txt
+  commands=$(cat $filename)
+  rm $filename
+  if [ "$failed" = "yes" -a "$fastfail" = "yes" ]; then
+    continue
+  fi
+  firstfail="yes"
+  for command in $commands
+  do
+    IFS=$' '
+    params=( $command )
+    component=${params[0]}
+    commandname=${params[1]}
+    skip="no"
+    rpc="$component.$commandname"
+    for excluderpc in ${excluderpcs[*]}
+    do
+     if [ $rpc = $excluderpc ]; then
+       skip="yes"
+       break
+     fi
+    done
+    if [ $skip = "yes" ]; then
+     IFS=$'\n'
+     continue
+    fi
+    count=${params[2]}
+    failcount=${params[3]}
+    errorname=${params[4]}
+    errorcount=${params[5]}
+    if [ "$prevrpc" != "$rpc" ]; then
+     addtotals $component $commandname $count $failcount
+    fi
+    IFS=$'\n'
+    if [ $failcount -gt 0 -a $count -gt 0 ]; then
+     let successrate=100-$failcount*100/$count
+     let errrate=$errorcount*100/$failcount
+     if [ $errrate -lt 1 ]; then
+       errrate="<1"
+     fi
+     if [ $successrate -lt $param_targetsuccess_percent -a "$noinstance" = "no" ]; then         
+       if [ "$prevrpc" != $rpc ]; then
+         if [ $firstfail = "yes" ]; then
+           firstfail="no"
+           headerborder "-"
+           printf "instance: %s\n" $servername
+           infoheader
+         fi
+         failed="yes"
+         printf "%-30s %-50s %5s %10s %10s %-50s %10s\n" "$component" "$commandname" "$successrate" "$count" "$failcount" "$errorname" "$errrate"
+       else
+         printf "%109s %-50s %10s\n" " " $errorname $errrate
+       fi
+     fi     
+    fi
+    prevrpc=$rpc
+  done
+done
+
+if [ "$printsummary" = "yes" ]; then
+  if [ "$failed" = "yes" -a "$noinstance" = "no" ]; then
+    headerborder "-"
+    echo "Summary"
+    headerborder "-"
+  else
+    infoheader
+  fi
+  sumcomps=$(set | grep "fecsco_" | sort)
+  for sumcomp in $sumcomps 
+  do
+    if [ "${sumcomp:0:7}" = "fecsco_" ]; then
+      for (( i=7;i<${#sumcomp};i++ )) do
+        if [ "${sumcomp:$i:1}" = "=" ]; then
+          break
+        fi
+      done
+      let complen=$i-7
+      component=${sumcomp:7:$complen}
+      let i=$i+1
+      count=${sumcomp:$i}
+      eval "failcount=\$fecscof_$component"
+      let successrate=100-$failcount*100/$count
+      printf "%-30s %-50s %5s %10s %10s %-50s %10s\n" "${sumcomp:7:$complen}" "(total)" "$successrate" "$count" "$failcount" " " " "
+    fi
+  done 
+  sumcmds=$(set | grep "fecscd_" | sort)
+  for sumcmd in $sumcmds
+  do
+    if [ "${sumcmd:0:7}" = "fecscd_" ]; then
+      for (( i=7;i<${#sumcmd};i++ )) do
+        if [ "${sumcmd:$i:1}" = "=" ]; then
+          break
+        fi
+      done
+      let complen=$i-7
+      componentcmd=${sumcmd:7:$complen}
+      let i=$i+1
+      count=${sumcmd:$i}
+      eval "failcount=\$fecscdf_$componentcmd"
+      let successrate=100-$failcount*100/$count
+
+      flag=" "
+      if [ $successrate -lt $param_targetsuccess_percent ]; then         
+        flag="*"
+        failed="yes" 
+      fi
+
+      for (( i=0;i<${#componentcmd};i++ ))
+      do
+        if [ "${componentcmd:$i:1}" = "_" ]; then
+          let lastund=$i
+        fi
+      done
+      component=${componentcmd:0:$lastund}
+      let lastund=$lastund+1
+      commandname=${componentcmd:$lastund}
+      printf "%-30s %-50s %5s %10s %10s %-50s %10s\n" "$component" "$commandname" "$successrate" "$count" "$failcount" "$flag" " "
+    fi
+  done
+fi
+
+IFS=$oldIFS
+
+if [ "$failed" = "yes" ]; then
+  echo "Error: At least one of the RPCs had success rate below specified target of $param_targetsuccess_percent%." >&2
+  exit -1
+elif [ "$printsummary" = "no" ]; then
+  echo "All RPC failure rates are within specified target of $param_targetsuccess_percent%."
+fi
+

@@ -1,0 +1,1468 @@
+[headername="framework/tdf/qosdatatypes.h"]
+#include "framework/gen/qosdatatypes.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/network.h"]
+#include "framework/gen/network.tdf"
+
+[headername="framework/tdf/vault_server.h"]
+#include "framework/gen/vault_server.tdf"
+
+[headername="framework/tdf/frameworkconfigdefinitions_server.h"]
+#include "framework/gen/frameworkconfigdefinitions_server.tdf"
+
+// TODO: Disabling proto generation because of circular import caused by Blaze::Logging namespace
+[headername="framework/tdf/logging.h", includeProto=false]
+#include "framework/gen/logging.tdf"
+
+namespace Blaze
+{
+
+[description="Used by cfgtest tool to hold all the decoded configs in a single TDF object."]
+class DecodedConfigs
+{
+    [tag="ctdf", description="The pairs of feature/component (name) to its decoded configuration TDF"]
+    map<string(128), variable, ignorecase> mConfigTdfs;
+};
+
+class PortValue
+{
+    [tag="srcn", default=0, description="Source port information."]
+    uint16_t mSrc;
+
+    [tag="dstn", default=0, description="The destination of port"]
+    uint16_t mDst; 
+};
+
+[description="Port information list."]
+typedef list<PortValue> PortValueList;
+
+typedef list<string(32)> VersionList;
+
+class ClientVersionInfo
+{
+    [tag="comp", description="List of the compatible client versions."]
+    VersionList mCompatible;
+        
+    [tag="inco", description="List of the incompatible client versions."]
+    VersionList mIncompatible;
+};
+
+typedef map<ServiceName, ServiceName> TrialServiceNameRemapMap;
+
+[
+    description = "Configuration data for redirector settings as parsed from the config file."
+]
+class RedirectorSettingsConfig
+{
+    [tag="cliv", reconfigurable="yes", description="Client Version information."]
+    ClientVersionInfo mClientVersions;
+    
+    [tag="sbid", reconfigurable="yes", description="(DEPRECATED) The sandbox ID defined for the particular environment. Replaced with framework level config setting (see framework.cfg)."]
+    string(64) mSandboxId;
+
+    [tag="snrm", reconfigurable="yes", description="A mapping of source service name to trial service name used to redirect trial titles to the trial servicename."]
+    TrialServiceNameRemapMap mTrialServiceNameRemap;
+};
+
+[trackChanges = true, description="Configuration overrides for a connection to a DB. NOTE: deliberately a small subset of DbConnConfig, because most values are not overridable."]
+class DbConnOverrideConfig
+{
+    [tag="maxc", reconfigurable="yes", description="The maximum connection count to connect to the DB.", default=5]
+    uint32_t maxConnCount;
+};
+
+[trackChanges = true, description="Configuration for a connection to a DB."]
+class DbConnConfig
+{
+    enum DbClientType
+    {
+        MYSQL = 0
+    };
+
+    [tag="clnt", reconfigurable="no", description="The type of db to connect to.", default=MYSQL]
+    DbClientType client;
+
+    [tag="host", reconfigurable="yes", description="The name of the DB host. Only reconfigurable for read slaves."]
+    string(MAX_HOSTNAME_LENGTH) hostname;
+    
+    [tag="port", reconfigurable="yes", description="The port for the DB host. Only reconfigurable for read slaves."]
+    uint16_t port;
+    
+    [tag="db", reconfigurable="no", description="The name of the db schema used."]
+    string(256) database;
+
+    [tag="cred", reconfigurable="no", description="The VaultLookup to the entry in Vault where overrides for 'secret' config values are stored (optional; ignored if Vault is disabled)."]
+    VaultLookup vaultPath;
+
+    [tag="unme", reconfigurable="no", description="The name of the user to log into the DB."]
+    string(256) username;
+
+    [tag="pwrd", reconfigurable="no", description="The password to log into the DB."]
+    string(256) password;
+
+    [tag="oftr", reconfigurable="no", description="The obfuscator string used to decode password (optional)."]
+    string(256) obfuscator;
+        
+    [tag="maxc", reconfigurable="yes", description="The maximum connection count to connect to the DB.", default=5]
+    uint32_t maxConnCount;
+    
+    [tag="minq", reconfigurable="yes", description="The minimum time a query needs to run.  If a timeout is less than this, the query will not be attempted.", default="100ms"]
+    TimeValue minQueryTime;
+    
+    [tag="maxq", reconfigurable="yes", description="The max time a query needs to run.", default="5000ms"]
+    TimeValue maxQueryTime;
+
+    [tag="maxp", reconfigurable="yes", description="The max time a ping needs to run. IMPORTANT: If this time is exceeded the blaze server will squelch attempts to obtain new connections until ping succeeds.", default="5000ms"]
+    TimeValue maxPingTime;
+
+    [tag="maxk", reconfigurable="yes", description="The max time a kill command needs to run. IMPORTANT: If this time is exceeded the kill command will be aborted.", default="5000ms"]
+    TimeValue maxKillTime;
+    
+    [tag="hlth", reconfigurable="no", description="Whether health check is enabled."]
+    bool healthcheck;
+    
+    [tag="chst", reconfigurable="no", description="What charset to use for the DB.", default="utf8"]
+    string(256) charset;
+    
+    [tag="cmsn", reconfigurable="no", description="Whether compression is enabled on this connection.", default=true]
+    bool compression;
+    
+    [tag="bsvr", reconfigurable="no", description="A list of server config names to which this DbConnPool is dedicated.  Valid only for Db read slave"]
+    list<string(64)> boundToServerConfigs;
+    
+    [tag="slvs", reconfigurable="yes", description="List of configurations for slave dbs."]
+    list<DbConnConfig> slaves;
+
+    [tag="over", reconfigurable="yes", description="map of overrides per instance type"]
+    map<string(64), DbConnOverrideConfig> instanceOverrides;
+
+    [tag="asyn", reconfigurable="no", description="Whether to use asynchronous client API (as opposed to making blocking calls and using DB threads)", default=true]
+    bool asyncDbConns;
+
+    [tag="ssl", reconfigurable="no", default=false, description="Whether to use ssl for db connections" ]
+    bool useSsl; 
+};
+
+[description="Configuration for dbmig."]
+class DbMigConfig
+{
+    [tag="migp", description="Path to the dbmig executable.", default="../bin/dbmig/dbmig.py", advanced=true]
+    string(512) dbmigPath;
+    
+    [tag="comp", description="Base path of the component directories where the dbmig files are stored.", default="../", advanced=true]
+    string(512) componentPath;
+    
+    [tag="pytp", description="Path to the python executable.", default="", advanced=true]
+    string(512) pythonPath;
+
+    [tag="cenv", description="Content environment name. Loads specific content/ scripts.", default="", advanced=true]
+    string(128) contentEnvironment;
+
+    [tag="dbdt", description="Timeout override for how long the DB Migration can take.", default="5m", advanced=true]
+    TimeValue dbmigDurationTimeout;
+};
+
+[description="Configuration for database timeouts."]
+class DbSchedulerConfig
+{
+    [tag="rtim", reconfigurable="no", description="The default db query timeout for performing queries outside of startup or RPC command.", default="10s", advanced=true]
+    TimeValue dbRuntimeQueryTimeout;
+    
+    [tag="stim", reconfigurable="yes", description="The timeout for performing database queries during server startup.", default="120m", advanced=true]
+    TimeValue dbStartupQueryTimeout;
+
+    [tag="qsp", reconfigurable="yes", description="Sampling period used to calculate query execution time average and deviation.", default="30s", advanced=true]
+    TimeValue dbQuerySamplePeriod;
+
+    [tag="qvt", reconfigurable="yes", description="The amount of variance in the average query time between sampling periods that will cause a query time transition to a higher or lower level.  A 0 value disables tracking the transitions.  A value of 0.2 means that a transition will happen if the average + deviation is 20% greater than the values from the previous sampling period.  Valid values must be between 0 and dbSquelchingMaxQueryVariance.", default=0.1f, advanced=true]
+    float dbQueryVarianceThreshold;
+
+    [tag="qtbd", reconfigurable="no", description="The amount of time after server startup that will be used to calibrate the baseline average query times.  Squelching will not take effect until after this amount of time has passed.  This ensures that squelching does not kick in prematurely.  The peak average query time will be tracked for this duration and then used as the baseline value when detecting threshold crossing events.", default="24h", advanced=true]
+    TimeValue dbQueryTimeBaselineDuration;
+
+    [tag="qtbm", reconfigurable="no", description="Sets the default average query time baseline.  If the baseline determined during the dbQueryTimeBaselineDuration is less than this value then this value is used as the minimum instead.  This protects against a server being started before a title has gone live and no valid baseline gets set because no queries will have been executed.", default="50ms", advanced=true]
+    TimeValue dbQueryTimeBaselineMinimum;
+
+    [tag="qvhs", reconfigurable="no", description="Defines the size of the ring buffer used to track query time threshold transitions.  This setting must have a minimum value of 8.", default=32, advanced=true]
+    uint32_t dbQueryVarianceHistorySize;
+
+    [tag="dbcp", reconfigurable="yes", description="Defines, as a percentage of the maximum allowed connections, the minimum number of connections that query-time-based squelching will reduce the pool to.  For example, if a pool has a max connection count of 100 and this value is set to 0.2 then query-time-based squelching will reduce the available connection count down to no lower than 20.  A value of 1.0 will disable reductions.  Value must be between 0 and 1.", default=1.0f, advanced=true]
+    float dbSquelchingMinConnectionCountPercent;
+
+    [tag="qmsc", reconfigurable="yes", description="Defines the percentage increase in average query times that will result in maximum connection squelching.  For example, a value of 2.0 means that if the average query time increases 200% from the baseline (eg. from 50ms to 100ms) then the available DB connections will be reduced to the minimum value as defined by the dbSquelchingMinConnectionCountPercent configuration setting.  Value must be > 1.", default=3.0f, advanced=true]
+    float dbSquelchingMaxQueryVariance;
+
+    [tag="trim", reconfigurable="yes", description="The period at which the DB connections checked for disuse and closed.  A value of 0 will disable trimming.", default="10m", advanced=true]
+    TimeValue dbConnectionTrimPeriod;
+
+    [tag="trth", reconfigurable="yes", description="Determines what the connection count is trimmed down to as a percentage of the current active count.  For example, if the current active count is 20 and this value is set to 0.1, then the total connected connections will be trimmed to 22.  Value must be between 0 and 1.", default=0.1, advanced=true]
+    float dbConnectionTrimThreshold;
+};
+
+typedef map<ClientPlatformType, string(64)> DbNameByPlatformTypeMap;
+typedef map<ClientPlatformType, uint32_t> DbIdByPlatformTypeMap;
+
+[description="The overall database configuration."]
+class DatabaseConfiguration
+{
+    [tag="vsce", reconfigurable="yes", description="Whether to check the contents of non-escaped strings appended to queries (lots of string compares)", default=false]
+    bool verbatimQueryStringChecksEnabled;
+
+    [tag="dbmg", reconfigurable="no", description="Dbmig settings.", advanced=true]
+    DbMigConfig dbmig;
+    
+    [tag="dbto", reconfigurable="default", description="Timeout settings.", advanced=true]
+    DbSchedulerConfig dbScheduler;
+    
+    typedef map<string(64), DbConnConfig, ignorecase> DbConfigMap;
+    
+    [tag="dbcn", reconfigurable="yes", description="Map of db connection configs. Note that master connections cannot be added, removed, or reconfigured with the exception of the maxConnCount. Slaves, however, can be added and removed and are fully reconfigurable."]
+    DbConfigMap databaseConnections;
+    
+    typedef map<string(64), string(64), ignorecase> DbAliasMap;
+    
+    [tag="dbal", reconfigurable="no", description="Set of aliases used to refer to one db connection pool with a second, alternate name."]
+    DbAliasMap databaseAliases;
+};
+
+typedef string(MAX_HOSTNAME_LENGTH) hostAndPort;
+typedef list<hostAndPort> RedisNodeConfigList;
+
+[description="Configuration for the Redis Cluster."]
+class RedisClusterConfig
+{
+    [tag="node", description="The list of available Redis Cluster nodes."]
+    RedisNodeConfigList nodes;
+
+    [tag="pwrd", description="The password to log into Redis."]
+    string(256) password;
+
+    [tag="oftr", description="The obfuscator string used to decode password (optional)."]
+    string(256) obfuscator;
+};
+
+typedef map<string(64), RedisClusterConfig, ignorecase> RedisClustersMap;
+typedef map<string(64), string(64), ignorecase> RedisClusterByAliasMap;
+typedef map<string(64), string(512)> RedisDumpFileLocationsMap;
+
+[description="Configuration for the Redis Clusters."]
+class RedisConfig
+{
+    [tag="dali", description="The default redis cluster name to use", default="main"]
+    string(256) defaultAlias;
+
+    [tag="oftr", description="The obfuscator string used to decode password (optional)."]
+    string(256) obfuscator;
+
+    [tag="dbcn", reconfigurable="yes", description="Map of redis clusters configs."]
+    RedisClustersMap clusters;
+    
+    [tag="dbal", reconfigurable="no", description="Set of aliases used to refer to one component with a redis cluster."]
+    RedisClusterByAliasMap aliases;
+
+    [tag="rcd", default="2s", description="Time to wait before retrying a redis command after a node failure or a failed MOVED/ASK redirection."]
+    TimeValue retryCommandDelay;
+
+    [tag="mcr", default=10, description="Maximum number of times to retry a redis command after a node failure or a failed MOVED/ASK redirection."]
+    uint16_t maxCommandRetries;
+
+    [tag="usd", default="1s", description="Time to wait between failed attempts to update a cluster's slot configuration."]
+    TimeValue updateSlotsDelay;
+
+    [tag="mus", default=0, description="Maximum number of times to re-attempt cluster activation (useful on Windows, where redis clusters may not be fully sharded by the time the blazeserver starts up)"]
+    uint16_t maxActivationRetries;
+};
+
+enum VaultAuthType
+{
+    [description="Authenticate with the vault using a static token."]
+    VAULT_AUTH_TOKEN,
+    [description="Authenticate with the vault using Approle login."]
+    VAULT_AUTH_APPROLE
+};
+
+enum VaultConfigEngine
+{
+    [description="Key Value Version 1."]
+    VAULT_ENGINE_KV1,
+    [description="Key Value Version 2."]
+    VAULT_ENGINE_KV2
+};
+
+[description="A static authentication token to communicate with the vault."]
+class VaultAuthToken
+{
+    [tag="tokn", description="The token to authentication with the vault."]
+    string(256) token;
+
+    [tag="accr", description="The token accessor to use when checking on the status of the token."]
+    string(256) accessor;
+};
+
+[description="A role and secret (aka username and password) to authenticate with the vault."]
+class VaultAuthApprole
+{
+    [tag="path", description="The approle engine path in Vault."]
+    string(256) path;
+
+    [tag="role", description="The role id (aka application's user name) to authenticate."]
+    string(256) roleId;
+
+    [tag="secr", description="The secret id (aka password) to authenticate.", printFormat="censor"]
+    string(256) secretId;
+
+    [tag="wrap", default=false, description="If true, secretId is not a raw secret id at all, but a wrapping token to obtain the secret id from Vault."]
+    bool wrapped;
+
+    [tag="spat", description="If non empty, specifies a file path from which secret id should be loaded, and takes precedence over any value configured in the secretId field."]
+    string(256) secretIdPath;
+};
+
+[description="The vault configuration."]
+class VaultConfig
+{
+    [tag="enab", default=true, description="Set if the vault is enabled."]
+    bool enabled;
+
+    [tag="engn", default=VAULT_ENGINE_KV2, description="The Vault engine to use for VaultLookup configuration."]
+    VaultConfigEngine vaultConfigEngine;
+
+    [tag="autt", description="The authentication type."]
+    VaultAuthType authType;
+
+    [tag="autp", description="The authentication parameters."]
+    variable authParameters;
+
+    [tag="nspc", description="The Vault namespace."]
+    string(64) vaultNamespace;
+
+    [tag="lsrd", default=4, description="The divisor is applied to scale the lease renewal period."]
+    uint32_t leaseRenewDivisor;
+
+    [tag="cltm", description="Vault generic api timeout", default="15s"]
+    TimeValue callTimeout;
+
+    [tag="hcon", description="Http connection configuration for the Hashicorp Vault service."]
+    HttpServiceConnection httpConnection;
+};
+
+[description="Configuration for wal cache."]
+class WalCacheConfig
+{
+    class CacheGroup
+    {
+        [tag="name", default="", description="the name of cache group."]
+        string(64) name;
+        
+        [tag="maxa", default=0, description="the maxage of cache group."]
+        uint16_t maxage;
+    };
+    typedef list<CacheGroup> CacheGroupList;
+    
+    [tag="ccgp", description="the set of cache groups."]
+    CacheGroupList cacheGroups;
+};
+
+[description="Configuration for server endpoint settings", generateProto=false]
+class EndpointConfig
+{
+    [description="Configuration for the type of connection this endpoint uses."]
+    enum ConnectionType
+    {
+        [description="A client connection."]
+        CONNECTION_TYPE_CLIENT,
+
+        [description="A server connection."]
+        CONNECTION_TYPE_SERVER
+    };
+
+    [generateProto=false]
+    class OutputQueueConfig
+    {
+        [tag="max", description="The maximum amount of data allowed to be queued.", default=100000000]
+        uint32_t max;
+
+        [tag="high", description="The high water mark, or at what point a connection will be squelched.", default=5000000]
+        uint32_t highWatermark;
+
+        [tag="low", description="The low water mark, or at what point a connection will be unsquelched.", default=4000000]
+        uint32_t lowWatermark;
+
+        [tag="grac", description="The amount of time the client has to read some amount of data off of the outgoing queue while the connection is squelching before server drops the conn. 0s to disable.", default="2s"]
+        TimeValue gracePeriod;
+    };
+
+    typedef string(64) ControlListName;
+    typedef list<string(256)> CommandList;
+    typedef map<ControlListName, CommandList> CommandListByNameMap;
+    typedef map<ControlListName, ClientPlatformTypeList> PlatformsByControlListMap;
+    typedef map<ControlListName, PlatformsByControlListMap> PlatformSpecificControlListsMap;
+
+    [tag="ctrl", description="Defines RPC control lists for use in whitelisting and blacklisting."]
+    CommandListByNameMap rpcControlLists;
+
+    [tag="pctl", description="For endpoints that whitelist/blacklist different RPCs depending on the caller's platform. Defines new platform-specific RPC control lists by mapping lists defined in rpcControlLists to the platform(s) on which they apply." ]
+    PlatformSpecificControlListsMap platformSpecificRpcControlLists;
+
+    [description="Configuration for an endpoint", generateProto=false]
+    class Endpoint
+    {
+        [tag="chnl", description="The type of channel this endpoint runs on. Not reconfigurable - if this value is changed for an existing Endpoint type, config validation will fail on reconfigure."]
+        string(128) channel;
+
+        [tag="prot", description="The protocol used for the endpoint. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+        string(128) protocol;
+
+        [tag="enc", description="The name of the encoder used for the endpoint. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+        string(128) encoder;
+
+        [tag="dec", description="The name of the decoder used for the endpoint. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+        string(128) decoder;
+
+        [tag="bnd", description="What interfaces the endpoint binds to. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure.", default=BIND_ALL]
+        BindType bind;
+
+        [tag="sreq", description="Whether or not the endpoint processes requests in order.", default=true]
+        bool serializeRequests;
+
+        [tag="flrt", description="How long between log messages indicating the command fiber count has been exceeded", default="10s"]
+        TimeValue fiberOverrunWarnLogInterval;
+
+        [tag="actv", description="How long the endpoint keeps a connection open without activity. 0 means no timeout.", default="0s"]
+        TimeValue inactivityTimeout;
+
+        [tag="eitb", description="Enables client to specify whether server should ignore inactivity timeout for current connection. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure.", default=false]
+        bool enableInactivityTimeoutBypass;
+
+        [tag="ctmo", description="How long commands are allowed to run before timing out.", default="15s"]
+        TimeValue commandTimeout;
+
+        [tag="shmo", description="How long ssl are allowed to handshake before timing out. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure.", default="10s"] // ssl handshakes typically take 250ms to 1s. 10s is a generous timeout.
+        TimeValue sslHandShakeTimeout;
+
+        [tag="fsiz", description="Max size of an incoming frame in bytes.", default=262144]
+        uint32_t maxFrameSize;
+
+        [tag="cmax", description="How many simultaneous active connections this endpoint will accept.", default=100]
+        uint32_t maxConnections; 
+
+        [tag="accp", description="Maximum number of connections this endpoint accepts per read. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure.", default=5]
+        uint32_t maxAcceptsPerIdle;
+
+        [tag="queu", description="Configuration for the output queue settings."]
+        OutputQueueConfig queuedOutputData; 
+
+        // TODO: Rename from `trust` to `allowedIpList`
+        [tag="aipl", description="List of inet filters that make up our allowed IP list settings."]
+        NetworkFilterConfig trust;
+
+        [tag="icln", description="List of inet filters that indicate remote addresses that should have a route to our internal interface for the port assigned to this endpoint."]
+        NetworkFilterConfig hasInternalNicAccess;
+
+        [tag="rate", description="The name of the RateLimiter this endpoint will use."]
+        string(128) rateLimiter;
+
+        [tag="cotp", default=CONNECTION_TYPE_CLIENT, description="The type of connection this endpoint creates. This applies only to Slave endpoints. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+        ConnectionType connectionType;
+
+        [tag="mit", default="60s", description="The maximum amount of time the user ping may be suspended for. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+        TimeValue maximumInactivityTimeoutSuspensionPeriod;
+
+        [tag="ares", default=false, description="The session associated with the client connection remains active for the inactiveTimeout.  Only applicable to client external connections."]
+        bool allowResumeConnection;
+
+        [tag="ssl", description="The name of the SSL context that should be used for this endpoint.  Only applicable for SSL-enabled endpoints."]
+        string(256) sslContext;
+
+        [tag="resp", default="7s", description="The amount of time after data has been received on a connection the server can consider the client to be fully responsive. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+        TimeValue assumeResponsivePeriod;
+
+        [tag="wlst", description="The list of RPCs to whitelist. If not specified or if specified, but empty, no RPCs are whitelisted. To whitelist all RPCs, use '*'."]
+        ControlListName rpcWhiteList;
+ 
+        [tag="blst", description="The list of RPCs to blacklist. If not specified or specified and empty, no RPCs are blacklisted."]
+        ControlListName rpcBlackList;
+        
+        [tag="keep", description="True if TCP keep-alive should be enabled for client inbound connections on this endpoint. ", default=false]
+        bool mTcpKeepAlive;
+    };
+    
+    [description="Configuration for a grpc endpoint", generateProto=false]
+    class GrpcEndpointConfig
+    {
+        [tag="chnl", description="The type of channel this endpoint runs on. Not reconfigurable - if this value is changed for an existing Endpoint type, config validation will fail on reconfigure."]
+        string(128) channel;
+
+        [tag="bnd", description="What interfaces the endpoint binds to. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure.", default=BIND_ALL]
+        BindType bind;
+        
+        [tag="ctmo", description="How long commands are allowed to run before timing out.", default="15s"]
+        TimeValue commandTimeout;
+        
+        [tag="fsiz", description="Max size of an incoming frame in bytes.", reconfigurable="no", default=262144]
+        uint32_t maxFrameSize;
+        
+        [tag="cmax",reconfigurable="no", description="How many simultaneous active connections this endpoint will accept.", default=100]
+        uint32_t maxConnections; 
+
+        // TODO: Rename from `trust` to `allowedIpList`
+        [tag="aipl", description="List of inet filters that make up our allowed IP list settings."]
+        NetworkFilterConfig trust; 
+
+        [tag="tcil", description="List of inet filters that make up our trusted client IP list settings."]
+        NetworkFilterConfig trustedClientIpList; 
+
+        [tag="icln", description="List of inet filters that indicate remote addresses that should have a route to our internal interface. This is used as a hint when choosing whether to redirect a client to the internal or external IP address."]
+        NetworkFilterConfig hasInternalNicAccess;
+
+        [tag="rate", description="The name of the RateLimiter this endpoint will use."]
+        string(128) rateLimiter;
+
+        [tag="ssl", reconfigurable="no", description="The name of the SSL context that should be used for this endpoint. Only applicable for SSL-enabled endpoints."]
+        string(256) sslContext;
+        
+        [tag="wlst", description="The list of RPCs to whitelist. If not specified or if specified, but empty, no RPCs are whitelisted. To whitelist all RPCs, use '*'."]
+        ControlListName rpcWhiteList;
+ 
+        [tag="blst", description="The list of RPCs to blacklist. If not specified or specified and empty, no RPCs are blacklisted."]
+        ControlListName rpcBlackList;
+
+        [tag="mci", reconfigurable="no", default="2m", description="Max idle time before a connection is cleaned up.", details="The idle time is started from the time pending rpc count becomes zero(including streaming rpcs such as notifications)." ]
+        TimeValue maxConnIdleTime;
+
+        [tag="keep", reconfigurable="no", default=true, description="Keep the channel alive without any rpc calls.", details="GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS argument in grpc." ]
+        bool keepAlive;
+
+        [tag="kati", reconfigurable="no", default="5m", description="Keep Alive send interval", details="GRPC_ARG_KEEPALIVE_TIME_MS argument in grpc." ]
+        TimeValue keepAliveSendInterval;
+
+        [tag="kato", reconfigurable="no", default="20s", description="Keep Alive timeout.", details="GRPC_ARG_KEEPALIVE_TIMEOUT_MS argument in grpc." ]
+        TimeValue keepAliveTimeout;
+
+        [tag="envy", default="", description="Resource name requested by local Envoy ingress node.", details="Envoy access disabled if empty string."]
+        string(128) envoyResourceName;
+
+        [tag="hash", description="List of SHA 256 digests of S2S client certs that we trust from the Envoy x-forwarded-client-cert header.", details="Requires internal endpoint or mTLS trustedHashes to ensure validity of header."]
+        list<string(256)> envoyXfccTrustedHashes;
+    };
+
+    [description="Aggregates multiple endpoint names", generateProto=false]
+    class EndpointGroup
+    {
+        [tag="name", description="List of endpoint names."] 
+        list<string(128)> endpoints;
+
+        [tag="grpc", description="List of grpc endpoint names."] 
+        list<string(128)> grpcEndpoints;
+    };
+    
+    [tag="egrp", reconfigurable="no", description="Map of endpoint groups."]
+    map<string(128), EndpointGroup, ignorecase> endpointGroups;
+    
+    [tag="epts", reconfigurable="yes", description="Map of endpoint types."]
+    map<string(128), Endpoint, ignorecase> endpointTypes;
+
+    [tag="eptg", reconfigurable="yes", description="Map of grpc endpoint types."]
+    map<string(128), GrpcEndpointConfig, ignorecase> grpcEndpointTypes;
+
+    [tag="sdto", reconfigurable="yes", default="5s", description="How long we will wait for all connections to gracefully close after a shutdown command, before forceably shutting down."]
+    TimeValue shutdownTimeout;
+};
+
+[description="Configuration for HTTP XML protocol"]
+class HttpXmlProtocolConfig
+{
+    enum EnumOptions
+    {
+        IDENTIFIER,
+        VALUE
+    };
+    
+    enum XmlOutputOptions
+    {
+        ELEMENTS,
+        ATTRIBUTES
+    };
+
+    enum VoidRpcOptions
+    {
+        EMPTY,
+        XML
+    }; 
+    
+    [tag="enop", description="Defines how enum is returned: as value or as identifier."]
+    EnumOptions enumOption;
+    
+    [tag="xmop", description="Defines how XML output is formatted: as elements or attributes"]
+    XmlOutputOptions xmlOutputOption;
+    
+    [tag="vrop", default=EMPTY, description="Defines how void RPC results are returned: as XML or empty result."]
+    VoidRpcOptions voidRpcOption; 
+
+    [tag="ucpr", description="Should XML output using compression be supported, for clients that may want it"]
+    bool useCompression;
+
+    [tag="ncpr", description="Whether to support compressed eventxml notifications (in addition to httpxml RPC messages/responses) if useCompression is true", default=false]
+    bool compressEventNotifications;
+    
+    [tag="cplv", description="The compression level must be -1 for default, or between 0 and 9: 1 gives best speed, 9 gives best compression, 0 gives no compression at all"]
+    int32_t compressionLevel;
+};
+
+[description="Configuration for REST protocol"]
+class RestProtocolConfig
+{
+    [tag="ucpr", description="Should XML output using compression be supported, for clients that may want it"]
+    bool useCompression;
+    
+    [tag="cplv", description="The compression level must be -1 for default, or between 0 and 9: 1 gives best speed, 9 gives best compression, 0 gives no compression at all"]
+    int32_t compressionLevel;
+};
+
+[description="Configuration of global http service manager"]
+class HttpServiceConfig
+{
+    [tag="hsc", description="List of address and the corresponding components."]
+    HttpServiceConnectionMap mHttpServices;
+};
+
+[description="Configuration of global grpc service manager"]
+class OutboundGrpcServiceConfig
+{
+    [tag="grpc", description="List of gRPC service configurations."]
+    OutboundGrpcServiceConnectionMap mOutboundGrpcServices;
+};
+
+[description="Configuration Per-IP Rate Limiting"]
+class RateConfig
+{
+    [description="Defines a rate limit for a specific RPC command.  A maximum of 32 specific RPC commands can be rate limited server wide."]
+    class RpcRateLimit
+    {
+        [tag="comp", description="The name of the component that contains the command this rate limit will apply to."]
+        ComponentName componentName;
+        
+        [tag="cmd", description="The name of the command this rate limit will apply to."]
+        string(64) commandName;
+        
+        [tag="limt", description="The maximum number of times this command can be called by a specific IP address each minute."]
+        uint16_t rateLimitPerIpPerMinute;
+    };
+
+    [description="Defines rate limits applied to each connection on and endpoint that uses this rate limiter."]
+    class RateLimiter
+    {
+        [tag="lpip", description="The maximum total number of connections allowed for each remote IP address."]
+        uint16_t connectionLimitPerIp;
+        
+        [tag="cnrt", description="The maximum number of connection attempts that are allowed (per minute) per remote IP address."]
+        uint16_t connectionAttemptRateLimitPerIpPerMinute;
+        
+        [tag="rprt", description="The maximum number of total RPC commands that are allowed (per minute) per remote IP address."]
+        uint16_t totalRpcRateLimitPerIpPerMinute;
+
+        [tag="sppl", description="A list of RpcRateLimits to rate-limit specific RPCs.  A maximum of 32 RPCs can be rate-limited server wide."]
+        list<RpcRateLimit> specificRpcRateLimitPerIpPerMinute;
+
+        [tag="exip", description="A list of ip addresses that are specifically excluded from the rate-limiting defined by this RateLimiter.  By default, no ip addresses are excluded."]
+        NetworkFilterConfig excludedIpList;
+
+        [tag="inip", description="A list of ip addresses that are specifically included from the rate-limiting defined by this RateLimiter.  By default, all ip addresses are included."]
+        NetworkFilterConfig includedIpList;
+    };
+
+    [tag="rdef", description="A map of named RateLimiter objects"]
+    map<string(128), RateLimiter, ignorecase> rateLimiters;
+};
+
+[
+description="Controls how exceptions are handled by the blaze processes."
+]
+class ExceptionConfig
+{
+    [tag="exch", default=true, description="Overrides OS seg-fault exception handling behavior.", details="Under Linux, Blaze tracks the SIGSEGV exception."]
+    bool exceptionHandlingEnabled;
+
+    [tag="fexc", default=50, description="Total number of fiber exceptions allowed before terminating process.", details="Limits the alltime number of seg-fault exceptions handled by Blaze's exception handler.  Upon reaching this limit, the exception is thrown back to the OS for handling.  If zero, the effect is to turn off Blaze seg-fault exception handling.  Under Linux, Blaze tracks the SIGSEGV exception."]
+    uint32_t totalFiberExceptionsAllowed;
+    
+    [tag="fdly", default="10s", description="Minimum delay allowed between fiber exceptions before terminating process.", details="Limits the minimum time between exceptions.   For example if two exceptions occurs within a time interval less than the delayPerFiberException configured, the exception is thrown back to the OS."]
+    TimeValue delayPerFiberException;
+
+    [tag="core", default=true, description="Flags whether process will output a coredump on a fiber exception.", details="Enables Linux core dump saving by Blaze when hitting a Worker Fiber exception.", advanced=true]
+    bool coreDumpsEnabled;
+    
+    [tag="csze", default=0, description="Maximum size of core file allowed.", details="Defines the maximum Linux core file size.   If zero, core file size is unlimited.", advanced=true]
+    uint64_t coreFileSize;
+    
+    [tag="cprf", default="core", description="Core filename prefix.", details="Defines the Linux core file name prefix.", advanced=true]
+    string(256) coreFilePrefix;  
+
+    [tag="exwl", reconfigurable="yes", description="disables core dumping and counting towards exception thresholds, for exceptions occurring with the listed callstack hashes."]
+    list<uint64_t> exceptionCallstackWhitelist;
+};
+
+[trackChanges = true, description="Controls the artificial RPC delay and overrides the error returned from RPC"]
+class DebugSettingsConfig
+{
+    [tag="deen", default=false, description="Enable the debug settings."]
+    bool debugEnabled;
+    
+    [tag="orbe", default=false, description="Defines if the configured error code override is done before executing the RPC command."]
+    bool overrideBeforeExecution;
+
+    [tag="dir", default=0, description="Defines a rate of applying the delay to RPCs."]
+    uint32_t delayIgnoreRate;
+    
+    [tag="dpcm", default="0s", description="Add an artificial delay to each command for debugging the client."]
+    TimeValue delayPerCommand;
+    
+    [tag="ersr", default=0, description="Defines the rate of returning success error code."]
+    uint32_t errorSuccessRate;
+    
+    [tag="ferr", default=0, description="Forces an error code to be returned from every single slave RPC command."]
+    int32_t forceError;
+
+    typedef map<string(64), int32_t> RpcIntMap;
+    typedef map<string(64), RpcIntMap> ComponentRpcIntMap;
+    typedef map<string(64), TimeValue> RpcTimeMap;  
+    typedef map<string(64), RpcTimeMap> ComponentRpcTimeMap;
+
+    [tag="eror", description="Error overrides for specific RPC."]
+    ComponentRpcIntMap errorOverrides;
+    
+    [tag="deor", description="Delay overrides for specific RPC."]
+    ComponentRpcTimeMap delayOverrides;
+};
+
+[description="Configuration for Transaction Context handling."]
+class TransactionConfig
+{
+    [tag="dfto", default="15s", description="Default timeout for transaction."]
+    TimeValue defaultTransactionTimeout;
+
+    [tag="tcsi", default="5s", description="Transaction clean sweep interval."]
+    TimeValue cleanSweepInterval;
+};
+
+[description="Configuration controlling how metrics are exported for ingestion into graphite or statsd"]
+class MetricsExportConfig
+{
+    enum Format
+    {
+        STATSD,
+        GRAPHITE
+    };
+
+    enum InjectorType
+    {
+        UDP,
+        TCP
+    };
+
+    [tag="prfx", default="blaze", description="Set the prefix to be prepended to all exported metrics."]
+    string(1024) prefix;
+
+    [tag="comp", default=false, description="Control whether component metrics are sent."]
+    bool componentMetrics;
+
+    [tag="fibr", default=false, description="Control whether fiber timing metrics are sent."]
+    bool fiberTimings;
+
+    [tag="stat", default=false, description="Control whether getStatus metrics are sent."]
+    bool status;
+
+    [tag="outm", default=false, description="Control whether outbound connection metrics are sent."]
+    bool outboundMetrics;
+
+    [tag="dbm", default=false, description="Controls whether DB query metrics are sent."]
+    bool dbMetrics;
+    
+    [tag="stor", default=false, dedscription="Controls whether storage manager metrics are sent."]
+    bool storageManagerMetrics;
+
+    [tag="host", default="127.0.0.1", description="Hostname to send metrics to."]
+    string(256) hostname;
+
+    [tag="port", default=2003, description="TCP/UDP port to send metrics to."]
+    uint16_t port;
+
+    [tag="form", default=GRAPHITE, description="Set the metrics output format."]
+    Format format;
+
+    [tag="injt", default=TCP, description="Set the injection mechanism."]
+    InjectorType injector;
+
+    [tag="time", default="1m", description="Frequency at which metrics export should be performed."]
+    TimeValue exportInterval;
+};
+
+typedef map<string(256), string(256)> MetricTagList;
+
+class MetricFilter
+{
+    [tag="mtch", description="Complete or prefix match for metric filter. Strings starting with '^' char will be used for prefix match. Every other string will be used for a complete match"]
+    string(-1) mMatch;
+
+    [tag="tags", description="Tag/value pairs which must all match for a metric to match."]
+    MetricTagList mTags;
+};
+
+typedef list<MetricFilter> MetricFilterList;
+
+[description="Configuration controlling how metrics are exported to the EADP Cloud Operational Insights system."]
+class OperationalInsightsExportConfig
+{
+    [tag="host", default="localhost", description="Hostname to send metrics to."]
+    string(256) agentHostname;
+
+    [tag="port", default=8125, description="UDP port to send metrics to."]
+    uint16_t agentPort;
+
+    [tag="time", default="10s", description="Frequency at which metrics export should be performed."]
+    TimeValue exportInterval;
+
+    [tag="maxp", default=1000, description="Maximum size of a UDP packet sent to statsd"]
+    uint32_t maxPacketSize;
+
+    [tag="ecma", default=false, description="Enable this if exporting to the Cloud OI gostatsd agent.  This will enable protocol optimizations which are extensions to the standard statsd protocol."]
+    bool enableGostatsdExtensions;
+
+    [tag="excl", description="List of expressions of metrics to exclude from being exported."]
+    MetricFilterList exclude;
+
+    [tag="incl", description="Whitelist of expressions of metrics to include in export."]
+    MetricFilterList include;
+
+    [tag="tags", description="Extra tags which will be added to all exported metrics."]
+    map<string(128), string(128)> globalTags;
+};
+
+
+[description="Configuration for server metrics logging."]
+class MetricsLoggingConfig
+{
+    [tag="time", default="1m", description="Frequency at which metrics logging should be performed."]
+    TimeValue loggingInterval;
+
+    [tag="comp", default=true, description="Controls if component metrics should be logged."]
+    bool componentMetrics;
+
+    [tag="fibr", default=true, description="Controls if fiber timings should be logged."]
+    bool fiberTimings;
+
+    [tag="stat", default=true, description="Controls if server status should be logged."]
+    bool status;
+
+    [tag="dbm", default=true, description="Controls if DB  query metrics should be logged."]
+    bool dbMetrics;
+
+    [tag="outm", default=true, description="Controls if outbound connection metrics should be logged."]
+    bool outboundMetrics;
+
+    [tag="stor", default=true, dedscription="Controls if storage manager metrics should be logged."]
+    bool storageManagerMetrics;
+
+    [tag="mexp", description="Configure legacy metrics export mechanism."]
+    MetricsExportConfig metricsExport;
+
+    [tag="oiex", description="Configure EADP Cloud Operational Insights metrics export mechanism."]
+    OperationalInsightsExportConfig operationalInsightsExport;
+};
+
+[description="Configuration for replicator."]
+class ReplicationConfig
+{
+    [tag="wmvt", default="10s", description="The amount of time to wait for a map version to synchronize before timing out."]
+    TimeValue waitForMapVersionTimeout;
+    
+    [tag="thiv", default="250ms", description="The amount of time to spend cleaning replicated objects before pumping the selector."]
+    TimeValue syncThrottleInterval;
+    
+    [tag="thic", default=1, description="The number of replicated objects to clean before checking if the throttle interval expired."]
+    uint32_t syncThrottleItemCount;
+};
+
+typedef string(256) OutboundResourcePattern;
+
+[description="OutboundResource for OutboundMetricsConfigEntry"]
+class OutboundResource
+{
+    [tag="pttn", description="resource pattern string (supports regex) to match for tracking outbound metrics"]
+    OutboundResourcePattern mPattern;
+
+    [tag="time", description="threshold response time value that will trigger a WARN log entry to be logged when exceeded"]
+    TimeValue mThreshold;
+};
+
+
+typedef list<OutboundResource> OutboundResourceList;
+
+enum OutboundTransactionType
+{
+    HTTP = 0,
+    REDIS,
+    MAX_OUTBOUND_TXN_TYPE
+};
+
+[description="Configuration entry for each resource pattern for OutboundMetricsManager"]
+class OutboundMetricsConfigEntry
+{
+    [tag="rsrc", description="list of outbound resources which contain resource pattern strings and thresholds"]
+    OutboundResourceList mResources;
+
+    [tag="size", description="size of each bucket in terms of time duration"]
+    TimeValue mBucketSize;
+
+    [tag="bkts", description="number of buckets to use to track outbound transaction response time"]
+    uint32_t mBucketCount;
+};
+
+typedef map<OutboundTransactionType,OutboundMetricsConfigEntry> OutboundMetricsConfigMap;
+
+[description="Configuration of global outbound metrics manager"]
+class OutboundMetricsConfig
+{
+    [tag="omc", description="Map of outbound transaction type and resource patterns to track metrics for"]
+    OutboundMetricsConfigMap mOutboundMetrics;
+};
+
+[description="Configuration for the ConnectionManager"]
+class ConnectionManagerConfig
+{
+   [tag="ackt", default="10s", reconfigurable="yes", description="max time to wait for graceful connection closure acknowledgement."]
+   TimeValue mGracefulClosureAckTimeout;
+   
+   [tag="rirt", default="0s", description="time to wait for remote instance to restart before all held RPCs are cancelled; when set to 0 system will use 2/3 * RPC timeout"]
+   TimeValue mRemoteInstanceRestartTimeout;
+};
+
+class ProfanityServiceConfig
+{
+    [tag="serv", default=false, reconfigurable="yes", description="Should the profanity filter use eadp profanity service for filtering."]
+    bool mUseProfanityService;
+
+    [tag="flid", default="", reconfigurable="yes", description="Eadp profanity service filter id obtained when onboarding with the service."]
+    string(32) mProfanityServiceFilterId; // The 32 char length limitation is defined by the profanity service.
+
+    [tag="rtry", default=2, reconfigurable="yes", description="The maximum number of retries for a Profanity Service RPC before giving up. Total number of tries is (1 + retryLimit). Depending on the failure, the RPC may not be retried at all."]
+    uint8_t mProfanityServiceRetryLimit;
+
+    [tag="rdly", default=1000, reconfigurable="yes", description="The number of milliseconds of delay of first retry. The delay of following retries will increase exponentially."]
+    uint16_t mProfanityServiceRetryDelay;
+
+    [tag="prfi", default="", reconfigurable="yes", description="DEPRECATED - The full Profanity filter used by the original filter service that ran on the Blaze Server.  Not used if the profanity srevice is enabled."]
+    string(-1) profanityFilter;
+};
+
+[description="Configuration for refreshing instance data in Redis"]
+class InstanceRefreshRedisConfig
+{
+    [tag="rfri", default="10s", reconfigurable="yes", description="The frequency of calls to refresh the instance data in Redis"]
+    TimeValue redisRefreshInterval;
+
+    [tag="rttl", default="2m", reconfigurable="yes", description="The time to live for the instance data in Redis. Should be reasonably bigger than mRedisRefreshInterval in order to avoid expiring the data."]
+    TimeValue redisTTL;
+
+    [tag="fail", default=0, reconfigurable="yes", description="The number of consecutive failed attempts to refresh the instance data that will be allowed before the blazeserver instance is shut down. (If set to 0, the blazeserver instance will not be shut down, regardless of the number of failed attempts.)"]
+    uint16_t maxRedisRefreshFailures;
+};
+
+[description="Configuration for all framework entities.", generateProto=false]
+class FrameworkConfig
+{
+    [tag="cgvs", default="", reconfigurable="yes"]
+    string(256) configVersion;
+    
+    [tag="db", reconfigurable="yes", description="Database configuration."]
+    DatabaseConfiguration databaseConfig;
+
+    [tag="wlcc", reconfigurable="no", description="The wal cache configuration."]
+    WalCacheConfig WalCache;
+    
+    [tag="fbrs", reconfigurable="yes", description="The fibermanager configuration."]
+    FiberConfig fibers;
+    
+    [tag="epts", reconfigurable="default", description="The endpoint configuration."]
+    EndpointConfig endpoints;
+
+    [tag="hxml", reconfigurable="yes", description="Defines HTTP XML protocol behavior"]
+    HttpXmlProtocolConfig httpXmlConfig;
+
+    [tag="rest", reconfigurable="yes", description="Defines HTTP XML protocol behavior"]
+    RestProtocolConfig restConfig;
+    
+    [tag="http", reconfigurable="yes", description="Defines the HTTP service manager behavior"]
+    HttpServiceConfig httpServiceConfig;
+
+    [tag="grpc", reconfigurable="yes", description="Defines the outbound gRPC service manager behavior"]
+    OutboundGrpcServiceConfig outboundGrpcServiceConfig;
+
+    [tag="rlmt", reconfigurable="yes", description="The rate limiter configuration."]
+    RateConfig rates;
+
+    [tag="prfc", default="", reconfigurable="yes", description="Profanity filter config."]
+    ProfanityServiceConfig profanityConfig;
+
+    [tag="defl", default="", reconfigurable="yes"]
+    string(4) defaultLocale;
+
+    [tag="lsml", default=4096, description="The maximum length for localization string."]
+    uint32_t locStringMaxLength;
+
+    [tag="loca", default="", reconfigurable="yes"]
+    string(-1) localization;
+    
+    [tag="excp", reconfigurable="yes", description="Controls how exceptions are handled on the server."]
+    ExceptionConfig exceptionConfig;
+    
+    [tag="desc", reconfigurable="yes", description="Defines debug settings."]
+    DebugSettingsConfig debugSettingsConfig;
+
+    [tag="tran", description="Transaction config"]
+    TransactionConfig transactionConfig;
+
+    [tag="metr", reconfigurable="yes", description="Metrics logging config"]
+    MetricsLoggingConfig metricsLoggingConfig;
+
+    [tag="repl", description="Replication config"]
+    ReplicationConfig replicationConfig;
+    
+    [tag="rdir", description="Redirector settings config"]
+    RedirectorSettingsConfig redirectorSettingsConfig;
+
+    [tag="omet", description="Outbound metrics config"]
+    OutboundMetricsConfig outboundMetricsConfig;
+
+    [tag="dchk", reconfigurable="yes", description="The frequency of drain status checks which leads to shutdown once drain is completed", default="5s"]
+    TimeValue mDrainStatusCheckInterval;
+
+    [tag="sbid", reconfigurable="yes", description="The sandbox ID defined for the particular environment.", default="EARW.1"]
+    string(64) mSandboxId;
+
+    [tag="shut", reconfigurable="yes", description="Connectionmanager config"]
+    ConnectionManagerConfig mConnectionManagerConfig;
+
+    [tag="crtr", reconfigurable="yes", description="The average frequency of certificate refresh polling from Vault (with some random variance)", default="1h"]
+    TimeValue mCertRefreshInterval;
+
+    [tag="iipc", reconfigurable="yes", description="Instance info publishing config"]
+    InstanceRefreshRedisConfig mInstanceInfoPublishingConfig;
+};
+
+[description="Configuration for describing a server instance and all its endpoints."]
+class ServerConfig
+{
+    enum InstanceType
+    {
+         CONFIG_MASTER,
+         SLAVE,
+         AUX_MASTER,
+         AUX_SLAVE,
+         UNKNOWN
+    };
+    
+    enum ServiceImpact
+    {
+        [ description="If this instance is down, *entire* cluster goes down." ]
+        CRITICAL,
+        [ description="If this instance is down, instances hosting dependent slaves go down, rest of cluster stays up." ]
+        CLUSTER,
+        [ description="If this instance is down, instances hosting dependent slaves stay up, rest of cluster stays up." ]
+        TRANSIENT
+    };
+    
+    [tag="type", description="Type of the instance.", default=ServerConfig::UNKNOWN]
+    InstanceType instanceType;
+
+    [tag="impc", description="What happens to connected instances if this instance goes down(applies only to masters)", default=ServerConfig::TRANSIENT]
+    ServiceImpact serviceImpact;
+    
+    [tag="inte", description="The name of the endpoint that other instances will use to connect to this one.", default="internalFire2"]
+    string(128) internalEndpoint;
+
+    [tag="epts", description="The endpoint group(defined in FrameworkConfig)."]
+    string(128) endpoints;
+
+    [tag="cmpt", description="The list of component groups this instance loads."]
+    list<string(256)> components;
+
+    [tag="cltp", description="A list of ClientTypes the redirector should direct to this instance."]
+    ClientTypeList clientTypes;
+
+    [tag="urpl", description="Whether this instance subscribes for partial user replication.", default=true]
+    bool partialUserReplication;
+
+    [tag="iplu", description="Whether user assigned as local to this (aux) instance is replicated on demand(false), or immediately upon login(true).", default=false]
+    bool immediatePartialLocalUserReplication;
+};
+
+[description="Describes search location of a config file. Replaces $component with <componentname>."]
+class ConfigPath
+{
+    [tag="file", description="Name of config file."]    
+    string(256) file;
+
+    [tag="prec", default="", description="Name of preconfig config file (optional)."]    
+    string(256) preconfigFile;
+        
+    [tag="dirs", description="List of directory locations used to locate the config file."]    
+    list<string(256)> dirs;
+};
+
+class SSLContextConfig
+{
+    [description="Configuration for the minimum SSL protocol version supported by this context."]
+    enum SSLProtocolVersion
+    {
+        SSLV_2_3,
+        TLSV_1,
+        TLSV_1_1,
+        TLSV_1_2,
+        TLSV_1_3
+    };
+
+    [tag="peer", default=false, description="Set to true to perform SSL peer verification."]
+    bool verifyPeer;
+
+    [tag="hash", description="List of base64 encoded SHA 256 digests of client certs that we trust."]
+    list<string(256)> trustedHashes;
+
+    [description="Options for loading server certs include local disk, hostname specific certs from Vault, or shared certs from Vault."]
+    enum SSLServerPathType
+    {
+        LOCAL_DISK,
+        VAULT_SHARED,
+        VAULT_HOSTNAME
+    };
+
+    [tag="ptyp", default=VAULT_HOSTNAME, description="Determines if server cert and key should be loaded from Vault",
+     details="When true, key and cert parameters are Vault paths, otherwise they are local disk paths"]
+    SSLServerPathType pathType;
+
+    [tag="ext", default=true, description="Identifies whether this SSL Context is for an external or internal endpoint",
+     details="When true, key and cert are for the external hostname, otherwise internal hostname"]
+    bool externalCert;
+
+    [tag="key", default="", description="Override location for the pem file associated with the cert configuration.", 
+     details="By default it is loaded from /ssl for Windows and /home/gos-ops/cert/ on Linux.", advanced=true]
+    string(128) key;
+
+    [tag="cert", default="", description="Override location for the pem file associated with the cert configuration.", 
+     details="By default it is loaded from /ssl for Windows and /home/gos-ops/cert/ on Linux.", advanced=true]
+    string(128) cert;
+
+    [tag="ccd", default="ssl/ca-certs", advanced=true]
+    string(128) caCertDirectory;
+
+    [tag="caf", default="ssl/ca-certs/cacert.pem", description="path+filename to PEM format file of CA's"]
+    string(1024) caFile;
+
+    [tag="cili", default="", description="Define the list of ciphers that are available for use on this context.", 
+     details="List format is specified in a single string defined here: https://www.openssl.org/docs/apps/ciphers.html#CIPHER_LIST_FORMAT", advanced=true]
+    string(128) cipherList;
+    
+    [tag="sslv", default=TLSV_1_1, description="The minimum SSL protocol version supported by this context."]
+    SSLProtocolVersion minSSLProtocolVersion;
+};
+
+class SSLConfig
+{
+    const char8_t* DEFAULT_SSL_CONTEXT_NAME = "default";
+
+    [tag="ctxs", description="Map of all the SSL contexts defined for this server for use in endpoint configurations."]
+    map<string(256), SSLContextConfig, ignorecase> contexts;
+};
+
+typedef map<string(32), Blaze::Logging::Level, ignorecase> CategoriesMap;
+
+class LogEventConfig
+{
+    [tag="name", description="The name of the event logging category."]
+    string(32) category;
+
+    [tag="rotp", description="The period at which event logs will be rotated (0s to rotate every midnight GMT).", default="0s"]
+    TimeValue rotationPeriod;
+};
+
+typedef list<LogEventConfig> EventsList;
+
+typedef map<string(32), string(32), ignorecase> TraceMap;
+
+class LogEntryBehaviours
+{
+    [tag="fnam", description="The filename of the log entry (as recorded by the __FILE__ preprocessor macro)."]
+    string(1024) filename;
+
+    [tag="line", description="The line number of the log entry (as recorded by the __LINE__ preprocessor macro)."]
+    int32_t lineNum;
+
+    [tag="supp", default=false, description="Controls if this log entry should be suppressed regardless of the logging level."]
+    bool suppress;
+
+    [tag="pin", default=false, description="Controls if this log entry should be logged regardless of the logging level."]
+    bool pin;
+
+    [tag="sat", default=10, description="If suppression is enabled then log the suppressed line once every suppressionThreshold times and log a second entry indicating that this number of subsequent log entries will be suppressed."]
+    uint32_t suppressionThreshold;
+
+    [tag="core", default=false, description="Controls if a core file should be programmatically generated if this log entry is triggered."]
+    bool generateCore;
+
+    [tag="mcor", default=4, description="If core generation is enabled for this log entry then this setting controls the total number of cores that will be generated.", advanced=true]
+    uint32_t maxCores;
+};
+
+// TODO: Disabling proto generation because of circular import caused by Blaze::Logging::Level
+// (including CategoriesMap)
+[generateProto=false]
+class LoggingConfig
+{
+    enum Output
+    {
+        BOTH              = 0,
+        STDOUT,
+        FILE
+    };
+
+    [tag="leve", default=Blaze::Logging::INFO, description="Define the default logging level for all loggers"]
+    Blaze::Logging::Level level;
+
+    [tag="outp", default=BOTH, description="Controls whether log output goes to stdout, the log file or both."]
+    Output output;
+
+    [tag="rofz", default=10000000, description="The approximate maximum size of a log file before it is rotated."]
+    uint32_t rotationFileSize;
+    
+    [tag="inlo", default=true, description="Control whether source file and line number information is logged.", advanced=true]
+    bool includeLocation;
+
+    [tag="enlo", default=true, description="Control whether source file and line number information are encoded as numbers rather than strings.", advanced=true]
+    bool encodeLocation;
+
+    [tag="mcl", default=0, description="How long should the category field be?", advanced=true]
+    uint32_t maxCategoryLength;
+
+    [tag="pfme", default=true, description="If true and a log entry consists of multiple lines, each line will be prepended with a standard prefix (data/time, component, user, etc.)", advanced=true]
+    bool prefixMultilineEnabled;
+    
+    [tag="coal", default=false, description="When true, the BLAZE_ASSERT* logging macros will cause the server to core, otherwise an Error log is logged.", advanced=true]
+    bool coreOnAssertLog;
+    
+    [tag="trac", description="Control what level of trace logging is enabled."]
+    TraceMap trace;
+    
+    [tag="cago", description="Individual log levels for logger categories can be set in this map."]
+    CategoriesMap categories;
+
+    [tag="even", description="A list of log event configs for which event logs will be produced."]
+    EventsList mEvents;
+
+    [tag="bevt", description="A list of log event configs for which binary event logs will be produced."]
+    EventsList mBinaryEvents;
+
+    [tag="lesz", default=1048576, description="Max size of large log entry (default 1MB)."]
+    uint32_t mLargeEntrySize;
+
+    [tag="lect", default=64, description="Max count of largest log entries that can be queued by the logger.", advanced=true]
+    uint32_t mLargeEntryCount;
+
+    [tag="bhav", description="Defines logging behaviours for specific log entries.", advanced=true]
+    list<LogEntryBehaviours> behaviours;
+
+    [tag="gtrc", description="Tracers for grpc core. Be very careful when turning these on. They are way too verbose!"]
+    list<string(-1)> mGrpcCoreTracers;
+
+    [tag="dbnp", reconfigurable="no", description="Database names per platform."]
+    DbNameByPlatformTypeMap mDbNamesByPlatform;
+
+    [tag="saud", default=false, reconfigurable="yes", description="Audit logging killswitch", advanced=true]
+    bool mSuppressAuditLogging;
+
+    [tag="sdbg", default=false, reconfigurable="yes", description="Debug console logging killswitch (Windows-only)", advanced=true]
+    bool mSuppressDebugConsoleLogging;
+
+    [tag="audr", default="60s", reconfigurable="yes", description="Governs how often cached audit log file handles are refreshed.", advanced=true]
+    TimeValue mAuditLogRefreshInterval;
+
+    [tag="audc", default="1d", reconfigurable="yes", description="Governs how often the audit entries are checked for expiry."]
+    TimeValue mAuditEntryExpiryCheckInterval;
+
+    [tag="audx", default="180d", reconfigurable="yes", description="How long 'stale' audit entries can persist before it is removed/obfuscated."]
+    TimeValue mAuditEntryExpiryDuration;
+};
+
+[description="Controls the settings for TCP keep-alives for outbound connections.  When enabled, the total time to detect a dead connection will be (keepAliveInterval * keepAliveCount) seconds."
+]
+class SocketKeepAlive
+{
+    [tag="kai", default="15s", description="Number of seconds between sending TCP keep alives.  Disabled if set to 0."]
+    TimeValue keepAliveInterval;
+    [tag="kac", default=4, description="Number of times a keep-alive will be sent before closing a connection if no ACKs are received.  Disabled if set to 0."]
+    uint32_t keepAliveCount;
+};
+
+[description="The deployment configuration information."]
+class DeploymentConfig
+{
+   [tag="mail", description="E-mail addresses for the monitor to notify on server crash"]     
+   string(2048) monitorMail;
+
+   [tag="mrst", description="E-mail addresses for the monitor to notify on server crash - not restarted"]
+   string(2048) monitorNotRestartedMail;
+
+   [tag="depm", description="Email addresses for deploy notification."]
+   string(2048) deployMail;
+
+   [tag="mcnt", description="Number of times the server can crash before the monitor restarts"]
+   uint16_t monitorAllowedCrashCount;
+
+   [tag="mtim", description="Amount of time between crashes before the monitor restarts"]
+   uint16_t monitorAllowedCrashTime;  
+
+};
+
+[description="Server instance configuration."]
+class ServerInstanceConfig
+{
+    [tag="type"] string(64) type;
+    [tag="name"] string(64) name;
+    [tag="port"] uint16_t port;
+    [tag="strt", default=true] bool start;
+};
+
+typedef list<ServerInstanceConfig> ServerInstanceConfigList;
+typedef map<ClientPlatformType, ServiceName> PlatformToServiceNameMap;
+
+// TODO: Proto generation is disabled for LoggingConfig
+[description="Top level configuration for the boot file.", generateProto=false]
+class BootConfig
+{
+    [description="Describes the interfaces the process can bind to", generateProto=false]
+    class Interfaces
+    {
+        [tag="int", description="The internal address to bind to."]
+        string(32) internal;
+        
+        [tag="ext", description="The external address to bind to."]
+        string(32) external;  
+    };
+
+    [description="Aggregates multiple component names", generateProto=false]
+    class ComponentGroup
+    {
+        [tag="verb", default=false, description="Whether or not component names should be loaded verbatim or take into account instance type."]
+        bool verbatim;
+
+        [tag="name", description="List of component names."]
+        list<string(128)> components;
+    };
+
+    [tag="env", default="dev", description="The service environment for this server (e.g. prod, dev, cert, test)."]
+    string(ENVIRONMENT_NAME_MAX_LENGTH) mServiceEnvironment;
+
+    [tag="srid", description="The Nucleus Client Id for the Blaze server."]
+    string(MAX_NUCLEUS_CLIENT_ID_LENGTH) mBlazeServerNucleusClientId;
+
+    [tag="pltd", description="The default service name for this process, one for each platform in use."]
+    PlatformToServiceNameMap mPlatformToDefaultServiceNameMap;
+    
+    [tag="name", description="The service name for this process."]
+    ServiceNameInfoMap serviceNames;
+    
+    [tag="plat", description="The hosted platforms for this server."]
+    ClientPlatformTypeList mHostedPlatforms; 
+
+    [tag="cplt", default=INVALID, description="The configured platform for this server. 'common' will result in multiple hosted platforms. Used for config checking."]
+    ClientPlatformType mConfiguredPlatform; 
+    
+    [tag="mock", default=false, description="If set, overrides all mock service settings and tries to enable mock services for all console 1st party calls.  Must be enabled for PC mocking console users."]
+    bool mUseMockConsoleServices;
+
+    [tag="ht1b", default=false, description="If set, this maintains a bug in the heat encoder where list/maps do not encode their key/value types correct.  Changing this is only safe after all clients have been updated.  Not rolling restart safe (affects Redis encoding)."]
+    bool mEnableHeat1BackCompat;
+
+    [tag="rxba", default=true, description="If set, requires that an xbox address be used with the XboxOne users.  Otherwise allows non-xbox addresses (standard IP)."]
+    bool mXboxOneRequiresXboxClientAddress;
+    
+    [tag="pas", description="The address of the port assignment service."]
+    string(256) portAssignmentServiceAddr;
+    
+    [tag="pasp", description="The port type this PAS client uses.", default=0]
+    uint16_t pasPortType;
+
+    [tag="rdir", description="The address of the redirector."]
+    string(256) redirectorSlaveAddr;
+
+    [tag="qrsi", default=false, description="If set, the redirector is the authoritative source for querying the internal fire endpoints of remote peers to connect to on bootstrap. Otherwise the default remote info source other than the redirector is authoritative."]
+    bool useRedirectorForRemoteServerInstances;
+
+    [tag="peer", description="The internal fire endpoints of remote peers to connect to on bootstrap before querying the redirector.", 
+     details="This list should be empty for most Blaze configurations, except for the redirector itself."]
+    list<string(256)> remoteServerInstances;
+
+    [tag="intf", description="The interfaces this server uses."]
+    Interfaces interfaces;
+
+    [tag="cpth", description="Map of config file search paths."]
+    map<string(64), ConfigPath, ignorecase> configPaths;
+    
+    [tag="crot", description="List of root directories to search for configuration.", 
+     details="If this list is empty, the current directory is searched.  If not empty, the first directory serves as the 'primary' directory for loading configuration, while subsequent directories are used for loading config overload files."]
+    list<string(256)> rootConfigDirectories;
+
+    [tag="cfgs", description="Map of supported server configurations."]
+    map<string(64), ServerConfig, ignorecase> serverConfigs;
+    
+    [tag="inst", description="List of server instances(defined in serverConfigs) to boot."]
+    ServerInstanceConfigList serverInstances;
+    
+    [tag="cpts", description="Map of component groups(referenced from serverConfigs), each comprised of one or more components."] 
+    map<string(64), ComponentGroup, ignorecase> componentGroups;
+
+    [tag="asrt", description="Specifies whether the server should break on asserts, or just log them", default=false]
+    bool breakOnAssert;
+
+    [tag="hovr", description="If set, indicates the external hostname that is published to the redirector"]
+    string(512) hostnameOverride;
+
+    [tag="iovr", description="If set, indicates the internal hostname that is published to the redirector"]
+    string(512) internalHostnameOverride;
+
+    [tag="exip", description="If set, indicates the external ip address that is published to the redirector"]
+    string(32) externalIpOverride;
+
+    [tag="inip", description="If set, indicates the internal ip address that is published to the redirector"]
+    string(32) internalIpOverride;
+
+    [tag="log", description="Define the default logging for a blaze server instance."]
+    LoggingConfig logging;
+
+    [tag="sele"]
+    SelectorConfig selector;
+
+    [tag="soko", description="Controls for adjusting various socket options for outbound connections."]
+    SocketKeepAlive socketKeepAlive;  
+    
+    [tag="depi", description="Information about the deployment for the monitor"]
+    DeploymentConfig deployInfo;
+    
+    [tag="blck", default=false, description="If true, allows blocking operations during the reconfigure stage.",  details="This option is provided for running components that do not fully conform to the component reconfigure guidelines, which state that there can be no blocking calls during a reconfigure.  This can potentially cause reconfigures to fail and leave the server in an unknown state.  All components should be able to successfully reconfigure without this flag being set."]
+    bool mAllowBlockingReconfigure;
+
+    [tag="rhup", description="Default list of server features reconfigured by issuing SIGHUP on Linux and CTRL+Break on Windows.", 
+     details="If this list is empty, logging is reconfigured"]
+    list<string(256)> hupReconfigureFeatures;
+
+    [tag="reds", description="Redis Clusters configuration."]
+    RedisConfig redisConfig;
+
+    [tag="iiac", description="Instance id allocator config"]
+    InstanceRefreshRedisConfig instanceIdAllocatorConfig;
+};
+
+} // namespace Blaze
+

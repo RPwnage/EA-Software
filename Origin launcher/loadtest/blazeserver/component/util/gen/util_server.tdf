@@ -1,0 +1,231 @@
+[headername="util/tdf/utiltypes.h"]
+#include "util/gen/utiltypes.tdf"
+
+[headername="framework/tdf/frameworkconfigtypes_server.h"]
+#include "framework/gen/frameworkconfigtypes_server.tdf"
+
+namespace Blaze
+{
+namespace Util
+{
+typedef map<string(64), string(512), ignorecase>  ClientConfig;
+typedef map<string(64), ClientConfig, ignorecase> ClientConfigMap;
+typedef map<ClientPlatformType, ClientConfigMap> PlatformClientConfigMap;
+typedef list<string(32)> OfferIdList;
+
+class UserSmallStorageData
+{
+    [tag="maxk", default=8, description = "UserSmallStorage maxkeys"]
+    uint32_t mMaxkeys;
+};
+
+class TuneableTelemetryGroupData
+{
+    [tag="ttgn", default="unnamed group", description = "Tuneable telemetry group name"]
+    string(64) mGroupName;
+    
+    [tag="ttgd", default="", description = "Tuneable telemetry group definition, listing the member in the group, comma seperated, '%' is the wildcard"]
+    string(1024) mGroupDefinition;
+    
+    [tag="ttgt", default="Persona", description = "Tuneable telemetry group identifier, indicates which ID we should use to filter, acceptable values 'Persona' and 'NucleasId'"]
+    string(64) mIdentifierType;
+    
+};
+
+typedef list<TuneableTelemetryGroupData> TuneableTelemetryGroupList;
+class TuneableTelemetryGroup
+{
+    [tag="ttgp", description = "Tuneable Telemetry group definitions"]
+    TuneableTelemetryGroupList mTuneableTelemetryGroups;
+};
+
+class TuneableTelemetryFilterData
+{
+    [tag="ttfa", default="", description = "Tuneable telemetry filter action, must start with either '+' or '-' then list a telemetry hook"]
+    string(1024) mAction;
+    
+    [tag="ttft", default="Persona", description = "Tuneable telemetry filter type, acceptable values 'Persona', 'Group' and 'NucleasId'"]
+    string(64) mIdentifierType;
+    
+    [tag="ttfu", default="", description = "Tuneable telemetry filter definition, listing the member in the group, comma seperated, '%' is the wildcard, but no wildcards accepted with the Identifier is 'Group'"]
+    string(1024) mBlazeIds;
+    
+    [tag="ttfg", default="ALL", description = "Tuneable telemetry filter game definition, denoting which games this filter applies to. 'ALL', 'NONE' or a Blaze service name are accepted"]
+    string(128) mGameId;
+    
+};
+
+typedef list<TuneableTelemetryFilterData> TuneableTelemetryFilterList;
+class TuneableTelemetryFilters
+{
+    [tag="ttfl", description = "Tuneable Telemetry filter definitions"]
+    TuneableTelemetryFilterList mTuneableTelemetryFilters;
+};
+
+class TelemetryElement
+{
+    [tag="addr", default="", description = "Telemetry address"]
+    string(64) mAddress;
+
+    [tag="port", default=0, description = "Telemetry port"]
+    uint32_t mPort;
+
+    [tag="sect", default="", description = "Telemetry secret - Simply used as a salt to generate the telemetry key"]
+    string(256) mSecret;
+
+    [tag="doma", default="", description = "Telemetry domain - Simply used as a salt to generate the telemetry key"]
+    string(64) mDomain;
+
+};
+
+typedef list<TelemetryElement> TelemetryElementList;
+typedef map<string(64), TelemetryElementList, ignorecase> TelemetryElementsByProduct;
+typedef map<ClientPlatformType, TelemetryElementsByProduct> PlatformTelemetryElementsByProduct;
+
+enum DisconnectTelemetryLogType
+{
+    [description="Do not log disconnect telemetry for any users."]
+    DISCONNECT_TELEMETRY_NONE,
+    [description="Log disconnect telemetry for all users."]
+    DISCONNECT_TELEMETRY_ALL_USERS,
+    [description="Log disconnect telemetry for users specified in the audit list."]
+    DISCONNECT_TELEMETRY_AUDIT_USERS
+};
+
+class TelemetryPINConfig
+{
+    [tag="url", description="The PIN url to establish the connection to."]
+    string(256) mUrl;
+
+    [tag="tenv", description="The PIN environment to use."]
+    string(32) mEnvironment;
+};
+
+class TelemetryData
+{
+    [tag="tsvr", description = "Telemetry servers"]
+    PlatformTelemetryElementsByProduct mTelemetryServers;
+
+    [tag="asvr", description = "TelemetryData"]
+    PlatformTelemetryElementsByProduct mAnonymousServers;
+
+    [tag="doma", default="", description = "Telemetry domain"]
+    string(64) mDomain;
+
+    [tag="tdis", default="", description = "Telemetry disable"]
+    string(1024) mTelemetryDisable;
+
+    [tag="tnto", default="", description = "Telemetry no toggle ok"]
+    string(1024) mTelemetryNoToggleOk;
+    
+    [tag="tstm", default="", description = "Telemetry User server time override"]
+    string(8) mTelemetryUseServerTime;
+
+    [tag="tfil", default="", description = "Telemetry filter"]
+    string(1024) mTelemetryFilter;
+
+    [tag="tsp", default=0, description = "percentage full the buffer should be before attempting a send"]
+    uint32_t mTelemetrySendPercentage;
+
+    [tag="tsd", default=0, description = "the delay, in milliseconds, to wait after an entry before a send"]
+    uint32_t mTelemetrySendDelay;
+    
+    [tag="ttfs", description = "Tuneable Telemetry filters, to be processed and possibly added to the global filters defined in mTelemetryFilter"]
+    TuneableTelemetryFilterList mTuneableTelemetryFilters;
+    
+    [tag="ttgs", description = "Tuneable Telemetry groups"]
+    TuneableTelemetryGroupList mTuneableTelemetryGroups;
+    
+    [tag="tsvn", default="telemetry-3-common", description = "Telemetry Cluster Service Name"]
+    ServiceName mTelemetryServiceName;
+
+    [tag="edct", reconfigurable="yes", default=DISCONNECT_TELEMETRY_NONE, description="Specifies if the Blaze SDK should submit Telemetry events for game server or blaze server disconnects."]
+    DisconnectTelemetryLogType mDisconnectTelemetryType;
+
+    typedef list<string(MAX_PERSONA_LENGTH)> PersonaNameList;
+    [tag="adps", reconfigurable="yes", description="List of persona names for whom disconnect telemetry events will be submitted by BlazeSDK."]
+    PersonaNameList mDisconnectAuditPersonas;
+
+    [tag="pinc", reconfigurable="yes", description="The PIN configurations sent down to Telemetry SDK to use."]
+    TelemetryPINConfig mPINConfig;
+};
+
+class TickerServerData
+{
+    [tag="addr", default="", description = "TickerServer address"]
+    string(64) mAddress;
+
+    [tag="port", default=0, description = "TickerServer port"]
+    uint32_t mPort;
+
+    [tag="ctxt", default="", description = "TickerServer context"]
+    string(1024) mContext;
+
+    [tag="hlpd", default=0, description = "TickerServer helloperiod"]
+    uint32_t mHelloperiod;
+
+    [tag="bred", default=0, description = "TickerServer bgred"]
+    uint32_t mBgred;
+
+    [tag="bgrd", default=0, description = "TickerServer bggreen"]
+    uint32_t mBggreen;
+
+    [tag="bblu", default=0, description = "TickerServer bgblue"]
+    uint32_t mBgblue;
+
+    [tag="balp", default=0, description = "TickerServer bgalpha"]
+    uint32_t mBgalpha;
+
+    [tag="hfil", default=0, description = "TickerServer hfilter"]
+    uint32_t mHfilter;
+
+    [tag="lfil", default=0, description = "TickerServer lfilter"]
+    uint32_t mLfilter;
+};
+
+typedef list<TickerServerData> TickerServerDataList;
+
+class TickerData
+{
+    [tag="tlst", description = "TickerServers settings"]
+    TickerServerDataList mTickerServers;
+};
+
+
+class UtilConfig 
+{
+    [tag="dbpt", reconfigurable="no", description = "DBs to use for each platform"]
+    DbNameByPlatformTypeMap mDbNamesByPlatform;
+
+    [tag="ccnf", reconfigurable="yes", description = "Retrieve Platform specific config if requested. Fall back to the common section if platform not specified."]
+    PlatformClientConfigMap mClientConfigs;
+
+    [tag="usst", reconfigurable="yes", description = "Small User Storage settings."]
+    UserSmallStorageData mUserSmallStorage;
+
+    [tag="telm", reconfigurable="yes", description = "Telemetry settings"]
+    TelemetryData mTelemetry;
+
+    [tag="tick", reconfigurable="yes", description = "Ticker settings"]
+    TickerData mTicker;
+
+    [tag="psuf", reconfigurable="yes", description = "If true, calls to Util::preAuth() that are made by CLIENT_TYPE_GAMEPLAY_USERs will fast-fail with UTIL_PSU_LIMIT_EXCEEDED if the instance has reached the configured PSU limit."]
+    bool mPreAuthFailsBeyondPsuLimit;
+};
+
+[
+    tdfid = "hash",
+    description = "User settings saved",
+    details = "Triggered when a user setting has been updated",
+    generateProto=true
+]
+class UserSettingsSaved
+{
+    [tag="pid", description="Persona of the players whose settings have been saved"]
+    BlazeId mUserPersonaId;
+
+    [tag="key", description="Key of the setting being saved"]
+    UserSettingKey mKey;
+};
+} //namespace Util
+} //namespace Blaze

@@ -1,0 +1,827 @@
+/*! ************************************************************************************************/
+/*!
+    \file matchmaker_config_server.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/userextendeddatatypes.h"]
+#include "framework/gen/userextendeddatatypes.tdf"
+
+[headername="gamemanager/tdf/matchmaker_types.h"]
+#include "gamemanager/gen/matchmaker_types.tdf"
+
+[headername="gamemanager/tdf/matchmaker_server.h"]
+#include "gamemanager/gen/matchmaker_server.tdf"
+
+[headername="customcode/component/gamemanager/tdf/customrules_config_server.h"]
+#include "customcode/component/gamemanager/gen/customrules_config_server.tdf"
+
+[headername="gamemanager/tdf/scenarios_config_server.h"]
+#include "gamemanager/gen/scenarios_config_server.tdf"
+
+// Probably need to remove once this is directly included from GM
+[headername="framework/tdf/attributes.h"]
+#include "framework/gen/attributes.tdf"
+
+[headername="gamemanager/tdf/externalsessionconfig_server.h"] // For ExternalSessionServerConfigMap in matchmakerSettings
+#include "gamemanager/gen/externalsessionconfig_server.tdf"
+
+[headername="gamemanager/tdf/retenetwork_config_server.h"]
+#include "gamemanager/gen/retenetwork_config_server.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+
+//
+// UED Rule
+//
+typedef string(64) GroupSizeAdjustmentExpression;
+typedef list<GroupSizeAdjustmentExpression> GroupAdjustmentFormulaList;
+const char8_t *GROUP_SIZE_VARIABLE_IDENTIFIER = "groupSize";
+
+[description="Configuration parameters of the UED rule.", trackChanges = true]
+class UEDRuleConfig
+{
+    [tag="ukey", description="The name used to identify the data on the UED."]
+    UserExtendedDataName userExtendedDataName;
+    
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="gvf", description="The name of the formula used to calculate value of a group of users."]
+    GroupValueFormula groupValueFormula;
+    
+    [tag="gadj", description="The group size adjustment formula(s) to apply before calculating the group value formula."]
+    GroupAdjustmentFormulaList groupAdjustmentFormula;
+    
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+    
+    [tag="rnge", description="The acceptable range of values for this rule."]
+    Range range;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+
+    [tag="dbuk", description="Number of buckets the UED's range gets divided into for rule diagnostics. 0 disables the rule's diagnostics.", default=25]
+    uint64_t diagnosticBucketPartitions;
+
+    [tag="biev", description="If true, the rule is evaluated bidirectionally. If false, matches are evaluated unidirectionally.", default=true]
+    bool bidirectionalEvaluation;
+};
+
+//
+// Team Ued Rule
+//
+
+[description="Configuration parameters of a Team UED Balance rule.", trackChanges = true]
+class TeamUEDBalanceRuleConfig
+{
+    [tag="ukey", description="The name used to identify the data on the UED."]
+    UserExtendedDataName userExtendedDataName;
+
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+
+    [tag="gvf", default=GROUP_VALUE_FORMULA_SUM, description="The name of the formula used to calculate value of a team."]
+    GroupValueFormula teamValueFormula;
+    
+    [tag="gadj", description="The group size adjustment formula(s) to apply before calculating the group value formula."]
+    GroupAdjustmentFormulaList groupAdjustmentFormula;
+    
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+
+    [tag="rnge", description="The acceptable range of values for this rule."]
+    Range range;
+
+    [tag="bckt", default=100, description="The number of partitions of the range for RETE. Bucket size will be the total range magnitude divided by this. To disable use of RETE (and only rely on post-RETE) set this value to 0."]
+    uint32_t bucketPartitions;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time available to the client."]
+    RangeOffsetLists rangeOffsetLists;
+    
+    [tag="retr", default=5, description="During CG finalization, after rule-evaluation filtered out a matched sessions list, you pick some of those sessions to add to the finalization. It occassionally can fail (and return you to MM rule evaluation, later) due to resulting Team requirements failing on your picked MM sessions, while an alternate set of picks might have successfully finalized. This tuning parameter allows x such failed finalization attempts to retry on a different sequence of picks, before returning to evaluation/MM pool. Higher values increase match times/rates generally, but, could incur extra performance overhead."]
+    uint16_t maxFinalizationPickSequenceRetries;
+};
+
+//
+// Team Ued Position Parity Rule
+//
+
+[description="Configuration parameters of a Team UED Position Parity rule.", trackChanges = true]
+class TeamUEDPositionParityRuleConfig
+{
+    [tag="ukey", description="The name used to identify the data on the UED."]
+    UserExtendedDataName userExtendedDataName;
+
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="tcmp", description="The number of players, working down from the top-ranked player on a team, to compare for UED parity."]
+    uint16_t topPlayersToCompare;
+    
+    [tag="bcmp", description="The number of players, working down from the bottom-ranked player on a team, to compare for UED parity."]
+    uint16_t bottomPlayersToCompare;
+    
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+
+    [tag="rnge", description="The acceptable range of values for this rule."]
+    Range range;
+
+    [tag="rofl", description="The defined lists of how a range changes over time available to the client. Range offsets with two values use the first for the allowable range on the bottom players, and the 2nd for the top players."]
+    RangeOffsetLists rangeOffsetLists;
+    
+    [tag="retr", default=5, description="During CG finalization, after rule-evaluation filtered out a matched sessions list, you pick some of those sessions to add to the finalization. It occassionally can fail (and return you to MM rule evaluation, later) due to resulting Team requirements failing on your picked MM sessions, while an alternate set of picks might have successfully finalized. This tuning parameter allows x such failed finalization attempts to retry on a different sequence of picks, before returning to evaluation/MM pool. Higher values increase match times/rates generally, but, could incur extra performance overhead."]
+    uint16_t maxFinalizationPickSequenceRetries;
+};
+
+[description="Configuration parameters of a Team Composition rule.", trackChanges = true]
+class TeamCompositionRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+
+    [tag="poss", description="List of possible team compositions for this rule. Each team composition item in the configuration is a comma delimited list of its group sizes. Note this rule assumes a common team capacity for all teams in its games it can match. For each team composition, its sum of its group sizes must add up to this team capacity."]
+    PossibleValuesList possibleValues;
+    
+    [tag="fitt", description="The fit table."]
+    FitTableList fitTable;
+    
+    [tag="spft", description="The sparse fit table configuration."]
+    SparseFitTable sparseFitTable;
+    
+    [tag="fitm", description="The minimum fit thresholds for this rule."]
+    FitThresholdsMap minFitThresholdLists;
+
+    [tag="mgtc", default=25, description="During CG finalization, after rule-evaluation filtered out a matched sessions set, you pick some of those sessions to add to the finalization, which satisfy one of your game team compositions. If one of your game team compositions cannot be finalized with, MM may retry the finalization session picking process on the next one in your list of acceptable game team compositions. There can be increased internal overhead due to numerous such retries. This tuning parameter allows capping the number of such retries on different game team compositions, before returning to evaluation/MM pool. To disable such capping, set this value to 0. Higher values increase match times/rates generally, but, could incur extra performance overhead."]
+    uint16_t maxFinalizationGameTeamCompositionsAttempted;
+
+    [tag="mpos", default=false, description="This setting is used to validate your rules configuration allows all mathematically possible team compositions can be matched with by this rule. A possible team composition for a given team capacity is one for which the sum of its group sizes add up to that capacity. If true blaze server will fail startup if the rule's possibleValues list is missing any such mathematically possible team composition for the rule's team capacity (as describe in possibleValues description). Note setting this to false (the default) means any potential matches/games with an actual team composition not specified in the possibleValues list, will be not matchable via this rule."]
+    bool requireMathematicallyCompletePossibleValues;
+
+    [tag="tcnt", default=2, description="The number of teams in a potential game this rule allows matching with."]
+    uint16_t teamCount;
+};
+
+//
+// Team Balance Rule
+//
+
+[description="Configuration parameters of the TeamBalance rule.", trackChanges = true]
+class TeamBalanceRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+};
+
+//
+// Team MinSize Rule
+//
+
+[description="Configuration parameters of the Team MinSize rule.", trackChanges = true]
+class TeamMinSizeRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+};
+
+//
+// Geo Location Rule
+//
+[description="Configuration parameters of the GeoLocation rule.", trackChanges = true]
+class GeoLocationRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="rnge", description="The acceptable range of values for this rule."]
+    Range range;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+    
+    [tag="abus", default=1, description="Defines bucket size in Find Game mode only of buckets sessions and games are grouped into for both latitude and longitude."]
+    uint32_t angularBucketSizeInDegrees;
+};
+
+//
+// Game Size Rule
+//
+[description="Configuration parameters of the GameSize rule.", trackChanges = true]
+class GameSizeRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="rnge", description="The acceptable range of values for this rule."]
+    Range range;
+    
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+};
+
+
+//
+// Attribute Rules
+//
+enum AttributeRuleType
+{
+    EXPLICIT_TYPE,
+    ARBITRARY_TYPE
+};
+
+[description="configuration of a game attribute rule.", trackChanges = true]
+class GameAttributeRuleServerConfig
+{
+    [tag="rult", default=EXPLICIT_TYPE, description="Type of generic rule, explicit or arbitrary"]
+    AttributeRuleType ruleType;
+    
+    [tag="attn", description="The name of the attribute this rule checks."]
+    Collections::AttributeName attributeName;
+    
+    [tag="votm", default=OWNER_WINS, description="The voting method this rule employs."]
+    RuleVotingMethod votingMethod;
+    
+    [tag="abst", default="random", description="The default value used when abstaining from this rule."]
+    ParamValue defaultAbstainValue;
+    
+    [tag="poss", description="List of possible values for the given attribute."]
+    PossibleValuesList possibleValues;
+    
+    [tag="fitt", description="The fit table."]
+    FitTableList fitTable;
+    
+    [tag="mafp", default=1.0, description="For arbitrary rules, the fit value for a matching value."]
+    FitValue matchingFitPercent;
+    
+    [tag="mifp", default=0.0, description="For arbitrary rules, the fit value for a mismatching value."]
+    FitValue mismatchFitPercent;
+    
+    [tag="spft", description="The sparse fit table configuration."]
+    SparseFitTable sparseFitTable;
+    
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+   
+    [tag="fitm", description="The minimum fit thresholds for this rule."]
+    FitThresholdsMap minFitThresholdLists;
+};
+
+[description="configuration of a dedicated server attribute rule.", trackChanges = true]
+class DedicatedServerAttributeRuleServerConfig
+{
+    [tag="rult", default=EXPLICIT_TYPE, description="Type of generic rule, explicit or arbitrary"]
+    AttributeRuleType ruleType;
+    
+    [tag="attn", description="The name of the attribute this rule checks."]
+    Collections::AttributeName attributeName;
+    
+    [tag="poss", description="List of possible values for the given attribute."]
+    PossibleValuesList possibleValues;
+    
+    [tag="fitt", description="The fit table."]
+    FitTableList fitTable;
+    
+    [tag="spft", description="The sparse fit table configuration."]
+    SparseFitTable sparseFitTable;
+    
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="uset", description="The default value is used if not set."]
+    Collections::AttributeValue mDefaultValue;
+
+    [tag="fitv", default=1.0, description="The min fit threshold value for this rule."]
+    float mMinFitThresholdValue;
+};
+
+[description="configuration of a player attribute rule.", trackChanges = true]
+class PlayerAttributeRuleServerConfig
+{
+    [tag="rult", default=EXPLICIT_TYPE, description="Type of generic rule, explicit or arbitrary"]
+    AttributeRuleType ruleType;
+    
+    [tag="attn", description="The name of the attribute this rule checks."]
+    Collections::AttributeName attributeName;
+    
+    [tag="gfvc", default=GROUP_VALUE_FORMULA_MAX, description="The name of the formula used to calculate value of a group of users. Applies to both the group matchmaking, and the group being checked. Does not support LEADER or SUM."]
+    GroupValueFormula groupValueFormula;
+    
+    [tag="poss", description="List of possible values for the given attribute."]
+    PossibleValuesList possibleValues;
+    
+    [tag="fitt", description="The fit table."]
+    FitTableList fitTable;
+    
+    [tag="mafp", default=1.0, description="For arbitrary rules, the fit value for a matching value."]
+    FitValue matchingFitPercent;
+    
+    [tag="mifp", default=0.0, description="For arbitrary rules, the fit value for a mismatching value."]
+    FitValue mismatchFitPercent;
+    
+    [tag="spft", description="The sparse fit table configuration."]
+    SparseFitTable sparseFitTable;
+    
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+   
+    [tag="fitm", description="The minimum fit thresholds for this rule."]
+    FitThresholdsMap minFitThresholdLists;
+};
+
+//
+// Expanded Ping Site Rule
+//
+[description="Configuration for the expanded ping site rule.", trackChanges = true]
+class ExpandedPingSiteRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values - Our latency to the ping site and the min latency."]
+    FitFormulaConfig fitFormula;
+
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+
+    [tag="mlo", description="Overrides the minimum latency. Any thing equal to or below this value will be considered an exact match."]
+    uint32_t minLatencyOverride;
+};
+
+//
+// Ranked Game Rule
+//
+[description="Configuration for the ranked game rule.", trackChanges = true]
+class RankedGameRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+
+    [tag="votm", description="The voting method this rule employs."]
+    RuleVotingMethod votingMethod;
+    
+    [tag="mafp", default=1.0, description="For arbitrary generic rules, the fit value for a matching value."]
+    FitValue matchingFitPercent;
+    
+    [tag="mifp", default=0.5, description="For arbitrary generic rules, the fit value for a mismatching value."]
+    FitValue mismatchFitPercent;
+    
+    [tag="fitm", description="The minimum fit thresholds for this rule."]
+    FitThresholdsMap minFitThresholdLists;
+};
+
+//
+// Virtual Game Rule
+//
+[description="Configuration for the virtual game rule.", trackChanges = true]
+class VirtualGameRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="mafp", default=1.0, description="The fit value for a matching value."]
+    FitValue matchingFitPercent;
+    
+    [tag="mifp", default=0.5, description="The fit value for a mismatching value."]
+    FitValue mismatchFitPercent;
+    
+    [tag="fitm", description="The minimum fit thresholds for this rule."]
+    FitThresholdsMap minFitThresholdLists;
+};
+
+//
+// Host Balancing Rule
+// 
+[description="Configuration for the host balancing rule.", trackChanges = true]
+class HostBalancingRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="fitm", description="The minimum fit thresholds for this rule."]
+    FitThresholdsMap minFitThresholdLists;
+};
+
+//
+// Host Viability Rule Config
+//
+[description="Configuration for the host viability rule.", trackChanges = true]
+class HostViabilityRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="fitm", description="The minimum fit thresholds for this rule."]
+    FitThresholdsMap minFitThresholdLists;
+};
+
+//
+// Game Name Rule Config
+//
+[description="Configuration for the game name rule.", trackChanges = true]
+class GameNameRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="icas", default=true, description="if true, treat upper and lower case ascii alphabet characters in a-z, A-Z (0x41-0x5A, 0x61-0x7A) as same in terms of searches. "]
+    bool ignoreCase;
+    
+    [tag="minl", default=3, description="min allowed char length (in relevant characters) enforced on all searches"]
+    uint32_t minLength;
+    
+    [tag="relc", default="", description="allows explicitly specifying search-relevant characters from (extended) 8-bit ascii. If omitted, or empty, defaults relevant characters to a-z, A-Z, and 0-9. Non search-relevant characters are stripped from names/search strings, for matching with this rule."]
+    string(256) relevantChars;
+};
+
+//
+// Avoid Games Rule Config
+//
+[description="Configuration for the avoid Games Rule.", trackChanges = true]
+class AvoidGamesRuleConfig
+{
+    [tag="maxg", default=4, description="max game ids sessions can specify."]
+    uint32_t maxGameIdListSize;
+};
+
+//
+// Avoid Players Rule Config
+//
+[description="Configuration for the Avoid Players Rule.", trackChanges = true]
+class AvoidPlayersRuleConfig
+{
+    [tag="musd", default=500, description="specifies the cutoff number of avoid players actually used. Clients specifying more than this, only get 'maxUsedPlayers' players used."]
+    uint32_t maxPlayersUsed;
+};
+
+//
+// Preferred Players Rule Config
+//
+[description="Configuration for the Preferred Players Rule.", trackChanges = true]
+class PreferredPlayersRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+
+    [tag="musd", default=500, description="specifies the cutoff number of preferred players actually used. Clients specifying more than this, only get 'maxUsedPlayers' players used."]
+    uint32_t maxPlayersUsed;
+};
+
+//
+// Preferred Games Rule Config
+//
+[description="Configuration for the Preferred Games Rule.", trackChanges = true]
+class PreferredGamesRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+
+    [tag="musd", default=500, description="specifies the cutoff number of preferred games actually used. Clients specifying more than this, only get 'maxGamesUsed' games."]
+    uint32_t maxGamesUsed;
+};
+
+//
+// Player Count Rule Config
+//
+[description="Configuration for the Player Count Rule.", trackChanges = true]
+class PlayerCountRuleConfig
+{   
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+};
+
+//
+// Total Player Slots Rule Config
+//
+[description="Configuration for the Total Player Slots Rule.", trackChanges = true]
+class TotalPlayerSlotsRuleConfig
+{   
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+};
+
+//
+// Player Slot Utilization Rule Config
+//
+[description="Configuration for the Player Slot Utilization Rule.", trackChanges = true]
+class PlayerSlotUtilizationRuleConfig
+{
+    [tag="wght", description="The weight of the rule."]
+    Weight weight;
+    
+    [tag="fitf", description="The formula used to calculate the fit percent between two numeric values."]
+    FitFormulaConfig fitFormula;
+    
+    [tag="rofl", description="The defined lists of how a range changes over time availble to the client."]
+    RangeOffsetLists rangeOffsetLists;
+
+    [tag="dbuk", description="Number of buckets the percentage range gets divided into for rule diagnostics.", default=25]
+    uint64_t diagnosticBucketPartitions;
+};
+
+
+//
+// QoS Validation Rule
+//
+
+typedef string(32) QosCriteriaTierName;
+
+[description="Criteria tier", trackChanges = true]
+class QosCriteria
+{
+    [tag="name", description="The name of the QoS criteria tier."]
+    QosCriteriaTierName name;
+    
+    [tag="ping", description="Maximum acceptable latency at this tier."]
+    uint16_t maximumLatencyMs;
+    
+    [tag="loss", description="Maximum acceptable packet loss at this tier."]
+    float maximumPacketLoss;
+    
+    [tag="attm", description="Number of attempts before moving on to the next tier."]
+    uint16_t attemptsAtTier;
+};
+
+typedef list<QosCriteria> QosCriteriaList;
+
+[description="Qos validation criteria for a given topology.", trackChanges = true]
+class ConnectionValidationCriteria
+{
+    [tag="qosc", description="The QoS criteria for this topology."]
+    QosCriteriaList qosCriteriaList;
+    
+    [tag="test", description="The settings to test QoS criteria for this topology."]
+    QosSettings qosSettings;
+};
+
+typedef map<GameNetworkTopology, ConnectionValidationCriteria> QosValidationCriteriaMap;
+
+[description="Configuration for the Qos Validation Rule.", trackChanges = true]
+class QosValidationRuleConfig
+{
+    [tag="cont", description="If true, matchmaking will continue to process (until timeout) if a connection verification fails.", default=false]
+    bool continueMatchingAfterValidationFailure;
+    
+    [tag="maxg", default=50, description="max game or player ids sessions can specify as avoided due to Qos."]
+    uint32_t maxAvoidListSize;
+    
+    [tag="crit", description="Map of network topologies to Qos criteria. A topology not present in the map will not have QoS validation."]
+    QosValidationCriteriaMap connectionValidationCriteriaMap;
+};
+
+//
+// Matchmaking rules block of the config.
+//
+typedef map<RuleName, GameAttributeRuleServerConfig, ignorecase> GameAttributeRuleServerConfigMap;
+typedef map<RuleName, PlayerAttributeRuleServerConfig, ignorecase> PlayerAttributeRuleServerConfigMap;
+typedef map<RuleName, UEDRuleConfig, ignorecase> UEDRuleConfigMap;
+typedef map<RuleName, TeamUEDBalanceRuleConfig, ignorecase> TeamUEDBalanceRuleConfigMap;
+typedef map<RuleName, TeamUEDPositionParityRuleConfig, ignorecase> TeamUEDPositionParityRuleConfigMap;
+typedef map<RuleName, TeamCompositionRuleConfig, ignorecase> TeamCompositionRuleConfigMap;
+typedef map<RuleName, DedicatedServerAttributeRuleServerConfig, ignorecase> DedicatedServerAttributeRuleServerConfigMap;
+
+[description="Matchmaking rule configurations."]
+class MatchmakingRulesConfig
+{
+    [tag="gasr", description="GameSizeRule configuration."]
+    GameSizeRuleConfig predefined_GameSizeRule;
+
+    [tag="tbr", description="TeamBalanceRule configuration."]
+    TeamBalanceRuleConfig predefined_TeamBalanceRule;
+
+    [tag="tmsr", description="TeamMinSizeRule configuration."]
+    TeamMinSizeRuleConfig predefined_TeamMinSizeRule;
+
+    [tag="epsr", description="ExpandedPingSiteRule configuration."]
+    ExpandedPingSiteRuleConfig predefined_ExpandedPingSiteRule;
+
+    [tag="rgrc", description="RankedGameRule configuration."]
+    RankedGameRuleConfig predefined_RankedGameRule;
+    
+    [tag="vgrc", description="VirtualGameRule configuration."]
+    VirtualGameRuleConfig predefined_VirtualGameRule;
+    
+    [tag="hobr", description="HostBalancingRule configuration."]
+    HostBalancingRuleConfig predefined_HostBalancingRule;
+    
+    [tag="hovr", description="HostViabilityRule configuration."]
+    HostViabilityRuleConfig predefined_HostViabilityRule;
+    
+    [tag="geor", description="GeoLocationRule configuration."]
+    GeoLocationRuleConfig geoLocationRule;
+   
+    [tag="gnam", description="GameNameRule configuration."]
+    GameNameRuleConfig predefined_GameNameRule;
+
+    [tag="agam", description="AvoidGamesRule configuration."]
+    AvoidGamesRuleConfig predefined_AvoidGamesRule;
+  
+    [tag="aplr", description="AvoidPlayersRule configuration."]
+    AvoidPlayersRuleConfig predefined_AvoidPlayersRule;
+  
+    [tag="pplr", description="PreferredPlayersRule configuration."]
+    PreferredPlayersRuleConfig predefined_PreferredPlayersRule;
+    
+    [tag="pgr", description="PreferredGamesRule configuration."]
+    PreferredGamesRuleConfig predefined_PreferredGamesRule;
+    
+    [tag="tots", description="TotalPlayerSlotsRule configuration."]
+    TotalPlayerSlotsRuleConfig predefined_TotalPlayerSlotsRule;
+
+    [tag="plcn", description="PlayerCountRule configuration."]
+    PlayerCountRuleConfig predefined_PlayerCountRule;
+    
+    [tag="pctf", description="PlayerSlotUtilizationRule configuration."]
+    PlayerSlotUtilizationRuleConfig predefined_PlayerSlotUtilizationRule;
+  
+    [tag="garc", description="Map of game attribute rule configurations."]
+    GameAttributeRuleServerConfigMap gameAttributeRules; // genericRules
+
+    [tag="dsar", description="Map of dedicated server attribute rule configurations."]
+    DedicatedServerAttributeRuleServerConfigMap dedicatedServerAttributeRules; // genericRules
+
+    [tag="parc", description="Map of player attribute rule configurations."]
+    PlayerAttributeRuleServerConfigMap playerAttributeRules;
+    
+    [tag="uedr", description="Map of user extended data rule configurations."]
+    UEDRuleConfigMap userExtendedDataRuleMap;
+
+    [tag="tued", description="Map of team user extended data rule configurations."]
+    TeamUEDBalanceRuleConfigMap teamUEDBalanceRuleMap;
+    
+    [tag="tpar", description="Map of team position parity rule configurations."]
+    TeamUEDPositionParityRuleConfigMap teamUEDPositionParityRuleMap;
+
+    [tag="tcpn", description="Map of team composition rule configurations."]
+    TeamCompositionRuleConfigMap teamCompositionRuleMap;
+    
+    [tag="qosr", description="QosValidationRule configuration."]
+    QosValidationRuleConfig qosValidationRule;
+};
+
+//
+// Range offsets, for game sizes.
+//
+[description="A range of values defined by min and max.", trackChanges = true]
+class GameSizeRange
+{
+    [tag="rmin", default=0, description="The minimum value in the range."]
+    int64_t min;
+    
+    // Regular Range.mMax default is always 0. To avoid config validation fail messages for simple back compatibility with legacy GameSizeRule based configs, we use this non 0 default.
+    [tag="rmax", default=32, description="The maximum value in the range."]
+    int64_t max;
+};
+
+//
+// Overall matchmaking configuration.
+//
+[descritpion="Matchmaking configuration"]
+class MatchmakingServerConfig
+{
+    [tag="dip", default="50ms", description="The default matchmaking idle period", details="The default matchmaking idle period", advanced=true]
+    TimeValue idlePeriod; 
+    
+    [tag="dsnp", default="2s", description="The matchmaking status notification period in seconds.", details="This must be larger than idlePeriod, otherwise idlePeriod will be used.", advanced=true]
+    TimeValue statusNotificationPeriod;
+    
+    [tag="mxus", default=1, description="The maximum active matchmaking sessions per user session. The startMatchmaking RPC will return error when exceeded.",  details="If set to 0, there is no limit.", advanced=true]
+    uint32_t maxActiveSessionsPerUserSession;
+
+    [
+        tag="cput", default = 70, reconfigurable="yes", 
+        description="The point at which the matchmaker will attempt to shard create game sessions to additional Matchmaker slaves.", 
+        details="The threshold determines the average level of mm slave CPU utilization amongst active shards that will cause additional mm slaves to be considered for CG matchmaking (sharding splits the matchmaking session population).  Once the threshold is reached, if available, another mm slave will be considered for CG MM sessions.", advanced=true
+    ]
+    uint32_t cpuUtilizationShardingThreshold;
+    
+    [
+        tag="cpul", default = 50, reconfigurable="yes", 
+        description="The point at which the matchmaker will attempt to recoup sharded Matchmaker slaves.", 
+        details="The threshold determines the average level of mm slave CPU utilization that will cause previously created matchmaking shards to be recouped.  Once usage amongst active shards drops below this threshold, the last started slave will be removed from consideration for create game matchmaking requests.", advanced=true
+    ]
+    uint32_t cpuUtilizationRecoupShardingThreshold;
+
+    [
+        tag="rcth", default = "60s", reconfigurable="yes",
+        description="Minimum time between recoup of sharded Matchmaker slaves.",
+        details="When recouping shards, must wait for a period to allow the distribution of sessions to settle on the reduced cluster and determine the new CPU usage before making the decision to recoup another shard."
+    ]
+    TimeValue recoupShardWaitPeriod;
+
+    [
+        tag="cpuo", default = 90, reconfigurable="yes", 
+        description="The point at which the matchmaker will consider no longer sending traffic to a Matchmaker slave instance due to CPU overload.", 
+        details="When selecting shards, if a Matchmaker slave's utilization is over this threshold, and it is an outlier compared to the rest of the active pool, we will select another instance to receive new requests.", advanced=true
+    ]
+    uint32_t cpuUtilizationOverloadThreshold;
+    
+    [tag="mxss", default=50, description="The maximum new create game sessions processed per Matchmaker idle.", details="The matchmaker limits the number of new sessions it will process each time it idles; if the number of new sessions exceeds this max, we queue the new sessions (fifo) for processing next idle.", advanced=true]
+    uint32_t maxNewCreateGameSessionsPerIdle;
+    
+    [tag="dqcp", default=95, description="The CPU cap, when reached will prevent new create game sessions from being dequeued on the idle."]
+    uint32_t dequeueCreateSessionsCpuCap;
+    
+    [tag="dccc", default=32, description="DEPRECATED - The criteria complexity cap.", details="Complexity is the number of permutations of all required rule values.  For example, two required rules with two values has a complexity value of four. If a title sends up a criteria with complexity > cap, we return an err", advanced=true]
+    uint32_t criteriaComplexityCap;
+    
+    [tag="ecdg", default=true, description="Determines whether a matchmaking session should evaluate and reject un-connectable sessions during create game finalization.", details="If true, a matchmaking session will evaluate and reject un-connectable sessions during create game finalization for games to be created with the PEER_TO_PEER_FULL_MESH topology. This setting does not affect find game matchmaking behavior, nor prevent players from joining games directly. We do attempt to detect when users are behind the same firewall, and allow them to match if they have matching external IPs.", advanced=true]
+    bool evaluateConnectibilityDuringCreateGameFinalization;
+
+    [tag="gnl3", default=false, description="For internal testing. Override to allow configuring GameNameRule minLength less than default 3", advanced=true]
+    bool allowGameNameRuleMinLengthBelow3;
+
+    [tag="dsip", default="50ms", description="The slave idle period.", details="The slave idle period.", advanced=true]
+    TimeValue slaveIdlePeriod;
+
+    [tag="sppi", default=20, description="The number of sessions processed by the slave per idle.", advanced=true]
+    uint32_t slaveNumSessionProcessedPerIdle;
+
+    [tag="gpsm", default=100, description="The slave's no. of games per session request to the master.", details="This is also the number of initially sorted by fit score matches when doing find game matchmaking.", advanced=true]
+    uint32_t slaveNumGamesPerSessionRequestToMaster;
+
+    [tag="grps", default=300, description="The slave matched game references per session.", advanced=true]
+    uint32_t slaveNumMatchedGameReferencesPerSession;
+        
+    [tag="mxrg", description="specifies a common minimum Participant count, and maximum total Participant slots of games for Matchmaking and GameBrowser. Used for clamping game size related rules, match ranges, etc."]
+    GameSizeRange gameSizeRange;
+    
+    [tag="rscf", description="Configuration of the rule salience."]
+    RuleSalienceConfig ruleSalience;
+    
+    [tag="ruls", description="Configuration for each matchmaking rule."]
+    MatchmakingRulesConfig rules;
+    
+    [tag="curu", description="Custom rule configurations."]
+    CustomRuleConfigs customRules;
+
+    [tag="mprs", default="60s", description="The PlayerJoin Timeout in seconds."]
+    TimeValue playerReservationTimeout;
+
+    [tag="ecfg", description="External sessions configuration."]
+    ExternalSessionServerConfigMap externalSessions;
+    
+    [tag="ndfg", default=10, reconfigurable="yes", description="The number of match results per matchmaking session outputted at TRACE log level to the server log."]
+    uint32_t numDebugFindGameResults;
+
+    [tag="smrt", default="5s", reconfigurable="yes", description="Timeout to use for matchmaker / gamebrowser calls to multiple search slaves."]
+    TimeValue searchMultiRpcTimeout;
+
+    [tag="lcti", default="120s", reconfigurable="yes", description="For internal use only. The time allowed for matchmaking session's QoS validation stage for potential match to run, before the match will be deemed failed. Used to ensure the finalization will eventually end. Note: this value should be set to at least the gamesession.cfg's joinTimeout to avoid prematurely kicking players."]
+    TimeValue qosValidationTimeout;
+
+    [tag="exbr", default=true, reconfigurable="yes", description="Enable XblBlockPlayersRule on xbox one."]
+    bool isXblBlockPlayersRuleEnabled;
+    
+    [tag="futu", default=false, description="If true, sessions that are about to timeout will autmoatically pull in matches that could be made in the future, past the timeout value of the matchmaking session.  All matches are still bi-directional, but the pulled in session will not have yet decayed to accept the session that is about to expire."]
+    bool allowExpiredSessionFutureMatching;
+
+    [tag="pmui", default="1m", description="Defines the length of the Player Matchmaking Rate (defaults to per minute)."]
+    TimeValue playersMatchmakingMetricUpdateInterval;
+
+    [tag="pmhd", default="5m", description="Defines how long the history should be tracked for the Player Matchmaking Rate (defaults to 5 minutes).  The player matchmaking rate will be averaged over this duration."]
+    TimeValue playersMatchmakingMetricHistoryDuration;
+
+    [tag="dgne", default=false, reconfigurable="yes", description="For internal use. To enable updating Matchmaking diagnostics in metrics, set this to true."]
+    bool trackDiagnostics;
+    
+    [tag="prrt", default=true, reconfigurable="yes", description="If true, prefer/avoid player rules are implemented in Rete as a performance enhancement."]
+    bool runPlayerRulesInRete;
+};
+
+} // namespace GameManager
+} // namespace Blaze

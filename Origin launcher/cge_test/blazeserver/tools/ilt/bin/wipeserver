@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# relative path of script relative to launch location
+srcDir=$(dirname ${BASH_SOURCE[0]})
+
+set -e
+
+source $srcDir/clientdeploy.cfg
+source $srcDir/util
+
+makeSudoStr $clientuser
+
+allServerHosts=$(echo "${masterhost[@]} ${serverhost[@]} ${auxserverhost[@]}" | tr ' ' '\n' | sort -u)
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 command"
+    echo "command:  wipelogs   - clears logs on all server boxes"
+    echo "          wipecores  - clears cores on all server boxes"
+    echo "          wipedocker - clears docker image cache on all server boxes"
+    echo "          wipeall    - wipes all deployed data from all server boxes"
+    exit 1
+fi
+
+cmdStr=""
+
+case "$1" in
+wipelogs)
+    cmdStr="$sudoStr rm -rf \`echo ~$clientuser\`/arc/$runname \`echo ~$clientuser\`/$runname/log/*; echo \"Done(wipelogs): \$(hostname).\""
+    ;;
+wipecores)
+    cmdStr="$sudoStr rm -rf \`echo ~$clientuser\`/core/$runname \`echo ~$clientuser\`/$runname/*/etc/core.*; echo \"Done(wipecores): \$(hostname).\""
+    ;;
+wipedocker)
+    if [ -z "$2" ]; then
+        echo "wipedocker error - no docker image specified"
+        exit 1
+    fi
+    for img in $2 src.ent.ea.com:8443/gs/gs_docker_sandbox/$2 ;
+    do
+        cmdStr+="if [ -n \"\$(docker images -q $img)\" ]; then docker system prune -af --volumes; fi;"
+    done
+    ;;
+wipeall)
+    cmdStr="$sudoStr rm -rf \`echo ~$clientuser\`/arc/$runname \`echo ~$clientuser\`/core/$runname \`echo ~$clientuser\`/$runname; echo \"Done(wipeall): \$(hostname).\""
+    ;;
+*)
+    echo "Unknown command - $1, check usage"
+    exit 1
+esac
+
+for host in ${allServerHosts[@]}; do
+    echo "Host: ${host}"
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${host} "$cmdStr" &
+done
+
+
+wait
+
+echo "done $0"

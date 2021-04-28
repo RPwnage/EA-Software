@@ -1,0 +1,367 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+    <createtask name="PackageExclude">
+        <parameters>
+            <option name="FileSet" value="Required"/>
+            <option name="ExternalPackage"/>
+        </parameters>
+        <code>
+            <do if="@{PropertyExists('package.packageexclusions')}">
+                <!-- Exclude items specified in package.packageexclusions -->
+                <foreach item="String" in="${package.packageexclusions}" property="exclude">
+                    <choose>
+                        <do if="@{PathIsPathRooted('${exclude}')}">
+                            <fileset name="${PackageExclude.FileSet}" append="true">
+                                <excludes name="${exclude}"/>
+                            </fileset>
+                        </do>
+                        <do>
+                            <fileset name="${PackageExclude.FileSet}" append="true" basedir="${package.dir}">
+                                <excludes name="${exclude}"/>
+                            </fileset>
+                        </do>
+                    </choose>
+                </foreach>
+            </do>
+            <choose>
+                <do if="@{PropertyExists('nant.project.buildroot')}">
+                    <ExcludeDir Fileset="${PackageExclude.FileSet}" Directory="${nant.project.buildroot}" />
+                </do>
+                <do>
+                    <!-- If buildroot isn't specified, exclude config folders in package.dir-->
+                    <foreach item="String" in="${package.configs}" property="package-config-name">
+                        <do if="@{DirectoryExists('${package.dir}\${package-config-name}')}">
+                            <fileset name="${PackageExclude.FileSet}" append="true">
+                                <excludes name="${package.dir}\${package-config-name}\**"/>
+                            </fileset>
+                        </do>
+                    </foreach>
+                </do>
+            </choose>
+            <do if="@{PropertyExists('nant.project.packageroots')} and !@{StrIsEmpty(${PackageExclude.ExternalPackage})}">
+                <!--
+        Packages like Apt may have a sub-folder Contribs and list it as a package root. package-external should
+        not include Contribs.
+        -->
+                <foreach item="String" in="${nant.project.packageroots}" property="root">
+                    <do if="@{StrStartsWith(${root}, ${package.dir})}">
+                        <fileset name="${PackageExclude.FileSet}" append="true">
+                            <excludes name="${root}\**"/>
+                        </fileset>
+                    </do>
+                </foreach>
+            </do>
+        </code>
+    </createtask>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'package')}' == 'exclude'">
+        <target name="package" description="Create a package archive for distribution" allowoverride="true">
+          <!--<echo message="
+Warning: The package target is deprecated and will be removed. 
+We have replaced the package target with the &quot;eapm package&quot; command.
+If you need a Framework target to do more complicated packaging, 
+you may continue to do that but it should handle all the details of packaging and not override or rely on the eaconfig packaging targets."/>-->
+          <call target="package-default"/>
+        </target>
+    </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'sign-package')}' == 'exclude'">
+    <target name="sign-package" description="Create package signature file" allowoverride="true">
+      <property name="eaconfig.sign-only" value="true"/>
+      <call target="package-default"/>
+      <property name="eaconfig.sign-only" value="false"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'verify-signature')}' == 'exclude'">
+    <target name="verify-signature" description="Verify signatures for all master files" allowoverride="true">
+      <property name="packagefiles-fileset" value="packagefiles-overrides" local="true"/>
+
+      <do unless="@{FileSetExists('packagefiles-overrides')}">
+        <!-- Create initial fileset for the package -->
+        <fileset name="packagefiles" append="true" basedir="${package.dir}">
+          <!-- includes -->
+          <includes name='**'/>
+
+          <!-- excludes -->
+          <excludes name='**.vcproj'/>
+          <excludes name='**.vcxproj'/>
+          <excludes name='**.sln'/>
+          <excludes name='**.suo'/>
+          <excludes name='**.ncb'/>
+          <excludes name=".*/**" />
+          <!-- anything in a folder beginning with a . i.e .git/ -->
+          <excludes name=".*" />
+          <!-- anything beginning with a . i.e .gitignore -->
+          <excludes name='p4protocol.sync'/>
+        </fileset>
+
+        <property name="packagefiles-fileset" value="packagefiles" local="true"/>
+      </do>
+
+      <task name="PackageExclude" FileSet="${packagefiles-fileset}"/>
+
+      <property name="signpackage-packagefiles-fileset" value="${packagefiles-fileset}" local="true"/>
+      <property name="signpackage-packagefiles-fileset" value="sign-package-files" local="true" if="@{FileSetExists('sign-package-files')}"/>
+
+      <verify-package-signature packagefiles-filesetname="${signpackage-packagefiles-fileset}"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'package-default')}' == 'exclude'">
+        <target name="package-default" description="Default implementation of 'package' target." allowoverride="true">
+
+          <property name="packagefiles-fileset" value="packagefiles-overrides" local="true"/>
+          
+          <do unless="@{FileSetExists('packagefiles-overrides')}">
+            <!-- Create initial fileset for the package -->
+            <fileset name="packagefiles" append="true" basedir="${package.dir}">
+              <!-- includes -->
+              <includes name='**'/>
+
+              <!-- excludes -->
+              <excludes name='**.vcproj'/>
+              <excludes name='**.vcxproj'/>
+              <excludes name='**.sln'/>
+              <excludes name='**.suo'/>
+              <excludes name='**.ncb'/>
+              <excludes name=".*/**" /> <!-- anything in a folder beginning with a . i.e .git/ -->
+              <excludes name=".*" /> <!-- anything beginning with a . i.e .gitignore -->
+              <excludes name='p4protocol.sync'/>
+            </fileset>
+
+            <property name="packagefiles-fileset" value="packagefiles" local="true"/>
+          </do>
+
+          <task name="PackageExclude" FileSet="${packagefiles-fileset}"/>
+
+          <!-- Verify that package contains proper version number -->
+          <test-version-file packagename="${package.name}" targetversion="${package.targetversion}" packagedir="${package.dir}"/>
+
+          <update-manifest-compatibility/>
+
+          <property name="signpackage-packagefiles-fileset" value="${packagefiles-fileset}" local="true"/>
+          <property name="signpackage-packagefiles-fileset" value="sign-package-files" local="true" if="@{FileSetExists('sign-package-files')}"/>
+
+          <signpackage packagefiles-filesetname="${signpackage-packagefiles-fileset}"/>
+
+          <do unless="${eaconfig.sign-only??false}">
+            <!-- Create the package zip with the fileset created -->
+            <zip zipfile='${package.builddir}/${package.name}-${package.targetversion}.zip' zipentrydir='${package.name}\${package.targetversion}'>
+              <fileset basedir='${package.dir}'>
+                <includes fromfileset="${packagefiles-fileset}" />
+              </fileset>
+            </zip>
+          </do>
+
+        </target>
+    </do>
+	
+	<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+		<do unless="'@{OptionSetGetValue('config.targetoverrides', 'upload-to-packageserver')}' == 'exclude'">
+		<target name="upload-to-packageserver" description="Use EAPM to post package to web package server." allowoverride="true">
+			<echo message="Publishing ${package.name}-${package.targetversion}.zip to package server..." />
+			
+			<property name="eapm.path" value="@{PathCombine(${nant.location}, 'eapm.exe')}" />		
+			<property name="zipPath" value="@{PathCombine(${package.builddir}, '${package.name}-${package.targetversion}.zip')}" />
+			
+			<fail unless="@{FileExists('${zipPath}')}" message="Failed to find generated package zip (${zipPath}). You may need to run 'package' target first." />
+			
+			<!-- Call eapm post on the package -->
+			<exec program="${eapm.path}">
+				<args>
+					<arg value="post"/>
+					<arg value="${zipPath}"/>
+					<arg value="${eaconfig.post.account}" if="@{PropertyExists('eaconfig.post.account')}"/>
+					<arg value="-mark-old-official-as-accepted" if="${eaconfig.post.mark-old-official-as-accepted??false}"/>
+				</args>
+			</exec>
+		</target>
+		</do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'package-external')}' == 'exclude'">
+        <target name='package-external' description='Create a package archive for external distribution' depends='buildall' allowoverride="true">
+            <!-- Construct the base fileset -->
+            <fileset name="externalfiles0" append="true" basedir="${package.dir}">
+                <!-- includes -->
+                <includes name='**'/>
+
+                <!-- excludes -->
+                <excludes name='source\**'/>
+                <excludes name='**.vcproj'/>
+                <excludes name='**.vcxproj'/>
+                <excludes name='**.sln'/>
+                <excludes name='**.suo'/>
+                <excludes name='**.ncb'/>
+                <excludes name=".*/**" /> <!-- anything in a folder beginning with a . i.e .git/ -->
+                <excludes name=".*" /> <!-- anything beginning with a . i.e .gitignore -->
+                <excludes name='p4protocol.sync'/>
+            </fileset>
+            <task name="PackageExclude" FileSet="externalfiles0" ExternalPackage="true"/>
+
+            <!-- Copy it to externalfiles. Using fromfileset will inherit its includes/excludes -->
+            <foreach item="FileSet" in="externalfiles0" property="filename">
+                <fileset name="externalfiles" append="true">
+                    <includes name="${filename}"/>
+                </fileset>
+            </foreach>
+
+            <choose>
+                <do if="@{StrStartsWith(${package.builddir}, ${package.dir})}">
+                    <foreach item="String" in="${package.configs}" property="build-config-name">
+                        <!-- Add the bin directory for this config, if it exists -->
+                        <do if="@{DirectoryExists('${package.builddir}/${build-config-name}/bin')}">
+                            <fileset name="externalfiles" append="true">
+                                <includes name="${package.builddir}/${build-config-name}/bin/**" />
+                            </fileset>
+                        </do>
+                        <!-- Add the lib directory for this config, if it exists -->
+                        <do if="@{DirectoryExists('${package.builddir}/${build-config-name}/lib')}">
+                            <fileset name="externalfiles" append="true">
+                                <includes name="${package.builddir}/${build-config-name}/lib/**" />
+                            </fileset>
+                        </do>
+                    </foreach>
+                </do>
+                <do>
+                    <!--
+          Now that builddir is outside package.dir, adding them to the fileset will cause bogus
+          paths in the zip file. So copy bin/lib folders to package.dir before adding them.
+          -->
+                    <foreach item="String" in="${package.configs}" property="build-config-name">
+                        <!-- Add the bin directory for this config, if it exists -->
+                        <do if="@{DirectoryExists('${package.builddir}/${build-config-name}/bin')}">
+                            <copy todir="${package.dir}/${build-config-name}/bin">
+                                <fileset basedir="${package.builddir}/${build-config-name}/bin">
+                                    <includes name="**"/>
+                                </fileset>
+                            </copy>
+                            <fileset name="externalfiles" append="true">
+                                <includes name="${package.dir}/${build-config-name}/bin/**" />
+                            </fileset>
+                        </do>
+                        <!-- Add the lib directory for this config, if it exists -->
+                        <do if="@{DirectoryExists('${package.builddir}/${build-config-name}/lib')}">
+                            <copy todir="${package.dir}/${build-config-name}/lib">
+                                <fileset basedir="${package.builddir}/${build-config-name}/lib">
+                                    <includes name="**"/>
+                                </fileset>
+                            </copy>
+                            <fileset name="externalfiles" append="true">
+                                <includes name="${package.dir}/${build-config-name}/lib/**" />
+                            </fileset>
+                        </do>
+                    </foreach>
+                </do>
+            </choose>
+
+            <!-- Create the package zip with the fileset created -->
+            <zip zipfile='${package.builddir}/${package.name}-external-${package.targetversion}.zip' zipentrydir='${package.name}\${package.targetversion}'>
+                <fileset basedir='${package.dir}'>
+                    <includes fromfileset="externalfiles" />
+                </fileset>
+            </zip>
+            <do unless="@{StrStartsWith(${package.builddir}, ${package.dir})}">
+                <!-- Clean up copied folders -->
+                <foreach item="String" in="${package.configs}" property="build-config-name">
+                    <delete dir="${package.dir}/${build-config-name}"/>
+                </foreach>
+            </do>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'package-external-all')}' == 'exclude'">
+        <target name='package-external-all' description='Create an archive for external distribution' depends='buildall' allowoverride="true">
+            
+            <property name="zipfile" value="${package.builddir}/${package.name}-external-${package.targetversion}.zip"/>
+            <property name="defaultbuildroot" value="${package.dir}/distbuild"/>
+            
+            <!-- Construct the base fileset -->
+            <fileset name="externalfiles0" append="true" basedir="${package.dir}">
+                <!-- includes -->
+                <includes name='**'/>
+
+                <!-- excludes -->
+                <excludes name='source\**'/>
+                <excludes name='**.vcproj'/>
+                <excludes name='**.sln'/>
+                <excludes name='**.suo'/>
+                <excludes name='**.ncb'/>
+                <excludes name='${zipfile}'/>
+                <excludes name='p4protocol.sync'/>
+            </fileset>
+            <task name="PackageExclude" FileSet="externalfiles0" ExternalPackage="true"/>
+
+            <!-- Copy it to externalfiles. Using fromfileset will inherit its includes/excludes -->
+            <foreach item="FileSet" in="externalfiles0" property="filename">
+                <fileset name="externalfiles" append="true">
+                    <includes name="${filename}"/>
+                </fileset>
+            </foreach>
+
+            <!-- Copy it to externalfiles. Using fromfileset will inherit its includes/excludes -->
+            <choose>
+                <do if="@{StrStartsWith(${package.builddir}, ${package.dir})}">
+                    <foreach item="String" in="${package.configs}" property="build-config-name">
+                        <do if="@{DirectoryExists('${nant.project.buildroot}')}">
+                            <!-- Add the bin directory for this config, if it exists -->
+                            <fileset name="externalfiles" append="true">
+                                <includes name="${nant.project.buildroot}/**/${build-config-name}/bin/**" />
+                            </fileset>
+                            <!-- Add the lib directory for this config, if it exists -->
+                            <fileset name="externalfiles" append="true">
+                                <includes name="${nant.project.buildroot}/**/${build-config-name}/lib/**" />
+                            </fileset>
+                        </do>
+                    </foreach>
+                </do>
+                <do>
+                    <foreach item="String" in="${package.configs}" property="build-config-name">
+                        <do if="@{DirectoryExists('${nant.project.buildroot}')}">
+                            <mkdir dir="${defaultbuildroot}" failonerror="false"/>
+                            <copy todir="${defaultbuildroot}">
+                                <fileset basedir="${nant.project.buildroot}">
+                                    <includes name="${nant.project.buildroot}/**/${build-config-name}/bin/**"/>
+                                </fileset>
+                            </copy>
+                            <copy todir="${defaultbuildroot}">
+                                <fileset basedir="${nant.project.buildroot}">
+                                    <includes name="${nant.project.buildroot}/**/${build-config-name}/lib/**"/>
+                                </fileset>
+                            </copy>
+                            <!-- Add the bin directory for this config, if it exists -->
+                            <fileset name="externalfiles" append="true">
+                                <includes name="${defaultbuildroot}/**/${build-config-name}/bin/**" />
+                            </fileset>
+                            <!-- Add the lib directory for this config, if it exists -->
+                            <fileset name="externalfiles" append="true">
+                                <includes name="${defaultbuildroot}/**/${build-config-name}/lib/**" />
+                            </fileset>
+                        </do>
+                    </foreach>
+                </do>
+            </choose>
+
+            <!-- Create the package zip with the fileset created -->
+            <zip zipfile='${zipfile}' zipentrydir='${package.name}\${package.targetversion}'>
+                <fileset basedir='${package.dir}'>
+                    <includes fromfileset="externalfiles" />
+                    <excludes name="**/*/*.idb" />
+                </fileset>
+            </zip>
+            
+            <do unless="@{StrStartsWith(${package.builddir}, ${package.dir})}">
+                <!-- Clean up copied folders -->
+                <delete dir="${defaultbuildroot}"/>
+            </do>
+        </target>
+    </do>
+
+</project>

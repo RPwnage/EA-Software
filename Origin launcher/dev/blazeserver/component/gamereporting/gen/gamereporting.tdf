@@ -1,0 +1,150 @@
+[headername="framework/tdf/attributes.h"]
+#include "framework/gen/attributes.tdf"
+
+[headername="gamemanager/tdf/gamemanager_types.h"]
+#include "gamemanager/gen/gamemanager_types.tdf"
+
+namespace Blaze
+{
+[usePtrOption=true]
+namespace GameReporting
+{
+const uint32_t MAX_NAME_LENGTH = 64;
+    
+typedef uint32_t GameEventType;
+typedef GameManager::GameReportingId GameHistoryId;
+typedef string(MAX_NAME_LENGTH) ReportClassName;
+typedef string(48) ReportAttributeName;
+typedef string(64) EventTypeName;
+
+[description="Allows player to override its finished game state (DNF status) instead of relying on GameManager game status.  This only affects the DNF status of the submitted (i.e. not applicable to trusted reports.)"]
+enum GameReportPlayerFinishedStatus
+{
+    [description="DNF status depends on game state (if IN_GAME then DNF, if POST_GAME then Finished."]
+    GAMEREPORT_FINISHED_STATUS_DEFAULT,
+    
+    [description="Override - game report is from a player who's finished the game."]
+    GAMEREPORT_FINISHED_STATUS_FINISHED,
+
+    [description="Override - game report is from a player who has not finished the game."]
+    GAMEREPORT_FINISHED_STATUS_DNF  
+};
+
+[
+    description = "Game report container object.",
+    details = "Defines the game report type, id and the custom title-defined variable report TDF pointed to in the game type's configuration."
+]
+class GameReport
+{
+    [tag="grid", description="The unique value assigned at the beginning of the game."]
+    GameManager::GameReportingId gameReportingId;  
+    
+    [tag="gtyp", description="The game type Id specified in the create game or reset game request.  If this is an offline report, use the desired game type."]
+    GameManager::GameReportName gameReportName;
+        
+    [tag="game", description="Variable game report.  Consult report TDF documentation for more information."]
+    variable report;
+    
+    [tag="part", description="An optional participants list for use with Offline reports.  If more than one user's data is being reported in the offline report, include the users in this participants list to allow game history lookup by participant blaze id."]
+    GameManager::PlayerIdList offlineParticipantList;   
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+[
+    description = "Game report request object.",
+    details = "Used to submit either an online game report or offline game report."
+]
+class SubmitGameReportRequest
+{
+    [tag="rprt", description="GameReport as submitted to game reporting."]
+    GameReport gameReport;
+       
+    [tag = "fnsh", description = "Allows alteration of the submitter's DNF status instead of using GameManager's player status at end-game (online non-trusted only.)"]
+    GameReportPlayerFinishedStatus finishedStatus;
+    
+    [tag="prvt", description="Private data.  This data is not included in the actual game report but is transmitted from submitters to various stages in the processing pipeline for consumption."]
+    variable privateReport;    
+};
+
+typedef map<GameManager::PlayerId, GameReport> GameReportsMap;
+
+[
+    description = "Describes an event that occured during play.",
+    details = "Based on a title's requirements, a game can use events to report game data as an alternative to submitting whole game reports.  Titles should collect GameEvents into a GameEvents instance during gameplay for efficiency.  For details refer to the submitGameEvents documentation."
+]
+class GameEvent
+{
+    [tag="gmet", description="Type of this event."] GameEventType gameEventType;
+    [tag="data", description="Custom TDF containing data specific to the event type."] variable gameEventData;
+};
+
+[
+    description = "Contains a list of game events accumulated on the client.",
+    details = "Request object for the submitGameEvents RPC."
+]
+class GameEvents
+{
+    [tag="proc", description="Event processor name identifying the event processor to use."] string(32) gameEventProcessorName;
+    [tag="gmes", description="List of game events."] list<GameEvent> gameEvents;
+};
+
+[
+    description = "Contains the values of custom events.",
+    details = "If no custom eventdata tdf is specified for event type that is defined in the configuration, this will be used as the eventData tdf by default."
+]
+class GenericEvent
+{
+    [tag="evet", description="Generic event data."] 
+    Collections::AttributeMap eventMap;  
+};
+
+[
+    description = "Custom events for the report.",
+    details = "Request object for the submitEvent for custom event that is specified in the configuration."
+]
+class CustomEvent
+{
+    [tag="evtn", description="Event type name."]
+    EventTypeName mEventType;
+    
+    [tag="eved", description="Event data."]
+    variable mEventData;
+};
+
+typedef map<EventTypeName, CustomEvent, ignorecase> CustomEvents;
+
+[
+    description = "Async notification sent down when a submitted game report completes processing.",
+    details = "The notification is sent to players when game report finished processing.  Which players this is sent to depends on the game type's processing code.  In most cases this will be to all players remaining at game's end (POST_GAME.)"
+]
+class ResultNotification
+{
+    [tag="eror", description="Error in processing Game Reports or Error_OK if successful."]
+    int32_t blazeError;
+    [tag="fnl", description="True if this is the final result notification for this game."]
+    bool finalResult;
+    [tag="grid", description="The unique value assigned at the beginning of the game."]
+    GameManager::GameReportingId gameReportingId;   
+    [tag="ghid", description="The unique value assigned for game history query."]
+    GameHistoryId gameHistoryId;   
+    [tag="data", description="title specific custom data to send to the client"]
+    variable customData;
+};
+
+
+[
+    description = "Updates the metric specified if configured.",
+    details = "Fire-and-forget method that updates the configured metric value (or a no-op if metric doesn't exist.)"
+]
+class UpdateMetricRequest
+{
+    [tag="metr", description="Metric name."]
+    ReportAttributeName metricName;
+    [tag="valu", description="Metric Value."]
+    int64_t value;
+};
+
+} // namespace GameReporting
+} // namespace Blaze

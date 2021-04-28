@@ -1,0 +1,107 @@
+// Common helpers for protobuf generation
+
+group protobufbase;
+
+//
+// Explicitly checks for 'false', since ANTLR has no built in way to distinguish between that and null.
+isFalse ::= ["false":"true"]
+
+//
+// For checking if a C++ type name is a primitive. Does not include blob, TimeValue etc
+isCppPrimitive ::= [
+    "bool" : "true",
+    "char8_t" : "true",
+    "int8_t" : "true",
+    "uint8_t" : "true",
+    "int16_t" : "true",
+    "uint16_t" : "true",
+    "int32_t" : "true",
+    "uint32_t" : "true",
+    "int64_t" : "true",
+    "uint64_t" : "true",
+    "float" : "true",
+    "double" : "true"
+]
+
+//
+// Print basic list
+printTypeList(typeList) ::= <<
+<typeList; separator="::">
+>>
+
+//
+// Print generic List into a proto option's list (see protobuf docs). Auto-wrap-and-indented:
+//  listName: [ value1, value2,
+//              verylongvalue3,
+//              v4, v5, v6, .. ]
+printAsOptionStrList(listNode, listName) ::=<<
+<if(listNode)><listName>: <{[ <listNode:{<it; format="protoPrimitiveValue">}; wrap="\n ", separator=", ">}; anchor> ]<endif>
+>>
+
+//
+// Print map<string,string> into a proto option's map (see protobuf docs). Auto-indented:
+//  mapName: [ {key: 1, value: 2},
+//             {key: 3, value: 4}, ..]
+printAsOptionStrStrMap(mapNode, mapName) ::=<<
+<if(mapNode)><if(mapNode.keys)><mapName>: <{[ <mapNode.keys:{key| { key: "<key>", value: "<mapNode.(key)>" }}; separator=",\n ">}; anchor> ]<endif><endif>
+>>
+
+//
+// Print map<string,number_type> into a proto option's map (see protobuf docs). Auto-indented:
+//  mapName: [ {key: 1, value: 2},
+//             {key: 3, value: 4}, ..]
+printAsOptionStrNumMap(mapNode, mapName) ::=<<
+<if(mapNode)><if(mapNode.keys)><mapName>: <{[ <mapNode.keys:{key| { key: "<key>", value: <mapNode.(key)> }}; separator=",\n ">}; anchor> ]<endif><endif>
+>>
+
+//
+// Print map<number_type,string>, or, map<bool,string> into a proto option's map (see protobuf docs). Auto-indented:
+//  mapName: [ {key: 1, value: 2},
+//             {key: 3, value: 4}, ..]
+printAsOptionNumStrMap(mapNode, mapName) ::=<<
+<if(mapNode)><if(mapNode.keys)><mapName>: <{[ <mapNode.keys:{key| { key: <key>, value: "<mapNode.(key)>" }}; separator=",\n ">}; anchor> ]<endif><endif>
+>>
+
+//
+// *Converts* and prints a list<object> into a map<string,string> proto option. Auto-indented:
+//  listName: [ {key: 1, value: 2},
+//              {key: 3, value: 4}, ..]
+printListAsOptionStrStrMap(listNode, mapName, listItemMemberForKey, listItemMemberForValue) ::=<<
+<if(listNode)><mapName>: <{[ <listNode:{it|<if(it.(listItemMemberForKey))>{ key: "<it.(listItemMemberForKey)>", value: "<if(it.(listItemMemberForValue))><it.(listItemMemberForValue)><endif>" }<endif>}; separator=",\n ">}; anchor> ]<endif>
+>>
+
+
+//
+// Prints basic options for class's message.    NOTE: always prints at least a dummy description (following lines know to add a comma).
+//
+printBasicClassMsgOptions(node) ::= <<
+description: "<if(node.description)>: <node.description; format="stripnl"><endif>"<if(node.details)>,
+details: "<node.details; format="stripnl">"<endif><if(node.default)>,
+default: "<node.default>"<endif><if(node.trackChanges)>,
+track_changes: <node.trackChanges><endif><if(node.tdfregistration)>,
+tdfregistration: "<node.tdfregistration>"<endif><if(node.advanced)>,
+advanced: <node.advanced><endif><if(node.allowref)>,
+allowref: <node.allowref><endif><if(node.nameoverride)>,
+nameoverride: "<node.nameoverride>"<endif><if(node.printFormat)>,
+print_format: "<node.printFormat>"<endif><if(node.tdfid)>,
+tdfid: "<node.tdfid>"<endif><if(node.tag)>,
+tag: "<node.tag>" /*eatdf*/<endif><if(node.reconfigurable)>,
+reconfigurable: "<node.reconfigurable>"<endif><if(node.allocInPlace)>,
+alloc_in_place: <node.allocInPlace><endif><if(isFalse.(node.ownsmem))>,
+ownsmem: <node.ownsmem><endif>
+>>
+
+//
+// Prints basic options for class member's message.    NOTE: always prints at least a dummy description (following lines know to add a comma).
+printBasicClassMemberMsgOptions(member) ::= <<
+<printBasicClassMsgOptions(node=member)><if(member.TypeRef)><if(member.TypeRef.Symbol)><if(member.TypeRef.Symbol.FullName)><if(!isCppPrimitive.(member.TypeRef.Symbol.FullName))>,
+type_alias: "<member.TypeRef.Symbol.FullName>"<endif><endif><if(member.TypeRef.Symbol.ActualCategoryString)><if(member.TypeRef.ActualScopedAttributes)><if(member.TypeRef.ActualScopedAttributes.SizeConstant)>,
+string_value_max_len: "<printTypeList(member.TypeRef.ActualScopedAttributes.SizeConstant)>"<endif><endif><endif>
+<endif><endif>
+>>
+
+// Print file import attributes
+printImportsFileOptions(fileNode) ::=<<
+<if(fileNode.Includes)>imports: <{[ <fileNode.Includes:{it|<if(it.includeproto)><if(it.headername)>{ key: "<printInclude(it); format="escapeQuotes">",   value: { headername: "<if(it.headername)><it.headername; format="escapeQuotes"><endif>"<if(isFalse.(it.client_include))>, client_include: false<endif> } }<endif><endif>}; separator=",\n ">}; anchor>
+]<endif>
+>>

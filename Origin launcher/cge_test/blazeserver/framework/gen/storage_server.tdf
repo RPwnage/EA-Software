@@ -1,0 +1,139 @@
+
+[headername="framework/tdf/slivermanagertypes_server.h"]
+#include "framework/gen/slivermanagertypes_server.tdf"
+
+namespace Blaze
+{
+
+[description = "Configuration for storage"]
+class StorageConfig
+{
+    [tag="ucoi", reconfigurable="yes", description="Record updates that occur within this interval will be coalesced. Zero disables coalescing.", default="250ms"]
+    TimeValue updateCoalesceInterval;
+};
+
+[description = "Storage record version is currently a TDF due to a simplifying restriction that all fields in a record must be TDFs."]
+class StorageRecordVersionTdf
+{
+    [tag="vers"]
+    uint64_t version;
+};
+
+[description = "Request used to register a storage listener to receive record updates for a sliver owned by the storage table hosted on a remote Blaze instance"]
+class SyncStorageSliverRequest
+{
+    typedef list<string(64)> FieldPrefixList;
+    typedef list<uint64_t> RecordIdList;
+    typedef list<uint64_t> RecordVersionList;
+
+    [tag="inst", description=""]
+    uint16_t instanceId;
+
+    [tag="nspc", description=""]
+    SliverNamespace sliverNamespace;
+
+    [tag="plst", description="Field prefixes used to determine which instances are affected by the field changes. All public fields are always replicated."]
+    FieldPrefixList fieldPrefixes;
+
+    [tag="slid", description="Sliver id this instance wants to receive record updates for."]
+    SliverId sliverId;
+
+    [tag="ilst", description="Record ids already synced to this instance."]
+    RecordIdList haveRecordIds;
+
+    [tag="vlst", description="Record versions already synced to this instance."]
+    RecordVersionList haveRecordVersions;
+};
+
+[description = "Request used to deregister a storage listener stop receiving record updates for a sliver owned by the storage table hosted on a remote Blaze instance"]
+class UnsyncStorageSliverRequest
+{
+    [tag="inst", description=""]
+    uint16_t instanceId;
+
+    [tag="nspc", description=""]
+    SliverNamespace sliverNamespace;
+
+    [tag="slid", description="Sliver id this instance wants to receive record updates for."]
+    SliverId sliverId;
+};
+
+[description = "Storage record updated notification"]
+class StorageRecordUpdate
+{
+    [description = "Storage field entry"]
+    class FieldEntry
+    {
+        [tag="fnam", description=""]
+        string(64) fieldName;
+
+        [tag="fval", description="Uses blob for transmission to avoid double encoding data for storage and replication"]
+        blob fieldValue;
+    };
+
+    [tag="nspc", description=""]
+    SliverNamespace sliverNamespace;
+
+    [tag="reid", description=""]
+    uint64_t recordId;
+
+    [tag="revn", description=""]
+    uint64_t recordVersion;
+
+    [tag="flst", description=""]
+    list<FieldEntry> fields;
+};
+
+[description = "Storage record erased notification"]
+class StorageRecordErase
+{
+    [tag="nspc", description=""]
+    SliverNamespace sliverNamespace;
+
+    [tag="reid", description=""]
+    uint64_t recordId;
+};
+
+[description = "Storage table metrics"]
+class StorageTableMetrics
+{
+    typedef map<string(128), uint64_t> CountByContextMap;
+
+    [tag="nspc", description=""]
+    SliverNamespaceStr sliverNamespaceStr;
+
+    [tag="tfch", description="Cumulative number of field changes(upserts) issued locally for this table"]
+    uint64_t totalFieldChanges;
+
+    [tag="tfup", description="Cumulative number of actual field updates processed locally for this table"]
+    uint64_t totalFieldUpdates;
+
+    [tag="tfig", description="Cumulative number of duplicate field updates ignored locally for this table"]
+    uint64_t totalFieldIgnores;
+
+    [tag="fich", description="Cumulative number of field changes(upserts) issued locally for this table by fiber"]
+    CountByContextMap changesByFiber;
+
+    [tag="flch", description="Cumulative number of field changes(upserts) issued locally for this field"]
+    CountByContextMap changesByField;
+
+    [tag="flup", description="Cumulative number of actual field updates processed locally for this field"]
+    CountByContextMap updatesByField;
+
+    [tag="flig", description="Cumulative number of duplicate field updates ignored locally for this field"]
+    CountByContextMap ignoresByField;
+};
+
+typedef list<StorageTableMetrics> StorageTableMetricsList;
+
+[description = "Storage metrics"]
+class GetStorageMetricsResponse
+{
+    [tag="tmet", description=""]
+    StorageTableMetricsList tableMetrics;
+};
+
+} // Blaze
+
+
+

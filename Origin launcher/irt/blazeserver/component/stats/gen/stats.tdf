@@ -1,0 +1,613 @@
+[headername="framework/tdf/entity.h"]
+#include "framework/gen/entity.tdf"
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+namespace Blaze
+{
+namespace Stats
+{
+const uint32_t STATS_LEADERBOARD_NAME_LENGTH = 64;
+const uint32_t STATS_ENTITY_NAME_LENGTH = 64;
+const uint32_t STATS_GROUP_NAME_LENGTH = 64;
+const uint32_t STATS_CATEGORY_NAME_LENGTH = 64;
+const uint32_t STATS_STAT_NAME_LENGTH = 64;
+const uint32_t STATS_STATVALUE_LENGTH = 1024;
+const uint32_t STATS_LONG_DESC_LENGTH = 256;
+const uint32_t STATS_SHORT_DESC_LENGTH = 128;
+const uint32_t STATS_FORMAT_LENGTH = 32;
+const uint32_t STATS_KIND_LENGTH = 8;
+const uint32_t STATS_METADATA_LENGTH = 128;
+const uint32_t STATS_SCOPESTRING_LENGTH = 1024;
+
+// A qualified name is CategoryName::StatName, but TDF does not support addition,
+// so we manually add 64 + 2 + 64 to get 130
+const uint32_t STATS_QUALIFIED_STAT_NAME_LENGTH = 130;
+
+const char8_t* SCOPE_NAME_NONE = "No_Scope_Defined";
+const char8_t* SCOPE_UNIT_SEPARATOR = ";";
+const char8_t* SCOPE_NAME_VALUE_SEPARATOR = "=";
+
+[ description = "Period type constants. Configuration file uses bitmask equivalent to combine several period types."]
+enum StatPeriodType
+{
+    STAT_PERIOD_ALL_TIME = 0, //0x01 - corresponding value in the stats.cfg
+    STAT_PERIOD_MONTHLY = 1,  //0x02
+    STAT_PERIOD_WEEKLY = 2,   //0x04
+    STAT_PERIOD_DAILY = 3,    //0x08
+    STAT_NUM_PERIODS = 4      //0x10
+};
+
+/// @todo use StatPeriodType instead of int32_t
+typedef list<int32_t> PeriodTypeList;
+
+[ description="Category type" ]
+enum CategoryType
+{
+  CATEGORY_TYPE_REGULAR = 0,
+  CATEGORY_TYPE_GLOBAL
+};
+
+typedef int32_t UserStatId;
+
+[description = "A key scope name in the stats config."]
+typedef string(STATS_STAT_NAME_LENGTH) ScopeName;
+
+[description = "A key scope value in the stats config."]
+typedef int64_t ScopeValue;
+
+[description="The scope name/value pair object."]
+typedef map<ScopeName, ScopeValue, ignorecase> ScopeNameValueMap;
+
+[description = "A map of key scope start values to end values--as per keyscope definitions in the stats config."]
+typedef map<ScopeValue, ScopeValue> ScopeStartEndValuesMap;
+
+/// @todo if/when supported, should inline ScopeStartEndValuesMap in ScopeNameValueListMap instead...
+class ScopeValues
+{
+    [tag="ksvl", description="List of scope values--arranged in a start to end value map."] ScopeStartEndValuesMap mKeyScopeValues;
+};
+typedef map<ScopeName, ScopeValues, ignorecase> ScopeNameValueListMap;
+
+const ScopeValue KEY_SCOPE_VALUE_ALL = -1;
+const ScopeValue KEY_SCOPE_VALUE_USER = -2;
+const ScopeValue KEY_SCOPE_VALUE_AGGREGATE = -3; /// @todo may not be needed
+const ScopeValue KEY_SCOPE_VALUE_MULTI = -4;
+
+[description = "All information contained for a keyscope item(specified by key scope name) in the config."]
+class KeyScopeItem
+{
+    [tag="ksvl", description="Key scope values arranged in a start to end value map.  An empty map means all values (except aggregate key value, if used)."] ScopeStartEndValuesMap mKeyScopeValues;
+    [tag="enag", description="Enable aggregation.  Specifying an aggregate key value in the config enables aggregration."] bool mEnableAggregation;
+    [tag="agky", description="If aggregation enabled, the key value to use.  Otherwise, ignored."] ScopeValue mAggregateKeyValue;
+};
+
+[description="The scope name/object map used for retrieve all keyscopes defined in the config."]
+typedef map<ScopeName, KeyScopeItem, ignorecase> KeyScopesMap;
+class KeyScopes
+{
+    [tag="ksit", description="type of Key scope item.", allowref=true] KeyScopesMap mKeyScopesMap;
+};
+
+[ description = "Stat name." ]
+typedef string(STATS_STAT_NAME_LENGTH) StatName;
+
+[ description = "String representation of a stat value." ]
+typedef string(STATS_STATVALUE_LENGTH) StatValue;
+
+[
+    description = "Contains the name and properties for a stat category."
+]
+class StatCategorySummary
+{
+    [tag="name", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mName;
+    [tag="desc", description="Category desc."] string(STATS_LONG_DESC_LENGTH) mDesc;
+    [tag="ctyp", description="Category type"] CategoryType mCategoryType;
+    [tag="etyp", description="Entity type for the category."] ObjectType mEntityType;
+    [tag="ptyp", description="List of period types for the category."] list<StatPeriodType> mPeriodTypes;
+    [tag="keys", description="List of keyscopes for the category."] list<ScopeName> mKeyScopes;
+};
+
+[
+    description = "The list of stat categories returned following a getStatCategoryList request."
+]
+class StatCategoryList
+{
+    [tag="cats", description="List of stat categories."] list<StatCategorySummary> mCategories;
+};
+
+[
+    description = "Contains the name and description for a StatGroup.",
+    details = "Data structure to hold name and description of the group. 
+    It is used as an entry to the list of available groups."
+]
+class StatGroupSummary
+{
+    [tag="name", description="Group name."] string(STATS_GROUP_NAME_LENGTH) mName;
+    [tag="desc", description="Group description."] string(STATS_LONG_DESC_LENGTH) mDesc;
+    [tag="meta", description="Metadata."] string(STATS_METADATA_LENGTH) mMetadata;
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+
+[
+    description = "Describes an individual stat.",
+    details = "For StatGroups this represents the name of a stat.  
+    This may be one of an array of descriptions that map one-to-one with StatValues for an entity (i.e. in EntityStats)"
+]
+class StatDescSummary
+{
+    [tag="name", description="Stat name."] StatName mName;
+    [tag="sdsc", description="Stat description."] string(STATS_SHORT_DESC_LENGTH) mShortDesc;
+    [tag="ldsc", description="Detailed description of stat."] string(STATS_LONG_DESC_LENGTH) mLongDesc;
+    [tag="type", description="Type of stat"] int32_t mType;
+    [tag="dflt", description="Default value of stat"] StatValue mDefaultValue;
+    [tag="frmt", description="Formatting string in printf syntax"] string(STATS_FORMAT_LENGTH) mFormat;
+    [tag="kind", description="Hint to localize type on client"] string(STATS_KIND_LENGTH) mKind;
+    [tag="meta", description="Metadata"] string(STATS_METADATA_LENGTH) mMetadata;
+    [tag="catg", description="Category"] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="drvd", description="True if the stat is a derived one."] bool mDerived;
+};
+
+[
+    description = "A set of stat values retrieved for a given entity.",
+    details = "Holds a list of stats for the given entity ID in the order as stats were requested."
+]
+class EntityStats
+{
+    [tag="eid",  description="Entity ID."] EntityId mEntityId;
+    [tag="etyp", description="Entity Type."] ObjectType mEntityType;
+    [tag="poff", description="Period offset."] int32_t mPeriodOffset;
+    [tag="stat", description="List of stat values."] list<StatValue> mStatValues;
+};
+
+[
+    description = "Request parameters for retrieving stat values if not using a StatGroup."
+]
+class GetStatsRequest
+{
+    [tag="cat", description="Category name for the requested set of stats."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="etyp", description="Entity type for the requested set of stats."] ObjectType mEntityType;
+    [tag="ptyp", description="Period type for the requested set of stats."] int32_t mPeriodType;
+    [tag="prid", default =0, description="Absolute period id to use in the request.  If unspecified (i.e. 0) the period offset field is used.  Default is unspecified."]   int32_t mPeriodId;
+    [tag="poff", description="0 for current, or positive number of periods ago."] int32_t mPeriodOffset;
+    [tag="eid", description="List of entity IDs."] list<EntityId>  mEntityIds;
+    [tag="name", description="Lists names of requested stats."] list<StatName> mStatNames;
+    [tag="ksls", description="List of key scope name and value for the stats would like to retrieve."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+
+[
+    description = "Stat values for a list of entities retrieved from the server.",
+    details = "Holds a set of stats with columns defined by the stat names and rows defined by the entity IDs."
+]
+class StatValues
+{
+    [tag="stat", description="List of stat rows."] list<EntityStats> mEntityStatsList;
+};
+
+[description = "A common string type used by stats scope."]
+typedef string(STATS_SCOPESTRING_LENGTH) ScopeString;
+[ description = "StatValues map by string combination of [key scope name/key scope value]."]
+typedef map <ScopeString, StatValues, ignorecase> KeyScopeStatsValueMap;
+[
+    description = "The response of GetStatsRequest or getStatsByGroup."
+]
+class GetStatsResponse
+{
+    [tag="kssv", description="A map of keyscope value combination and stats value."] KeyScopeStatsValueMap mKeyScopeStatsValueMap;
+};
+
+[
+    description = "The list of StatGroups returned following a GetStatGroupListRequest."
+]
+class StatGroupList
+{
+    [tag="grps", description="List of stat groups."] list<StatGroupSummary> mGroups;
+};
+
+[
+    description = "Object used to request details about a StatGroup given the StatGroup name."
+]
+class GetStatGroupRequest
+{
+    [tag="name", description="Name of stat group."] string(STATS_GROUP_NAME_LENGTH) mName;
+};
+
+[
+    description = "Container for details about a StatGroup.",
+    details = "Identifies a StatGroup as presenting stats for a specific type of entity.  Supplies a list of stats used in the group."
+]
+class StatGroupResponse
+{
+    [tag="name", description="Group name."] string(STATS_GROUP_NAME_LENGTH) mName;
+    [tag="desc", description="Group description."] string(STATS_LONG_DESC_LENGTH) mDesc;
+    [tag="cnam", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategoryName;    
+    [tag="etyp", description="Entity type."] ObjectType mEntityType;
+    [tag="meta", description="Metadata."] string(STATS_METADATA_LENGTH) mMetadata;
+    [tag="stat", description="List of stat descriptions."] list<StatDescSummary> mStatDescs;
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+
+[
+    description = "Request stat descriptions for a list of stat names."
+]
+class GetStatDescsRequest
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="stat", description="List of stat names."] list <StatName> mStatNames;
+};
+
+[
+    description = "Container to store the result of a GetStatDescsRequest."
+]
+class StatDescs
+{
+    [tag="etyp", description="Entity type."] ObjectType mEntityType;
+    [tag="stat", description="List of descriptions."] list<StatDescSummary> mStatDescs;
+};
+
+[
+    description = "Request stat values based on the stats configured for a particular StatGroup."
+]
+class GetStatsByGroupRequest
+{
+    [tag="name", description="Group name."] string(STATS_GROUP_NAME_LENGTH) mGroupName;
+    [tag="eid", description="List of entity IDs."] list<EntityId> mEntityIds;
+    [tag="ptyp", description="Period type."] int32_t mPeriodType;
+    [tag="prid", default =0, description="Absolute period id to use in the request. If unspecified (i.e. 0) the time field is used. Default is unspecified."]   int32_t mPeriodId;    
+    [tag="poff", description="0 for current, or positive number of periods ago."] int32_t mPeriodOffset;
+    [tag="pctr", default=1, description="Period counter: number of periods to return. Default is 1."] int32_t mPeriodCtr;
+    [tag="ksum", description="Key scope name/value pairs  retrieved from StatGroupSummary, client needs to specify the value for the scope if the value retrieved is question mark."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="vid", description="ID of view: just loops through the server and used by client side to link original request with a set of response notifications."] uint32_t mViewId;
+    [tag="time", description="Timestamp used to determine period id. If unspecified (i.e. 0) the period offset field is used."] int32_t mTime;
+};
+
+[
+    description = "Describes a set of stats for GetDateRange() request."
+]
+class GetDateRangeRequest
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="ptyp", description="Period type."] int32_t mPeriodType;
+    [tag="prid", default =0, description="Absolute period id to use in the request.  If unspecified (i.e. 0) the period offset field is used.  Default is unspecified."]   int32_t mPeriodId;
+    [tag="poff", description="0 for current, or positive number of periods ago."] int32_t mPeriodOffset;
+};
+
+[
+    description = "Encapsulates date range."
+]
+class DateRange
+{
+    [tag="strt", description="Start date."] uint32_t mStart;
+    [tag="end", description="End date."] uint32_t mEnd;
+};
+
+[
+    description = "Identifies a set of stats to get cont for."
+]
+class GetEntityCountRequest
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="ptyp", description="Period type."] int32_t mPeriodType;
+    [tag="prid", default =0, description="Absolute period id to use in the request.  If unspecified (i.e. 0) the period offset field is used.  Default is unspecified."]   int32_t mPeriodId;
+    [tag="poff", description="0 for current, or positive number of periods ago."] int32_t mPeriodOffset;
+    [tag="ksum", description="Map of key scope name to value for the stats to be counted."] ScopeNameValueMap mKeyScopeNameValueMap;
+
+};
+
+[
+    description = "Object encapsulating an entity count."
+]
+class EntityCount
+{
+    [tag="cnt", description="Number of entities."] int32_t mCount;
+};
+
+[
+    description = "Update for a single stat.",
+    details = "Stat name, value, and type of update indecator. Entry into StatRowUpdate."
+]
+class StatUpdate
+{
+    [tag="name", description="Stat name."] StatName mName;
+    [tag="valu", description="Stat value."] StatValue mValue;
+    [tag="type", description="Type of update (assign, increment, etc.)."] int32_t mUpdateType;
+};
+
+[
+    description = "Holds row of stats and identifying information.",
+    details = "At present only updates of the current period are allowed, hence no period id or offset."
+]
+class StatRowUpdate
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="eid", description="Entity ID."] EntityId mEntityId;
+    [tag="updt", description="List of stats."] list<StatUpdate> mUpdates;
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="ptyp", description="List of period types (FOR ADMIN USE ONLY)."] PeriodTypeList mPeriodTypes;
+};
+
+[
+    description = "Update for a set of stats."
+]
+class UpdateStatsRequest
+{
+    [tag="updt"] list<StatRowUpdate> mStatUpdates;
+};
+
+class WipeStatsRequest
+{
+    enum WipeStatsOperation
+    {
+        WIPE_STATS_OPERATION_INVALID = 0,
+        DELETE_BY_CATEGORY_KEYSCOPE_USERSET = 1,
+        DELETE_BY_CATEGORY_KEYSCOPE_ENTITYID = 2,
+        DELETE_BY_KEYSCOPE_USERSET = 3,
+        DELETE_BY_KEYSCOPE_ENTITYID = 4,
+        DELETE_BY_ENTITYID = 5,
+        DELETE_BY_CATEGORY = 6,
+        DELETE_BY_CATEGORY_ENTITYID = 7,
+        DELETE_BY_CATEGORY_KEYSCOPE = 8
+    };
+
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategoryName;
+    [tag="eid", description="Entity id (for category-specific operations)"] EntityId mEntityId;
+    [tag="etyp", description="Entity Object Id."] ObjectId mEntityObjectId;
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="oper", description="Operation code defining which stats to wipe.", default=DELETE_BY_CATEGORY_KEYSCOPE_ENTITYID] WipeStatsOperation mOperation;
+};
+
+// ----------- Leaderboards ------------------
+
+[
+    description = "Request for a leaderboard's details."
+]
+class LeaderboardGroupRequest
+{
+    [tag="name", description = "Name of leaderboard."] string(STATS_LEADERBOARD_NAME_LENGTH) mBoardName;
+    [tag="lbid", description = "Identifies the leaderboard."] int32_t mBoardId;
+};
+
+typedef list<StatDescSummary> StatDescSummaryList;
+
+[
+    description = "Contains information about how to present the Leaderboard."
+]
+class LeaderboardGroupResponse
+{
+
+    [tag="etyp", description="Entity type."] ObjectType mEntityType;
+    [tag="snam", description="Name of ranking stat."] StatName mStatName;
+    [tag="name", description="Leaderboard group."] string(STATS_GROUP_NAME_LENGTH) mName;
+    [tag="bnam", description="Leaderboard name."] string(STATS_LEADERBOARD_NAME_LENGTH) mBoardName;
+    [tag="desc", description="Leaderboard description."] string(STATS_LONG_DESC_LENGTH) mDesc;
+    [tag="meta", description="Metadata."] string(STATS_METADATA_LENGTH) mMetadata;
+    [tag="list", description="List of stat descriptions."] StatDescSummaryList mStatDescSummaries;
+    [tag="ksum", description="Key scope name/values (value list) pairs for the group defined in the stats config."] ScopeNameValueListMap mKeyScopeNameValueListMap;
+    [tag="lbsz", description="Maximum configured size of leaderboard."] int32_t mLeaderboardSize;
+    [tag="ascd", description="Whether this leaderboard is ascending or not."] bool mAscending;
+};
+
+[
+    description = "Leaderboard folder entry."
+]
+class FolderDescriptor
+{
+    [description="If this bit is set in mFolderId, this is leaderboard descriptor."]
+    const uint32_t IS_LEADERBOARD = 0x040000000;
+
+    [tag="flid", description="Uniquely identifies the folder or leaderboard."] uint32_t mFolderId;
+    [tag="flnm", description="Folder or leaderboard name."] string(STATS_LEADERBOARD_NAME_LENGTH) mName;
+    [tag="flds", description="Folder or leaderboard description."] string(STATS_LONG_DESC_LENGTH) mDescription;
+    [tag="sdes", description = "Folder or Leaderboard short description."] string(STATS_SHORT_DESC_LENGTH) mShortDesc;
+};
+
+[
+    description = "Represents a leaderboard folder.",
+    details = "Leaderboard folder contains subfolders or/and leaderboards"
+]
+class LeaderboardFolderGroup
+{
+    [description="ID of top folder."]
+    const uint32_t TOP_FOLDER = 0x0;
+
+    [tag="prid", description="Uniquely identifies the folder's parent."] uint32_t mParentId;
+    [tag="owid", description="Uniquely identifies this folder."] uint32_t mFolderId;
+    [tag="ownm", description="Folder or leaderboard name."] string(STATS_LEADERBOARD_NAME_LENGTH) mName;
+    [tag="owds", description="Folder or leaderboard description."] string(STATS_LONG_DESC_LENGTH) mDescription;
+    [tag="sdes", description = "Folder short description."] string(STATS_SHORT_DESC_LENGTH) mShortDesc;
+    [tag="meta", description="Metadata."] string(STATS_METADATA_LENGTH) mMetadata;
+    [tag="flds", description="Leaderboard folder."] list<FolderDescriptor> mFolderDescriptors;
+};
+
+[
+    description = "Identifies the folder to fetch."
+]
+class LeaderboardFolderGroupRequest
+{
+    [description="Invalid FolderId constant."] 
+    const uint32_t INVALID_FOLDER = UINT32_MAX;
+    
+    [tag="name", description = "Name of leaderboard folder if FolderId is invalid."] string(STATS_LEADERBOARD_NAME_LENGTH) mFolderName;
+    [tag="flid", description="Uniquely identifies the folder if FolderName not specified."] uint32_t mFolderId;
+};
+
+[
+    description = "Request all stat values for a Leaderboard within a given rank range."
+]
+class LeaderboardStatsRequest
+{
+    [tag="name", description ="Name of leaderboard."] string(STATS_LEADERBOARD_NAME_LENGTH) mBoardName;
+    [tag="lbid", description="Leaderboard ID."] int32_t mBoardId;
+    [tag="prid", default =0, description="Absolute period id to use in the request. If unspecified (i.e. 0) the time field is used. Default is unspecified."]   int32_t mPeriodId;
+    [tag="poff", description="0 for current, or positive number of periods ago."] int32_t mPeriodOffset;
+    [tag="strt", description="Stat rank to start with."] int32_t mRankStart;
+    [tag="coun", description="Number of stats to display."] int32_t mCount;
+    [tag="ksum", description="Key scope name/value pairs for user defined scopes defined a question mark in leaderboard."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="time", description="Timestamp used to determine period id. If unspecified (i.e. 0) the period offset field is used."] int32_t mTime;
+    [tag="uset", description="ObjectId of user set to filter LB. If equal to OBJECT_ID_INVALID, no filtering is done "] ObjectId mUserSetId;
+};
+
+union StatRawValue
+{
+    [tag="flot"] float floatValue;
+    [tag="int"] int64_t intValue;
+    [tag="str"] string(STATS_STATVALUE_LENGTH) stringValue;
+};
+
+[
+    description = "Stat data for a leaderboard row."
+]
+class LeaderboardStatValuesRow
+{
+    [tag="rank", description="Row rank."] int32_t mRank;
+    // FIFA SPECIFIC CODE START
+    [tag="enid", description="Entity ID."] EntityId mEntityId;
+    [tag="enam", description="Entity name."] string(STATS_ENTITY_NAME_LENGTH) mEntityName;
+    // FIFA SPECIFIC CODE END
+    [tag="uatt", description="Entity's custom attribute."] UserInfoAttribute mAttribute;
+    [tag="rsta", description = "Value of the ranked stat used to determine leaderboard row order."] StatValue mRankedStat;
+    [tag="stat", description = "Values of the other stats on the leaderboard.  Values map 1-to-1 with the column stat names."] list<StatValue> mOtherStats;
+    [tag="rwfg", default=false, description = "The flag of use raw stats."] bool mIsRawStats;
+    [tag="rwst", description = "Value of the ranked raw stat used to determine leaderboard row order."] StatRawValue mRankedRawStat;
+    [tag="rwot", description = "Values of the other raw stats on the leaderboard.  Values map 1-to-1 with the column stat names."] list<StatRawValue> mOtherRawStats;
+    [tag="user", description="The core user info.  Applicable if entity ID is a user type."] CoreIdentification mUser; 
+};
+
+[
+   description = "A list of leaderboard rows."
+]
+class LeaderboardStatValues
+{
+    typedef list<LeaderboardStatValuesRow> RowList;
+    [tag="ldls", description = "Returned stat rows based on the query."] RowList mRows; // mLeaderboardList;
+};
+
+[
+    description = "CenteredLeaderboardRequest object."
+]
+class CenteredLeaderboardStatsRequest 
+{
+    [tag="name", description = "Name of leaderboard."] string(STATS_LEADERBOARD_NAME_LENGTH) mBoardName;
+    [tag="lbid", description="Leaderboard ID."] int32_t mBoardId;
+    [tag="prid", default =0, description="Absolute period id to use in the request. If unspecified (i.e. 0) the time field is used. Default is unspecified."]   int32_t mPeriodId;
+    [tag="poff", description="0 for current, or positive number of periods ago."] int32_t mPeriodOffset;
+    [tag="cent", description="Entity ID of central entity."] EntityId mCenter;
+    [tag="coun", description="Number of stat rows requested."] int32_t mCount;
+    [tag="ksum", description="Key scope name/value pairs for user defined scopes defined a question mark in leaderboard."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="time", description="Timestamp used to determine period id. If unspecified (i.e. 0) the period offset field is used."] int32_t mTime;
+    [tag="uset", description="ObjectId of user set to filter LB. If equal to OBJECT_ID_INVALID, no filtering is done "] ObjectId mUserSetId;
+    [tag="bott", default=false, description="If centered entity is unranked, indicates whether to fetch entity at bottom or return no rows"] bool mShowAtBottomIfNotFound;
+};
+
+[
+    description = "FilteredLeaderboardRequest object."
+]
+class FilteredLeaderboardStatsRequest
+{
+    [tag="name", description = "Name of leaderboard."] string(STATS_LEADERBOARD_NAME_LENGTH) mBoardName;
+    [tag="lbid", description="Leaderboard ID."] int32_t mBoardId;
+    [tag="prid", default =0, description="Absolute period id to use in the request. If unspecified (i.e. 0) the time field is used. Default is unspecified."]   int32_t mPeriodId;
+    [tag="poff", description="0 for current, or positive number of periods ago."] int32_t mPeriodOffset;
+    [tag="idls", description="List of requested entity IDs."] list<EntityId> mListOfIds;
+    [tag="ksum", description="Key scope name/value pairs for user defined scopes defined a question mark in leaderboard."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="time", description="Timestamp used to determine period id. If unspecified (i.e. 0) the period offset field is used."] int32_t mTime;
+    [tag="uset", description="ObjectId of user set."] ObjectId mUserSetId;
+    [tag="filt", description="Include or exclude entities that do no have any stats", default=true] bool mIncludeStatlessEntities;
+    [tag="limt", description="Maximum count of results to return.", default=UINT32_MAX] uint32_t mLimit;
+    [tag="cofv", description="Whether to include entities that do not meet the cutoff value. Enforcing (true) will exclude entities. Default is false.", default=false] bool mEnforceCutoffStatValue;
+};
+
+[
+    description = "data structure used to send stats asynchronously."
+]
+class KeyScopedStatValues
+{
+    [tag="vid", description="ID of view the stats are requested for."] uint32_t mViewId;
+    [tag="grnm", description="Group name."] string(STATS_GROUP_NAME_LENGTH) mGroupName;
+    [tag="key", description = "keyScope string"] ScopeString mKeyString;
+    [tag="last", description = "Flag indicating last package."] bool mLast;
+    [tag="sts", description = "stats for the given entity and keyScope"] StatValues mStatValues;
+};
+
+
+[
+    description = "Leaderboard tree request."
+]
+class GetLeaderboardTreeRequest
+{
+    [tag="name", description = "Name of top folder of tree."] string(STATS_LEADERBOARD_NAME_LENGTH) mFolderName;
+};
+
+[
+    description = "Leaderboard tree node."
+]
+class LeaderboardTreeNode
+{
+    [tag="ndid", description = "Node ID."] uint32_t mNodeId;
+    [tag="name", description = "Node name."] string(STATS_LEADERBOARD_NAME_LENGTH) mNodeName;
+    [tag="sdes", description = "Node short description."] string(STATS_SHORT_DESC_LENGTH) mShortDesc;
+    [tag="chds", description = "ID (number) of first child of node."] uint32_t mFirstChild;
+    [tag="chdc", description = "Number of children for this node."] uint32_t mChildCount;
+    [tag="last", description = "True if this is last node sent. Used to determine end of tree transmission."] bool mLastNode;
+    [tag="rtnm", description = "Name of root folder of the tree"] string(STATS_LEADERBOARD_NAME_LENGTH) mRootName;
+};
+
+[
+    description = "A tdf class to contain a list of leaderboard tree nodes."
+]
+class LeaderboardTreeNodes
+{
+    [tag="ltnl", description = "List of leaderboard tree nodes."] list<LeaderboardTreeNode> mLeaderboardTreeNodes;
+};
+
+class LeaderboardEntityCountRequest
+{
+    [tag="name", description ="Name of leaderboard."] string(STATS_LEADERBOARD_NAME_LENGTH) mBoardName;
+    [tag="lbid", description="Leaderboard ID."] int32_t mBoardId;
+    [tag="prid", default =0, description="Absolute period id to use in the request.  If unspecified (i.e. 0) the period offset field is used.  Default is unspecified."]   int32_t mPeriodId;
+    [tag="poff", description="0 for current, or positive number of periods ago."] int32_t mPeriodOffset;
+    [tag="ksum", description="Key scope name/value pairs for user defined scopes defined a question mark in leaderboard."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+
+[
+    description = "Identifies the keyscope value to be changed."
+]
+class KeyScopeChangeRequest
+{
+    [tag="etp", description="Entity Type."] ObjectType mEntityType;
+    [tag="eid", description="Entity ID."] EntityId mEntityId;
+    [tag="ksnm", description="KeyScope Name."] ScopeName mKeyScopeName;
+    [tag="ksov", description="Old KeyScope Value."] ScopeValue mOldKeyScopeValue;
+    [tag="ksnv", description="New KeyScope Value."] ScopeValue mNewKeyScopeValue;
+};
+
+class PeriodIds
+{
+    [tag="dly", description="Daily period ID."] int32_t mCurrentDailyPeriodId;
+    [tag="wly", description="Weekly period ID."] int32_t mCurrentWeeklyPeriodId;
+    [tag="mly", description="Monthly period ID."] int32_t mCurrentMonthlyPeriodId;
+    
+    [tag="dhou", description="Daily rollover: hour."] int32_t mDailyHour;
+    [tag="dret", description="Daily rollover: retention."] int32_t mDailyRetention;
+    [tag="dbuf", description="Daily rollover: future period buffer.", default=9] int32_t mDailyBuffer;
+    [tag="whou", description="Weekly rollover: hour."] int32_t mWeeklyHour;
+    [tag="wday", description="Weekly rollover: day."] int32_t mWeeklyDay;
+    [tag="wret", description="Weekly rollover: retention."] int32_t mWeeklyRetention;
+    [tag="wbuf", description="Weekly rollover: future period buffer.", default=2] int32_t mWeeklyBuffer;
+    [tag="mhou", description="Monthly rollover: hour."] int32_t mMonthlyHour;
+    [tag="mday", description="Monthly rollover: day.", default=1] int32_t mMonthlyDay;
+    [tag="mret", description="Monthly rollover: retention."] int32_t mMonthlyRetention;
+    [tag="mbuf", description="Monthly rollover: future period buffer.", default=1] int32_t mMonthlyBuffer;
+};
+
+[description="A entity ranks map, map key is entityId and value is the entity rank."]
+typedef map<EntityId, int32_t> EntityRankMap;
+
+[description="The response of getEntityRank(), contains the entity ranks map."]
+class GetEntityRankResponse
+{
+    [tag="erkm", description="A entity ranks map, the map contains entity ranks keyed by entityId."]
+    EntityRankMap mEntityRankMap;
+};
+}
+}

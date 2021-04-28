@@ -1,0 +1,374 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<property name="nx.support-shared-pch" value="false"/>
+
+	<!-- keeping this property around for now for backward compatibility -->
+	<property name="package.nx_config.dir" value="${package.eaconfig.dir}"/>
+
+	<!-- The file that included this file should have don't a dependent to nxsdk package already.  Do a quick test -->
+	<fail unless="@{PropertyExists('package.nxsdk.appdir')}" 
+	      message="Config package setup error! The file that load nx-arm-clang-common.xml should have done a dependent on nxsdk package which should setup property 'package.nxsdk.appdir'!"/>
+	<!-- We got some nxsdk package changelist having package.nxsdk.appdir point to a wrong folder that doesn't exist.  Test for that. -->
+	<fail unless="@{DirectoryExists('${package.nxsdk.appdir}')}"
+	      message="Detected error with nxsdk package setup.  The property 'package.nxsdk.appdir' points to a folder that doesn't exist: ${package.nxsdk.appdir}.  Please check nxsdk package's Initialize.xml."/>
+	<fail if="${package.nxsdk.nvn-debugger-enabled??false} and ${package.nxsdk.llgd-enabled??false}"
+		  message="Only one of NVNGD or LLGD may be enabled at once, as per the documentation."/>
+
+	<property name="NintendoBuildType"  value="Release"/>
+	<property name="NintendoBuildType"  value="Debug" if="@{OptionSetGetValue('configuration-definition', 'debug')} == 'on'"/>
+	<property name="NintendoBuildType"  value="Develop" if="@{OptionSetGetValue('configuration-definition', 'optimization')} == 'on'"/>
+
+	<set-config-vs-version/>
+
+	<property name="incredibuild.supports.xge" value="true"/>
+	<property name="incredibuild.supports.sln" value="true"/>
+
+	<!-- <build> task properties -->
+	<property name="build.pathstyle"   value="Unix"/>
+	<property name="lib-prefix"        value="lib"/>
+	<property name="lib-suffix"        value=".a"/>
+	<property name="dll-suffix"        value=".nro"/>
+	<property name="exe-suffix"        value=".nspd_root"/>   <!-- This value can actually be .nspd_root, .nsp, or .nca depending on ApplicationProgramFormat's input. -->
+	<do if="${nx.application_program_format??raw} == 'nsp'">
+		<property name="exe-suffix" value=".nsp"/>
+	</do>
+
+	<property name="package.nxsdk.nvn-debugger-nso-path" unless="@{PropertyExists('package.nxsdk.nvn-debugger-nso-path')}" value="Nvidia_gfx_debugger.nso"/>
+	<property name="package.nxsdk.llgd-target-nso-path" unless="@{PropertyExists('package.nxsdk.llgd-target-nso-path')}" value="llgd-target.nso"/>
+
+	<!-- 
+	NX's VSI user interface allows people to change build target between RAW (.nspd_root) or NSP (.nsp) ApplicationProgramFormat and the VSI will
+	set TargetExt MSBuild Property value based on that selection.  So we need to tell Framework not to set the TargetExt property and just let NX's VSI 
+	take care of setting it.
+	-->
+	<property name="nx.vcproj.use_vsi_targetext" value="true"/>
+
+	<!-- get Environment variables  -->
+
+	<!-- Compile in parallel on multiple CPUs         -->
+	<property name="cc.parallelcompiler"    value="true"/>
+
+	<property name="cc.useresponsefile" value="${nx.cc.useresponsefile??false}"/>
+	<property name="lib.useresponsefile" value="${nx.lib.useresponsefile??true}"/>
+	<property name="link.useresponsefile" value="${nx.link.useresponsefile??true}"/>
+
+	<property name="cc.usealtsepinresponsefile" value="true"/>
+	<property name="lib.usealtsepinresponsefile" value="true"/>
+	<property name="link.usealtsepinresponsefile" value="true"/>
+
+	<optionset name="config-build-layout-entrypoint-common">
+		<option name="nspd_root" value="%output%"/>
+		<option name="nsp" value="%output%"/>
+	</optionset>
+	
+	<choose>
+		<do if="${NintendoBuildType} == 'Debug'">
+			<property name="nx.cc.defines.${config-processor}">
+				${property.value}
+				NN_SDK_BUILD_DEBUG
+			</property>
+		</do>
+		<do if="${NintendoBuildType} == 'Develop'">
+			<property name="nx.cc.defines.${config-processor}">
+				${property.value}
+				NN_SDK_BUILD_DEVELOP
+			</property>
+		</do>
+		<do>
+			<property name="nx.cc.defines.${config-processor}">
+				${property.value}
+				NN_SDK_BUILD_RELEASE
+			</property>
+		</do>
+	</choose>
+
+	<property name="nx.cc.defines.${config-processor}">
+		${property.value}
+		NN_NINTENDO_SDK
+	</property>
+
+	<property name="nx-default-application-data-dir-template" value="%outputbindir%\assets"/>
+	<property name="nx-default-nro-deploy-path-template" value="${nx-default-application-data-dir-template}"/>
+	<property name="nx-default-nrr-file-name-template" value="${nx-default-application-data-dir-template}\.nrr\Application.nrr"/>
+
+	<include file="nx-clang-buildtools.xml"/>
+
+	<optionset name="config-options-common">
+		<option name="preprocess"/>
+		<option name="postprocess">
+			nx-arm-clang-postprocess
+		</option>
+		<option name="shortchar" value=""/> <!-- Unset the default setting in global\init.xml.  NX doesn't allow this setting. -->
+		<option name="buildset.cc.system-includedirs" >
+			${option.value}
+			${cc.system-includedirs}
+		</option>
+		<option name="buildset.cc.defines">
+			${option.value}
+			${cc.common-defines}
+			EA_PLATFORM_NX=1
+		</option>
+		<option name="buildset.cc.defines" if="${package.nxsdk.nvn-debugger-enabled??false}">
+			${option.value}
+			EA_NX_NVN_DEBUGGER=1
+		</option>
+		<option name="buildset.cc.defines" if="${package.nxsdk.llgd-enabled??false}">
+			${option.value}
+			EA_NX_LLGD=1
+		</option>
+		<option name="buildset.cc.options">
+			${option.value}
+			${cc.common-options}
+			-fPIC
+		</option>
+		<option name="buildset.cc.options" if="${NintendoBuildType} != 'Debug'">
+			${option.value}
+			-mimplicit-float
+		</option>
+		<option name="buildset.link.options" >
+			${option.value}
+			${link.common-options}
+		</option>
+		<option name="buildset.link.libraries">
+			${option.value}
+			${link.system-libs}
+		</option>
+		<option name="buildset.link.libraries" if="${NintendoBuildType}' != 'Release'">
+			${option.value}
+			libnn_profiler.a
+		</option>
+		<option name="buildset.link.librarydirs">
+			${option.value}
+			${link.system-librarydirs}
+		</option>
+		<option name="link.postlink.program" value="${package.nxsdk.dir}\bin\post_link.bat" />
+		<option name="link.postlink.commandline">
+			%outputdir%
+			%outputname%
+			${package.nxsdk.appdir}
+		</option>
+	</optionset>
+
+	<optionset name="config-options-program">
+		<option name="buildset.link.options">
+			${option.value}
+			-Wl,-T ${package.nxsdk.appdir}\Resources\SpecFiles\${NintendoApplicationLinkerScriptFile}
+		</option>
+		<!-- 
+			http://sourceware.org/binutils/docs-2.20/ld/ARM.html 
+			The no-wchar-size-warning switch prevents the linker from warning when linking object files that specify incompatible EABI wchar_t size attributes. 
+			For example, with this switch enabled, linking of an object file using 32-bit wchar_t values with another using 16-bit wchar_t values will not be diagnosed. 
+		-->
+		<option name="buildset.link.options" if="'${platform-ptrsize}'=='32bit' and @{StrCompareVersions('${package.nxsdk.version}', '9.0.0')} lt 0">
+			${option.value}
+			-Wl,--no-wchar-size-warning
+		</option>
+	</optionset>
+
+	<optionset name="config-options-library">
+		<option name="liboutputname" value="%outputdir%\${lib-prefix}%outputname%${lib-suffix}" />
+		<option name="buildset.lib.options">
+			${lib.options??}
+		</option>
+	</optionset>
+
+	<optionset name="config-options-dynamiclibrary" >
+		<option name="generatedll"                          value="on" />
+		<option name="buildset.name"                        value="DynamicLibrary" />
+		<option name="buildset.tasks"                       value="asm cc link" />
+		<option name="buildset.cc.defines"                  value="EA_DLL" />
+		<!-- NX's dll output has dll-suffix .nro, but it also create stub library in same bin folder with extension .nrs -->
+		<option name="linkoutputname"                       value="%outputdir%\%outputname%${dll-suffix}" />
+		<option name="impliboutputname"                     value="%outputdir%\%outputname%.nrs"/>
+		<option name="buildset.cc.options">
+		</option>
+		<option name="buildset.link.options">
+			${option.value}
+			-nostartfiles
+			-Wl,--gc-sections
+			-Wl,-init=_init,-fini=_fini
+			-Wl,--shared
+			-Wl,--export-dynamic,-z,combreloc,-z,relro,--enable-new-dtags
+			-fuse-ld=lld.exe
+			-Wl,--build-id=md5
+			-Wl,-T ${package.nxsdk.appdir}\Resources\SpecFiles\${NintendoDynamicLibraryLinkerScriptFile}
+		</option>
+		<option name="buildset.link.options" if="${platform-ptrsize} == '32bit'">
+			${option.value}
+			-mabi=aapcs-linux
+			-mcpu=cortex-a57
+			-mfloat-abi=hard
+			-mfpu=crypto-neon-fp-armv8
+			-Wl,--target2=got-rel
+		</option>
+		<option name="buildset.link.options" if="${platform-ptrsize} == '64bit'">
+			${option.value}
+			-mcpu=cortex-a57+fp+simd+crypto+crc
+		</option>
+	</optionset>
+
+	<optionset name="config-options-program">
+		<option name="deployassets" value="false"/>
+
+		<option name="linkoutputname" value="%outputdir%\%outputname%${exe-suffix}" />
+		<option name="linkoutputmapname" value="%outputdir%\%outputname%.map" />
+
+		<option name="buildset.link.libraries">
+			${option.value}
+			libnn_gfx.a
+			libnn_init_memory.a
+		</option>
+		<!-- When building against Release libraries, must link against nnSdk.nss -->
+		<option name="buildset.link.libraries" if="${NintendoBuildType} == 'Release'">
+			${option.value}
+			nnSdk.nss
+		</option>
+		<!-- When building against Debug or Develop, must link against nnSdkEn.nss -->
+		<option name="buildset.link.libraries" unless="${NintendoBuildType} == 'Release'">
+			${option.value}
+			nnSdkEn.nss
+		</option>
+		<!-- NSO is stripped out in NxVisualStudioExtension.WriteExtensionLinkerToolProperties -->
+		<!-- Nvidia_gfx_debugger.nss is automatically added by the NX VSI with the nso file present -->
+		<option name="buildset.link.libraries" if="${package.nxsdk.nvn-debugger-enabled??false}">
+			${option.value}
+			${package.nxsdk.nvn-debugger-nso-path}
+		</option>
+		<!-- NSO is stripped out in NxVisualStudioExtension.WriteExtensionLinkerToolProperties -->
+		<!-- llgd-target.nss is automatically added by the NX VSI with the nso file present -->
+		<option name="buildset.link.libraries" if="${package.nxsdk.llgd-enabled??false}">
+			${option.value}
+			${package.nxsdk.llgd-target-nso-path}
+		</option>
+		<option name="buildset.link.options">
+			${option.value}
+			-nostartfiles
+			-Wl,--gc-sections
+			-Wl,-init=_init,-fini=_fini
+			-Wl,-pie
+			-Wl,-z,combreloc,-z,relro,--enable-new-dtags
+			-Wl,-u,malloc
+			-Wl,-u,calloc
+			-Wl,-u,realloc
+			-Wl,-u,aligned_alloc
+			-Wl,-u,free
+			-Wl,--export-dynamic
+			-fuse-ld=lld.exe
+			-Wl,--build-id=md5
+		</option>
+		<option name="buildset.link.options" if="${platform-ptrsize} == '32bit'">
+			${option.value}
+			-mabi=aapcs-linux
+			-mcpu=cortex-a57
+			-mfloat-abi=hard
+			-mfpu=crypto-neon-fp-armv8
+			-Wl,--target2=got-rel
+		</option>
+		<option name="buildset.link.options" if="${platform-ptrsize} == '64bit'">
+			${option.value}
+			-mcpu=cortex-a57+fp+simd+crypto+crc
+		</option>
+		<option name="buildset.link.librarydirs" if="${package.nxsdk.nvn-debugger-enabled??false}">
+			${option.value}
+			@{PathGetFullPath(@{PathCombine('${package.nxsdk.appdir}', '..\NvnGraphicsDebugger\target\${NintendoNVNGDFolder}')})}
+		</option>
+	</optionset>
+
+	<property name="visualstudio.hide.unsupported.csharp" value="${visualstudio.hide.unsupported.csharp??true}"/>
+
+	<optionset name="config-options-csharplibrary">
+		<option name="buildset.name"            value="CSharpLibrary" />
+		<option name="buildset.tasks"           value="csc" />
+		<option name="buildset.csc.target"      value="library" />
+	</optionset>
+
+	<optionset name="config-options-csharpprogram">
+		<option name="buildset.name"            value="CSharpProgram" />
+		<option name="buildset.tasks"           value="csc" />
+		<option name="buildset.csc.target"      value="exe" />
+	</optionset>
+
+	<optionset name="config-options-csharpwindowsprogram">
+		<option name="buildset.name"            value="CSharpWindowsProgram" />
+		<option name="buildset.tasks"           value="csc" />
+		<option name="buildset.csc.target"      value="winexe" />
+	</optionset>
+
+	<!-- clear properties that are appended to optionsets above-->
+	<property name="cc.defines"/>
+	<property name="cc.options"/>
+	<property name="cc.includedirs"/>
+	<property name="link.libraries"/>
+
+	<property name="platform.sdklibs.regular"/>
+	<property name="platform.sdklibs.debug"/>
+
+	<!-- Visual Studio solution generation -->
+	<property name="${config-platform}-visualstudio-extension" value="nx-clang-visualstudio-extension"/>
+	<property name="eaconfig.visual-studio.ComputeCustomBuildOutput.ext" value=".o .a .obj .lib"/>
+	<property name="xge.profile" value="${package.nx_config.dir}\config\data\nx_xge_profile.xml" unless="@{PropertyExists('xge.profile')}"/>
+
+	<optionset name="sdk.portable-gen-data">
+		<option name="NINTENDO_SDK_ROOT" value="package.nxsdk.sdkdir"/>
+	</optionset>
+
+	<property name="backend.pregenerate">
+		${property.value}
+		nx-generate-nmeta
+	</property>
+
+	<!-- NX NSDKMeta Configuration Template -->
+	<optionset name="config-options-nmetaoptions">
+
+		<option name="core.name" value="Application"/>
+		<option name="core.applicationId" value="0x01004b9000490000"/>
+
+		<option name="application.title.language" value="AmericanEnglish"/>
+		<option name="application.title.publisher" value="Electronic Arts"/>
+		<option name="application.icon.language" value="AmericanEnglish"/>
+		<option name="application.icon.iconPath" value="@{PathToNativeOS('${package.nx_config.dir}/config/data/nx_ea_logo.bmp')}"/>
+		<option name="application.displayVersion" value="1.0.0"/>
+		<option name="application.supportedLanguage" value="AmericanEnglish"/>
+		<option name="application.rating.organization" value="ESRB"/>
+		<option name="application.rating.age" value="0"/>
+		<option name="application.userAccountSaveDataSize" value="0x0000000000400000"/>
+		<option name="application.userAccountSaveDataJournalSize" value="0x0000000000100000"/>
+		<option name="application.temporaryStorageSize" value="0x0000000004000000"/>
+		<option name="application.logoType" value="LicensedByNintendo"/>
+		<option name="application.startupUserAccount" value="None"/>
+		<option name="application.releaseVersion" value="0"/>
+		<option name="application.cacheStorageSize" value="0x0000000020000000"/>
+		<option name="application.cacheStorageJournalSize" value="0x0000000020000000"/>
+	</optionset>
+
+	<!-- Only support building in Visual Studio with NX VSI at the moment. -->
+	<dependent name="nx_vsi"/>
+
+	<!--
+	At present, the lastest version of NX VSI (9.3) forcibly add -std=gnu++14 to c++ compiler command line.  This is also
+	documented as required option from official Nintendo documentation.  
+	However, we've contacted Nintendo Support Forum and we're told that we can just insert -std=gnu++17 (or -std=c++17) on command line
+	and that is fine to override it that way.
+	We currently set the default to gnu++17.  To change the default back, set global properly 'cc.std.nx.default' and set
+	to 'gnu++14'.  To globally override ALL projects with specific settings, set global property 'cc.std.nx' to specific value
+	which will override the following optionset settings.
+        Note that starting with VSI version 10.2.10.29332, there will be proper support to set CppLanguageStandard flag.
+	-->
+	<property name="cc.std.nx.default" value="${cc.std.nx.default??gnu++17}"/>
+
+	<!-- 
+	Really NOT efficient to use this target in Visual Studio's post build step to spawn another process of nant.exe which needs to waste time
+	creating build graph etc before we can even execute the asset copying.  It would really impact build time!
+	ALSO, exact file list are not track on build farm when it is trying to cache the build output!
+	We need to find a better solution!
+	-->
+	<target name="copy-asset-files.nx" style="use" description="Deploy files to the package" hidden="true">
+		<property name="package.asset-configbuilddir" value="@{GetModuleOutputDir('bin', '${package.name}')}\assets" />
+		<property name="${groupname}.CopyAssetsWithoutSync" value="${${groupname}.CopyAssetsWithoutSync??true}"/>
+		<call target="copy-asset-files"/>
+	</target>
+
+</project>

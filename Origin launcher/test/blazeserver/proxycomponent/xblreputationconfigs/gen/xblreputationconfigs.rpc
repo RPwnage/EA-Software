@@ -1,0 +1,74 @@
+[ headername="xblreputationconfigs/tdf/xblreputationconfigs.h" ]
+#include "xblreputationconfigs/gen/xblreputationconfigs.tdf"
+
+
+namespace Blaze
+{
+namespace XBLReputation
+{
+
+[
+    id = core/1022,
+    description = "Proxy component used to define xbl reputation fetching",
+    details = "xbl reputations",
+    proxyOnly = true,
+    http = {
+        payloadEncoderSubType = "NORMAL"
+    }
+]
+component XBLReputationConfigs
+{
+    errors
+    {
+        [ description = "authentication error, possibly due to invalid/expired token" ]
+        XBLREPUTATION_AUTHENTICATION_REQUIRED = 1; //http 401
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+                id = 1,
+                description = "Get reputation for a single user",
+                details = "Gets the reputation value for the supplied user",
+                requires_authentication = false,
+                client_export = false,
+                http = {
+                    resource = "/users/xuid({xuid})/scids/{scid}/stats/{reputationIdentifier}",
+                    method = "GET",
+                    custom_request_headers = {
+                        "Authorization"          = "getReputationRequestHeader.authToken"
+                    },
+                    addEncodedPayload = false
+                }
+            ]
+            GetReputationResponse getReputation(GetReputationRequest);
+
+             [
+                 id = 2,
+                 description = "Get reputation for a list of users",
+                 details = "Gets the reputation value for the supplied user list",
+                 requires_authentication = false,
+                 client_export = false,
+                 errors = { XBLREPUTATION_AUTHENTICATION_REQUIRED },
+                 http = {
+                     resource = "/batch",
+                     method = "POST",
+                     custom_request_headers = {
+                         "Authorization"          = "PostBatchReputationRequestHeader.authToken"
+                     },
+                     status_code_errors = {
+                         401 = XBLREPUTATION_AUTHENTICATION_REQUIRED
+                     },
+                     requestPayloadMember = "PostBatchReputationRequestBody"
+                 }
+             ]
+             PostBatchReputationRetrievalResponse getBatchReputationRetrieval(PostBatchReputationRetrievalRequest);
+        }
+    }
+}
+
+
+}
+}

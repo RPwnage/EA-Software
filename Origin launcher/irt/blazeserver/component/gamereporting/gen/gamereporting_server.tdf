@@ -1,0 +1,782 @@
+[headername="framework/tdf/attributes.h"]
+#include "framework/gen/attributes.tdf"
+
+[headername="framework/tdf/entity.h"]
+#include "framework/gen/entity.tdf"
+
+[headername="framework/tdf/frameworkredistypes_server.h"]
+#include "framework/gen/frameworkredistypes_server.tdf"
+
+[headername="gamemanager/tdf/gamemanager.h"]
+#include "gamemanager/gen/gamemanager.tdf"
+
+[headername="gamemanager/tdf/gamemanager_server.h"]
+#include "gamemanager/gen/gamemanager_server.tdf"
+
+[headername="gamereporting/tdf/gamehistory.h"]
+#include "gamereporting/gen/gamehistory.tdf"
+
+[headername="gamereporting/tdf/gamereporting.h"]
+#include "gamereporting/gen/gamereporting.tdf"
+
+[headername="gamemanager/tdf/externalsessionconfig_server.h"]
+#include "gamemanager/gen/externalsessionconfig_server.tdf"
+
+namespace Blaze
+{
+namespace GameReporting
+{
+
+[description="GameReporting StartedGameInfo refers to the equivalent GameManager TDF"]
+typedef GameManager::StartedGameInfo StartedGameInfo;
+[description="GameReporting GameInfo refers to the equivalent GameManager TDF"]
+typedef GameManager::GameInfo GameInfo;
+[description="GameReporting PlayerInfo refers to the equivalent GameManager TDF"]
+typedef GameManager::GamePlayerInfo PlayerInfo;
+
+[description="Identifies the type of game report being processed."]
+enum ReportType
+{
+    [description="Player-based report"]
+    REPORT_TYPE_STANDARD =    0x00,
+    [description="Trusted game report"]
+    REPORT_TYPE_TRUSTED_MID_GAME =     0x01, 
+    REPORT_TYPE_TRUSTED_END_GAME =     0x02, 
+    [description="Offline report"]
+    REPORT_TYPE_OFFLINE =     0x03
+};
+
+[
+    description = "Private Data TDF.", 
+    details = "Contains a custom TDF to user for the submitter's private data.  This has to be a separate class since during collation, the data is organized in a map of blaze ids, reports."
+]   
+class PrivateReport
+{
+    [tag="data", description="A custom TDF of private data for the submitter."]
+    variable data;
+};    
+
+typedef list<GameManager::PlayerId> GMPlayerIdList;
+
+[
+    description = "Contains game report information accumulated during report collation.",
+    details = "It is used to send reports to slaves for processing after report collating/gathering is finished."
+]
+class CollatedGameReport
+{
+    [tag="gid", description="Game id of the game being reported on."] GameManager::GameId mGameId;
+    [tag="fngm", description="Information about the game being reported on."] GameInfo gameInfo;
+    [tag="rprt", description="Full game report TDF, collated from DNF and finished game reports."] GameReport gameReport;
+    [tag="prvt", description="Private game report data, organized into a map of players."] map<BlazeId, PrivateReport> privateReports;
+    [tag="dnfs", description="DNF status for all players"] map<GameManager::PlayerId, int8_t> dnfStatus;    
+    [tag="plst", description="List of player ids submitted game report."] GameManager::PlayerIdList mSubmitterPlayerIds;  
+    [tag="sest", description="List of session ids submitted game report."] UserSessionIdList mSubmitterSessionIds;  
+    [tag="cerr", description="Collation Error Code"] int32_t error;
+    [tag="rtyp", description="Type of report submitted to master (offline not supported."] ReportType reportType;
+    [tag="send", description="Send time to slave."] uint64_t sendTimeMs;
+};
+
+typedef map<GameManager::PlayerId, SubmitGameReportRequest> SubmitGameReportsMap;
+
+[
+    description = "Contains list of game reports for the game and game attributes."
+]
+class SubmitDebugGameRequest
+{
+    [tag="fngm", description="Information about the game being reported on."] GameInfo mGameInfo;
+    [tag="topo", description="Topology"] GameNetworkTopology topology;    
+    [tag="rtyp", description="Report type (STANDARD, OFFLINE, TRUSTED_MID_GAME, TRUSTED_END_GAME)", default=REPORT_TYPE_STANDARD] ReportType mReportType;
+    [tag="grfn", description="List of game reports."] SubmitGameReportsMap mFinishedGameReports;
+    [tag="grdn", description="List of game reports."] SubmitGameReportsMap mDnfGameReports;        
+};
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+class GameTypeReportConfig
+{
+    typedef string(128) ReportValueData;
+    typedef map<ReportAttributeName, ReportValueData, ignorecase> ReportValueByAttributeMap;
+
+    [tag="plid", description = "reference to the player ID if applicable - used to compile a list of players for the ReportParser."]
+    ReportValueData playerId;
+        
+    [tag="rval", description="Report Values Configuration"]
+    ReportValueByAttributeMap reportValues;
+
+    class StatUpdate
+    {
+        [tag="cat",description="Stat category to update."]
+        ReportValueData category;
+        [tag="cate",description="Stat category expression to update."]
+        ReportValueData categoryExpr;
+        [tag="opt",description="If true, ignores stat updates for value expressions that fail to evaluate.", default=false]
+        bool optional;
+        [tag="cond", description = "Conditional StatUpdate update expression.  If expression evaluates to false, skip this StatUpdate update.  If expression is omitted/blank, DO NOT skip this StatUpdate update."]
+        ReportValueData condition;
+        [tag="eid",description="Entity ID to update stat for."]
+        ReportValueData entityId;
+        [tag="kidx",description="Keyscope Index (optional)"]
+        ReportValueData keyscopeIndex;
+        [tag="keys",description="Keyscopes."]
+        ReportValueByAttributeMap keyscopes;
+        
+        class Stat
+        {
+            [tag="valu", description = "reference to stat data or absolute value."]
+            ReportValueData value;
+        
+            enum Type
+            {
+                ASSIGN = 0x0,
+                CLEAR = 0x1,
+                INCREMENT = 0x2,
+                DECREMENT = 0x3,
+                MAX = 0x4,
+                MIN = 0x5,
+                OR = 0x6,
+                AND = 0x7,
+                FETCH = 0xff
+            };
+            [tag="type", description = "stat update type", default=INCREMENT]
+            Type type;
+            
+            [tag="cond", description = "conditional stat update expression"]
+            ReportValueData condition;
+        };
+        [tag="stat", description="Stats to update."]
+        map<ReportAttributeName, Stat, ignorecase> stats;                
+    };
+    [tag="stup", description="Stat updates"]
+    map<ReportAttributeName, StatUpdate, ignorecase> statUpdates;
+
+    class StatsServiceUpdate
+    {
+        [tag="api", description="Stats Service API version to use.", default="1.0"]
+        ReportValueData apiVersion;
+        [tag="ctx", description="Stats Service context to update."]
+        ReportValueData context;
+        [tag="cat", description="Stats Service category to update."]
+        ReportValueData category;
+        [tag="opt", description="If true, ignores stat updates for value expressions that fail to evaluate.", default=false]
+        bool optional;
+        [tag="cond", description = "Conditional StatsServiceUpdate update expression.  If expression evaluates to false, skip this StatsServiceUpdate update.  If expression is omitted/blank, DO NOT skip this StatsServiceUpdate update."]
+        ReportValueData condition;
+        [tag="eid", description="Entity ID to update stat for."]
+        ReportValueData entityId;
+
+        class DimensionalStat
+        {
+            [tag="valu", description="reference to stat data or absolute value."]
+            ReportValueData value;
+
+            enum Type
+            {
+                INCREMENT = 0x1,
+                DECREMENT = 0x2,
+                MIN = 0x3,
+                MAX = 0x4,
+                ASSIGN = 0x5
+            };
+            [tag="type", description="stat update type (maps directly to Stats Service CollectionOperator enum)", default=INCREMENT]
+            Type type;
+
+            [tag="cond", description="conditional stat update expression"]
+            ReportValueData condition;
+            
+            [tag="dims", description="dimensions"]
+            ReportValueByAttributeMap dimensions;
+        };
+        [tag="dstt", description="Dimensional stats to update."]
+        map<ReportAttributeName, list<DimensionalStat>, ignorecase> dimensionalStats;
+        
+        class Stat
+        {
+            [tag="valu", description="reference to stat data or absolute value."]
+            ReportValueData value;
+
+            enum Type
+            {
+                INCREMENT = 0x1,
+                DECREMENT = 0x2,
+                MIN = 0x3,
+                MAX = 0x4,
+                ASSIGN = 0x5
+            };
+            [tag="type", description="stat update type (maps directly to Stats Service CollectionOperator enum)", default=INCREMENT]
+            Type type;
+
+            [tag="cond", description="conditional stat update expression"]
+            ReportValueData condition;
+        };
+        [tag="stat", description="Stats to update."]
+        map<ReportAttributeName, Stat, ignorecase> stats;
+    };
+    [tag="ssup", description="Stats Service updates"]
+    map<ReportAttributeName, StatsServiceUpdate, ignorecase> statsServiceUpdates;
+
+    class PsnMatchUpdate
+    {
+        class MatchResults
+        {
+            [tag="coop",description="Cooperative result.  Used if competitionType is COOPERATIVE."]
+            ReportValueData cooperativeResult;
+
+            class CompetitiveResult
+            {
+                [tag="eid", description="Entity ID to report rank and/or score for.  Becomes player ID (Blaze ID will NOT be sent)."]
+                ReportValueData entityId;
+                [tag="scor", description = "Score to report.  Omitted from PSN request if resultType is RESULT (i.e., included if SCORE)"]
+                ReportValueData score;
+            };
+            [tag="comp",description="Competitive result.  Used if competitionType is COMPETITIVE."]
+            CompetitiveResult competitiveResult;
+        };
+        [tag="mres", description="Match Results"]
+        MatchResults matchResults;
+
+        [tag="msta", description="Additional Match Statistics"]
+        ReportValueByAttributeMap matchStats;
+    };
+    [tag="psmu", description="PSN Match updates"]
+    map<ReportAttributeName, PsnMatchUpdate, ignorecase> psnMatchUpdates;
+
+    class GameHistory
+    {
+        typedef string(64) TableName;
+
+        [tag="tabl", description = "table name"]
+        TableName table;
+        [tag="etyp", description="entity type of the primary key(s)"]
+        ObjectType entityType;
+        [tag="pkey", description = "a list of primary keys for the table"]
+        list<ReportAttributeName> primaryKey;
+        [tag="hlim", default = 20, description = "max number of rows stored per unique primary keys, or 0 to disable the max limit.  20 is the default."]
+        uint32_t historyLimit;
+        [tag="cols", description = "table column map"]
+        ReportValueByAttributeMap columns;
+    };   
+
+    [tag="hist", description="Game History data."]
+    list<GameHistory> gameHistory;
+    
+    class AchievementUpdates
+    {
+        [tag="pid",description="Product ID to associated with the achievements."]
+        string(128) productId;
+
+        [tag="eid",description="Entity ID to update achievement for."]
+        ReportValueData entityId;
+
+        class Achievement
+        {
+            [tag="acid", description = "The achievement string identifier."]
+            string(128) id;
+
+            [tag="meta", description="Flag to include extra (static) metadata - only use this if caching product definitions is impractical.", default=false]
+            bool mIncludeMetadata;
+
+            [tag="pts", description = "Reference to report data or absolute value."]
+            ReportValueData points;
+
+            [tag="cond", description = "Conditional achievement update expression."]
+            ReportValueData condition;
+        };
+
+        [tag="achs", description="A list of achievements to update."]
+        list<Achievement> achievements;
+
+        [tag="dev", description="The device name of the dynamic achievements that are granted on based on events."]
+        string(128) mDevice;
+
+        class Event
+        {
+            [tag="evid", description="The event id string identifier."]
+            string(128) id;
+
+            [tag="data", description="Key-value pairs of game-defined events to update."]
+            ReportValueByAttributeMap eventData;
+        };
+
+        [tag="eves", description="Key-value pairs of game-defined events to update."]
+        list<Event> eventList;        
+    };
+    [tag="achu", description="Achievement updates"]
+    AchievementUpdates achievementUpdates;
+
+    class Event
+    {
+        [tag="cate", description="The tdf of event."]
+        ReportValueData tdfMemberName;
+
+        [tag="enid", description="Entity ID to event for."]
+        ReportValueData entityId;
+
+        [tag="etda", description = "event data map."]
+        ReportValueByAttributeMap eventData;
+    };
+    [tag="etmp", description="events map."]
+    map<ReportAttributeName, Event, ignorecase> eventUpdates;
+    
+    [tag="metr", description="Metrics Configuration"]
+    ReportValueByAttributeMap metricUpdates;
+
+    [tag="tdf", description="Report TDF full classname + namespace"]
+    string(256) reportTdf;
+    
+    // FIFA SPECIFIC CODE START    
+    [tag="skip", default=true, description="Skip comparing reports at collation at this node and child nodes"]
+    // FIFA SPECIFIC CODE START
+    bool skipComparison;
+
+    [tag="subr", description="Subreports within report."]
+    map<ReportAttributeName, GameTypeReportConfig, ignorecase> subreports;       
+};
+
+[
+    description = "GameType configuration used by the GameReportingConfig class.",
+    details = "Replaces the 2.x configuration attribute map."
+]
+class GameTypeConfig
+{    
+    [tag="auor", default=true, description="If false, the offline game report don't allow nothing change for the user specified in the report (if he didn't send it)."]
+    bool arbitraryUserOfflineReportProcessing;
+    [tag="proc", description="Report processor class name used by report class factory."]
+    string(64) reportProcessorClass;
+    [tag="coll", description="Report collator class name used by report class factory."]
+    string(64) reportCollatorClass;
+    [tag="data", description="TDF class name of the Custom data"]
+    string(64) customDataTdf;
+    
+    [tag="glob", reconfigurable="no", description="Custom per game-type configuration values"]
+    variable mCustomConfig;   
+    
+    [tag="attr", description="Attributes per report class (game, player, club, etc."]
+    GameTypeReportConfig report;    
+
+    [tag="dbse", reconfigurable="no", description="Database settings used for game history for this specific game type. Will use base gamereporting dbName if not set", default=""]
+    string(64) dbName;
+};
+
+typedef map<GameManager::GameReportName, GameTypeConfig, ignorecase> GameTypeConfigMap;
+
+[
+    description = "Game History Specific Configuration.",
+    details = "Data pertaining the Game History Configuration."
+]
+class GameHistoryConfig
+{    
+    [tag="gpur", description="The maximum number of games to purge per purge interval.", default=0]
+    uint32_t maxGamesToPurgePerInterval;
+    [tag="lpur", default="60m", description="Governs how often expired game reports are purged if there is no more games to purge."]
+    TimeValue lowFrequentPurgeInterval;
+    [tag="hpur", default="30m", description="Governs how often expired game reports are purged if there is more games to purge."]
+    TimeValue highFrequentPurgeInterval;
+    [tag="hexp", description="governs the delay before a game report becomes eligible for purge."]
+    TimeValue historyExpiry;
+};
+
+class GameHistoryReportingFilter
+{    
+    [tag="tabn", default="player", description="Game history table name."]
+    TableName table;
+
+    [tag="anam", default="", description="Attribute name."]
+    ReportAttributeName name;
+
+    [tag="aidx", default=0, description="Attribute Index."]
+    uint16_t index;
+
+    [tag="hvar", description="Indication whether the filter rule includes a variable."]
+    bool hasVariable;
+
+    [tag="etyp", description="Blaze object type."]
+    string(MAX_NAME_LENGTH) entityType;
+
+    [tag="expr", default="", description="Expression of filter rule."]
+    string(MAX_FILTER_LENGTH) expression;
+};
+
+typedef list<GameHistoryReportingFilter> GameHistoryReportingFilterList;
+
+class GameHistoryReportingQueryColumn
+{    
+    [tag="tabn", default="player", description="Game history table name."]
+    TableName table;
+    
+    [tag="anam", default="", description="Attribute name."]
+    ReportAttributeName name;
+
+    [tag="aidx", default=0, description="Attribute index."]
+    uint16_t index;
+};
+
+typedef list<GameHistoryReportingQueryColumn> GameHistoryReportingQueryColumnList;
+
+class GameHistoryReportingQuery
+{    
+    [tag="qnam", default="", description="Game report query name."]
+    QueryName name;
+
+    [tag="gtyp", default="", description="Game type as specified via the game reporting configuration."]
+    GameManager::GameReportName typeName;
+   
+    [tag="mgrr", default=10, description="Max number of game reports to return."]
+    uint32_t maxGamesToReturn;
+    
+    [tag="filt", description="List of filters."]
+    GameHistoryReportingFilterList filters;
+    
+    [tag="cols", description="List of game report columns selected to fetch."]
+    GameHistoryReportingQueryColumnList columns;   
+};
+
+class GameHistoryReportingViewColumn
+{    
+    [tag="tabn", default="player", description="Game history table name."]
+    TableName table;
+    
+    [tag="anam", description="Attribute name."]
+    ReportAttributeName name;
+
+    [tag="aidx", default=0, description="Attribute index."]
+    uint16_t index;
+
+    [tag="etyp", description="Entity type."]
+    string(MAX_NAME_LENGTH) entityType;
+    
+    [tag="core", description="If non-empty, identifies this column as containing information about a Blaze user. Valid values are 'externalId' or 'personaNamespace'."]
+    string(32) mUserCoreIdentName;
+
+    [tag="sdsc", default="", description="Short description of column title."]
+    string(SHORT_DESC_LENGTH) shortDesc;
+    
+    [tag="ldsc", default="", description="Long description of column title."]
+    string(DESCRIPTION_LENGTH) longDesc;
+      
+    [tag="frmt", description="Formatting string in printf syntax."]
+    string(32) format;
+
+    [tag="dtyp", default="string", description="Data type of attribute."]
+    string(32) type;
+       
+    [tag="kind", default="", description="Hint to localize type on client."]
+    string(8) kind;
+
+    [tag="meta", default="", description="Metadata."]
+    string(METADATA_LENGTH) metadata;
+
+    [tag="unkv", description="Value to return when the value is unknown or NULL."]
+    Collections::AttributeValue unknownValue;
+    
+    [tag="valu", description="List of attribute values."]
+    Collections::AttributeValueList values;
+};
+
+typedef list<GameHistoryReportingViewColumn> GameHistoryReportingViewColumnList;
+
+class GameHistoryReportingView
+{
+    [tag="vnam", default="", description="Game report view name."]
+    ViewName name;
+
+    [tag="gtyp", default="", description="Game type as specified via the game reporting configuration."]
+    GameManager::GameReportName typeName;
+
+    [tag="desc", default="", description="Game report view description."]
+    string(DESCRIPTION_LENGTH) desc;
+
+    [tag="meta", default="", description="Game report view metadata."]
+    string(METADATA_LENGTH) metadata;
+
+    [tag="maxg", default=10, description="Max number of games to return."]
+    uint32_t maxRowsToReturn;
+
+    [tag="rtyp", default="game", description="Game type as the context of returned row data."]
+    GameManager::GameReportName rowAttributeType;
+        
+    [tag="filt", description="List of filters."]
+    GameHistoryReportingFilterList filters;
+
+    [tag="lgrc", description="List of game report columns."]
+    GameHistoryReportingViewColumnList columns;
+
+    [tag="skgr", default=false, description="If true, the group by tag will not be added to the queryion."]
+    bool skipGrouping;
+};
+
+typedef list<GameHistoryReportingQuery> GameHistoryReportingQueryList;
+typedef list<GameHistoryReportingView> GameHistoryReportingViewList;
+
+[
+    description = "Game History Reporting Specific Configuration.",
+    details = "Data pertaining the Game History Reporting Configuration."
+]
+class GameHistoryReportingConfig
+{    
+    [tag="grql", description="The list for GameHistoryReporting Queries."]
+    GameHistoryReportingQueryList queries;
+    
+    [tag="grvl", description="The list for GameHistoryReporting View."]
+    GameHistoryReportingViewList views;
+
+    [tag="dsmp", description="platform map for long/short description"]
+    map<ClientPlatformType, map<string(-1), string(-1), ignorecase>> platformDescriptionMap;
+};
+
+class MetricsAttribute
+{
+    [tag="attp", description="The attribute type of reports."]
+    string(MAX_NAME_LENGTH) attributeType;
+    
+    [tag="name", description="The name attribute."]
+    string(MAX_NAME_LENGTH) name;
+};
+
+typedef list<MetricsAttribute> MetricsAttributeList;
+
+[
+    description = "Metrics Info Specific Configuration.",
+    details = "Data pertaining the Metrics Info Configuration."
+]
+class MetricsInfoConfig
+{
+    [tag="rpst", default=100, description="Calculate the averate over the last N reports."]
+    uint32_t reportsToStore;
+    
+    [tag="stav", description="Keep track the average of these attribute values."]
+    MetricsAttributeList storeAverage;
+    
+    [tag="stvl", description="Keep track the total number of each value."]
+    MetricsAttributeList storeByValue;
+};
+
+typedef list<uint32_t> SkillDampingTable;
+class DampingTable
+{    
+    [tag="name", description="The name of damping table."]
+    string(MAX_NAME_LENGTH) name;
+    
+    [tag="tabl", description="The damping table."]
+    SkillDampingTable table;
+};
+
+typedef list<DampingTable> DampingTableList;
+
+[
+    description = "Skill Info Specific Configuration.",
+    details = "Data pertaining the Skill Info Configuration."
+]
+class SkillInfoConfig
+{    
+    [tag="dptb", description="The list for DampingTable."]
+    DampingTableList dampingTables;
+    
+    [tag="mxvl", default=0, description="The max value of DampingTable."]
+    int32_t maxValue;
+};
+
+[
+    description = "Configuration attributes for the Basic Report Processor",
+    details = "If using the 'basic' report processor, specifies any configurable options for the whole processor."
+]
+class BasicConfig
+{
+    [tag="stat", description="Defines how game reporting handles errors when updating stats via the UpdateStatsHelper utility.", default=true]
+    bool strictStatsUpdates;
+
+    [tag="megr", default=false, description="If true, all submitted reports (mid-game, DNF, finished) will be merged at collation."]
+    bool mergeReports;
+};
+
+// FIFA SPECIFIC CODE START
+class HmacConfig
+{
+    [tag="hmnk", description="Number of keys used for HMAC"]
+    uint32_t hmacNumKeys;
+
+    [tag="hmkf", description="Name of keyfile (under etc)"]
+    string(MAX_NAME_LENGTH) hmacKeyFile;
+
+    [tag="hmlw", description="Number of columns for each line in the keyfile (used to fseek to desired key (hmacKeyLineWidth * desired index)"]
+    uint32_t hmacKeyLineWidth;
+
+    [tag="hmio", description="For debugging purposes to always select the same key (-1 to disable)"]
+    int32_t hmacKeyIndexOverride;
+};
+// FIFA SPECIFIC CODE END
+
+class EventType
+{
+    [tag="name", description = "The name of event type."] 
+    EventTypeName name;
+    
+    [tag="tdf", description="The tdf name of event data."] 
+    string(256) tdf;
+};
+
+typedef list<EventType> EventTypes;
+
+[
+    description = "Configuration data for Game Reporting as parsed from the config file.",
+    details = "Replaces the 2.x configuration attribute map."
+]
+class GameReportingConfig
+{
+    [tag="ctim", reconfigurable="no", description="Report collection timeout from end-of-game in seconds.", default=15, advanced=true]
+    int32_t collectionTimeoutSec;
+
+    [tag="ptim", description="Report processing timeout.", default="60s"]
+    TimeValue processingTimeout;
+
+    [tag="mxrp", reconfigurable="yes", description="Set the maximum number of game reports what will be processed simultaneously by each grSlave instance.", default=50]
+    uint16_t maxConcurrentReportsProcessedPerSlave;
+
+    [tag="mxss", reconfigurable="yes", description="Set the maximum number of Stats Service RPCs sent simultaneously by each grSlave instance.", default=5]
+    uint16_t maxConcurrentStatsServiceRpcsPerSlave;
+
+    [tag="stry", reconfigurable="yes", description="The maximum number of retries for a Stats Service RPC before giving up. Depending on the failure, the RPC may not be retried at all.", default=2]
+    uint8_t statsServiceRpcRetryLimit;
+
+    [tag="mqss", reconfigurable="yes", description="Set the maximum number of Stats Service RPCs that can be queued by each grSlave instance.", default=200000]
+    uint32_t maxQueuedStatsServiceRpcsPerSlave;
+
+    [tag="dbse", reconfigurable="no", description="Database settings used for game history.", default=""]
+    string(64) dbName;
+    
+    [tag="trco", reconfigurable="no", description="Enables trusted game report collation.", default=false]
+    bool enableTrustedReportCollation;
+       
+    [tag="etps", reconfigurable="no", description="Event types."]
+    EventTypes eventTypes;
+   
+    [tag="gtyp", reconfigurable="no", description="Game Types."]
+    GameTypeConfigMap gameTypes;
+    
+    [tag="hist", reconfigurable="no", description="Game History Configuration"]
+    GameHistoryConfig gameHistory;
+    
+    [tag="htrt", reconfigurable="no", description="Game History Reporting Configuration"]
+    GameHistoryReportingConfig gameHistoryReporting;
+    
+    [tag="mtif", reconfigurable="no", description="Metrics Info Configuration"]
+    MetricsInfoConfig metricsInfo;
+    
+    [tag="skif", reconfigurable="no", description="Skill Info Configuration"]
+    SkillInfoConfig skillInfo;
+    
+    [tag="basc", reconfigurable="no", description="Basic Report Processor Configuration options."]
+    BasicConfig basicConfig;
+
+// FIFA SPECIFIC CODE START
+    [tag="hmac", reconfigurable="no", description="HMAC keyfile configuration options"]
+    HmacConfig hmacConfig;
+    
+    [tag="cust", reconfigurable="no", description="DEPRECATED - user the customGlobalConfig instead - Custom attribute map"]
+    Collections::AttributeMap mCustomAttributeMap;
+// FIFA SPECIFIC CODE END
+
+    [tag="glob", reconfigurable="no", description="Custom global configuration values"]
+    variable mCustomGlobalConfig;
+    
+    [tag="drnd", reconfigurable="yes", advanced=true, default="5s", description="The minimum amount of time to delay a 'drain complete' status after a shutdown has begun.  This is a tunable value that generally does not need to be set."]
+    TimeValue mDrainDelayPeriod;
+    
+    [tag="pinr", reconfigurable="yes", default=true, description="Should game reporting attempt to send game_end event to PIN."]
+    bool mGameReportInGameEndPinEvent;
+
+    [tag="exts", reconfigurable="yes", description="External session default settings."]
+    GameManager::ExternalSessionServerConfig mExternalSessions;
+};
+
+[generateProto=true]
+bitfield ReportFlag
+{
+    [description="Report is suspected for abuse"]
+    abuse : 1;
+};
+
+[generateProto=true]
+class ReportFlagInfo
+{
+    [tag="flag", description="A collection of game report flags. The first bit flag is reserved for reports suspected of abuse."]
+    ReportFlag mFlag;
+    
+    [tag="abrs", description="The reason that a game report is flagged."]
+    string(128) mFlagReason;
+};
+
+[
+    description = "A game report that includes the Collector category and receive order.",
+    details = "Used by the Collector util."
+]
+class CollectorGameReport
+{
+    [tag="cat", description="Collector category for this report."]
+    uint32_t mCategory;
+
+    [tag="ord", description="Order that this report was received by the Collector."]
+    uint32_t mOrder;
+
+    [tag="rprt", description="GameReport as submitted to game reporting."]
+    GameReport mGameReport;
+};
+
+typedef map<GameManager::PlayerId, CollectorGameReport> CollectorReportMap;
+
+[
+    description = "Collector data for a specific game.",
+    details = "Used by the Collector util."
+]
+class CollectorData
+{
+    [tag="colr", description="All Collector reports for a specific game."]
+    CollectorReportMap mReports;
+
+    [tag="colx", description="Running index/tally of all reports received/collected for a specific game."]
+    uint32_t mReportIndex;
+};
+
+[
+    description = "Contains data to collate game reports for a game."
+]
+class ReportCollateData
+{
+    [tag="fngm", description="Information about the finished game being reported on."]
+    GameInfo mGameInfo;
+
+    [tag="stgm", description="Information about the start of game being reported on.  Also used to create GameReportCollator objects."]
+    StartedGameInfo mStartedGameInfo;
+
+    [tag="plst", description="List of player ids submitted game report."]
+    GameManager::PlayerIdList mSubmitterPlayerIds;
+
+    [tag="sest", description="List of session ids submitted game report."]
+    UserSessionIdList mSubmitterSessionIds;
+
+    [tag="prst", description="The absolute time value at which point collation ends and processing begins."]
+    TimeValue mProcessingStartTime;
+
+    [tag="ftme", description="Time (in ms) when the game for this game report finished."]
+    uint64_t mFinishedGameTimeMs;
+
+    [tag="rtyp", description="Type of report submitted (offline not supported)."]
+    ReportType mReportType;
+
+    [tag="fini", description="Whether the game is finished or not (mid-game)."]
+    bool mIsFinished;
+
+    [tag="proc", description="Whether the game report is to be processed.  Covers the time between the slave receiving the last report and another slave being notified to process the reports."]
+    bool mIsProcessing;
+
+    [tag="gmrp", description="All reports for a specific game.  Used by GameReportCollator objects."]
+    GameReportsMap mCollectedGameReportsMap;
+
+    [tag="colc", description="Collector data for a specific game.  Used by the Collector util (as part of GameReportCollator objects)."]
+    CollectorData mCollectorData;
+
+    [tag="cust", description="Custom TDF of collation data.  Provided for custom collators."]
+    variable mCustomData;
+};
+
+} //namespace GameReporting
+} //namespcae Blaze

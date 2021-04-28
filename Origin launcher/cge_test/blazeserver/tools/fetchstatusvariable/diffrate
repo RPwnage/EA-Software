@@ -1,0 +1,330 @@
+#/bin/bash
+
+# compare RPC rates
+
+relative_path=$0
+let last_slash=-1
+for (( i=0;i<${#relative_path};i++ ))
+do
+  if [ "${relative_path:i:1}" = "/" ]; then
+    let last_slash=i+1
+  fi
+done
+if [ $last_slash -gt -1 ]; then
+  relative_path=${relative_path:0:$last_slash}
+else
+  relative_path="./"
+fi
+
+source $relative_path/common
+
+function usage {
+  echo "Usage: $0 file1 file2 interval_sec [reffile [target_psu_to_ref_psu_ratio_percent [threshold_percent [upper_limit_percent ]]]] [options] "
+  echo "Options: "
+  echo "    --help       Print help information (this page). "
+  echo "    --noheader   Do not print headers. "
+  echo "    --refonly    Print only rate difference for RPCs marked as reference in reffile ('*' charachter preceeds RPC name) "
+}
+
+function headerborder {
+  if [ "$printheader" = "yes" ]; then
+    local i
+    let c=$2
+    for (( i=0;i<c;i++ ))
+    do
+      printf "%c" $1
+    done
+    printf "\n"
+  fi
+}
+
+function infoheader {
+  if [ "$printheader" = "yes" ]; then
+    headerborder "-"
+    printf "%-15s %-30s %5s %10s %10s %10s\n" "component" "command" "sr[%]" "count/s" "fail cnt/s" "ref rate"
+    headerborder "-"
+  fi
+}
+
+function comparerates {
+  local oldIFS=$IFS
+  IFS=$'\n'
+
+  local param_lines1=( $1 )
+  local param_linesref=( $2 )
+  local param_threshold=$3
+  local param_upper_limit=$4
+  local i1=0
+  local iref=0
+  local component component1 componentref
+  local cmd cmd1 cmdref
+  local count1 countref fcount1 fcountref
+  local line1 lineref
+  local diffcount=0
+  local successrate countpersec failcountpersec flag limit testit
+
+  local maxi1=${#param_lines1[*]}
+  local maxiref=${#param_linesref[*]}
+ 
+   while [ $i1 -lt $maxi1 -o $iref -lt $iref ]; do
+    IFS=$' '
+    line1=( ${param_lines1[$i1]} )
+    lineref=( ${param_linesref[$iref]} )
+
+    comp1=${line1[0]}
+    cmd1=${line1[1]}
+    successrate1=${line1[2]}
+    count1=${line1[3]}
+    fcount1=${line1[4]}
+
+    compref=${lineref[0]}
+    cmdref=${lineref[1]}
+    countref=${lineref[3]}
+    
+    if [ "${cmdref:0:1}" = '*' ]; then
+      testit="yes"
+      cmdref=${cmdref:1}
+    else
+      testit="no"
+    fi
+    
+    flag=" "
+    refupperlimit=""
+    if [  "$comp1.$cmd1" = "$compref.$cmdref" ]; then
+      component=$comp1
+      cmd=$cmd1
+      let i1=$i1+1
+      let iref=$iref+1
+      let refrate=$countref*$param_target_psu_to_ref_psu_percent/100
+      let refthreshold=$refrate*$param_threshold/100
+      if [ "$testit" = "yes" -a "$cmd" != "(total)" ]; then
+        if [ $refthreshold -gt $count1 ]; then
+          flag="*"
+          let failcount=$failcount+1
+        fi
+        if [ -n "$param_upper_limit" ]; then
+          let refupperlimit=$refrate*$param_upper_limit/100
+          if [ $refupperlimit -lt $count1 ]; then
+            flag="*"
+            let failcount=$failcount+1
+          fi
+        fi
+      fi
+      successrate=$successrate1
+      countpersec=$count1
+      failcountpersec=$fcount1
+    elif [ "$comp1.$cmd1" = "." -o "$comp1.$cmd1" \> "$compref.$cmdref" -a "$ocmpref.$cmdref" != "." ]; then
+      component=$compref
+      cmd=$cmdref
+      let iref=$iref+1
+      let diffcount=$countref
+      if [ "$testit" = "yes" -a "$cmd" != "(total)" ]; then
+        flag="*"
+        let failcount=$failcount+1
+      fi
+      successrate=0
+      countpersec=0
+      failcountpersec=0
+      let refrate=$countref*$param_target_psu_to_ref_psu_percent/100
+      let refthreshold=$refrate*$param_threshold/100
+    else
+      component=$comp1
+      cmd=$cmd1
+      let i1=$i1+1
+      let diffcount=0
+      successrate=$successrate1
+      countpersec=$count1
+      failcountpersec=$fcount1
+      refrate=0
+      let refthreshold=0
+    fi
+
+    if [ "$refonly" = "no" -o "$testit" = "yes" ]; then
+      printf "%-25s %-50s %5s %10s %10s %10s %10s %10s %10s\n" "$component" "$flag$cmd" "$successrate" "$countpersec" "$failcountpersec" "$refrate" "$refthreshold" "$refupperlimit"
+    fi
+ 
+    IFS=$'\n'
+  done
+
+  IFS=$oldIFS
+}
+
+function calcdiff {
+  local oldIFS=$IFS
+  IFS=$'\n'
+
+  local param_lines1=( $1 )
+  local param_lines2=( $2 )
+  local param_interval=$3
+  local i1=0
+  local i2=0
+  local component component1 component2
+  local cmd cmd1 cmd2 cmdref
+  local count1 count2 countref fcount1 fcount2
+  local line1 line2 
+  local diffcount=0
+  local difffailcount=0
+  local successrate countpersec failcountpersec
+
+  local maxi1=${#param_lines1[*]}
+  local maxi2=${#param_lines2[*]}
+ 
+  while [ $i1 -lt $maxi1 -o $i2 -lt $maxi2 ]; do
+    IFS=$' '
+    line1=( ${param_lines1[$i1]} )
+    line2=( ${param_lines2[$i2]} )
+
+    comp1=${line1[0]}
+    cmd1=${line1[1]}
+    count1=${line1[3]}
+    fcount1=${line1[4]}
+
+    comp2=${line2[0]}
+    cmd2=${line2[1]}
+    count2=${line2[3]}
+    fcount2=${line2[4]}
+
+    if [  "$comp1.$cmd1" = "$comp2.$cmd2" ]; then
+      let diffcount=$count2-$count1
+      let difffailcount=$fcount2-$fcount1
+      component=$comp1
+      cmd=$cmd1
+      let i2=$i2+1
+      let i1=$i1+1
+    elif [ "$comp1.$cmd1" = "." -o "$comp1.$cmd1" \> "$comp2.$cmd2" -a "$ocmp2.$cmd2" != "." ]; then
+      component=$comp2
+      cmd=$cmd2
+      let i2=$i2+1
+      let diffcount=$count2
+      let difffailcount=$fcount2
+    else
+      component=$comp1
+      cmd=$cmd1
+      let i1=$i1+1
+      let diffcount=0
+      let diffailcount=0
+    fi
+
+    if [ $diffcount -gt 0 ]; then
+      let successrate=($diffcount-$difffailcount)*100/$diffcount
+    else
+      let successrate=100
+    fi
+    let countpersec=$diffcount*60/$param_interval
+    let failcountpersec=$difffailcount*60/$param_interval
+    printf "%-25s %-50s %5s %10s %10s\n" "$component" "$cmd" "$successrate" "$countpersec" "$failcountpersec"
+ 
+    IFS=$'\n'
+  done
+
+  IFS=$oldIFS
+}
+
+param_file1=$1
+param_file2=$2
+param_interval=$3
+param_reffile=""
+param_threshold=""
+param_upper_limit=""
+param_target_psu_to_ref_psu_percent=""
+args=("$@")
+
+if [ $# -lt 3 ]; then
+  usage
+  exit 1
+fi
+
+printheader="yes"
+refonly="no"
+
+let failcount=0
+
+if [ $# -gt 3 ]; then
+  for (( i=3;i<$#;i++ )) do
+    argval=${args[$i]} 
+    if [ "$argval" = "--noheader" ]; then
+      printheader="no" 
+      continue
+    elif [ "$argval" = "--refonly" ]; then
+      refonly="yes"
+      continue
+    elif [ "$argval" = "--help" ]; then
+      usage
+      exit 0
+    fi
+
+    if [ "${argval:0:1}" = "-" ]; then
+      echo "Unknown option: $argval"
+      exit 1
+    fi
+
+    if [ -z $param_reffile ]; then
+      param_reffile=$argval
+    elif [ -z $param_target_psu_to_ref_psu_percent ]; then
+      param_target_psu_to_ref_psu_percent=$argval
+    elif [ -z $param_threshold ]; then
+      let param_threshold=$argval
+      if [ $param_threshold -gt 99 ]; then
+        echo "Parameter treshold_percent has to be less than 100."
+        exit 1
+      fi
+    elif [ -z $param_upper_limit ]; then
+      let param_upper_limit=$argval
+      if [ $param_upper_limit -lt 101 ]; then
+        echo "Parameter upper_limit_percent has to be greater than 100."
+        exit 1
+      fi
+    fi
+   
+  done
+fi
+
+if [ -z $param_target_psu_to_ref_psu_percent ]; then
+  param_target_psu_to_ref_psu_percent="100"
+fi
+
+if [ -z $param_threshold ]; then
+  param_threshold="100"
+fi
+
+
+IFS=$'\n'
+
+if [ -z $param_threshold ]; then
+  param_threshold=100
+fi
+
+lines1=$(cat $param_file1 | grep '(total)' | sort -k1,1)
+lines2=$(cat $param_file2 | grep '(total)' | sort -k1,1)
+
+linesdif=$(calcdiff "$lines1" "$lines2" $param_interval)
+
+lines1=$(cat $param_file1 | grep -v '(total)' | sort -k1,1)
+lines2=$(cat $param_file2 | grep -v '(total)' | sort -k1,1)
+
+linesdif="$linesdif"$'\n'$(calcdiff "$lines1" "$lines2" $param_interval)
+
+if [ -z $param_reffile ]; then
+  if [ "$printheader" = "yes" ]; then
+    headerborder "-" 104
+    printf "%-25s %-50s %5s %10s %10s\n" "Component" "Command" "sr[%]" "RPC/min" "FAIL/min"
+    headerborder "-" 104
+  fi
+  echo "$linesdif"
+  headerborder "-" 104
+else
+  linesref=$(cat $param_reffile)
+  if [ "$printheader" = "yes" ]; then
+    headerborder "-" 137
+    printf "%-25s %-50s %5s %10s %10s %10s %10s %10s\n" "Component" "Command" "sr[%]" "RPC/min" "FAIL/min" "Target/min" "Min/min" "Max/min"
+    headerborder "-" 137
+  fi
+  comparerates "$linesdif" "$linesref" $param_threshold $param_upper_limit
+  headerborder "-" 137
+fi
+
+if [ $failcount -gt 0 ]; then
+  echo "Error: Reference rate check was failed by $failcount RPCs." >&2
+  exit 1
+fi
+

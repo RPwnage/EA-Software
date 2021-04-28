@@ -1,0 +1,170 @@
+group stubheadermaster : stubheadercommon;
+
+slaveComponent(fileNode, component) ::= <<>>
+
+masterComponent(fileNode, component) ::= <<
+<standardFileHeader()>
+<openIncludeGuard()>
+/*** Include Files ********************************************************************************/
+#include "framework/component/componentstub.h"
+#include "framework/component/message.h"
+#include "framework/connection/session.h"
+#include "framework/connection/inboundrpcconnection.h"
+#include "framework/component/notification.h"
+<if(component.ReplMaps)>#include "framework/replication/mapcollection.h"<endif>
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="tl">.h"
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="tl">_errorstub.h"
+
+#ifdef EA_PLATFORM_WINDOWS
+#pragma warning(push)
+#pragma warning(disable: 4702)
+#endif
+<if(component.generateProto)>
+#include "<component.RelativeOutputProtoPath;format="unixPath">/<component.Name;format="tl"><component.Type;format="toLower">_grpcservice.grpc.pb.h"
+<endif>
+
+#ifdef EA_PLATFORM_WINDOWS
+#pragma warning(pop)
+#endif
+
+/*** Defines/Macros/Constants/Typedefs ************************************************************/
+<if(component.Notifications)>
+namespace Blaze
+{
+class SlaveSession;
+class UserSession;
+}
+<endif>
+
+<if(component.configurationType)>
+namespace Blaze
+{
+class ConfigFile;
+class ConfigMap;
+}
+<endif>
+
+<componentConfigForwardDecl()>
+
+
+<if(component.ReplMaps)>
+namespace Blaze
+{
+template \<class ItemType, class BaseTdfType, class ContextType\> class ReplicatedMap;
+template \<class T\> class ReplicatedMapItem;
+class ReplicatedDataMediator;
+}
+
+<endif>
+
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+<component.Commands:{command|<if(!command.generate_command_class)><if(!command.passthrough)>class <command.Name; format="pascal">CommandStub; <endif><endif>}; separator="\n">
+
+/**************************************************************************************************/
+/*!
+    \class <component.Name><component.Type>
+
+    Stub class for the <component.Name><component.Type> component.
+*/
+/**************************************************************************************************/
+
+class <component.Name><component.Type>Stub : public <component.Name><component.Type>, public ::Blaze::ComponentStub
+{
+public:
+    <component.Name><component.Type>Stub();
+    virtual ~<component.Name><component.Type>Stub();
+    
+    virtual Component& asComponent() { return *this; }
+    virtual const Component& asComponent() const { return *this; }
+    virtual ComponentStub* asStub() { return this; }
+    virtual const ComponentStub* asStub() const { return this; }
+    virtual bool isLocal() const { return true; }
+    
+   <component.DynamicMaps:dynamicMapDefines(...); separator="\n\n">
+    <component.StaticMaps:staticMapDefines(...); separator="\n\n">
+    <component.Notifications:notificationDefines(...); separator="\n">
+
+<if(component.ReplMaps)>
+    virtual ::Blaze::BlazeRpcError replicationSubscribe(InstanceId selectedInstanceId = INVALID_INSTANCE_ID);
+    void addReplicationSubscription(SlaveSession& session, const ReplicationSubscribeRequest& req);
+    void removeReplicationSubscription(SlaveSession& session);
+<endif>
+    
+<componentAutoConfig()>
+
+protected:
+
+<if(component.ReplMaps)>MapCollection mMapCollection;<endif>
+
+<if(component.Commands)>
+private: 
+    <component.Commands:{command|<if(!command.generate_command_class)><if(!command.passthrough)>friend class ::<component.Scope.FullNameList; separator="::">::<command.Name; format="pascal">CommandStub; <endif><endif>}; separator="\n">   
+
+    <component.Commands:processCommandDefinition(...)>
+<endif>
+
+
+<if(component.ReplMaps)>
+protected:
+    void setupReplication();
+
+private:
+    <component.StaticMaps:{map|<map.Name>Map *m<map.Name>Map;}; separator="\n">
+<endif>
+
+
+};
+
+<if(component.generateProto)>
+<component.Commands:{<printGrpcCommandTypedef(component=component, command=it)>}>
+
+<component.Commands:{<printGrpcCommandCreatorDecl(it)>}; separator=";\n">;
+<endif>
+
+<component.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+<closeIncludeGuard()>
+<standardFileFooter()>
+>>
+
+staticMapDefines(map) ::= <<
+static const CollectionId <map.Name;format="toUpper">_MAP_ID;
+typedef ReplicatedMap\<<mapItemType()>, <printTypeRefFullScope(map.tdf_type)>, <if(map.context_type)><printTypeRefFullScope(map.context_type)><else>void<endif>\> <map.Name>Map;
+<map.Name>Map *get<map.Name>Map() { return m<map.Name>Map; }
+const <map.Name>Map *get<map.Name>Map() const { return m<map.Name>Map; }
+>>
+
+dynamicMapDefines(map) ::= <<
+typedef ReplicatedMap\<<mapItemType()>, <printTypeRefFullScope(map.tdf_type)>, <if(map.context_type)><printTypeRefFullScope(map.context_type)><else>void<endif>\> <map.Name>Map;
+<map.Name>Map *create<map.Name>Map(CollectionId &id<if(map.context_type)>, const <printTypeRefFullScope(map.context_type)> *context<endif>);
+void destroy<map.Name>Map(<map.Name>Map *map<if(map.context_type)>, const <printTypeRefFullScope(map.context_type)> *context<endif>);
+<map.Name>Map *get<map.Name>Map(CollectionId &id);
+const <map.Name>Map *get<map.Name>Map(CollectionId &id) const;
+>>
+
+mapItemType() ::= "<if(map.item_type)><printTypeRefFullScope(map.item_type)><elseif(map.master_item_type)><printTypeRefFullScope(map.master_item_type)><else><printTypeRefFullScope(map.tdf_type)><endif>"
+
+userSessionNotificationDefines(notification) ::= <<
+void send<notification.Name>ToUserSession(::Blaze::UserSessionMaster* userSessionMaster<if(notification.NotificationType)>, const <printTypeRefFullScope(notification.NotificationType)>* payload<endif>, bool sendImmediately = false) { sendNotificationToUserSession(NOTIFICATION_INFO_<notification.Name;format="toUpper">, userSessionMaster, <if(notification.NotificationType)>(const EA::TDF::Tdf*)payload<else>nullptr<endif>, ::Blaze::NotificationSendOpts(sendImmediately)); }
+template\<typename InputIterator, typename SessionFetchFunction\>
+void send<notification.Name>ToUserSessions(InputIterator first, InputIterator last, SessionFetchFunction fetchFunction<if(notification.NotificationType)>, const <printTypeRefFullScope(notification.NotificationType)>* payload<endif>, bool sendImmediately = false) { sendNotificationToUserSessions(NOTIFICATION_INFO_<notification.Name;format="toUpper">, first, last, fetchFunction, <if(notification.NotificationType)>(const EA::TDF::Tdf*)payload<else>nullptr<endif>, ::Blaze::NotificationSendOpts(sendImmediately)); }
+
+void send<notification.Name>ToUserSessionById(::Blaze::UserSessionId userSessionId<if(notification.NotificationType)>, const <printTypeRefFullScope(notification.NotificationType)>* payload<endif>, bool sendImmediately = false) { sendNotificationToUserSessionById(NOTIFICATION_INFO_<notification.Name;format="toUpper">, userSessionId, <if(notification.NotificationType)>(const EA::TDF::Tdf*)payload<else>nullptr<endif>, ::Blaze::NotificationSendOpts(sendImmediately)); }
+template\<typename InputIterator, typename SessionIdFetchFunction\>
+void send<notification.Name>ToUserSessionsById(InputIterator first, InputIterator last, SessionIdFetchFunction fetchFunction<if(notification.NotificationType)>, const <printTypeRefFullScope(notification.NotificationType)>* payload<endif>, bool sendImmediately = false) { sendNotificationToUserSessionsById(NOTIFICATION_INFO_<notification.Name;format="toUpper">, first, last, fetchFunction, <if(notification.NotificationType)>(const EA::TDF::Tdf*)payload<else>nullptr<endif>, ::Blaze::NotificationSendOpts(sendImmediately)); }
+
+>>
+
+notificationDefines(notification) ::= <<
+
+// <notification.Name> Notification Interface
+<if(notification.client_export)>
+<userSessionNotificationDefines(notification)>
+<elseif(notification.passthrough)>
+<userSessionNotificationDefines(notification)>
+<else>
+void send<notification.Name>ToInstanceById(InstanceId instanceId<if(notification.NotificationType)>, const <printTypeRefFullScope(notification.NotificationType)>* payload<endif>) { sendNotificationToInstanceById(NOTIFICATION_INFO_<notification.Name;format="toUpper">, instanceId, <if(notification.NotificationType)>(const EA::TDF::Tdf*)payload<else>nullptr<endif>, ::Blaze::NotificationSendOpts()); }
+void send<notification.Name>ToSliver(SliverIdentity sliverIdendtity<if(notification.NotificationType)>, const <printTypeRefFullScope(notification.NotificationType)>* payload<endif>) { sendNotificationToSliver(NOTIFICATION_INFO_<notification.Name;format="toUpper">, sliverIdendtity, <if(notification.NotificationType)>(const EA::TDF::Tdf*)payload<else>nullptr<endif>, ::Blaze::NotificationSendOpts()); }
+void send<notification.Name>ToSlaveSession(SlaveSession* session<if(notification.NotificationType)>, const <printTypeRefFullScope(notification.NotificationType)>* payload<endif>, bool sendImmediately = false) { sendNotificationToSlaveSession(NOTIFICATION_INFO_<notification.Name;format="toUpper">, session, <if(notification.NotificationType)>(const EA::TDF::Tdf*)payload<else>nullptr<endif>, ::Blaze::NotificationSendOpts(sendImmediately)); }
+void send<notification.Name>ToSlaves(<if(notification.NotificationType)>const <printTypeRefFullScope(notification.NotificationType)>* payload,<endif> bool sendImmediately = false) { sendNotificationToSlaves(NOTIFICATION_INFO_<notification.Name;format="toUpper">, <if(notification.NotificationType)>(const EA::TDF::Tdf*)payload<else>nullptr<endif>, ::Blaze::NotificationSendOpts(sendImmediately), true); }
+<endif>
+>>

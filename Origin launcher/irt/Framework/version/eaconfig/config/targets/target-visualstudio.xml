@@ -1,0 +1,399 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <target name="visualstudio-internal" hidden="true">
+	<warn group="5016" message="Calling target '${target.name}' when package.VisualStudio.use-non-proxy-build-tools='true'. When invoking 'visualstudio' targets your installed Visual Studio will be found and it's included MSBuild will be used. If you wish to use pre-package MSBuild use an 'msbuild' target instead." if="${package.VisualStudio.use-non-proxy-build-tools??false}"/>
+  
+    <property name="vsi-use-dbs" value="0"/>
+    <property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}" />
+	
+    <set-config-vs-version/>
+    <call target="get-visualstudio-installdir"/>
+
+    <call target="set-sln-file"/>
+
+    <property name="platform.name.${config-system}" value="@{GetVisualStudioPlatformName()}"/>
+
+    <choose>
+      <do if="@{FileExists('${sln-file}')}">
+        <GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+        <GetVSConfigName ConfigPropertyName="vsproj_config_name"/>
+		<exec program="${eaconfig.dev-env}">
+		  <args>
+			<arg value="/safemode"/>
+			<arg value="/Log &quot;${VisualStudio.devenv.logfile}&quot;" if="@{PropertyExists('VisualStudio.devenv.logfile')}"/>
+			<arg value="/build"/>
+			<arg value='"${vsproj_config_name}|${platform.name.${config-system}}"'/>
+			<arg value='"${sln-file}"'/>
+			<arg value="/project ${eaconfig.build-one-module}" if="@{PropertyExists('eaconfig.build-one-module')}"/>
+		  </args>
+		  <env>
+			<option name="VSI_USE_DBS" value="${vsi-use-dbs}"/>
+		  </env>
+		</exec>
+      </do>
+      <do>
+        <choose>
+          <do if="@{StrIsEmpty('${${eaconfig.build.group}.buildmodules??}')}">
+            <echo message="There seems to be no modules in the '${eaconfig.build.group}' build group, nothing to build!"/>
+          </do>
+          <do>
+            <fail message="Need to generate SLN file for ${package.name} package.  Couldn't find ${sln-file}"/>
+          </do>
+        </choose>
+      </do>
+    </choose>
+  </target>
+  
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <target name="visualstudio-internal-all" hidden="true">
+        <property name="eaconfig.build.configs" value ="@{DistinctItems('${config} ${eaconfig.build.configs??${package.configs}}')}"/> 
+        <property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>        
+        <property name="eaconfig.cmdline_prop_optionset_name" value="nant.commandline.properties"/> 
+        <do if="!@{OptionSetExists('nant.commandline.properties')} and @{OptionSetExists('nant.commadline.properties')}"> 
+            <!-- 
+                TODO: nant.commadline.properties cleanup 
+                We had a typo with nant.commandline.properties in older version of Framework and  
+                this optionset was named nant.commadline.properties.  So if the new optionset name  
+                doesn't exists, we must be using an old Framework.  Switch back to the old name. 
+            --> 
+            <property name="eaconfig.cmdline_prop_optionset_name" value="nant.commadline.properties"/> 
+        </do> 
+        <foreach item="String" in="${eaconfig.build.configs}" property="build-config-name"> <!-- TODO: parallel.foreach? VS builds are very parllel anyway and kicking them all at once just add confusion-->
+            <choose>
+                <!-- if its our current config, just build sln -->
+                <do if="${build-config-name} == ${config}">
+                    <call target="visualstudio-internal"/>
+                </do>
+                
+                <!-- if its not our current config, launch a sub project with right config call internal singe config target -->
+                <do>
+                    <nant buildfile="${nant.project.buildfile}" 
+                    target="visualstudio-internal" 
+                    optionset="${eaconfig.cmdline_prop_optionset_name}" 
+                    global-properties-action="initialize" 
+                    start-new-build="false">
+                        <property name="config" value="${build-config-name}"/>
+                        <property name="package.configs" value="${eaconfig.build.configs}"/>
+                        <property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}"/>
+                        <property name="eaconfig.build.group.names" value="${eaconfig.build.group.names}"/>
+                    </nant>
+                </do>
+            </choose>
+        </foreach>
+    </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="visualstudio-internal-clean" hidden="true">
+    <set-config-vs-version/>
+    <call target="get-visualstudio-installdir"/>
+    <property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}" />
+
+    <call target="set-sln-file"/>
+
+    <property name="platform.name.${config-system}" value="@{GetVisualStudioPlatformName()}"/>
+
+    <do if="@{FileExists('${sln-file}')}">
+      <GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+      <GetVSConfigName ConfigPropertyName="vsproj_config_name"/>
+
+      <exec program="${eaconfig.dev-env}">
+        <args>
+          <arg value="/safemode"/>
+          <arg value="/Log &quot;${VisualStudio.devenv.logfile}&quot;" if="@{PropertyExists('VisualStudio.devenv.logfile')}"/>
+          <arg value="/clean"/>
+          <arg value='"${vsproj_config_name}|${platform.name.${config-system}}"'/>
+          <arg value="${sln-file}"/>
+          <arg value="/project ${eaconfig.build-one-module}" if="@{PropertyExists('eaconfig.build-one-module')}"/>
+        </args>
+      </exec>
+    </do>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="visualstudio-internal-deploy" hidden="true">
+    <set-config-vs-version/>
+    <call target="get-visualstudio-installdir"/>
+    <property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}" />
+
+    <call target="set-sln-file"/>
+
+    <do unless="@{FileExists('${sln-file}')}">
+      <!-- Try to use alternative sln file that could be generated by slngroup targets -->
+      <do unless="@{PropertyExists('eaconfig.build.split-by-group-names')}">
+        <property name="sln-file-alt" local="true" value="@{GetSolutionFileName('${eaconfig.build.group}', '${generate-single-config??false}', 'false')}"/>
+        <do if="@{FileExists('${sln-file-alt}')}">
+          <echo>
+            Deploy target for '${eaconfig.build.group}' group:
+            Solution file '${sln-file}' does not exist.
+            Will use file '${sln-file-alt}' that is generated when 'eaconfig.build.split-by-group-names=false'
+          </echo>
+          <property name="sln-file" value="${sln-file-alt}"/>
+        </do>
+      </do>
+    </do>
+
+    <property name="platform.name.${config-system}" value="@{GetVisualStudioPlatformName()}"/>
+
+    <do if="@{FileExists('${sln-file}')}">
+      <GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+      <GetVSConfigName ConfigPropertyName="vsproj_config_name"/>
+
+      <exec program="${eaconfig.dev-env}">
+        <args>
+          <arg value="/safemode"/>
+          <arg value="/Log &quot;${VisualStudio.devenv.logfile}&quot;" if="@{PropertyExists('VisualStudio.devenv.logfile')}"/>
+          <arg value="/deploy"/>
+          <arg value='"${vsproj_config_name}|${platform.name.${config-system}}"'/>
+          <arg value="${sln-file}"/>
+          <arg value="/project ${eaconfig.build-one-module}" if="@{PropertyExists('eaconfig.build-one-module')}"/>
+        </args>
+      </exec>
+    </do>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="visualstudio-internal-open" hidden="true">
+    <set-config-vs-version/>
+
+    <property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}" />
+
+    <!-- we don't need to verify build settings when opening a visual studio solution, it causes issues on some platforms -->
+    <property local="true" name="original_export_build_settings" value="${package.VisualStudio.exportbuildsettings??true}"/>
+    <property name="package.VisualStudio.exportbuildsettings" value="false"/>
+    
+    <call target="get-visualstudio-installdir"/>
+    
+    <!-- set exportbuildsettings back to what it was before to avoid impacting multi target cases -->
+    <property name="package.VisualStudio.exportbuildsettings" value="${original_export_build_settings}"/>
+
+    <!-- update build script intellisense files -->
+    <call target="intellisense-quick-install"/>
+    
+    <call target="set-sln-files"/>
+    
+    <parallel.foreach item="String" in="${sln-files}" property="distinct-config-sln-file">
+        <property name="sln-file" value="@{StrReplace(@{DistinctItems('${distinct-config-sln-file}')}, '?', ' ')}"/>
+        <choose>
+            <do if="@{FileExists('${sln-file}')}">
+                <start filename="${eaconfig.dev-env}" useshell="false" detached="true">
+                    <args>
+                        <arg value="&quot;${sln-file}&quot;"/>
+                    </args>
+                </start>
+            </do>
+            <do>
+                <echo>Visual Studio solution file '${sln-file}' does not exist </echo>
+            </do>
+        </choose>
+      </parallel.foreach>
+  </target>
+  
+  <!-- set current sln file name for current group and config -->
+  <target name="set-sln-file" hidden="true">
+        <property name="sln-file" value="@{GetSolutionFileName('${eaconfig.build.group}', '${generate-single-config??false}', '${eaconfig.build.split-by-group-names??true}')}"/>
+  </target>
+  
+  <!-- collects sln file names for current group across all package configs-->
+  <target name="set-sln-files" hidden="true">
+        <property name="sln-files" value=""/> <!-- we collect distinct sln names in this property-->
+  
+        <property name="eaconfig.build.configs" value ="@{DistinctItems('${config} ${eaconfig.build.configs??${package.configs}}')}"/>
+        <property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>        
+        <property name="eaconfig.cmdline_prop_optionset_name" value="nant.commandline.properties"/> 
+        <do if="!@{OptionSetExists('nant.commandline.properties')} and @{OptionSetExists('nant.commadline.properties')}"> 
+            <!-- 
+                TODO: nant.commadline.properties cleanup 
+                We had a typo with nant.commandline.properties in older version of Framework and  
+                this optionset was named nant.commadline.properties.  So if the new optionset name  
+                doesn't exists, we must be using an old Framework.  Switch back to the old name. 
+            --> 
+            <property name="eaconfig.cmdline_prop_optionset_name" value="nant.commadline.properties"/> 
+        </do> 
+        <foreach item="String" in="${eaconfig.build.configs}" property="build-config-name">
+            <choose>
+                <!-- if its our current config, just get the sln file name -->
+                <do if="${build-config-name} == ${config}">
+                    <call target="set-sln-file"/>
+                    
+                    <property name="sln-files" value="${property.value} @{StrReplace(${sln-file}, ' ', '?')}"/>
+                </do>
+                
+                <!-- if its not our current config, launch a sub project with right config and record the sln file name -->
+                <do>
+                    <nant buildfile="${nant.project.buildfile}" 
+                    target="set-sln-file" 
+                    optionset="${eaconfig.cmdline_prop_optionset_name}" 
+                    global-properties-action="initialize" 
+                    start-new-build="false">
+                        <property name="config" value="${build-config-name}"/>
+                        <property name="package.configs" value="${eaconfig.build.configs}"/>
+                        <property name="eaconfig.build.group" value="${eaconfig.build.group}"/>
+                        <property name="eaconfig.build.group.names" value="${eaconfig.build.group.names}"/>
+                        <out-property out-property-name="config-sln-file" child-property-name="sln-file"/>
+                    </nant>
+                    
+                    <property name="sln-files" value="${property.value} @{StrReplace(${sln-file}, ' ', '?')}"/>
+                </do>
+            </choose>
+        </foreach>
+
+        <!-- reduce property to distinct values -->
+         <property name="sln-files" value="@{DistinctItems('${sln-files}')}"/>
+  </target>
+
+  <!-- Locate the Visual Studio install directory. -->
+  <target name="get-visualstudio-installdir">
+    <dependent name="VisualStudio"/>
+	<do if="@{TargetExists('init-devenv-location')}"> <!-- in older versiions of VisualStudio package, devenv.com property is always defined  -->
+		<call target="init-devenv-location"/>
+	</do>
+	<property name="eaconfig.dev-env" value="${package.VisualStudio.devenv.com}"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio')}' == 'exclude'">
+    <target name="visualstudio" description="Build the library using visualstudio" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="visualstudio-internal"/>
+    </target>
+  </do>
+  
+   <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-all')}' == 'exclude'">
+    <target name="visualstudio-all" description="Build the library using visualstudio" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="visualstudio-internal-all"/>
+    </target>
+  </do>
+  
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-example')}' == 'exclude'">
+    <target name="visualstudio-example" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <call target="visualstudio-internal"/>
+    </target>
+  </do>
+  
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-all-example')}' == 'exclude'">
+    <target name="visualstudio-all-example" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <call target="visualstudio-internal-all"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-test')}' == 'exclude'">
+    <target name="visualstudio-test" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <call target="visualstudio-internal"/>
+    </target>
+  </do>
+  
+   <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-all-test')}' == 'exclude'">
+    <target name="visualstudio-all-test" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <call target="visualstudio-internal-all"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-tool')}' == 'exclude'">
+    <target name="visualstudio-tool" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="visualstudio-internal"/>
+    </target>
+  </do>
+  
+    <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-all-tool')}' == 'exclude'">
+    <target name="visualstudio-all-tool" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="visualstudio-internal-all"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-clean')}' == 'exclude'">
+    <target name="visualstudio-clean" description="Clean the library using visualstudio" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="visualstudio-internal-clean"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-example-clean')}' == 'exclude'">
+    <target name="visualstudio-example-clean" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <call target="visualstudio-internal-clean"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-test-clean')}' == 'exclude'">
+    <target name="visualstudio-test-clean" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <call target="visualstudio-internal-clean"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-tool-clean')}' == 'exclude'">
+    <target name="visualstudio-tool-clean" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="visualstudio-internal-clean"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-deploy')}' == 'exclude'">
+    <target name="visualstudio-deploy" description="Clean the library using visualstudio" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="visualstudio-internal-deploy"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-example-deploy')}' == 'exclude'">
+    <target name="visualstudio-example-deploy" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <call target="visualstudio-internal-deploy"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-test-deploy')}' == 'exclude'">
+    <target name="visualstudio-test-deploy" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <call target="visualstudio-internal-deploy"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-tool-deploy')}' == 'exclude'">
+    <target name="visualstudio-tool-deploy" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="visualstudio-internal-deploy"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-open')}' == 'exclude'">
+    <target name="visualstudio-open" description="Open the visualstudio solution" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="visualstudio-internal-open"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-example-open')}' == 'exclude'">
+    <target name="visualstudio-example-open" description="Open the visualstudio solution for example group" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <call target="visualstudio-internal-open"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-test-open')}' == 'exclude'">
+    <target name="visualstudio-test-open" description="Open the visualstudio solution for test group" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <call target="visualstudio-internal-open"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'visualstudio-tool-open')}' == 'exclude'">
+    <target name="visualstudio-tool-open" description="Open the visualstudio solution for tool group" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="visualstudio-internal-open"/>
+    </target>
+  </do>
+</project>

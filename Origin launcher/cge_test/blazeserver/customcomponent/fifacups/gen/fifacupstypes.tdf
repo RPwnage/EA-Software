@@ -1,0 +1,333 @@
+// Defines the TDF classes used in the fifacups component
+//  TDF classes are compiled with TypeComp, generating C++ classes that can be serialized in RPCs and Notifications.
+//
+// Note: see http://gos.online.ea.com/confluence/display/tech/Typecomp for info on the .tdf spec, as well as the compiler, TypeComp
+
+[headername="framework/tdf/entity.h"]
+#include "framework/gen/entity.tdf"
+
+[headername="stats/tdf/stats.h"]
+#include "stats/gen/stats.tdf"
+
+[headername="osdktournaments/tdf/osdktournamentstypes.h"]
+#include "osdktournaments/gen/osdktournamentstypes.tdf"
+
+
+namespace Blaze
+{
+namespace FifaCups
+{
+    typedef EntityId MemberId;
+    typedef uint32_t SeasonId;
+    typedef uint32_t LeagueId;
+    typedef Blaze::OSDKTournaments::TournamentId TournamentId;
+    typedef int64_t TimeStamp;
+        
+    enum MemberType
+    {
+        FIFACUPS_MEMBERTYPE_USER = 1,
+        FIFACUPS_MEMBERTYPE_CLUB,
+        FIFACUPS_MEMBERTYPE_COOP
+    };
+    
+    enum CupState
+    {
+        FIFACUPS_CUP_STATE_NONE = 0,
+        FIFACUPS_CUP_STATE_INACTIVE,
+        FIFACUPS_CUP_STATE_ACTIVE
+    };
+    
+    enum TournamentStatus
+    {
+        FIFACUPS_TOURNAMENT_STATUS_NONE = 0,
+        FIFACUPS_TOURNAMENT_STATUS_ELIMINATED,
+        FIFACUPS_TOURNAMENT_STATUS_WON
+    };
+
+    enum TournamentResult
+    {
+		FIFACUPS_TOURNAMENTRESULT_WON = 0,
+		FIFACUPS_TOURNAMENTRESULT_ELIMINATED,
+		FIFACUPS_TOURNAMENTRESULT_ADVANCED,
+		FIFACUPS_TOURNAMENTRESULT_NONE
+    };
+     
+    enum TournamentRule
+    {
+        [description="Unlimited access to the tournament"]
+        FIFACUPS_TOURNAMENTRULE_UNLIMITED = 1,
+        [description="Win once, unlimited retries if eliminated"]
+        FIFACUPS_TOURNAMENTRULE_RETRY_ON_LOSS   = 2,
+        [description="One attempt at the tournament"]
+        FIFACUPS_TOURNAMENTRULE_ONE_ATTEMPT   = 3
+    };
+    
+    enum StatMode
+    {
+		EVERY_OTHER_NONE = 0,
+		EVERY_OTHER_ODD,
+		EVERY_OTHER_EVEN
+	};
+     
+    [tdfid="hash", description="The configuration of a cup"]
+    class Cup
+    {
+        [tag="cid", description="The cup id"]
+        uint32_t mCupId;
+        
+        [tag="sdiv", description="The start division"]
+        uint32_t mStartDiv;
+
+        [tag="ediv", description="The end division"]
+        uint32_t mEndDiv;
+        
+        [tag="trul", description="The tournament rule for this cup"]
+        uint32_t  mTournamentRule;
+		
+		[tag="cacv", description="the cup active status for rotating cups, open being users can join this cup"]
+		CupState mState;
+		
+		[tag="copt", description="the time when this cup will be open"]
+		TimeStamp mTimeOpen;
+	
+		[tag="rulm", description="maps to different game (house) rules for each cup id"]
+		uint32_t mRuleId;
+	};
+    
+	[description="The configuration of a season"]
+	class SeasonConfiguration
+	{
+	    [tag="sid", description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+        
+        [tag="mtyp", description="The type of Entity that can be a member of this season"]
+        MemberType mMemberType;
+        
+        [tag="lgid", description="The league id associated with this season"]
+        LeagueId mLeagueId;
+                
+        [tag="tid", description="The tournament id associated with this seasonal play instance"]
+        TournamentId mTournamentId;
+        
+        [tag="sprt", descripion="Stats category period type"]
+        Blaze::Stats::StatPeriodType mStatPeriodtype;
+	};  
+	
+    [description="Request to get the cup info for the entity passed in"]
+    class GetCupInfoRequest
+    {
+        [tag="mid", description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+    }; 
+
+    [description="The details of a cup that is specific to registered member"]
+    class CupInfo
+    {
+    	[tag="sid", description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+
+        [tag="stat", description="The current state of the season"]
+        CupState mCupState;
+               
+        [tag="cst", description="Current regular season start time"]
+        TimeStamp mCupStart;
+        
+        [tag="cet", description="Current regular season end time"]
+        TimeStamp mCupEnd;
+        
+        [tag="nct", description="Next regular season start time"]
+        TimeStamp mNextCupStart;
+        
+        [tag="tid", description="The tournament id associated with this seasonal play instance"]
+        TournamentId mTournamentId;
+
+        [tag="tsta", description="Member's tournament status"]
+        TournamentStatus mTournamentStatus;
+
+        [tag="telg", description="Member is eligible for tournament play"]
+        bool mTournamentEligible;
+        
+        [tag="qdiv", description="The division within the leaderboard that the member is in"]
+        uint32_t mQualifyingDivision;
+
+        [tag="cid", description="Current active cup id"]
+        uint32_t mCupId;
+
+		[tag="clst", description = "future cups window data"]
+		list<Cup> mCups;	
+	};
+	
+    [description="Request to reset the cup status for the entity passed in"]
+	class ResetCupStatusRequest
+	{
+       [tag="mid", description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;   
+	};
+
+    [description="Set active cup id"]
+	class SetActiveCupIdRequest
+	{
+       [tag="mid", description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;   
+        
+        [tag="cpid", description="The cup id"]
+        uint32_t mCupId;
+	};
+	
+    [description="Request to update the tournament result of the given entity"]
+    class UpdateTournamentResultRequest
+    {
+        [tag="mid", description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+ 
+        [tag="tmrs", description="The tournament result"]
+        TournamentResult  mTournamentResult;
+        
+        [tag="tmlv", description="The tournament Level"]
+        uint32_t  mTournamentLevel;
+    };
+    
+    [description="Request to set the qualifying division of the given entity"]
+    class SetQualifyingDivRequest
+    {
+        [tag="mid", description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+ 
+        [tag="qdiv", description="the qualifying div"]
+        uint32_t  mDiv;
+    };
+    
+    [description="Request to register a club info fifa cups"]
+    class RegisterClubRequest
+    {
+        [tag="mid", description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mlg", description="The league id"]
+        LeagueId	mLeagueId;
+    };
+    
+       
+    [description="Request to register an entity info fifa cups"]
+    class RegisterEntityRequest
+    {
+        [tag="mid", description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType	mMemberType;
+
+        [tag="mlg", description="The league id"]
+        LeagueId	mLeagueId;        
+    };
+
+	[description="Cup Duration Structure"]
+    class CupDuration
+    {
+		[tag="cday", description="Cup Days"]
+		uint32_t mDays;
+		
+		[tag="cuph", description="Cup hours"]
+		uint32_t mHours;
+
+		[tag="cmin", description="Cup minutes"]
+		uint32_t mMinutes;
+	};
+	
+	class CupRotationException
+	{
+		[tag="cupi", description="The cup id"]
+		uint32_t mCupId;
+        
+		[tag="cpsa", description="the cup active status for rotating cups, open being users can join this cup"]
+		CupState mState;
+		
+		[tag="extm", description="the time when this cup will be open or close"]
+		string(64) mTime;
+		
+		[tag="exti", description="the time when this cup will be open or close in 64bit integer"]
+		TimeStamp mTimeInSeconds;
+	};
+			
+	class Instances
+	{
+	    [tag="sid", description="The seasonal play instance id"]
+        SeasonId mId;
+        
+        [tag="mtyp", description="The type of Entity that can be a member of this season"]
+        uint32_t mMemberType;
+        
+        [tag="lgid", description="The league id associated with this season"]
+        LeagueId mLeagueId;
+                
+        [tag="sprt", descripion="Stats category period type"]
+        uint32_t mPeriodType;
+
+		[tag="smod", description="The stat mode", reconfigurable="yes"]
+		uint32_t mStatMode;
+
+        [tag="tid", description="The tournament id associated with this seasonal play instance"]
+        TournamentId mTournamentId;
+        
+		[tag="tmod", description="The tournament mode", reconfigurable="yes"]
+		uint32_t mTournamentMode;		   
+
+		[tag="sdiv", description="The start division"]
+		uint32_t mStartDivision;		
+
+		[tag="cupc", default="SPOverallClubsStats", description = "Cup Stat Category", reconfigurable="yes"]
+		string(64) mCupStatCategory;
+		
+		[tag="cupd", description = "Cup Durtion days hours minutes", reconfigurable="yes"]
+		CupDuration mCupDuration;
+			
+		[tag="cdat", description = "Cups data", reconfigurable="yes"]
+		list<Cup> mCups;
+		
+		[tag="cdex", description = "Cups exception data", reconfigurable="yes"]
+		list<CupRotationException> mRotationExceptions;
+		
+		[tag="urot", description = "number of cups to rotate with", reconfigurable="yes"]
+		uint32_t mRotatingCupsCount;
+	};
+	
+	class FifaCupsConfig
+	{
+		[tag="dbna", default="main", description = "DB to use.", reconfigurable="no"]
+		string(64) mDbName;
+
+		[tag="aurg", description= "Are users automatically registered in versus seasonal play on login", reconfigurable="yes"]
+	    bool mAutoUserRegistration;
+
+		[tag="acrg", description= "Are clubs automatically registered in club seasonal play on club creation", reconfigurable="yes"]
+	    bool mAutoClubRegistration;
+
+		[tag="slst", description = "Seasonal data list", reconfigurable="yes"]
+		list<Instances> mInstances;
+	};
+	class GetConfigResponse
+	{
+		[tag="cfg", description="FifaCups server config TDF"]
+		FifaCupsConfig mConfig;
+	};
+       
+} // FifaCups
+} // Blaze
+
+
+

@@ -1,0 +1,170 @@
+[ headername="nucleusconnect/tdf/nucleusconnect.h" ]
+#include "nucleusconnect/gen/nucleusconnect.tdf"
+
+namespace Blaze
+{
+namespace NucleusConnect
+{
+
+[
+    id = core/1003,
+    description = "Component used for access to the Nucleus Connect 2.0 APIs",
+    details = "NucleusConnect supports RESTful APIs for communicating with the Nucleus Connect 2.0 system.",
+    proxyOnly = true,
+    http = {
+        apiVersion = "",
+        urlParamEncoderSubType = "DEFAULTDIFFERNCE"
+    }
+]
+component NucleusConnect
+{
+    errors
+    {
+        [ description = "The token provided was not a valid Identity 2.0 access token" ]
+        NUCLEUS_ERR_INVALID_TOKEN = 1;
+        [ description = "The request is rejected by Nucleus with a 4xx error." ]
+        NUCLEUS_ERR_INVALID_REQUEST = 2;
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+              id = 1,
+              description = "Get an access token by providing one of the possible oauth input (code, refresh token etc.)",
+              details = "Gets an access token to be used when accessing the Nucleus 2.0 api",
+              requires_authentication = false,
+              client_export = false,
+              errors = {
+                NUCLEUS_ERR_INVALID_REQUEST
+              },
+              errortype = ErrorResponse,
+              http = {
+                resource = "/connect/token",
+                method = "POST",
+                custom_request_headers = {
+                  "X-NUCLEUS-USER-IP" = "ipAddress",
+                  "X-Include-RT-Time" = "refreshTime"
+                },
+                url_params = {
+                  "grant_type" = "grantType",
+                  "code" = "code",
+                  "redirect_uri" = "redirectUri",
+                  "refresh_token" = "refreshToken",
+                  "pidId" = "pidId",
+                  "username" = "email",
+                  "password" = "password",
+                  "access_token" = "currentAccessToken", // Used with grant_type=exchange. Deprecated. 
+                  "client_id" = "clientId",
+                  "client_secret" = "clientSecret",
+                  "salt" = "salt",
+                  "scope" = "scope",
+                  "release_type" = "releaseType",
+                  "token_format" = "tokenFormat"
+                },
+                status_code_errors = {
+                  400 = NUCLEUS_ERR_INVALID_REQUEST,
+                  401 = NUCLEUS_ERR_INVALID_REQUEST,
+                  403 = NUCLEUS_ERR_INVALID_REQUEST,
+                  404 = NUCLEUS_ERR_INVALID_REQUEST,
+                  409 = NUCLEUS_ERR_INVALID_REQUEST
+                },
+                addEncodedPayload = false
+              }
+            ]
+            GetAccessTokenResponse getAccessToken(GetAccessTokenRequest);
+
+            [
+              id = 2,
+              description = "Get info related to an access token",
+              details = "Get info related to an access token",
+              requires_authentication = false,
+              client_export = false,
+              errors = {
+                NUCLEUS_ERR_INVALID_TOKEN
+              },
+              errortype = ErrorResponse,
+              http = {
+                resource = "/connect/tokeninfo",
+                method = "GET",
+                custom_request_headers = {
+                  "X-NUCLEUS-USER-IP" = "ipAddress",
+                  "X-INCLUDE-DEVICEID" = "includeDeviceid",
+                  "X-INCLUDE-CONSOLEENV" = "includeConsoleenv",
+                  "X-Include-IPGeo" = "includeGeoIp",
+                  "X-Include-StopProcess" = "includeStopProcess",
+                  "X-Include-AuthenticationSource" = "includeAuthSource",
+                  "X-Include-PlatformType" = "includePlatformType"
+
+                },
+                url_params = {
+                  "client_id" = "clientId",
+                  "access_token" = "accessToken"
+                },
+                status_code_errors = {
+                  400 = NUCLEUS_ERR_INVALID_TOKEN,
+                  401 = NUCLEUS_ERR_INVALID_TOKEN,
+                  403 = NUCLEUS_ERR_INVALID_TOKEN,
+                  404 = NUCLEUS_ERR_INVALID_TOKEN,
+                  409 = NUCLEUS_ERR_INVALID_TOKEN
+                },
+                encodeBoolsAsTrueFalse = true,
+                addEncodedPayload = false
+              }
+            ]
+            GetTokenInfoResponse getTokenInfo(GetTokenInfoRequest);
+
+            [
+              id = 3,
+              description = "Get an auth code",
+              details = "Fetches an auth code using an access token and persona/personaNamespace",
+              requires_authentication = false,
+              client_export = false,
+              errors = {
+                NUCLEUS_ERR_INVALID_REQUEST
+              },
+              errortype = ErrorResponse,
+              http = {
+                resource = "/connect/auth",
+                method = "GET",
+                url_params = {
+                  "client_id" = "clientId",
+                  "access_token" = "accessToken",
+                  "response_type" = "responseType",
+                  "redirect_uri" = "redirectUri",
+                  "persona_namespace" = "personaNamespace",
+                  "persona_display_name" = "personaName",
+                  "release_type" = "releaseType"
+                },
+                custom_response_headers = {
+                    "location" = "authCode"
+                },
+                status_code_errors = {
+                  400 = NUCLEUS_ERR_INVALID_REQUEST
+                },
+                maxHandledUrlRedirects = 0,
+                addEncodedPayload = false
+              }
+            ]
+            GetAuthCodeResponse getAuthCode(GetAuthCodeRequest);
+
+            [
+                id = 4,
+                description = "Get a list of Json Web Keys (JWK)",
+                details = "Get a list of Json Web Keys which are the public key info for JWT signature verification",
+                requires_authentication = false,
+                client_export = false,
+                errortype = ErrorResponse,
+                http = {
+                  resource = "/connect/.well-known/access-token-configuration/certs",
+                  method = "GET"
+              }
+            ]
+            GetJwtPublicKeyInfoResponse getJwtPublicKeyInfo();
+        }
+    }
+}
+
+} // namespace NucleusConnect
+} // namespace Blaze

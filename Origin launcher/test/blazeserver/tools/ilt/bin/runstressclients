@@ -1,0 +1,54 @@
+#!/bin/bash -x
+
+echo "Note: etc needs to be your current directory to run this script."
+
+# relative path of script relative to launch location
+srcDir=$(dirname ${BASH_SOURCE[0]})
+
+source $srcDir/clientdeploy.cfg
+
+startrun=$1
+endrun=$2
+containerNamePrefix=$3
+clientFullPath=$(realpath ${clientpath})
+
+# remove docker image on sandbox if already exists. always download new image from repository
+docker rmi -f src.ent.ea.com:8443/gs/gs_docker_sandbox/${dockerImage} > /dev/null 2>&1
+dockerAccessToken=$(sudo cat /opt/gs/etc/blazectrl.conf | sed -n -e 's/^.*registry_token = //p')
+docker login -u gitlab-ci-token -p ${dockerAccessToken} src.ent.ea.com:8443
+docker pull src.ent.ea.com:8443/gs/gs_docker_sandbox/${dockerImage}
+
+if [ -z "$endrun" ]; then
+    echo "Usage $0 num num"
+    echo "Run numbers are required"
+    exit 1
+fi
+
+ulimit -c unlimited
+export LD_LIBRARY_PATH="${clientFullPath}/lib"
+
+let startIndex=(startrun - 1)*totalstressconnections
+
+for i in `seq $startrun $endrun`; do 
+
+    echo "start stress $i..."
+
+    for stressinstance in ${stressinstances[@]}; do
+
+        # convert row to array of elements
+        instanceArr=($(echo "$stressinstance" | tr ":" " "))
+        instanceName=${instanceArr[0]}_${i}
+        instanceNumConns=${instanceArr[1]}
+        instanceConfig=${instanceArr[2]}
+
+        let instanceDelay=$rampup*60*1000/$instanceNumConns
+
+        docker run -dit --name ${containerNamePrefix}_${instanceName} --rm --net=host -v ${clientFullPath}:${clientFullPath} -e LD_LIBRARY_PATH=${clientFullPath}/lib -w ${clientFullPath}/etc src.ent.ea.com:8443/gs/gs_docker_sandbox/${dockerImage} \
+        ../bin/stress -c ../etc.ilt.sports/stress/stress-integrated.cfg $stressSecureOverride -DCONN_INSTANCE_DELAY=$instanceDelay -DNUM_CONNECTIONS=$instanceNumConns -DSERVER_CONFIG=../etc.ilt.sports/stress/stress-integrated-servers.cfg -DTEST_CONFIG=$instanceConfig -DSTART_INDEX=$startIndex -DMOCK_EXTERNAL_SESSIONS=${useMockConsoleServices} -DPLATFORM=${deployPlat} -DSERVICE_NAME_PREFIX=${serviceNamePrefix} -DUSE_STRESS_LOGIN=${useStressLogin} --instance_name ${instanceName} --logdir ../log --logname stress_client_${instanceName} --testid $(uuidgen -t) > /dev/null 2>&1
+
+        let startIndex+=instanceNumConns
+
+    done
+
+done
+

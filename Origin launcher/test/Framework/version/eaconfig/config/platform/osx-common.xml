@@ -1,0 +1,78 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <property name="osx.support-shared-pch" value="false"/>
+
+  <!-- keeping this property around for now for backward compatibility -->
+  <property name="package.osx_config.dir" value="${package.eaconfig.dir}"/>
+
+  <property name="cc.std.osx.default" value="${cc.std.osx.default??c++17}"/>
+  <property name="osx-deployment-target-version"   value="10.14"  unless="@{PropertyExists('osx-deployment-target-version')}"/>
+
+  <property name="default-lib-prefix"           value="lib"/>
+  <property name="default-lib-suffix"           value=".a"/>
+  <property name="default-dll-suffix"           value=".dylib"/>    <!-- OSX's shared library actually uses .dylib as extension -->
+  <property name="default-exe-suffix"           value=""/>
+  <property name="default-secured-exe-suffix"   value=""/>
+
+  <property name="lib-prefix"           value="${lib-prefix.${config-system}??${lib-prefix??${default-lib-prefix}}}"/>
+  <property name="lib-suffix"           value="${lib-suffix.${config-system}??${lib-suffix??${default-lib-suffix}}}"/>
+  <property name="dll-suffix"           value="${dll-suffix.${config-system}??${dll-suffix??${default-dll-suffix}}}"/>
+  <property name="exe-suffix"           value="${exe-suffix.${config-system}??${exe-suffix??${default-exe-suffix}}}"/>
+  <property name="secured-exe-suffix"   value="${secured-exe-suffix.${config-system}??${secured-exe-suffix??${default-secured-exe-suffix}}}"/>
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle"        value="Unix"/>
+  <!-- Compile in parallel on multiple CPUs -->
+  <property name="cc.parallelcompiler"    value="true"/>
+  <property name="as.parallelcompiler"    value="true"/>
+
+  <property name="eaconfig.use_valgrind" value="${eaconfig.use_valgrind??false}"/>
+  <property name="valgrind-define" value=""/>
+  <property name="valgrind-define" value="EA_VALGRIND_ENABLED" if="${eaconfig.use_valgrind}"/>
+
+  <do if="@{PropertyExists('sys.env.PATH')}">
+    <property name="build.env.PATH" value="${property.value}:${sys.env.PATH}" />
+  </do>
+
+  <property name="link.usealtsepinresponsefile" value="true"/>
+  <property name="lib.usealtsepinresponsefile" value="true"/>
+  <property name="cc.usealtsepinresponsefile" value="true"/>
+
+  <include file="osx-clang-buildtools.xml"/>
+
+  <target name="osxconfig-init-csharpcommon" hidden="true">
+    <property name="build.resgen.program" value="${package.mono.tools.resgen}"/>
+  </target>
+
+  <optionset name="config-options-csharplibrary">
+    <option name="buildset.name"            value="CSharpLibrary" />
+    <option name="buildset.tasks"           value="csc" />
+    <option name="buildset.csc.target"      value="library" />
+    <option name="delayedinit"              value="osxconfig-init-csharpcommon" />
+    <option name="linkoutputname"           value="%outputdir%/%outputname%.dll" />
+  </optionset>
+
+  <optionset name="config-options-csharpprogram">
+    <option name="buildset.name"            value="CSharpProgram" />
+    <option name="buildset.tasks"           value="csc" />
+    <option name="buildset.csc.target"      value="exe" />
+    <option name="delayedinit"              value="osxconfig-init-csharpcommon" />
+    <option name="linkoutputname"           value="%outputdir%/%outputname%.exe" />
+  </optionset>
+
+  <!--For Framework 2 and Framework 3 pre/post build steps-->
+  <do if="${xcode-projectize??false}">
+    <dependent name="XcodeProjectizer"/>
+  </do>
+  <property name="remotesync.additional-packages" value="${property.value} EARunner XcodeProjectizer"/>
+
+  <!-- Setup buildlayout file needed by Icepick -->
+  <!-- Expected an osx.get-packaging-output target being provided to properly resolve %output% token -->
+  <!-- Also, need to make sure to use target xcode-archive-export target to build the .ipa instead of xcodebuild -->
+  <optionset name="config-build-layout-entrypoint-common">
+      <option name="app" value="%output%"/>
+  </optionset>
+  <!-- An app bundle package should already contains all additional dependencies -->
+  <property name="osx.build-layout-skip-additionalfiles" value="true"/>
+  
+</project>

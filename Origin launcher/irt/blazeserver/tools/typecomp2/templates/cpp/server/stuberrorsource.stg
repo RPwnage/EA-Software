@@ -1,0 +1,61 @@
+group stuberrorsource : stubsourcecommon;
+
+masterComponent(fileNode, component) ::= << 
+<doComponent(fileNode=fileNode, component=component)>
+>>
+
+slaveComponent(fileNode, component) ::= <<
+<doComponent(fileNode=fileNode, component=component)>
+>>
+
+doComponent(fileNode, component) ::= <<
+<standardFileHeader()>
+
+/*** Include Files ********************************************************************************/
+
+#include "framework/blaze.h"
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="toLower">.h"
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="tl">_errorstub.h"
+
+/*** Defines/Macros/Constants/Typedefs ************************************************************/
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+
+<component.Commands:commandErrorStruct()>
+
+<component.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+
+<standardFileFooter()>
+>>
+
+commandErrorStruct(command) ::= <<
+<command.Name;format="pascal">Error::Error <command.Name;format="pascal">Error::commandErrorFromBlazeError(::Blaze::BlazeRpcError blazeError)
+{
+    if (((BLAZE_CODE_FROM_ERROR(blazeError) & BLAZE_COMPONENT_CUSTOM_ERROR_BASE) ==  BLAZE_COMPONENT_CUSTOM_ERROR_BASE) && BLAZE_COMPONENT_FROM_ERROR(blazeError) == <component.CompId>)
+    {
+        // let custom errors go through
+        return static_cast\<<command.Name;format="pascal">Error::Error\>(blazeError);
+    }
+    else
+    {
+        switch (blazeError)
+        {
+            case ::Blaze::ERR_OK : return ERR_OK;
+            case ::Blaze::ERR_SYSTEM : return ERR_SYSTEM;
+            case ::Blaze::ERR_TIMEOUT : return ERR_TIMEOUT;
+            case ::Blaze::ERR_MOVED : return ERR_MOVED;
+            case ::Blaze::ERR_GUEST_SESSION_NOT_ALLOWED : return ERR_GUEST_SESSION_NOT_ALLOWED;
+            case ::Blaze::ERR_AUTHORIZATION_REQUIRED : return ERR_AUTHORIZATION_REQUIRED;
+            <if(command.requires_authentication)>            case ::Blaze::ERR_AUTHENTICATION_REQUIRED : return ERR_AUTHENTICATION_REQUIRED;<endif>
+            <command.errors:{case ::Blaze::<it> : return <it>;}; separator="\n">
+            default:
+            {
+                BLAZE_WARN_LOG(<component.Name><component.Type>::LOGGING_CATEGORY, "[<command.Name;format="pascal">]: Warning: converting unexpected blazeRpcError " \<\<  blazeError \<\< " ("
+                                \<\< ::Blaze::ErrorHelp::getErrorName(blazeError) \<\<") to ERR_SYSTEM");
+                return ERR_SYSTEM;
+            }
+        }
+    }
+}
+
+
+>>

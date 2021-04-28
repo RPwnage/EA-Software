@@ -1,0 +1,191 @@
+// Defines the TDF classes used in the osdksettings component.
+//  TDF classes are compiled with TypeComp, generating C++ classes that can be serialized in RPCs and Notifications.
+//
+// Note: see http://gos.online.ea.com/confluence/display/tech/Typecomp for info on the .tdf spec, as well as the compiler, TypeComp
+
+namespace Blaze
+{
+namespace OSDKSettings
+{
+
+// Constants / Enums
+[ description = "Various length constants." ]
+const uint32_t  SETTING_IDENTIFIER_LENGTH_MAX        = 18;
+const uint32_t  SETTING_LABEL_LENGTH_MAX             = 64;
+const uint32_t  SETTING_HELP_LABEL_LENGTH_MAX        = 512;
+const uint32_t  SETTING_DEFAULT_STRING_LENGTH_MAX    = 256;
+
+[ description = "Label and value for 'any' integer." ]
+const char8_t*  SETTING_ANY_VALUE_LABEL              = "OSDK_ANY";
+const int32_t   SETTING_ANY_VALUE                    = -1;
+
+[ description = "Defaults for each type of field in a setting." ]
+const int8_t    SETTING_FIELD_BOOLEAN_DEFAULT_FALSE  = 0;
+const int8_t    SETTING_FIELD_BOOLEAN_DEFAULT_TRUE   = 1;
+const char8_t*  SETTING_FIELD_STRING_DEFAULT         = "";
+const int32_t   SETTING_FIELD_INTEGER_DEFAULT        = 0;
+
+[ description = "Some settings config file constants." ]
+const char8_t*  SETTING_CONFIG_FILE_ID               = "osdksettings";
+const char8_t*  SETTING_CONFIG_MAP_NAME              = "settings";
+const char8_t*  SETTING_CONFIG_TYPE_INTEGER          = "integer";
+const char8_t*  SETTING_CONFIG_TYPE_STRING           = "string";
+
+[ description = "Some Blaze typedefs to be used later in lists." ]
+typedef string(SETTING_IDENTIFIER_LENGTH_MAX) IdString;
+typedef string(SETTING_LABEL_LENGTH_MAX) LabelString;
+
+[ description = "A setting value." ]
+class SettingValue
+{
+    [tag="id", default = "", description = "Identifier of the setting."]
+    IdString mId;
+
+    [tag="type", default = "", description = "'integer' or 'string'"]
+    string(SETTING_DEFAULT_STRING_LENGTH_MAX) mType;
+
+    [tag="def", default = "", description = "Default int/string value of the setting."]
+    string(SETTING_DEFAULT_STRING_LENGTH_MAX) mDefault;
+
+    [tag="pers", default = true, description = "The toggles of the setting - visible, enabled, etc.)"]
+    bool mPersistent;
+
+    [tag="vis", default = true, description = "The toggles of the setting (visible, enabled, etc.)"]
+    bool mVisible;
+
+    [tag="enab", default = true, description = "The toggles of the setting (visible, enabled, etc.)"]
+    bool mEnabled;
+
+    [tag="labl", default = "", description = "Label of the setting."]
+    LabelString mLabel;
+
+    [tag="hlab", default = "", description = "Help label of the setting."]
+    string(SETTING_HELP_LABEL_LENGTH_MAX) mHelpLabel;
+
+    [tag="locf", default = false, description = "If localized = true, it means the client setting component will localize the label, help, and value fields. (default false)"]
+    bool mLocalized;
+	
+	[tag="locl", default = false, description = "If mHasLocalizedLabel = true, it means the label is localized. (default false)"]
+    bool mHasLocalizedLabel;
+
+    [tag="lohl", default = false, description = "If mHasLocalizedHelpLabel = true, it means the help label is localized. (default false)"]
+    bool mHasLocalizedHelpLabel;
+
+    [tag="lovl", default = false, description = "If mHasLocalizedValueLabel = true, it means the value label is localized. (default false)"]
+    bool mHasLocalizedValueLabel;
+
+    [tag="pval", description = "a list of possible values, [<value1>, <value2>,...]"]
+    list<int32_t> mPossibleValues;
+
+    [tag="pvll", description = "label for each possible value"]
+    list<string(SETTING_HELP_LABEL_LENGTH_MAX)> mPossibleValueLabels;
+};
+
+
+class SettingViewDataTdf
+{
+    [tag="id", description = "Identifier of the setting in this view."]
+    IdString mId;
+
+    [tag="pers", default = true, description = "The toggles of the setting - visible, enabled, etc.)"]
+    bool mPersistent;
+
+    [tag="vis", default = true, description = "The toggles of the setting (visible, enabled, etc.)"]
+    bool mVisible;
+
+    [tag="enab", default = true, description = "The toggles of the setting (visible, enabled, etc.)"]
+    bool mEnabled;
+
+    [tag="hlab", description = "Help label of the setting in this view."]
+    string(SETTING_HELP_LABEL_LENGTH_MAX) mHelpLabel;
+
+    [tag="defs", description = "Default value of the setting in this view."]
+    string(SETTING_DEFAULT_STRING_LENGTH_MAX) mDefault;
+
+    [tag="val", description = "Value of the setting in this view."]
+    string(SETTING_DEFAULT_STRING_LENGTH_MAX) mValue;
+};
+
+[ description = "A setting view." ]
+class SettingViewTdf
+{
+    [tag="id", description = "Identifier of the view."]
+    IdString mId;
+
+    [tag="lvds", description = "List of viewdata's."]
+    list<SettingViewDataTdf> mViewData;
+};
+
+[ description = "A setting group." ]
+class SettingGroup
+{
+    typedef list<IdString> IdStringList;
+
+    [tag="id", description = "Identifier of the group."]
+    IdString mId;
+
+    [tag="lset", description = "List of settings (not in views)."]
+    IdStringList mSettings;
+
+    [tag="lvws", description = "List of views."]
+    list<SettingViewTdf> mViews;
+};
+
+typedef list<SettingGroup> SettingGroupList;
+typedef list<SettingValue> SettingValueList;
+
+// RPC Request/Response Types
+[
+    description = "The request object for a fetchSettings command.",
+    details = "This request has no parameters."
+]
+class FetchSettingsRequest
+{
+};
+
+[ description = "The response object for a fetchSettings command." ]
+class FetchSettingsResponse
+{
+    [tag="lsin", description="List of integer settings."]
+    SettingValueList mSettingValueList;
+};
+
+[
+    description = "The request object for a fetchSettingsGroups command.",
+    details = "This request has no parameters."
+]
+class FetchSettingsGroupsRequest
+{
+};
+
+[ description = "The response object for a fetchSettingsGroups command." ]
+class FetchSettingsGroupsResponse
+{
+    [tag="lgrp", description="A list of setting groups."]
+    SettingGroupList mSettingGroupList;
+};
+
+
+class OSDKSettingsConfigTdf
+{
+    [tag="slst", description="List of settings values."]
+    SettingValueList settings;
+
+    [tag="sgrp", description="List of setting groups."]
+    SettingGroupList groups;
+};
+
+class OSDKSettingsConfig
+{
+    [tag="stts", description="The settings used by the osdk config."]
+    OSDKSettingsConfigTdf osdkSettings;
+};
+
+
+// Error Types
+
+} // OSDKSettings
+} // Blaze
+
+
+

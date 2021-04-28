@@ -1,0 +1,93 @@
+[headername="gamemanager/tdf/gamemanager_types.h"]
+#include "gamemanager/gen/gamemanager_types.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+
+
+[reconfigurable="yes", description = "Configuration for game quality factor shaper function"]
+class DefaultShaper
+{
+    [tag="best", default=0.0f, description="Best value possible.  Results in a score of 1.0"]
+    float bestValue;
+
+    [tag="maxv", default=-1.0f, description="Good enough value.  Games with this value are considered the same as the best Value (1.0 score)"]
+    float goodEnoughValue;
+
+    [tag="viab", default=-1.0f, description="Viable value.  Games can be created/joined with this value."]
+    float viableValue;
+
+    [tag="wrst", default=0.0f, description="Worst value possible.  Results in a score of 0.0"]
+    float worstValue;
+
+    [tag="gran", default=-1.0f, description="Indicates how values are grouped together.  Score only increases when passing granularity threshold."]
+    float granularity;
+};
+
+// Valid transforms:  
+// min, max, minmax (delta), avg, ratio?
+typedef string(-1) PackerQualityFactorTransform;
+
+typedef string(-1) PackerQualityFactorKey;
+typedef list<PackerQualityFactorKey> PackerQualityFactorKeyList;
+typedef map<PackerQualityFactorKey, float> PackerQualityFactorScoringMap;
+
+[reconfigurable="yes", description = "Configuration for game quality factor"]
+class GameQualityFactorConfig
+{
+    [tag="prop", default="", description="Derived game property optimized by this factor.  May reference values held by Players, not Game the."]
+    PropertyName gameProperty;
+
+    [tag="tran", default="", description="Transformation that will be applied to the gameProperty and or ScoringMap."]
+    PackerQualityFactorTransform transform;
+
+    [tag="tmmg", default=MERGE_MIN_MAX_RANGE, description="Op applied to the teams results."]
+    MergeOp teamMergeOp;
+
+    [tag="keys", description="List of keys that we want to send to Packer. (PackerQualityFactorKeyList)"]
+    TemplateAttributeDefinition keys;
+
+    [tag="scmp", description="Source of the values used per-player. (PackerQualityFactorScoringMap)"]
+    TemplateAttributeDefinition scoringMap;
+
+    [tag="shpr", description="Score shaper configuration."]
+    TemplateAttributeTdfMapping scoreShaper;
+};
+
+typedef list<GameQualityFactorConfig> GameQualityFactorConfigList;
+
+[reconfigurable="yes", description = "Configuration for game packer silo"]
+class PackerConfig
+{
+    [tag="qlst", description="List of quality factor optimizations and constraints applied when packing the game. Factors are processed in order of priority."]
+    GameQualityFactorConfigList qualityFactors;
+    
+    [tag="vgcd", default="1s", description="Amount of time after last game improvement(to viable score) before the game is finalized."]
+    TimeValue viableGameCooldownThreshold;
+
+    [tag="igcd", default="100ms", description="Amount of time after game improvement(to ideal score) before the game is finalized.", advanced=true]
+    TimeValue idealGameCooldownThreshold;
+
+    [tag="mwse", default=0, description="Caps the number of games evaluated by packer slave. Games added exceeding this will cause game with lowest score to be retired from evaluation.", advanced=true]
+    uint32_t maxWorkingSet;
+
+    [tag="role", default="game.roles", description="Expression that references a game property that tracks the number of roles."]
+    string(-1) roles;
+
+    [tag="fdur", default="5s", description="Max finalization time.", advanced=true]
+    TimeValue finalizationDuration; // PACKER_TODO: reduce this after more load testing and master change to prioritize session assignment by priority
+
+    [tag="mttl", default="1ms", description="Packer slave will refuse sessions that have less time remaining.", advanced=true]
+    TimeValue minTimeToLiveThreshold;
+    
+    [tag="pdfl", description="Debug setting that controls how long to pause after acquiring finalization locks. Used for testing mutually exclusive finalization.", advanced=true]
+    TimeValue pauseDurationAfterAcquireFinalizationLocks;
+};
+
+} // GameManager
+} // Blaze
+
+
+

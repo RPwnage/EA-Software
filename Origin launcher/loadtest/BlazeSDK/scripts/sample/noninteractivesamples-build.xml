@@ -1,0 +1,94 @@
+<project>
+    <!-- Copyright 2008-2016 Electronic Arts Inc.  All rights reserved. -->
+    <dependent name="PyroSDK"/>
+
+    <property name="buildtype" local="true" value="WindowsProgram" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+    <include file="${package.dir}/scripts/sample/_commonSampleSettings.xml"/>
+
+    <Program name="NonInteractiveSamples" frompartial="BlazeSample" unless="(${config-system} == 'iphone') or (${config-system} == 'iphonesim')">
+        <includedirs>
+            ${package.dir}/samples/NonInteractiveSamples
+        </includedirs>
+
+        <sourcefiles>
+            <includes name="${package.dir}/samples/NonInteractiveSamples/*.cpp"/>
+            <includes name="${package.dir}/samples/NonInteractiveSamples/xboxone/*.cpp" if="${config-system} == 'capilano'"/>
+        </sourcefiles>
+
+        <libraries>
+            <do if="${config-system} == 'ps5'">
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}SceAmpr.a"/><!--Needed for PS5 ampr methods used by EAIO-->
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}SceAppContent_stub_weak.a"/>
+            </do>
+        </libraries>
+
+        <bulkbuild enable="true"/>
+
+        <buildsteps>
+            <run workingdir="${package.builddir}/${config}/bin" args="-pyro:startui=${package.PyroSDK.dir}/prebuilt/PyroUi.exe"/>
+        </buildsteps>
+
+        <sdkreferences if="${config-system} == 'capilano' and ${gdk.enabled??false} == false">
+            Xbox Services API, Version=8.0
+            Xbox.Game.Chat.2.Cpp.API, Version=8.0
+        </sdkreferences>
+
+        <config>
+            <defines>
+                <do if="${config-system} == 'capilano' or ${config-system} == 'kettle' or ${config-system} == 'nx'">
+                    BLAZESAMPLE_EACUP_ENABLED
+                    BLAZESAMPLE_EASEMD_ENABLED
+                </do>
+            </defines>
+        </config>
+
+        <dependencies>
+            <auto>
+                <do if="${config-system} == 'capilano' or ${config-system} == 'kettle' or ${config-system} == 'nx'">
+                    EAMessage
+                    EASystemEventMessageDispatcher
+                    EAControllerUserPairing
+                </do>
+            </auto>
+        </dependencies>
+    </Program>
+
+    <do if="${config-system} == 'capilano' and ${gdk.enabled??false} == false">
+        <dependent name="DirtySDK"/>
+
+        <!--Set the appxmanifest options -->
+        <optionset name="runtime.NonInteractiveSamples.appxmanifestoptions" fromoptionset="config-options-appxmanifestoptions">
+            <option name="Xbox_Live_Config">
+                <![CDATA[
+                <mx:Extension Category="xbox.live">
+                    <mx:XboxLive TitleId="7A970EA1" PrimaryServiceConfigId="00000000-0000-0000-0000-00007a970ea1"/>
+                </mx:Extension>
+                
+                <mx:Extension Category="xbox.multiplayer">
+                    <mx:XboxMultiplayer CanSuppressPartyChat="true" />
+                </mx:Extension>
+            ]]>
+            </option>
+            <option name="extension_options">
+                ${option.value}
+                Xbox_Live_Config
+            </option>
+            <option name="capabilities">
+                ${option.value}
+                kinectAudio
+                kinectGamechat
+            </option>
+        </optionset>
+        <property name="runtime.NonInteractiveSamples.networking-manifest-files">
+            ${package.DirtySDK.networking-manifest-files}
+            ${package.dir}/scripts/sample/ignition-networkmanifest.xml
+        </property>
+
+        <!-- Copy over Shaders for Rendering -->
+        <copy file="${package.BlazeSDK.dir}\samples\xboxone\Tutorial05_PS.hlsl"
+              tofile="${package.configbindir}\NonInteractiveSamples\Tutorial05_PS.hlsl"/>
+        <copy file="${package.BlazeSDK.dir}\samples\xboxone\Tutorial05_VS.hlsl"
+              tofile="${package.configbindir}\NonInteractiveSamples\Tutorial05_VS.hlsl"/>
+    </do>
+</project>
+

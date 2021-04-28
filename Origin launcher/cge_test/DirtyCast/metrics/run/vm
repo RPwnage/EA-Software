@@ -1,0 +1,143 @@
+#!/usr/bin/python
+
+import commands, os, string, sys, time
+
+# declare uninitialized variables here
+build = ''
+diagnosticport = ''
+
+# declare initialized variables here
+voipserverport = 0
+portoffset = 0
+numvs = 0
+diagnosticport = 0
+regionlist = ''
+titlelist = ''
+platform = ''
+region = ''
+
+path = os.environ.get('PWD')
+reload = False
+valgrind = False
+
+def getvmoptions():
+	options = ' -queryrate=300 -summary=1'
+	return options
+
+def getlocalserverlist():
+	lslist = ''
+	for i in range(0, numvs):
+		vsport = voipserverport + portoffset * i
+
+		if i != 0:
+			lslist = lslist + ',' + str(vsport + 1)
+		else:
+			lslist = lslist + str(vsport + 1) 
+	return lslist
+
+def getregionaldiagport(platform):
+	diagport = 0
+
+	if (platform == 'ps3'):
+		diagport = 19995
+	elif (platform == 'xbl2'):
+		diagport = 19990
+	else:
+		diagport = 19985
+
+	return diagport
+
+def gettitlediagport(platform):
+	return getregionaldiagport(platform) + 1
+
+def startvm(options, serverlist, diagport, type, region, tier):
+	valgrindcall = ''
+	if valgrind:
+		valgrindcall = 'valgrind --tool=memcheck --leak-check=yes --log-file=valgrind-voipmetrics --error-limit=no -v '
+	command = '(' + valgrindcall + path + '/voipmetrics' + build[0] + ' voipmetrics.cfg' + ' -servername=127.0.0.1 -diagnosticport=' + str(diagport) + ' -region=' + region + ' -tier=' + str(tier) + options + ' -portlist='
+
+	command = command + serverlist
+	command = command + ' -logger.cfgfile=voipmetrics_logger.cfg -logger.errfile=voipmetrics' + str(diagport) + '.log'
+	command = command + ' -logger.catdflt=' + category.replace('voipmetrics.log', 'voipmetrics' + str(diagport) + '.log').strip()
+	command = command + ' > vm.log 2>&1 &) &'
+
+	print 'Starting ' + type + ' VoipMetrics' + str(diagport) + ' -> http://' + commands.getoutput('hostname').strip() + ':' + str(diagport) + '/status'
+	os.system(command)
+
+if len(sys.argv) < 2:
+	print 'Usage: ./vm {start [options] | stop {--reload} [options]}'
+	print 'Options:'
+	print '-build -diagnosticport -numvs -platform -portoffset -region -regionlist -titlelist -voipserverport --valgrind'
+	sys.exit()
+
+for option in sys.argv[2:]:
+	if option == '--valgrind':
+		valgrind = True
+	 	continue
+	option = option.strip().split('=')
+        if option[0] == '-voipserverport':
+                voipserverport = int(option[1])
+        elif option[0] == '-portoffset':
+                portoffset = int(option[1])
+        elif option[0] == '-build':
+                build = option[1]
+        elif option[0] == '-numvs':
+                numvs = int(option[1])
+	elif option[0] == '-diagnosticport':
+		diagnosticport = int(option[1])
+	elif option[0] == '-platform':
+		platform = option[1]
+	elif option[0] == '-region':
+		region = option[1]
+	elif option[0] == '-regionlist':
+		regionlist = option[1]
+	elif option[0] == '-titlelist':
+		titlelist = option[1]
+
+if sys.argv[1] == 'start':
+	config = open('voipmetrics_logger.cfg')
+	for line in config:
+		if line.find('CATEGORY_DEFAULT=') == 0:
+			category = line[17:]
+
+	options = getvmoptions()
+
+	# first, start vm for local server processes
+	startvm(options, getlocalserverlist(), diagnosticport, 'Local', region, 1)
+
+	# if there is a regional server list, start that
+	if regionlist != '':
+		startvm(options, regionlist, getregionaldiagport(platform), 'Regional', region, 2)
+
+	# if there is a title server list, start that
+	if titlelist != '':
+		# override diagnostic port with regional port
+		titlelist = titlelist.replace(':' + str(voipserverport), ':' + str(getregionaldiagport(platform)))
+		startvm(options, titlelist, gettitlediagport(platform), 'Title', region, 3)
+
+elif sys.argv[1] == 'stop':
+        killtype = '-TERM '
+
+        files = commands.getoutput('ls')
+        for file in files.split():
+                if file.find('voipmetrics') != -1 and file.find('.pid') != -1:
+			print 'Stopping VoipMetrics' +  file[11:file.find('.pid')]
+			pid = open(file).readline()
+			os.system('kill ' + killtype + pid)
+
+
+elif sys.argv[1] == 'kill':
+	killtype = '-TERM '
+	if type == '9':
+		killtype = '-9 '
+
+	pslist = commands.getoutput('ps -ef|grep ' + path.split('-')[0] + '|grep voipmetrics|grep -v grep').split('\n')
+	for ps in pslist:
+                if len(ps) != 0:
+		    print 'Killing VoipMetrics server'
+		    cmd = 'kill ' + killtype + ps.split()[1]
+		    os.system(cmd)
+
+else:
+	print 'Usage: ./vm {start [options] | stop [options] | kill [options]}'
+

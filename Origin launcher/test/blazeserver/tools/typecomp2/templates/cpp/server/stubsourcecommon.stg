@@ -1,0 +1,91 @@
+group stubsourcecommon : servercommon;
+
+componentAutoConfigIncl() ::= <<
+<if(component.configurationType)>
+#include "framework/controller/controller.h"
+<endif>
+
+
+<if(component.configurationType)>
+#include "framework/config/config_file.h"
+<endif>
+>>
+
+componentAutoConfigImpl() ::=<<
+<if(component.configurationType)>
+bool <component.Name><component.Type>Stub::loadConfig(EA::TDF::TdfPtr& newConfig, bool loadFromStaging) 
+{
+    newConfig = ComponentStub::mComponentInfo.baseInfo.configTdfDesc != nullptr ? ComponentStub::mComponentInfo.baseInfo.configTdfDesc->createInstance(getAllocator(), "Component Configuration") : nullptr;
+
+    const ::Blaze::ConfigFile* newConfigFile = nullptr;
+    ::Blaze::BlazeRpcError rc = ::Blaze::gController->getConfig(getBaseName(), loadFromStaging, newConfigFile, newConfig, true);
+    if (rc != ::Blaze::ERR_OK)
+    {
+        BLAZE_ERR_LOG(::Blaze::Log::SYSTEM, "[<component.Name><component.Type>Stub].loadConfig: Got error " \<\< ::Blaze::ErrorHelp::getErrorName(rc) \<\< " fetching config for component(<component.Name>).");
+        return false;    
+    }
+
+    if (loadFromStaging)
+    {
+        if (mComponentConfig != mInitialComponentConfig)
+        {
+            delete mComponentConfig;
+        }
+        mComponentConfig = newConfigFile;
+    }
+    else
+    {
+        // initial config will only get deleted in dtor to protect component implementations
+        // that access strings stored within the config without implementing onReconfigure()
+        mInitialComponentConfig = mComponentConfig = newConfigFile;
+    }
+
+    return true;
+}
+
+const ::Blaze::ConfigMap* <component.Name><component.Type>Stub::getComponentConfig() const
+{
+    return mComponentConfig;
+}
+<endif>
+
+>>
+
+mapCreateDestroy(map) ::= <<
+<component.Name><component.Type>Stub::<if(!component.IsMaster)>Shared<endif><map.Name>Map *<component.Name><component.Type>Stub::create<map.Name>Map(CollectionId &id<if(map.context_type)>, const <printTypeRefFullScope(map.context_type)> *context<endif>)
+{
+    return <if(component.IsMaster)>mMapCollection.<else>mSharedCollection-\><endif>createDynamicMap\<<if(!component.IsMaster)>Shared<endif><map.Name>Map\>(<map.Name;format="toUpper">_MAP_ID_RANGE, id<if(map.context_type)>, context<endif>);
+}
+
+void <component.Name><component.Type>Stub::destroy<map.Name>Map(<if(!component.IsMaster)>Shared<endif><map.Name>Map *map<if(map.context_type)>, const <printTypeRefFullScope(map.context_type)> *context<endif>)
+{
+    if (map != nullptr)
+    {
+        CollectionId id(map->getCollectionId());
+        <if(component.IsMaster)>mMapCollection.<else>mSharedCollection-\><endif>destroyDynamicMap(id<if(map.context_type)>, context<endif>);
+    }
+}
+
+<component.Name><component.Type>Stub::<if(!component.IsMaster)>Shared<endif><map.Name>Map* <component.Name><component.Type>Stub::get<map.Name>Map(CollectionId &id)
+{
+    return <if(component.IsMaster)>mMapCollection.<else>mSharedCollection-\><endif>getDynamicMap\<<if(!component.IsMaster)>Shared<endif><map.Name>Map\>(<map.Name;format="toUpper">_MAP_ID_RANGE, id);
+}
+
+const <component.Name><component.Type>Stub::<if(!component.IsMaster)>Shared<endif><map.Name>Map* <component.Name><component.Type>Stub::get<map.Name>Map(CollectionId &id) const
+{
+    return <if(component.IsMaster)>mMapCollection.<else>mSharedCollection-\><endif>getDynamicMap\<<if(!component.IsMaster)>Shared<endif><map.Name>Map\>(<map.Name;format="toUpper">_MAP_ID_RANGE, id);
+}
+
+>>
+
+printGrpcCommandCreatorDefinition(component, command) ::= <<
+<if(command.generateProto)>
+<if(!component.grpcOnly)>
+<printGrpcCommandCreatorDecl(command)>
+{
+    BLAZE_NEW_NAMED("<printGrpcCommandStubName(command)>") <printGrpcCommandStubName(command)>(static_cast\<<printGrpcServiceType(component)>::AsyncService*\>(service), cq, &<printGrpcCommandCreatorName(command)>, &::Blaze::Grpc::processIncomingRequestHandler, &<printGrpcServiceType(component)>::AsyncService::Request<command.Name>, <component.Name><component.Type>::CMD_INFO_<command.Name; format="toUpper">, endpoint);
+}
+
+<endif>
+<endif>
+>>

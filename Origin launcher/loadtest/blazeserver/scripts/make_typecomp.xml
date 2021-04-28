@@ -1,0 +1,87 @@
+<project>
+
+  <property name="package.blazeserver.typecomp.output" value="${package.builddir}/bin/typecomp.jar"/>
+  <property name="package.blazeserver.typecomp.intdir" value="${package.builddir}/bin/typecomp"/>
+  <property name="package.blazeserver.typecomp.intdir" value="@{StrReplace(${package.blazeserver.typecomp.intdir}, '\\', '/')}"/>
+  
+  <target name="buildtools">
+
+    <mkdir dir="${package.blazeserver.typecomp.intdir}"/>
+
+    <dependent name="antlr"/>
+
+    <!-- Copy antlr.jar to the packaeg build directory so we can relativize the path 
+             This is a workaround for classpath length problems -->
+    <do unless="@{FileExists('${package.builddir}/bin/antlr.jar')}">
+      <echo message="Copying ${package.antlr.jar} to ${package.builddir}/bin/antlr.jar"/>
+      <copy file="${package.antlr.jar}" tofile="${package.builddir}/bin/antlr.jar"/>
+    </do>
+
+    <!-- Run ANTLR to convert grammars to Java source code. -->
+    <exec program="${java.exe}" clearenv="true" workingdir="${package.dir}">
+        <args>
+            <arg value="-cp ${package.builddir}/bin/antlr.jar org.antlr.Tool"/>
+            <arg value="-o ${package.blazeserver.typecomp.intdir}"/>
+            <arg value="${exec.inputs.all}"/>
+        </args>
+        <inputs>
+            <includes name="${package.dir}/tools/typecomp2/**.g"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.blazeserver.typecomp.output}" asis="true"/>
+        </outputs>
+    </exec>
+
+    <!-- Compile the Java source code. -->
+    <exec program="${java.compiler}" clearenv="true" workingdir="${package.dir}">
+        <args>
+            <arg value="-cp ${package.builddir}/bin/antlr.jar"/>
+            <arg value="-d ${package.blazeserver.typecomp.intdir}"/>
+            <arg value="${exec.inputs.all}"/>
+        </args>
+        <inputs>
+            <includes name="${package.dir}/tools/typecomp2/**.java"/>
+            <includes name="${package.blazeserver.typecomp.intdir}/**.java"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.blazeserver.typecomp.output}" asis="true"/>
+        </outputs>
+    </exec>
+
+    <!-- Get a list of all the class names (sans path information). -->
+    <property name="package.blazeserver.typecomp.classes" value="@{DirectoryGetFiles('${package.blazeserver.typecomp.intdir}', '*.class', ' ')}"/>
+    <property name="package.blazeserver.typecomp.classes" value="@{StrReplace(${package.blazeserver.typecomp.classes}, '\\', '/')}"/>
+    <property name="package.blazeserver.typecomp.classes" value="@{StrReplace(${package.blazeserver.typecomp.classes}, '${package.blazeserver.typecomp.intdir}/', '')}"/>
+
+
+    <!-- Pack all the classes into a single Java executable archive. -->
+    <exec program="${java.archiver}" clearenv="true" workingdir="${package.blazeserver.typecomp.intdir}">
+        <args>
+            <arg value="cf"/>
+            <arg value="../typecomp.jar"/>
+            <arg value="-C ."/>
+            <arg value="TdfGrammar.tokens"/>
+            <arg value="${package.blazeserver.typecomp.classes}"/>
+        </args>
+        <inputs>
+            <includes name="${package.blazeserver.typecomp.intdir}/*.class"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.blazeserver.typecomp.output}" asis="true"/>
+        </outputs>
+    </exec>
+
+  </target>
+
+  <target name="cleantools">
+    <echo message="Cleaning Typecomp..."/>
+    <delete failonmissing="false">
+      <fileset>
+        <includes name="${package.blazeserver.typecomp.output}"/>
+        <includes name="${package.blazeserver.typecomp.intdir}/*.class"/>
+        <includes name="${package.builddir}/bin/antlr.jar"/>
+      </fileset>
+    </delete>
+  </target>
+  
+</project>

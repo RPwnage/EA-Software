@@ -1,0 +1,103 @@
+#!/usr/bin/python
+
+import commands, os, sys
+
+ident = -1
+startdate = ''
+starttime = ''
+enddate = ''
+endtime = ''
+firstcount = 0
+secondcount = 0
+workcount = 0
+startpoint = 0
+endpoint = 1000000000
+
+month = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
+
+def gettime(startpoint, startdate, starttime, endpoint, enddate, endtime):
+	global firstcount, secondcount, workcount, month
+	startmonth = int(startdate[5:7])
+	startday = int(startdate[8:10])
+	starthour = int(starttime[:2])
+	startmin = int(starttime[3:5])
+	startsec = int(starttime[6:8])
+	start = (month[startmonth] + startday) * 24 * 60 + starthour * 60 + startmin
+	endmonth = int(enddate[5:7])
+	endday = int(enddate[8:10])
+	endhour = int(endtime[:2])
+	endmin = int(endtime[3:5])
+	endsec = int(endtime[6:8])
+	end = (month[endmonth] + endday) * 24 * 60 + endhour * 60 + endmin
+
+	if startpoint > start or endpoint < end:
+		return ''
+
+	day = month[endmonth] - month[startmonth] + endday - startday
+	hour = endhour - starthour
+	min = endmin - startmin
+	sec = endsec - startsec
+
+	if sec < 0:
+		sec = sec + 60
+		min = min - 1
+	if min < 0:
+		min = min + 60
+		hour = hour - 1
+	if hour < 0:
+		hour = hour + 24
+		day = day - 1
+	if day < 0:
+		return 'failure'
+
+        if day == 0 and hour == 0 and min == 0 and sec <= 45:
+		firstcount = firstcount + 1
+	elif day == 0 and hour == 0 and min < 2:
+		if not min == 1 and sec > 30:
+			secondcount = secondcount + 1
+	else:
+		workcount = workcount + 1
+
+        if hour < 10:
+		hour = '0' + str(hour)
+        if min < 10:
+		min = '0' + str(min)
+
+	return str(hour) + ':' + str(min)
+
+
+for arg in sys.argv[1:]:
+	if arg.find('start=') != -1:
+		startstring = arg[6:]
+		startpoint = month[int(startstring[:2])]
+		startpoint = (startpoint + int(startstring[2:4])) * 24 * 60
+		startpoint = startpoint + int(startstring[5:7]) * 60
+		startpoint = startpoint + int(startstring[8:10])
+	if arg.find('end=') != -1:
+		endstring = arg[4:]
+		endpoint = month[int(endstring[:2])]
+		endpoint = (endpoint + int(endstring[2:4])) * 24 * 60
+		endpoint = endpoint + int(endstring[5:7]) * 60
+		endpoint = endpoint + int(endstring[8:10])
+
+files = commands.getoutput('ls')
+for file in files.split():
+	if file.find('gameserver') != -1 and file.find('.log') != -1:
+		for line in open(file):
+			if line.find('creating game IDENT=') != -1:
+				ident = int(line.split()[7][6:])
+				starttime = ''
+				endtime = ''
+			elif line.find('got \'play\' event') != -1:
+				startdate = line.split()[0]
+				starttime = line.split()[1]
+			elif line.find('deleting game') != -1 and ident != -1:
+				enddate = line.split()[0]
+				endtime = line.split()[1]
+				if starttime != '':
+					printval = 'IDENT=' + str(ident) + ' TIME=' + gettime(startpoint, startdate, starttime, endpoint, enddate, endtime)
+				ident = -1
+
+print 'First 45 seconds: ' + str(firstcount)
+print 'Second 45 seconds: ' + str(secondcount)
+print 'Successful Games: ' + str(workcount)

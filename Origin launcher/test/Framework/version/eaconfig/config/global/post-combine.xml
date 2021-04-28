@@ -1,0 +1,30 @@
+<!-- (c) Electronic Arts. All Rights Reserved. -->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- other modules can depend on this redist module in order to copylocal the redist dlls they need -->
+  <!-- defined here because debugflags only exists after the configset step -->
+  <do if="@{PropertyExists('eaconfig.debugfastlink')}">
+    <property name="include-dbghelp-redist" value="true" local="true" if="'${eaconfig.debugfastlink}' == 'on' or '${eaconfig.debugfastlink}' == 'true'"/>
+  </do>
+  <do unless="@{PropertyExists('eaconfig.debugfastlink')}">
+    <property name="include-dbghelp-redist" value="true" local="true" if="@{OptionSetGetValue('config-options-common', 'debugfastlink')} == 'on'"/>
+  </do>
+  <publicdata packagename="eaconfig">
+    <module name="VSRedist" if="(${gdk.enabled??false} and ${config-compiler??} == 'vc')  or ${config-system}==pc or ${config-system}==pc64">
+      <dlls-external>
+        <includes fromfileset="ms.redist-files" unless="@{OptionSetGetValue('config-options-common', 'usedebuglibs')} == 'on'"/>
+        <includes fromfileset="ms.redist-debug-files" if="@{OptionSetGetValue('config-options-common', 'usedebuglibs')} == 'on'"/>
+        <do if="${include-dbghelp-redist??false}">
+          <includes fromfileset="package.WindowsSDK.debugger-dlls"/>
+        </do>
+      </dlls-external>
+    </module>
+  </publicdata>
+
+  <!-- We delayed the load of the GDK's utility modules until now, so that they can now access certain config values (in particular the config-options-common optionset) -->
+  <do if="${gdk.enabled??false} and ${config-compiler??} == 'vc'">
+    <property name="gdk-modules-file" local="true" value="@{PathCombine('${package.GDK.dir}', 'scripts/ModuleInit.xml')}"/>
+    <include file="${gdk-modules-file}" if="@{FileExists('${gdk-modules-file}')}"/>
+  </do>
+
+</project>

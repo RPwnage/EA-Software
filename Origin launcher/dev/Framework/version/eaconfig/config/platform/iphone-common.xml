@@ -1,0 +1,332 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<property name="iphone.support-shared-pch" value="false"/>
+
+	<!-- keeping this property around for now for backward compatibility -->
+	<property name="package.ios_config.dir" value="${package.eaconfig.dir}"/>
+
+	<property name="cc.std.iphone.default" value="${cc.std.iphone.default??c++17}"/>
+	<property name="cc_clanguage.std.iphone.default" value="${cc_clanguage.std.iphone.default??c99}"/>
+	<property name="iphone-deployment-target-version"   value="11.0"        unless="@{PropertyExists('iphone-deployment-target-version')}"/>
+
+	<property name="default-lib-prefix"     value="lib" />
+	<property name="default-lib-suffix"     value=".a" />
+	<property name="default-dll-suffix"     value=".dylib"/>
+	<property name="default-exe-suffix"     value=""/>
+
+	<property name="lib-prefix"             value="${lib-prefix.${config-system}??${lib-prefix??${default-lib-prefix}}}"/>
+	<property name="lib-suffix"             value="${lib-suffix.${config-system}??${lib-suffix??${default-lib-suffix}}}"/>
+	<property name="dll-suffix"             value="${dll-suffix.${config-system}??${dll-suffix??${default-dll-suffix}}}"/>
+	<property name="exe-suffix"             value="${exe-suffix.${config-system}??${exe-suffix??${default-exe-suffix}}}"/>
+
+	<!-- <build> task properties -->
+	<property name="build.pathstyle"        value="Unix"/>
+	<!-- Compile in parallel on multiple CPUs -->
+	<property name="cc.parallelcompiler"    value="true"/>
+	<property name="as.parallelcompiler"    value="true"/>
+
+	<do if="@{PropertyExists('sys.env.PATH')}">
+		<property name="build.env.PATH" value="${property.value}:${sys.env.PATH}" />
+	</do>
+
+	<property name="link.usealtsepinresponsefile" value="true"/>
+	<property name="lib.usealtsepinresponsefile" value="true"/>
+	<property name="cc.usealtsepinresponsefile" value="true"/>
+
+	<include file="iphone-clang-buildtools.xml"/>
+
+	<optionset name="config-options-csharplibrary">
+		<option name="buildset.name"            value="CSharpLibrary" />
+		<option name="buildset.tasks"           value="csc" />
+		<option name="buildset.csc.target"      value="library" />
+	</optionset>
+
+	<optionset name="config-options-csharpprogram">
+		<option name="buildset.name"            value="CSharpProgram" />
+		<option name="buildset.tasks"           value="csc" />
+		<option name="buildset.csc.target"      value="exe" />
+	</optionset>
+
+	<optionset name="config-options-csharpwindowsprogram">
+		<option name="buildset.name"            value="CSharpWindowsProgram" />
+		<option name="buildset.tasks"           value="csc" />
+		<option name="buildset.csc.target"      value="winexe" />
+	</optionset>
+
+	<!--For Framework pre/post build steps-->
+	<do if="${xcode-projectize??false}">
+		<dependent name="XcodeProjectizer"/>
+	</do>
+	<property name="remotesync.additional-packages" value="${property.value} EATestPrintServer IPhoneRunner XcodeProjectizer"/>
+
+	<optionset name="config-options-common">
+		<option name="preprocess">
+			iphone-preprocess
+		</option>
+		<option name="postprocess">
+			iphone-postprocess
+		</option>
+		<!-- gcc enables strict aliasing through -ftree-vectorize  enable it on clang -->
+		<option name="enable.strict.aliasing" value="off" />
+		<!--- cc -->
+		<option name="buildset.cc.includedirs">
+			${option.value}
+			${cc.includedirs??}
+		</option>
+		<option name="buildset.cc.system-includedirs">
+			${option.value}
+			${cc.system-includedirs}
+		</option>
+		<option name="buildset.cc.defines">
+			${option.value}
+			${cc.common-defines}
+		</option>
+		<option name="buildset.cc.options">
+			${option.value}
+			${cc.common-options}
+			-Wno-deprecated-register
+			-Wno-nonportable-include-path
+		</option>
+		<!-- enable_bitcode accepted values: on, off -->
+		<option name="enable_bitcode" value="on" if="${iphone.enable_bitcode??${package.ios_config.enable_bitcode??true}}"/>
+		<!-- bitcode_generation_mode accepted values: bitcode, marker -->
+		<option name="bitcode_generation_mode" value="${iphone.bitcode_generation_mode??${package.ios_config.bitcode_generation_mode??bitcode}}"/>
+	</optionset>
+
+	<optionset name="config-options-library">
+		<option name="liboutputname" value="%outputdir%/${lib-prefix}%outputname%${lib-suffix}" />
+		<option name="buildset.lib.options">
+			${option.value}
+			${lib.common-options}
+		</option>
+	</optionset>
+
+	<!-- Copy link.librarydirs from clang proxy/non-proxy, so that GeneateBuildOptionSet will copy it to created build optionset -->
+	<optionset name="config-options-program">
+		<option name="clanguage" value ="off"/>
+		<option name="postbuildtarget">
+			${option.value}
+			sanitize-iphone-program-outputname
+			iphone-bundle
+			copy-asset-files.iphone
+		</option>
+		<option name="buildset.link.options">
+			${option.value}
+			${link.common-options}
+		</option>
+		<option name="buildset.link.librarydirs">
+			${option.value}
+			${link.system-librarydirs}
+		</option>
+		<option name="buildset.link.libraries">
+			${option.value}
+			${link.system-libs}
+		</option>
+		<option name="linkoutputname" value="%outputdir%/%outputname%${exe-suffix}" />
+		<option name="linkoutputmapname" value="%outputdir%/%outputname%.map" />
+	</optionset>
+
+	<optionset name="config-options-dynamiclibrary" >
+		<option name="generatedll"                          value="on" />
+		<option name="framework-bundle"                     value="on" />
+		<option name="clanguage" value ="off"/>
+		<option name="buildset.name"                        value="DynamicLibrary" />
+		<option name="buildset.tasks"                       value="asm cc link" />
+		<option name="buildset.cc.defines"                  value="EA_DLL" />
+		<option name="buildset.link.options">
+			${option.value}
+			${link.common-options}
+		</option>
+		<option name="buildset.link.librarydirs">
+			${option.value}
+			${link.system-librarydirs}
+		</option>
+		<option name="buildset.link.libraries">
+			${option.value}
+			${link.system-libs}
+		</option>
+		<option name="linkoutputname"     value="%outputdir%/%outputname%${dll-suffix}" />
+		<option name="impliboutputname"   value="%outputdir%/%outputname%${dll-suffix}"/>
+	</optionset>
+
+
+	<!-- 
+	An older version of the followings are in iphonesdk.  These should lives in config package.
+	They are now re-defined here with a new name and a new enable_objc_arc (ie -fobjc-arc) set as default
+	Application of the -fobjc-arc compiler and linker flag is done in iphone-clang-generate-options file!
+	-->
+	<optionset name="config-options-iphone.objective.cpp.library" fromoptionset="config-options-library">
+		<option name="clanguage" value ="off"/>
+		<option name="objective_c_cpp" value="on"/>
+		<option name="buildset.name" value="ObjCppLibrary"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x objective-c++
+			-fobjc-abi-version=2
+			-fobjc-legacy-dispatch
+		</option>
+		<option name="enable_objc_arc"  value="on" if="${iphone.enable_objc_arc??true}"/>
+		<option name="enable_objc_arc"  value="off" if="@{PropertyExists('iphone.enable_objc_arc')} and ${iphone.enable_objc_arc??true}==false"/>
+	</optionset>
+
+	<optionset name="config-options-iphone.objective.c.library" fromoptionset="config-options-library">
+		<option name="cc.cpp11" value ="off"/>
+		<option name="clanguage" value ="on"/>
+		<option name="objective_c_cpp" value="on"/>
+		<option name="buildset.name" value="ObjCLibrary"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x objective-c
+			-fobjc-abi-version=2
+			-fobjc-legacy-dispatch
+		</option>
+		<option name="enable_objc_arc"  value="on" if="${iphone.enable_objc_arc??true}"/>
+		<option name="enable_objc_arc"  value="off" unless="${iphone.enable_objc_arc??true}"/>
+	</optionset>
+
+	<optionset name="config-options-iphone.objective.cpp.program" fromoptionset="config-options-program">
+		<option name="clanguage" value ="off"/>
+		<option name="objective_c_cpp" value="on"/>
+		<option name="buildset.name" value="ObjCppProgram"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x objective-c++
+			-fobjc-abi-version=2
+			-fobjc-legacy-dispatch
+		</option>
+		<option name="enable_objc_arc"  value="on" if="${iphone.enable_objc_arc??true}"/>
+		<option name="enable_objc_arc"  value="off" unless="${iphone.enable_objc_arc??true}"/>
+	</optionset>
+
+	<optionset name="config-options-iphone.objective.c.program" fromoptionset="config-options-program">
+		<option name="cc.cpp11" value ="off"/>
+		<option name="clanguage" value ="on"/>
+		<option name="objective_c_cpp" value="on"/>
+		<option name="buildset.name" value="ObjCProgram"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x objective-c
+			-fobjc-abi-version=2
+			-fobjc-legacy-dispatch
+		</option>
+		<option name="enable_objc_arc"  value="on" if="${iphone.enable_objc_arc??true}"/>
+		<option name="enable_objc_arc"  value="off" unless="${iphone.enable_objc_arc??true}"/>
+	</optionset>
+
+	<optionset name="config-options-iphone.objective.cpp.appextension" fromoptionset="config-options-program">
+		<option name="buildset.name" value="ObjCppAppExtension"/>
+		<option name="app-extension" value="on"/>
+		<option name="clanguage" value ="off"/>
+		<option name="objective_c_cpp" value="on"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x objective-c++
+			-fobjc-abi-version=2
+			-fobjc-legacy-dispatch
+		</option>
+		<option name="buildset.link.options">
+			${option.value}
+			-e _NSExtensionMain
+			-fobjc-link-runtime
+			-Xlinker -rpath -Xlinker @executable_path/Frameworks
+			-Xlinker -rpath -Xlinker @executable_path/../../Frameworks
+		</option>
+		<option name="enable_objc_arc"  value="on" if="${iphone.enable_objc_arc??true}"/>
+		<option name="enable_objc_arc"  value="off" unless="${iphone.enable_objc_arc??true}"/>
+	</optionset>
+
+	<optionset name="config-options-iphone.objective.c.appextension" fromoptionset="config-options-program">
+		<option name="buildset.name" value="ObjCAppExtension"/>
+		<option name="app-extension" value="on"/>
+		<option name="cc.cpp11" value ="off"/>
+		<option name="clanguage" value ="on"/>
+		<option name="objective_c_cpp" value="on"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x objective-c
+			-fobjc-abi-version=2
+			-fobjc-legacy-dispatch
+		</option>
+		<option name="buildset.link.options">
+			${option.value}
+			-e _NSExtensionMain
+			-fobjc-link-runtime
+			-Xlinker -rpath -Xlinker @executable_path/Frameworks
+			-Xlinker -rpath -Xlinker @executable_path/../../Frameworks
+		</option>
+		<option name="enable_objc_arc"  value="on" if="${iphone.enable_objc_arc??true}"/>
+		<option name="enable_objc_arc"  value="off" unless="${iphone.enable_objc_arc??true}"/>
+	</optionset>
+
+	<!-- 
+	these are the old names for these optionsets, which are still used and so we forward to new optionsets
+	AND they must have enable_objc_arc turned off!  Old projects that uses these optionset may not have
+	updated their code to build with -fobjc-arc
+	-->
+	<optionset name="config-options-iphoneobjcpplibrary" fromoptionset="config-options-iphone.objective.cpp.library">
+		<option name="buildset.name" value="ObjectiveCPPLibrary"/>
+		<option name="enable_objc_arc"  value="off"/>
+	</optionset>
+
+	<optionset name="config-options-iphoneobjclibrary" fromoptionset="config-options-iphone.objective.c.library">
+		<option name="buildset.name" value="ObjectiveCLibrary"/>
+		<option name="enable_objc_arc"  value="off"/>
+	</optionset>
+
+	<optionset name="config-options-iphoneobjcappextension" fromoptionset="config-options-iphone.objective.c.appextension">
+		<option name="buildset.name" value="ObjectiveCAppExtension"/>
+		<option name="enable_objc_arc"  value="off"/>
+	</optionset>
+
+	<!-- 
+	this was probably added as way to force compiling c++ even with c files. However we have the -strict options for 
+	this and no need for a platform specific optionset. This is only kept in case some one is using it
+	-->
+	<optionset name="config-options-iphonecpplibrary" fromoptionset="config-options-library">
+		<option name="clanguage" value ="off"/>
+		<option name="buildset.name" value="IPhoneCPPLibrary"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x c++
+		</option>
+	</optionset>
+
+	<optionset name="iphone.buildoptionsets">
+		<option name="config-options-iphone.objective.c.appextension" value="ObjCAppExtension"/>
+		<option name="config-options-iphone.objective.c.library" value="ObjCLibrary"/>
+		<option name="config-options-iphone.objective.c.program" value="ObjCProgram"/>
+		<option name="config-options-iphone.objective.cpp.appextension" value="ObjCppAppExtension"/>
+		<option name="config-options-iphone.objective.cpp.library" value="ObjCppLibrary"/>
+		<option name="config-options-iphone.objective.cpp.program" value="ObjCppProgram"/>
+		<option name="config-options-iphonecpplibrary" value="IPhoneCPPLibrary"/>
+		<option name="config-options-iphoneobjcappextension" value="ObjectiveCAppExtension"/>
+		<option name="config-options-iphoneobjclibrary" value="ObjectiveCLibrary"/>
+		<option name="config-options-iphoneobjcpplibrary" value="ObjectiveCPPLibrary"/>
+	</optionset>
+
+	<!-- Clear properties that are already appended to the optionset-->
+	<property name="cc.options" />
+	<property name="cc.defines" />
+	<property name="cc.includedirs"/>
+	<property name="link.options"/>
+	<property name="link.libraries"/>
+	<property name="link.librarydirs"/>
+	<property name="lib.options"/>
+
+	<!-- for packages that do not use platform loader -->
+	<property name="config-platform-load-name" value="ios"/>
+	<property name="nant.platform-config-package-name" value="ios_config"/>
+
+	<!-- Setup buildlayout file needed by Icepick -->
+	<!-- Expected an iphone.get-packaging-output target being provided to properly resolve %output% token -->
+	<!-- Also, need to make sure to use target xcode-archive-export target to build the .ipa instead of xcodebuild -->
+	<optionset name="config-build-layout-entrypoint-common">
+		<option name="ipa" value="%output%"/>
+	</optionset>
+	<!-- An app bundle package should already contains all additional dependencies -->
+	<property name="iphone.build-layout-skip-additionalfiles" value="true"/>
+
+</project>

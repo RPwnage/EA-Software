@@ -1,0 +1,481 @@
+
+[ headername="framework/tdf/controllertypes_server.h" ]
+#include "framework/gen/controllertypes_server.tdf"
+
+[ headername="framework/tdf/storage_server.h" ]
+#include "framework/gen/storage_server.tdf"
+
+namespace Blaze
+{
+[
+  id = framework/0,
+  factory_create = false,
+  exposeRawConfig = false
+]
+component BlazeController
+{
+    permissions
+    {
+        PERMISSION_RELOAD_CONFIG = 1;
+        PERMISSION_SERVER_MAINTENANCE = 2;
+        PERMISSION_GET_METRICS_INFO = 3;
+        PERMISSION_CHANGE_AUDIT_LOGGING = 4;
+        PERMISSION_GET_AUDIT_LOGGING = 5;
+        PERMISSION_CHANGE_AUDIT_LOGGING_UNRESTRICTED = 6;
+    }
+
+    errors
+    {
+        [ description = "Interval requested is not being tracked." ]
+        CTRL_ERROR_INVALID_INTERVAL = 2;
+        [ description = "A component with a given master id already exists." ]
+        CTRL_ERROR_DUPLICATE_MASTER = 3;
+        [ description = "Could not run the dbmig script to upgrade." ]
+        CTRL_ERROR_DBMIG_FAILED = 4;
+        [ description = "Reconfiguration failed due to a validation error detailed in the ReconfigureErrorResponse."]
+        CTRL_ERROR_RECONFIGURE_VALIDATION_FAILED = 5;        
+        [ description = "Reconfiguration is in progress."]
+        CTRL_ERROR_RECONFIGURE_IN_PROGRESS = 6;
+        [ description = "Reconfiguration is skipped because none of the requested features are loaded."]
+        CTRL_ERROR_RECONFIGURE_SKIPPED = 7;
+        [ description = "Server instance already registered with this server."]
+        CTRL_ERROR_SERVER_INSTANCE_ALREADY_REGISTERED = 8;
+        [ description = "Server instance ID pool has been exhausted."]
+        CTRL_ERROR_SERVER_INSTANCE_ID_POOL_EXHAUSTED = 9;
+        [ description = "Specified instance type is not defined in ServerConfig::InstanceType enum."]
+        CTRL_ERROR_SERVER_INSTANCE_TYPE_INVALID = 10;
+        [ description = "Specified instance name is not defined in blaze.boot:serverConfigs section."]
+        CTRL_ERROR_SERVER_INSTANCE_BASE_NAME_INVALID = 11;
+        [ description = "Specified instance unqiue name is not defined in blaze.boot:serverConfigs section."]
+        CTRL_ERROR_SERVER_INSTANCE_NAME_INVALID = 12;
+        [ description = "Reconfiguration of all features is not allowed - feature list must be specified."]
+        CTRL_ERROR_RECONFIGURE_ALL_NOT_ALLOWED = 13;
+        [ description = "Specified feature name is invalid."]
+        CTRL_ERROR_FEATURE_NAME_INVALID = 14;
+        [ description = "Server instance object is not found on the target server."]
+        CTRL_ERROR_SERVER_INSTANCE_NOT_REGISTERED = 15;
+        [ description = "Server instance contains an active component that conflicts with a locally hosted component."]
+        CTRL_ERROR_SERVER_INSTANCE_ALREADY_HOSTS_COMPONENT = 16;
+        [ description = "Unrecognized component name."]
+        CTRL_ERROR_UNKNOWN_COMPONENT = 17;
+        [ description = "Component not hosted."]
+        CTRL_ERROR_COMPONENT_NOT_HOSTED = 18;
+        [ description = "Invalid filter specified."]
+        CTRL_ERROR_INVALID_FILTER = 19;
+    }
+
+    slave
+    {
+         methods
+         {
+                [
+                  id = 1,
+                  errors = { CTRL_ERROR_INVALID_INTERVAL },
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false 
+                ]
+                ComponentMetricsResponse getComponentMetrics(ComponentMetricsRequest);
+
+                [
+                  id = 2,
+                  internal = true,
+                  requires_authentication = false,
+                  generateProto = false, 
+                  generate_command_class = false 
+                ]
+                ServerStatus getStatus();
+            
+                [
+                  id = 3,
+                  errors = 
+                  { 
+                    CTRL_ERROR_RECONFIGURE_VALIDATION_FAILED, 
+                    CTRL_ERROR_RECONFIGURE_IN_PROGRESS, 
+                    CTRL_ERROR_RECONFIGURE_SKIPPED,
+                    CTRL_ERROR_RECONFIGURE_ALL_NOT_ALLOWED
+                  },
+                  errortype = ReconfigureErrorResponse,
+                  requiresUserSession = false,
+                  internal = true
+                ]
+                void reconfigure(ReconfigureRequest);
+
+                [
+                  id = 4,
+                  internal = true,
+                  passthrough = setComponentStateMaster 
+                ]
+                void setComponentState(SetComponentStateRequest);
+
+                [
+                  id = 5,
+                  internal = true,
+                  generate_command_class = false,
+                  description = "Change the service state of the process associated with this controller.  This allows a process to be taken out of service, drained of users, and then shutdown without end-user impact."
+                ]
+                void setServiceState(SetServiceStateRequest);
+                
+                [
+                  id = 6,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  description = "Writes out a core file for the process running this command.  Overrides the configuration settting exceptionConfig.coreDumpsEnabled setting."
+                ]
+                void dumpCoreFile(DumpCoreFileRequest);
+         
+                [
+                  id = 7,
+                  internal = true,
+                  description = "(DEPRECATED) Triggers the drain state, which will result in shutdown of the instance.  Use shutdown instead."
+                ]
+                void drain(DrainRequest);
+
+                [
+                  id = 8,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  description = "Configures memory tracking metrics and returns current metrics configuration. When empty: fetch current config."
+                ]
+                ConfigureMemoryMetricsResponse configureMemoryMetrics(ConfigureMemoryMetricsRequest);
+
+                [
+                  id = 9,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  description = "Queries memory tracking metrics and returns current metrics status. When empty: fetch all active."
+                ]
+                GetMemoryMetricsResponse getMemoryMetrics(GetMemoryMetricsRequest);
+
+                [
+                  id = 10,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  description = "Returns all fiber context timings."
+                ]
+                FiberTimings getFiberTimings();
+                
+                [
+                  id = 11,
+                  internal = true,
+                  requires_authentication = false,
+                  description = "Returns a list of components configured.",
+                  passthrough = getConfigFeatureListMaster
+                ]
+                ReconfigurableFeatures getConfigFeatureList();
+                
+                [
+                  id = 13,
+                  errors = { CTRL_ERROR_FEATURE_NAME_INVALID },
+                  internal = true,
+                  requires_authentication = false,
+                  description = "Used to retrieve component configuration."
+                ]
+                FetchComponentConfigurationResponse fetchComponentConfiguration(FetchComponentConfigurationRequest);       
+
+                [
+                  id = 14,
+                  internal = true,
+                  requires_authentication = false,
+                  description = "Starts remote transaction."
+                ]
+                StartRemoteTransactionResponse startRemoteTransaction(StartRemoteTransactionRequest);       
+
+                [
+                  id = 15,
+                  internal = true,
+                  requires_authentication = false,
+                  description = "Completes remote transaction."
+                ]
+                void completeRemoteTransaction(CompleteRemoteTransactionRequest);
+
+                [
+                  id = 16,
+                  internal = true,
+                  generate_command_class = false,
+                  blocking = true,
+                  description = "Shutdown one, some or all server instances.  Optionally can specify to drain and also restart the server."
+                ]
+                void shutdown(ShutdownRequest);
+                
+                [
+                  id = 17,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  generateProto = false, 
+                  description = "Fetches remote instance information."
+                ]
+                GetInstanceInfoResponse getInstanceInfo();
+                
+                [
+                  id = 18,
+                  errors = { CTRL_ERROR_SERVER_INSTANCE_NOT_REGISTERED, CTRL_ERROR_SERVER_INSTANCE_ALREADY_REGISTERED },
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  description = "Validates existence of an active outbound connection back to the calling instance."
+                ]
+                void checkClusterMembership(CheckClusterMembershipRequest);
+                
+                [
+                  id = 19,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  description = "Returns statistics of all executed queries."
+                ]
+                DbQueryMetrics getDbQueryMetrics();
+
+                [
+                  id = 20,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  description = "Returns list of all census data providers registered with instance."
+                ]
+                GetCensusDataProvidersResponse getCensusDataProviders();
+
+                [
+                    id = 21,
+                    internal = true,
+                    requires_authentication = false,
+                    generate_command_class = true,
+                    description = "Internal RPC command used to fetch census data from remote instance." 
+                ]
+                GetCensusDataForComponentsResponse getCensusDataForComponents(GetCensusDataForComponentsRequest);
+
+                [
+                    id = 22,
+                    internal = true,
+                    requires_authentication = false,
+                    generate_command_class = false,
+                    description = "Returns all outbound metrics"
+                ]
+                OutboundMetrics getOutboundMetrics();
+
+                [
+                  id = 23,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false,
+                  description = "Returns all connection metrics matching the given criteria."
+                ]
+                GetConnMetricsResponse getConnMetrics(GetConnMetricsRequest);
+
+                [
+                  id = 24,
+                  errors = { CTRL_ERROR_UNKNOWN_COMPONENT, CTRL_ERROR_COMPONENT_NOT_HOSTED },
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false 
+                ]
+                ComponentStatus getComponentStatus(ComponentStatusRequest);
+
+                [
+                  id = 25,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false 
+                ]
+                DrainStatus getDrainStatus();
+
+                [
+                  id = 26,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false 
+                ]
+                GetPSUResponse getPSUByClientType(GetMetricsByGeoIPDataRequest);
+
+                [
+                  id = 28,
+                  errors = { CTRL_ERROR_INVALID_FILTER },
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false
+                ]
+                GetMetricsResponse getMetrics(GetMetricsRequest);
+
+                [
+                  id = 29,
+                  internal = true,
+                  requires_authentication = false,
+                  generate_command_class = false
+                ]
+                GetMetricsSchemaResponse getMetricsSchema();
+
+                [
+                  id = 30,
+                  internal = true,
+                  description = "Immediately enables audit logging for the users, devices, and/or IP addresses specified in the request."
+                ]
+                void enableAuditLogging(UpdateAuditLoggingRequest);
+
+                [
+                  id = 31,
+                  internal = true,
+                  description = "Immediately disables audit logging for the users, devices, and/or IP addresses specified in the request."
+                ]
+                void disableAuditLogging(UpdateAuditLoggingRequest);
+
+                [
+                  id = 32,
+                  internal = true,
+                  description = "Gets the current audit entries."
+                ]
+                GetAuditsResponse getAudits();
+
+        }
+
+        events
+        {
+            [ id = 1000 ]
+            StartupEvent(ServerEvent);
+
+            [ id = 1001 ]
+            ShutdownEvent(ServerEvent);
+
+            [ id = 1002 ]
+            ComponentMetricsEvent(ComponentMetricsResponse);
+
+            [ id = 1003 ]
+            FiberTimingsEvent(FiberTimings);
+
+            [ id = 1004, generateProto = false ]
+            StatusEvent(ServerStatus);
+
+            [ id = 1005 ]
+            DbQueryMetricsEvent(DbQueryMetrics);
+
+            [ id = 1006 ]
+            OutboundMetricsEvent(OutboundMetrics);
+
+            [ id = 1007 ]
+            StorageManagerMetricsEvent(GetStorageMetricsResponse);
+        }
+
+        notifications
+        {
+            [
+              id = 0,
+              description = "Notifies that a shutdown has been broadcasted",
+              details = "Notifies that a shutdown has been broadcasted",
+              client_export = false
+            ]
+            ShutdownBroadcasted(ShutdownRequest);
+
+            [
+              id = 1,
+              description = "Notifies that a controller's state has changed",
+              details = "Triggered from a controller when information about it's current state (draining, etc) has been modified.  Other instances can take appropriate action, like rerouting around this controller.",
+              client_export = false
+            ]
+            NotifyControllerStateChange(ControllerStateChangeNotification);
+            
+            [
+                id = 2,
+                client_export = false,
+                description = "Sent when a user, deviceId, or IP address is added or removed from the audit list."
+            ]
+            NotifyUpdateAuditState();
+
+            [
+                id = 3,
+                client_export = false,
+                description = "Broadcast when instance load changes by a specified threshold value."
+            ]
+            NotifyLoadChange(InstanceLoadChangeNotification);
+        }
+    }
+
+    master
+    {
+        methods
+        {
+               [
+                 id = 1,
+                 requires_authentication = false,
+                 generateProto = false, 
+                 errors = {
+                    CTRL_ERROR_SERVER_INSTANCE_BASE_NAME_INVALID
+                 },
+                 description = "Get the ServerConfig tdf from the ConfigMaster instance for the calling instance type."
+               ]
+               GetServerConfigResponse getServerConfigMaster(GetServerConfigRequest);
+
+               [
+                 id = 2,
+                 requiresUserSession = false,
+                 errors = 
+                 { 
+                    CTRL_ERROR_RECONFIGURE_IN_PROGRESS, 
+                    CTRL_ERROR_RECONFIGURE_SKIPPED, 
+                    CTRL_ERROR_RECONFIGURE_ALL_NOT_ALLOWED 
+                 }
+               ]
+               void reconfigureMaster(ReconfigureRequest);
+               
+               [
+                 id = 4,
+                 requires_authentication = false,
+                 blocking = true,
+                 fiber_timeout_override = "5m",
+                 errors = { CTRL_ERROR_DBMIG_FAILED } 
+               ]
+               void runDbMig(RunDbMigInfo);
+
+               [ id = 5 ]
+               void setComponentStateMaster(SetComponentStateRequest);
+    
+               [
+                 id = 6,
+                 requires_authentication = false,
+                 description = "Get the requested config data from the ConfigMaster instance."
+               ]
+               ConfigResponse getConfigMaster(ConfigRequest);
+
+               [
+                 id = 7,
+                 requires_authentication = false,
+                 errors = { CTRL_ERROR_DUPLICATE_MASTER } 
+               ]
+               void preparedForReconfigureMaster(PreparedForReconfigureRequest);
+               
+               [
+                 id = 8,
+                 requires_authentication = false,
+                 errors = { CTRL_ERROR_DUPLICATE_MASTER } 
+               ]
+               void reconfiguredMaster();
+               
+               [
+                 id = 10,
+                 requires_authentication = false
+               ]
+               ReconfigurableFeatures getConfigFeatureListMaster(); 
+        }
+
+        notifications
+        {
+            [ id = 3 ]
+            SetComponentState(SetComponentStateRequest);
+            [ id = 6 ]
+            NotifyPrepareForReconfigure(PrepareForReconfigureNotification);
+            [ id = 7 ]
+            NotifyReconfigure(ReconfigureNotification);
+            [ id = 9 ]
+            NotifyPrepareForReconfigureComplete(PrepareForReconfigureCompleteNotification);
+        }
+    }
+}
+}
+
+
+
+
+

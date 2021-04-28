@@ -1,0 +1,163 @@
+<project>
+    <!-- =================================================================== -->
+    <!-- Common code defines -->
+    <!-- =================================================================== -->
+
+    <property name="runtime.defines" if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+        ${property.value}
+        _GNU_SOURCE
+    </property>
+
+    <property name="runtime.defines" if="${config-name} == 'dev-debug' or ${config-name} == 'debug'">
+        ${property.value}
+        DIRTYCODE_DEBUG=1
+        DIRTYCODE_PROFILE=0
+    </property>
+
+    <property name="runtime.defines" if="${config-name} == 'dev-profile' or ${config-name} == 'profile' or ${config-name} == 'dev-debug-opt' or ${config-name} == 'debug-opt'">
+        ${property.value}
+        DIRTYCODE_DEBUG=0
+        DIRTYCODE_PROFILE=1
+    </property>
+
+    <property name="runtime.defines" if="${config-name} == 'dev-opt' or ${config-name} == 'opt'">
+        ${property.value}
+        DIRTYCODE_DEBUG=0
+        DIRTYCODE_PROFILE=0
+    </property>
+
+    <property name="runtime.defines" if="${config-compiler} == 'clang' and !@{StrIsEmpty('${eaconfig.clang.sanitize??}')}">
+        ${property.value}
+        DIRTYCAST_SANITIZE=1
+    </property>
+
+    <!-- compiler options common to C/C++ -->
+    <property name="runtime.cc.common"/>
+    <property name="runtime.cc.common" if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+        -Wextra
+        -Wformat=2
+        -Wmissing-declarations
+        -Wpointer-arith
+        -Wstrict-aliasing
+        -Wwrite-strings
+        -Wunreachable-code
+        -fno-omit-frame-pointer <!-- Will just be ignored on debug builds as it is not omitted there -->
+        -Wno-unused-parameter   <!-- Enabled by -Wextra but we don't want to use it -->
+    </property>
+
+    <!-- buildtype used for C-file filesets -->
+    <BuildType name="CFile" from="CLibrary">
+        <option name="buildset.cc.options">
+            ${option.value}
+            ${runtime.cc.common}
+        </option>
+        <option name="buildset.cc.options" if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+            ${option.value}
+            -std=c11
+            -Wmissing-prototypes
+            -Wold-style-definition
+            -Wstrict-prototypes
+        </option>
+    </BuildType>
+
+    <PartialModule name="DCLibrary" buildtype="CFile">
+        <config>
+            <defines>
+                ${runtime.defines}
+            </defines>
+
+            <warningsuppression>
+                <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+                    -Wno-multichar
+                </do>
+
+                <do if="${config-compiler} == 'vc'">
+                    -wd4242 <!-- conversion from 'int' to 'char', possible loss of data -->
+                    -wd4244 <!-- conversion from 'int' to 'char', possible loss of data -->
+                </do>
+            </warningsuppression>
+        </config>
+    </PartialModule>
+
+    <PartialModule name="DCProgram" buildtype="Program">
+        <copylocal>true</copylocal>
+
+        <config>
+            <defines>
+                ${runtime.defines}
+            </defines>
+ 
+            <warningsuppression>
+                <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+                    -Wno-multichar
+                </do>
+
+                <do if="${config-compiler} == 'vc'">
+                    -wd4201 <!-- nonstandard extension used : nameless struct/union -->
+                    -wd4242 <!-- conversion from 'int' to 'char', possible loss of data -->
+                    -wd4244 <!-- conversion from 'int' to 'char', possible loss of data -->
+                </do>
+            </warningsuppression>
+
+            <buildoptions>
+                <option name="buildset.cc.options">
+                    ${option.value}
+                    ${runtime.cc.common}
+                </option>
+
+                <option name="buildset.link.options" if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+                    ${option.value}
+                    -rdynamic
+
+                    <!-- Adds the external dependencies that are not part of the package dependencies -->
+                    -lbz2
+                    -lz
+
+                    -Wl,-rpath,"\$ORIGIN"
+                </option>
+
+                <option name="stripallsymbols" value="off"/>
+                <option name="generatemapfile" value="off"/>
+            </buildoptions>
+        </config>
+
+        <dlls if="${config-compiler} == 'clang'">
+            <includes name="${package.UnixClang.bindir}/../lib/libc++.so.1"
+                if="@{FileExists('${package.UnixClang.bindir}/../lib/libc++.so.1')}"/>
+            <includes name="${package.UnixClang.bindir}/../lib/libc++abi.so.1"
+                if="@{FileExists('${package.UnixClang.bindir}/../lib/libc++abi.so.1')}"/>
+        </dlls>
+    </PartialModule>
+
+    <PartialModule name="WinDCProgram" buildtype="WindowsProgram">
+        <config>
+            <defines>
+                ${runtime.defines}
+            </defines>
+        
+            <warningsuppression>
+                <do if="${config-compiler} == 'vc'">
+                    -wd4054 <!-- typecast from function pointer to data pointer -->
+                    -wd4201 <!-- nonstandard extension used: nameless struct/union -->
+                    -wd4242 <!-- conversion from 'int' to 'char', possible loss of data -->
+                    -wd4244 <!-- conversion from 'int' to 'char', possible loss of data -->
+                </do>
+            </warningsuppression>
+
+            <buildoptions>
+                <option name="generatemapfile" value="off"/>
+                <option name="exceptions" value="off"/>
+                <option name="buildset.cc.options">
+                    ${option.value}
+                    ${runtime.cc.common}
+                </option>
+            </buildoptions>
+        </config>
+
+        <libraries append="true">
+            <includes name="ole32.lib" asis="true"/>
+            <includes name="shell32.lib" asis="true"/>
+        </libraries>
+    </PartialModule>
+</project>
+

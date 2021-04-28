@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package eadp.messagebus;
+
+import "google/protobuf/empty.proto";
+import "google/rpc/status.proto";
+
+import "eadp/annotations.proto";
+
+option java_package = "com.ea.gs.messagebus.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "KafkaTopicAdminProto";
+
+service KafkaTopicAdmin {
+    option (eadp.grpc.service_mapping) = {
+        ports: [ S2S, S2S_ADMIN]
+        scopes: {
+            key: "S2S"
+            value: "gs_messagebus_kafka_admin"
+        }
+        scopes: {
+            key: "S2S_ADMIN"
+            value: "gs_messagebus_kafka_admin"
+        }
+
+    };
+
+    rpc CreateTopic(TopicAdminRequest) returns (TopicAdminResponse);
+
+    rpc DeleteTopic(TopicAdminRequest) returns (TopicAdminResponse);
+
+    rpc SetTopicPartitions(TopicAdminRequest) returns (TopicAdminResponse);
+
+    rpc GetTopicMetadata(TopicAdminRequest) returns (TopicMetadataResponse);
+
+    rpc GetTopicList(google.protobuf.Empty) returns (TopicAdminResponse);
+
+}
+
+// Request message comprising topic admin action to execute.
+message TopicAdminRequest {
+    // The topic's name.
+    string topic_name = 1;
+    // The number of the topic partitions.
+    uint32 num_partitions = 2;
+    // The replication factor for the topic.
+    uint32 replication_factor = 3;
+}
+
+// Response message comprising possible topic admin action outcome.
+message TopicAdminResponse {
+    // The response status message.
+    google.rpc.Status status = 1;
+    // List of the topic names.
+    repeated string topic_name = 2;
+}
+
+// Response message comprising possible topic admin action outcome.
+message TopicMetadataResponse {
+    // The response status message.
+    google.rpc.Status status = 1;
+    // Information about topics and partitions.
+    repeated TopicMetadata metadata = 2;
+}
+
+// Topic metadata.
+message TopicMetadata {
+    // The topic's name.
+    string topic_name = 1;
+    // The partition number.
+    uint32 partition = 2;
+
+    // Information about a Kafka node.
+    message Node {
+        int32 id = 1;
+        string host = 2;
+        int32 port = 3;
+        string rack = 4;
+    }
+
+    Node leader = 3;
+    repeated Node replicas = 4;
+    repeated Node in_sync_replicas = 5;
+}

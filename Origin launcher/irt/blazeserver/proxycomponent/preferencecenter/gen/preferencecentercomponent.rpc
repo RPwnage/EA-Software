@@ -1,0 +1,105 @@
+[ headername="preferencecenter/tdf/preferencecenter.h" ]
+#include "preferencecenter/gen/preferencecenter.tdf"
+
+namespace Blaze
+{
+namespace PreferenceCenter
+{
+
+[
+    id = custom/1101,
+    description = "Component used for access to the EADP PreferenceCenter APIs.",
+    details = "PreferenceCenter supports RESTful APIs for communicating with the EADP Preference Center system.",
+    proxyOnly = true,
+    http = {
+        apiVersion = "",
+        payloadEncoderSubType = "NORMAL"
+    }
+]
+component PreferenceCenter
+{
+    errors
+    {
+        [ description = "Preference User requires a double opt-in" ]
+        PREFERENCECENTER_DOUBLEOPTIN_REQUIRED = 1;
+        [ description = "Access denied" ]
+        PREFERENCECENTER_ACCESSDENIED = 2;
+        [ description = "Preference User not found" ]
+        PREFERENCECENTER_USER_NOTFOUND = 3;
+        [ description = "Validation failed on an input" ]
+        PREFERENCECENTER_VALIDATIONFAILED = 4;
+        [ description = "Preference was not found" ]
+		PREFERENCECENTER_NO_SUCH_PREFERENCE = 5;
+    }
+
+    slave
+    {
+        methods
+        {
+			[
+              id = 1,
+              description = "Get all preferences that match the specified input parameter (name)",
+              details = "Get all preferences that match the specified input parameter (name)",
+              requires_authentication = false,
+              client_export = false,
+              errors = {
+                  PREFERENCECENTER_ACCESSDENIED,
+                  PREFERENCECENTER_VALIDATIONFAILED
+              },
+              errortype = PreferenceCenterError,
+              http = {
+                resource = "/proxy/identity/newPreferences",
+                method = "GET",
+				url_params = {
+                    name = "name"
+                },
+                custom_request_headers = {
+                  "Authorization" = "accessToken"
+                },
+                status_code_errors = {
+                    403 = PREFERENCECENTER_ACCESSDENIED,
+                    409 = PREFERENCECENTER_VALIDATIONFAILED
+                }
+              }
+            ]
+            GetPreferenceByNameResponse getPreferenceByName(GetPreferenceByNameRequest);
+			
+			[
+              id = 2,
+              description = "Update a preference user by Nucleus user ID",
+              details = "Update a preference user by Nucleus user ID",
+              requires_authentication = false,
+              client_export = false,
+              errors = {
+                  PREFERENCECENTER_ACCESSDENIED,
+				  PREFERENCECENTER_USER_NOTFOUND,
+				  PREFERENCECENTER_DOUBLEOPTIN_REQUIRED,
+                  PREFERENCECENTER_VALIDATIONFAILED
+              },
+              errortype = PreferenceCenterError,
+              http = {
+                resource = "/proxy/identity/pids/{pidId}/preferenceUser",
+                method = "PUT",
+                custom_request_headers = {
+                  "Authorization" = "authenticationCredentials.accessToken",
+                  "X-NUCLEUS-USER-IP" = "authenticationCredentials.ipAddress",
+                  "Double-Optin-Required" = "isDoubleOptInRequired"
+                },
+                status_code_errors = {
+                    403 = PREFERENCECENTER_ACCESSDENIED,
+					404 = PREFERENCECENTER_USER_NOTFOUND,
+					203 = PREFERENCECENTER_DOUBLEOPTIN_REQUIRED,
+                    409 = PREFERENCECENTER_VALIDATIONFAILED
+                },
+                requestPayloadMember = "requestData",
+                encodeEnumsAsStrings = true,
+                encodeBoolsAsTrueFalse = true
+              }
+            ]
+            PutPreferenceUserByPidIdResponse putPreferenceUserByPidId(PutPreferenceUserByPidIdRequest);
+        }
+    }
+}
+
+} // namespace PreferenceCenter
+} // namespace Blaze

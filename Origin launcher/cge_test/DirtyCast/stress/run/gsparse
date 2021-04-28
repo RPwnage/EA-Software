@@ -1,0 +1,131 @@
+#!/usr/bin/python
+
+import os, commands, sys, math
+from datetime import datetime
+from array import array
+
+def bestsort(averages, filenames):
+	i = 4
+	while i > 0 and averages[i] < averages[i-1]:
+		tempavg = averages[i]
+		averages[i] = averages[i-1]
+		averages[i-1] = tempavg
+		tempfile = filenames[i]
+		filenames[i] = filenames[i-1]
+		filenames[i-1] = tempfile
+		i = i - 1
+
+def worstsort(averages, filenames):
+	i = 0
+	while i < 4 and averages[i] > averages[i+1]:
+		tempavg = averages[i]
+		averages[i] = averages[i+1]
+		averages[i+1] = tempavg
+		tempfile = filenames[i]
+		filenames[i] = filenames[i+1]
+		filenames[i+1] = tempfile
+		i = i + 1
+
+files = os.listdir(os.getcwd())
+
+min = 1000000000
+max = -1
+total = 0
+count = 0
+linetotal = 0
+linecount = 0
+worstavg = [0, 0, 0, 0, 0]
+worstfile = ['', '', '', '', '']
+bestavg = [9999, 9999, 9999, 9999, 9999]
+bestfile = ['', '', '', '', '']
+readaftertime = datetime(1900, 01, 01, 01, 01, 01, 000)
+avgtotal = 0
+filecount = 0
+meanavg = 0
+latencyTotals = array("f")
+squaredDiff = array("f")
+
+if len(sys.argv) >= 2:
+	readaftertime = datetime.strptime(sys.argv[1], '%Y/%m/%d %H:%M:%S.%f')
+	
+print 'Considering only line after ', str(readaftertime)
+
+datafile = open('data.txt', 'w')
+for filename in files:
+	if filename.find('gsrvstress') != -1 and filename.find('.log') != -1:
+		file = open(filename)
+
+		tab = ''
+		for line in file.readlines():
+			if line.find('stressgameplay:') != -1:
+				latepos = line.find('late=')
+				if latepos != -1:
+					linetime = datetime.strptime(line[0:23], '%Y/%m/%d %H:%M:%S.%f')
+					if linetime >= readaftertime:
+						datafile.write(tab + line[latepos+5:latepos+8].strip())
+						if linecount > 4:
+							latency = int(line[latepos+5:latepos+8].strip())
+							if latency < min:
+								min = latency
+							if latency > max:
+								max = latency
+							linetotal = linetotal + latency
+						linecount = linecount + 1
+						tab = '\t'
+
+		total = total + linetotal
+		count = count + linecount - 5
+		if linecount > 5:
+			lineavg = (linetotal * 1.0) / (linecount - 5)
+		else:
+			lineavg = 0;
+		if worstavg[0] < lineavg:
+			worstavg[0] = lineavg
+			worstfile[0] = filename
+			worstsort(worstavg, worstfile)
+		if lineavg > 0:
+			filecount = filecount + 1
+			if bestavg[4] > lineavg:
+				bestavg[4] = lineavg
+				bestfile[4] = filename
+				bestsort(bestavg, bestfile)
+		linetotal = 0
+		linecount = 0
+		latencyTotals.append(lineavg)
+		avgtotal = avgtotal + lineavg
+		datafile.write('\n')
+
+datafile.close()
+
+if (count > 0):
+	meanavg = avgtotal / filecount
+	sdtotal = 0
+	for value in latencyTotals:
+		newValue = math.pow(value - meanavg, 2)
+		sdtotal = sdtotal + newValue
+
+	squareDiffMean = sdtotal / filecount
+
+	print 'Minimum Latency: ' + str(min)
+	print 'Maximum Latency: ' + str(max)
+	print 'Average Latency: ' + str(total * 1.0 / count)
+	print 'Mean Latency: ' + str(meanavg)
+
+	print 'Five Worst Average Clients:'
+	print worstfile[0] + ' - ' + str(worstavg[0])
+	print worstfile[1] + ' - ' + str(worstavg[1])
+	print worstfile[2] + ' - ' + str(worstavg[2])
+	print worstfile[3] + ' - ' + str(worstavg[3])
+	print worstfile[4] + ' - ' + str(worstavg[4])
+
+	print 'Five Best Average Clients:'
+	print bestfile[0] + ' - ' + str(bestavg[0])
+	print bestfile[1] + ' - ' + str(bestavg[1])
+	print bestfile[2] + ' - ' + str(bestavg[2])
+	print bestfile[3] + ' - ' + str(bestavg[3])
+	print bestfile[4] + ' - ' + str(bestavg[4])
+
+	print 'Standard deviation: ' + str(math.sqrt(squareDiffMean))
+	
+else:
+	print 'A minimum of six samples is required to generate a result'

@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package eadp.stats;
+
+import "google/protobuf/timestamp.proto";
+
+import "eadp/stats/entity_stats.proto";
+
+option java_package = "com.ea.gs.stats.grpc";
+option java_outer_classname = "EventProto";
+option java_multiple_files = true;
+
+enum EventType {
+    STATS_EVENT_UPDATE = 0;
+    STATS_EVENT_DELETE = 1;
+    // An event with this type will be sent to the message bus when the stat on which derived stat depends is updated.
+    // Example. We have derived stats with the fillowing expression kill_ratio = kills / shots
+    // When any of kills or shots is updated the following will be sent to the message bus to signal that the value of kill_ratio might be changed:
+    // Event:
+    //      header:
+    //          event_type: STATS_EVENT_DERIVED
+    //      stat_deltas:
+    //          - stat_id: kill_ratio
+    STATS_EVENT_DERIVED = 2;
+}
+
+message EventHeader {
+    // update ID (aka idempotency ID), specified by the client in the original update RPC - this indicates
+    // a single logical transaction
+    string update_id = 1;
+
+    // commit ID is a time UUID that refers to the entry in the commit log that generated this event - if
+    // a single update ID is reused, you can have multiple events with the same update ID and different
+    // commit IDs - this is included since it can be used to grab a point-in-time view of a stat by doing
+    // the roll-up compaction up to this UUID and no further
+    string commit_id = 2;
+
+    // trace ID generated internally for use in zipkin
+    string trace_id = 3;
+
+    // context, category, entity
+    string context_id = 4;
+    string category_id = 5;
+    string entity_id = 6;
+
+    google.protobuf.Timestamp timestamp = 7;
+}
+
+message StatDelta {
+    string stat_id = 1;
+
+    // includes delta and operator only
+
+    double value_delta = 2;
+    CollectionOperator operator = 3;
+
+    // Map of dimension names and values which were updated.
+    map<string, string> dimensions = 4;
+}
+
+message StatValue {
+    string stat_id = 1;
+
+    // includes delta, previous and updated values - depending on the operator, the
+    // previous value may not be derivable given the current value and a delta so we
+    // include both
+
+    double value_delta = 2;
+
+    double previous_value = 3;
+    double updated_value = 4;
+
+    CollectionOperator operator = 5;
+    map<string, string> dimensions = 6;
+}
+
+message StatDeltaEvent {
+    EventHeader header = 1;
+
+    // type of the event (UPDATE or DELETE)
+    EventType type = 2;
+
+    repeated StatDelta stat_deltas = 3;
+}
+
+
+message StatValueUpdatedEvent {
+    EventHeader header = 1;
+
+    // type of the event (UPDATE or DELETE)
+    EventType type = 2;
+
+    // absolute values
+    repeated StatValue stat_values = 8;
+}
+

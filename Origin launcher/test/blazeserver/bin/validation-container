@@ -1,0 +1,29 @@
+#!/opt/local/bin/python
+
+#/usr/bin/env python2.5
+#
+# Version 1.0 -- Blaze Validation Script
+#
+# This script will check the versioning information to make sure
+# a valid changelist exists for the build
+#
+
+import commands, os, sys
+
+version = 'debug'
+if len(sys.argv) > 1:
+    version = sys.argv[1]
+
+blazedir = os.path.abspath("../out/linux/" + version + "/")
+osfile = open(blazedir + "/bin/deployimage", "r")
+deployimage = osfile.read().strip()
+    
+versioninfo = commands.getstatusoutput("docker run --rm -v {0}:/blazeserver -w /blazeserver/bin -e LD_LIBRARY_PATH=/blazeserver/lib {1} ./blazeserver -v".format(blazedir, deployimage))
+if versioninfo[0] != 0:
+    print "[VALIDATION ERROR] {0}".format(versioninfo[1])
+    sys.exit(-1)
+
+if versioninfo[1].split()[3][0] == '?':
+    print '[VALIDATION ERROR] Invalid changelist number -'
+    print versioninfo[1]
+    sys.exit(-1)

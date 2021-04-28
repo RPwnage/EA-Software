@@ -1,0 +1,357 @@
+#
+# GDB stl functions, a set of scripts to help debugging STL
+# Copyright (C) 2000 Gilad Mishne
+# Modified (2005) by Antal Novak
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+#
+
+# Modified to work with EASTL instead of STL containers
+
+add-symbol-file __DEST__/EastlStdContainers.o 0
+
+####################
+# vector functions #
+####################
+
+define p_stl_vector_size
+  set $vec = ($arg0)
+  set $vec_size = $vec->mpEnd - $vec->mpBegin
+  printf "Vector Size: %d\n", $vec_size
+end
+
+define p_stl_vector
+  set $vec = ($arg0)
+  set $vec_size = $vec->mpEnd - $vec->mpBegin
+  if ($vec_size != 0)
+    set $i = 0
+    while ($i < $vec_size)
+      if ($argc == 2)
+        $arg1 ($vec->mpBegin+$i) $i
+      else
+        printf "Vector Element %d:  ", $i
+        p *($vec->mpBegin+$i)
+      end
+      set $i++
+    end
+  end
+end
+
+####################
+# deque functions #
+####################
+
+define p_stl_deque
+  set $deq = ($arg0)
+  set $vecsize = $deq->mItBegin.mpEnd - $deq->mItBegin.mpBegin
+  set $cur = $deq->mItBegin.mpCurrent
+  set $curend = $deq->mItBegin.mpEnd
+  set $curptr = $deq->mItBegin.mpCurrentArrayPtr
+
+  set $i = 0
+  while ($cur != $deq->mItEnd.mpCurrent)
+    if ($argc == 2)
+      $arg1 $cur $i
+    else
+      printf "Deque Element %d:  ", $i
+      p *$cur
+    end
+    set $i++
+    set $cur = $cur + 1
+    if ($cur == $curend)
+      set $curptr = $curptr + 1
+      set $cur = *$curptr
+      set $curend = $cur + $vecsize
+    end
+  end
+end
+
+
+##########################################################################
+# list functions                                                         #
+# provides generic pointers that need to be cast back to the type        #
+##########################################################################
+
+define p_stl_list_size
+  set $list = ($arg0)
+  set $list_size = 0
+  set $firstNode = &$list->mNode
+  set $curNode = $list->mNode->mpNext
+  while ($curNode != $firstNode)
+	 set $curNode = ($curNode)->mpNext
+    set $list_size++
+  end
+  printf "List Size: %d\n", $list_size
+end
+
+define p_stl_list
+  set $list = ($arg0)
+  set $list_size = 0
+  set $firstNode = &$list->mNode
+  set $curNode = $list->mNode->mpNext
+  while ($curNode != $firstNode)
+    if ($argc == 2)
+      $arg1 ((_EastlVoidPtrListNodeType *)$curNode)->mValue $list_size
+    else
+      printf "List Element %d: ", $list_size
+      p ((_EastlVoidPtrListNodeType *) $curNode)->mValue
+    end
+	 set $curNode = ($curNode)->mpNext
+    set $list_size++
+  end
+end
+
+define p_stl_intrusive_list
+  set $list = ($arg0)
+  set $list_size = 0
+  set $curNode = $list->mAnchor.mpNext
+  while ($curNode != &$list->mAnchor)
+    if ($argc == 2)
+      $arg1 $curNode $list_size
+    else
+      printf "List Element %d: ", $list_size
+      p $curNode
+    end
+    set $curNode = ($curNode)->mpNext
+    set $list_size++
+  end
+end
+
+####################
+# tree   functions #
+####################
+
+define p_stl_map_size
+  set $tree = ($arg0)
+  printf "Map Size: %d\n", $tree->mnSize
+end
+
+define p_stl_map
+  set $tree = ($arg0)
+  set $i = 0
+  set $node = $tree->mAnchor->mpNodeLeft
+  set $end = &$tree->mAnchor
+  while ($node != $end)
+    set $i++
+    set $value = ((_EastlVoidPtrMapNodeBaseType *) $node)->mValue
+    if ($argc == 2)
+      $arg1 $value $i
+    else
+      printf "Node %d: ", $i
+      p $value
+    end
+    if ($node->mpNodeRight != 0) 
+      set $node = $node->mpNodeRight
+        while ($node->mpNodeLeft != 0)
+          set $node = $node->mpNodeLeft
+        end
+    else 
+      set $tmp_node = $node->mpNodeParent
+        while ($node == $tmp_node->mpNodeRight) 
+          set $node = $tmp_node
+          set $tmp_node = $tmp_node->mpNodeParent
+        end
+        if ($node->mpNodeRight != $tmp_node)
+          set $node = $tmp_node
+        end
+    end
+  end
+end
+
+define p_stl_set_size
+  set $tree = ($arg0)
+  printf "Set Size: %d\n", $tree->mnSize
+end
+
+define p_stl_set
+  set $tree = ($arg0)
+  set $i = 0
+  set $node = $tree->mAnchor->mpNodeLeft
+  set $end = &$tree->mAnchor
+  while ($node != $end)
+    set $i++
+    set $value = ((_EastlVoidPtrSetNodeBaseType *) $node)->mValue
+    if ($argc == 2)
+      $arg1 $value $i
+    else
+      printf "Node %d: ", $i
+      p $value
+    end
+    if ($node->mpNodeRight != 0) 
+      set $node = $node->mpNodeRight
+        while ($node->mpNodeLeft != 0)
+          set $node = $node->mpNodeLeft
+        end
+    else 
+      set $tmp_node = $node->mpNodeParent
+        while ($node == $tmp_node->mpNodeRight) 
+          set $node = $tmp_node
+          set $tmp_node = $tmp_node->mpNodeParent
+        end
+        if ($node->mpNodeRight != $tmp_node)
+          set $node = $tmp_node
+        end
+    end
+  end
+end
+
+####################
+# hash   functions #
+####################
+
+define p_stl_hash_size
+  set $hash = ($arg0)
+  printf "Table Size: %d  (in %d buckets)\n", $hash->mnElementCount, $hash->mnBucketCount
+end
+
+define p_stl_hash
+  set $i = 0
+  set $hash = ($arg0)
+  set $table = $hash->mpBucketArray
+  set $table_size = $hash->mnElementCount
+  set $cur_bucket = 0
+
+  set $num_buckets = $hash->mnBucketCount
+  while ($cur_bucket < $num_buckets && $i < $table_size)
+    if ($table[$cur_bucket] != 0)
+      printf "Bucket %d:\n--------\n", $cur_bucket
+      set $cur_node = $table[$cur_bucket]
+      while ($cur_node != 0)
+        set $cur_val = $cur_node->mValue
+        set $cur_node = $cur_node->mpNext
+        if ($argc == 2)
+            $arg1 $cur_val
+        else
+            p $cur_val
+        end
+        set $i++
+      end
+      printf "\n"
+    end
+    set $cur_bucket++
+  end
+end
+
+define p_stl_hash_find
+  set $i = 0
+  set $hash = ($arg0)
+  set $table = $hash->mpBucketArray
+  set $table_size = $hash->mnElementCount
+  set $cur_bucket = 0
+
+  set $num_buckets = $hash->mnBucketCount
+  while ($cur_bucket < $num_buckets && $i < $table_size)
+    if ($table[$cur_bucket] != 0)
+      set $cur_node = $table[$cur_bucket]
+      while ($cur_node != 0)
+        set $cur_val = $cur_node->mValue
+        set $cur_node = $cur_node->mpNext
+        if ($cur_val.first == $arg1)
+            p $cur_val
+        end
+        set $i++
+      end
+    end
+    set $cur_bucket++
+  end
+end
+
+define p_stl_intrusive_hash
+  set $i = 0
+  set $hash = ($arg0)
+  set $table = $hash->mBucketArray
+  set $table_size = $hash->mnElementCount
+  set $cur_bucket = 0
+
+  set $num_buckets = sizeof($hash->mBucketArray)/sizeof($hash->mBucketArray[0]) - 1
+  while ($cur_bucket < $num_buckets && $i < $table_size)
+    if ($table[$cur_bucket] != 0)
+      printf "Bucket %d:\n--------\n", $cur_bucket
+      set $cur_node = $table[$cur_bucket]
+      while ($cur_node != 0)
+        if ($argc == 2)
+            $arg1 $cur_node
+        else
+            p $cur_node
+        end
+        set $cur_node = $cur_node->mpNext
+        set $i++
+      end
+      printf "\n"
+    end
+    set $cur_bucket++
+  end
+end
+
+
+#####################################
+# Documentation for online gdb help #
+#####################################
+
+document p_stl_list_size
+p_stl_list_size <list>: Print size of stl list
+end
+document p_stl_list
+p_stl_list <list>: Print contents of stl list as (void*) pointers. Cast back to actual template type to see the values.
+end
+document p_stl_intrusive_list
+p_stl_intrusive_list <list>: Print contents of eastl intrusive as (void*) pointers. Cast back to actual template type to see the values.
+end
+
+
+document p_stl_vector_size
+p_stl_vector_size <vector>: Print size of eastl vector
+end
+document p_stl_vector
+p_stl_vector <vector>: Print contents of eastl vector as (void*) pointers. Cast back to actual template type to see the values.
+end
+
+document p_stl_deque
+p_stl_deque <deque>: Print contents of eastl deque.
+end
+
+document p_stl_map_size
+p_stl_map_size <map>: Print size of eastl map
+end
+document p_stl_map
+p_stl_tree <map>: Print contents of eastl maps as (void*) pointers. 
+end
+document p_stl_set_size
+p_stl_set_size <set>: Print size of eastl set
+end
+document p_stl_set
+p_stl_tree <set>: Print contents of eastl sets as (void*) pointers. 
+end
+
+document p_stl_hash_size
+p_stl_hash_size <hash_map>: Print size of eastl hash_maps
+end
+document p_stl_hash
+p_stl_hash <hash_map>: Print contents of eastl hash_maps as (void*) pointers. 
+end
+document p_stl_hash_find
+p_stl_hash_find <hash_map> <value>: Find and print the node with the key==<value> in the given hash_map.
+end
+document p_stl_intrusive_hash
+p_stl_intrusive_hash <intrusive_hash_map> [<printFunc>]: Print contents of eastl intrusive_hash_maps.
+    An optional print function can be provided to print the contents of each node.  It will
+    be passed a pointer to the intrusive hash node.  For example you could define the following
+    function to print FiberSemaphore nodes from the FiberManager::mUsedSemaphoreList:
+        define printFiberSemaphore
+            set $fiberSem=(FiberSemaphore*)$arg0
+            printf "%d (FiberSemaphore*)%p\n", $sem->mId, $sem
+        eNd
+end
+

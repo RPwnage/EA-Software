@@ -1,0 +1,88 @@
+<project>
+  <do if="${config-system} == 'pc64'">
+    <!-- PC only: Build the blazeredis project, which starts redis in cluster mode and generates
+         a corresponding redis.cfg to be used by the blazeserver -->
+
+    <dependent name="EATDF"/>
+    <property name="package.blazeserver.codegen.templatedirs" local="true">
+      ${package.EATDF.dir}/tool/templates/cpp
+      ${package.EATDF.dir}/tool/templates/protobuf
+      ${package.blazeserver.dir}/tools/typecomp2/templates/cpp
+      ${package.blazeserver.dir}/tools/typecomp2/templates/cpp/shared
+      ${package.blazeserver.dir}/tools/typecomp2/templates/cpp/server
+    </property>
+
+    <property name="package.blazeserver.codegen.templates" local="true">
+      tdfheaderfile={RelativeDirNoGen}/tdf/{FileBase}.h
+      tdfsource={RelativeDirNoGen}/tdf/{FileBase}.cpp
+    </property>
+
+    <fileset name="package.blazeserver.blazeredis.tdfs">
+      <includes name="${package.dir}/tools/blazeredis/**.tdf"/>
+    </fileset>
+
+    <task name="package.EATDF.typecomp.task"
+        basedir="${package.dir}"
+        outdir="${package.builddir}/gen"
+        templates="${package.blazeserver.codegen.templates}"
+        templatedirs="${package.blazeserver.codegen.templatedirs}"
+        inputs="package.blazeserver.blazeredis.tdfs"
+        extraArgs="-D:generateProtos=false"
+        includedirs=""
+        dep="${package.builddir}/gen/blazeredistdfs.d"
+        />
+
+    <Program name="blazeredis" frompartial="BlazeProgram">
+
+      <includedirs>
+        ${package.dir}/tools/blazeredis
+        ${package.builddir}/gen/tools/blazeredis
+      </includedirs>
+
+      <dependencies>
+        <auto>
+          ${blazeserver.common.dependencies}
+          blazeserver/framework
+          blazeserver/framework_gen
+          blazeserver/proxycomponents
+          blazeserver/outboundgrpc
+          blazeserver/grpc_helpers
+        </auto>
+      </dependencies>
+
+      <sourcefiles>
+        <includes name="${package.dir}/tools/blazeredis/**.cpp"/>
+        <includes name="${package.builddir}/gen/tools/blazeredis/**.cpp"/>
+        <includes name="${package.builddir}/gen/blazerpcerrors.cpp"/>
+        <includes name="${package.builddir}/gen/blazerpcproxy.cpp"/>
+      </sourcefiles>
+
+      <config>
+        <buildoptions>
+          <option name="uselibrarydependencyinputs" value="off"/>
+        </buildoptions>
+      </config>
+
+      <!-- Custom build step for generating the blazeserver redis.cfg.
+           This build step is guaranteed to complete before either the blazeredis
+           or blazeserver project is launched, and is used to ensure that redis.cfg
+           exists when the blazeserver is started. -->
+      <buildsteps>
+        <custom-build-step after="PrepareForRun">
+          <custom-build-tool>
+            cmd.exe /c "cd ${package.dir}\bin\redis\etc &#038;&#038; ${package.builddir}\${config}\bin\blazeredis.exe --genconfig"
+          </custom-build-tool>
+          <!-- Set a dummy output to force VS to execute the build step on every run. (VS will only run the build step
+               if one of its inputs has changed, or if the output is set and doesn't already exist.) -->
+          <custom-build-outputs>
+            ${package.dir}/init/dummy.txt
+          </custom-build-outputs>
+        </custom-build-step>
+        <run workingdir="${package.dir}/bin/redis/etc"/>
+      </buildsteps>
+
+
+      <bulkbuild enable="true" partial="true" SplitByDirectories="true"/>
+    </Program>
+  </do>
+</project>

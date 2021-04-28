@@ -1,0 +1,62 @@
+[ headername="xblprofile/tdf/xblprofile.h" ]
+#include "xblprofile/gen/xblprofile.tdf"
+
+
+namespace Blaze
+{
+namespace XBLServices
+{
+
+[
+    id = core/1006,
+    description = "Proxy component used to define xbl profile service",
+    details = "xbl profile service",
+    proxyOnly = true,
+    http = {
+        payloadEncoderSubType = "NORMAL"
+    }
+]
+component XBLProfile
+{
+    errors
+    {
+        [ description = "External profile service authentication error, possibly due to invalid/expired token", http_status_code = 401 ]
+        XBLPROFILES_AUTHENTICATION_REQUIRED = 1;
+
+        [ description = "The user has exceeded the rate limit for calls to the external profile service", http_status_code = 429 ]
+        XBLPROFILES_RATE_LIMIT_EXCEEDED = 2;
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+                id = 1,
+                description = "Retrieve user info from external profile service",
+                details = "Retrieve user info from external profile service",
+                requires_authentication = false,
+                client_export = false,
+                errors = { 
+                    XBLPROFILES_AUTHENTICATION_REQUIRED,
+                    XBLPROFILES_RATE_LIMIT_EXCEEDED 
+                },
+                http = {
+                    resource = "users/batch/profile/settings",
+                    method = "POST",
+                    custom_request_headers = {
+                        "x-xbl-contract-version" = "getExternalUserProfilesRequestHeader.contractVersion",
+                        "Authorization"          = "getExternalUserProfilesRequestHeader.authToken",
+                        "Accept"                 = "getExternalUserProfilesRequestHeader.accept"
+                    },
+                    requestPayloadMember = "getExternalUserProfilesRequestBody"
+                }
+            ]
+            GetExternalUserProfilesResponse getExternalUserProfiles(GetExternalUserProfilesRequest);
+        }
+    }
+}
+
+
+}
+}

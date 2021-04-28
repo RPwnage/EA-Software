@@ -1,0 +1,82 @@
+[ headername="notify/tdf/notify.h" ]
+#include "notify/gen/notify.tdf"
+
+namespace Blaze
+{
+namespace Notify
+{
+[
+    id = core/1010,
+    description = "Component used to submit notifications to the Notify service",
+    details = "Notify supports RESTful APIs for communicating with the Notify service",
+    proxyOnly = true
+]
+
+component Notify
+{
+    errors
+    {
+        [ description = "forwarded user information is required but was not supplied" ]
+        NOTIFY_S2S_NO_FORWARDED_CREDENTIALS = 1; //http 400
+
+        [ description = "the supplied api key is invalid" ]
+        NOTIFY_INVALID_API_KEY = 2; //http 401
+
+        [ description = "the supplied access token is invalid or does not contain the required scope" ]
+        NOTIFY_BAD_ACCESS_TOKEN = 3; //http 403
+
+        [ description = "an internal error occurred on the Notify host" ]
+        NOTIFY_INTERNAL_ERROR = 4; //http 500
+
+        [ description = "failure caused by a temporary backend error" ]
+        NOTIFY_SERVICE_TEMPORARILY_UNAVAILABLE = 5; //http 503
+
+        [ description = "the service load balancer was unable to find any healthy backend Notify hosts" ]
+        NOTIFY_SERVICE_UNAVAILABLE = 6; //http 504
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+              id = 1,
+              description = "Publishes a notification to the Notify service",
+              details = "Publishes a notification to the Notify service via S2S trusted authentication",
+              requires_authentication = false,
+              client_export = false,
+              errors = {
+                NOTIFY_S2S_NO_FORWARDED_CREDENTIALS,
+                NOTIFY_INVALID_API_KEY,
+                NOTIFY_BAD_ACCESS_TOKEN,
+                NOTIFY_INTERNAL_ERROR,
+                NOTIFY_SERVICE_TEMPORARILY_UNAVAILABLE,
+                NOTIFY_SERVICE_UNAVAILABLE
+              },
+              errortype = NotifyError,
+              http = {
+                resource = "/notify/publications/{messageType}s",
+                method = "POST",
+                contentType = "application/json",
+                custom_request_headers = {
+                  "Authorization" = "accessToken",
+                  "X-Api-Version" = "apiVersion"
+                },
+                status_code_errors = {
+                  400 = NOTIFY_S2S_NO_FORWARDED_CREDENTIALS,
+                  401 = NOTIFY_INVALID_API_KEY,
+                  403 = NOTIFY_BAD_ACCESS_TOKEN,
+                  500 = NOTIFY_INTERNAL_ERROR,
+                  503 = NOTIFY_SERVICE_TEMPORARILY_UNAVAILABLE,
+                  504 = NOTIFY_SERVICE_UNAVAILABLE
+                },
+                requestPayloadMember = "notifications"
+              }
+            ]
+            void postNotifications(PostNotificationsRequest);
+        }
+    }
+}
+
+} // namespace Notify
+} // namespace Blaze

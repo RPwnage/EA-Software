@@ -1,0 +1,154 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- 
+  OSX host platforms don't have SDK package.  
+  So we setup the build tool paths here as well (instead of referencing 'package.[sdk_package].compiler property). 
+  -->
+
+  <include file="xcode-buildtools.xml"/>
+
+  <do unless="@{PropertyExists('package.osx_config.appdir')}">
+    <property name="package.osx_config.appdir" value="${xcode-app-developer-dir}"/>
+  </do>
+
+  <!-- Create these properties for backward compatibility in case they got referenced directly somewhere else. -->
+  <property name="package.osx_config.toolbindir"      value="${package.xcode.toolbindir}"/>
+  <property name="package.osx_config.xcrundir"        value="${package.xcode.toolbindir}"/>
+  <property name="package.osx_config.toolchainbindir" value="${package.xcode.toolchainbindir}"/>
+  <do.once context="project" key="SetMacOsxSDKVersion">
+    <SetAppleSDKVersion VersionPropertyName="package.macosxsdk.sdk-version" SdkName="mac"/>
+  </do.once>
+
+  <property name="package.osx_config.platformSdksDir" value="${package.osx_config.appdir}/Platforms/MacOSX.platform/Developer/SDKs/"/>
+
+  <compiler
+    path="${package.xcode.compiler}"
+    path-clanguage="${package.xcode.c-compiler}"
+    version="${package.xcode.version}"
+    >
+    <common-defines>
+      EA_PLATFORM_OSX=1
+    </common-defines>
+    <common-options>
+      -isysroot ${package.osx_config.platformSdksDir}MacOSX.sdk
+    </common-options>
+    <system-includedirs>
+    </system-includedirs>
+    <template>
+      <commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%objectfile%"
+        -c "%sourcefile%"
+      </commandline>
+      <pch.commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%pchfile%"        <!-- pch file -->
+        -c "%sourcefile%"     <!-- source file -->
+      </pch.commandline>
+      <responsefile>
+        <commandline>
+          @%responsefile%
+        </commandline>
+      </responsefile>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <!-- Need to make sure %system-includedir% is in unix path format -->
+      <system-includedir>-isystem "%system-includedir%"</system-includedir>
+    </template>
+  </compiler>
+
+  <assembler 
+    path="${package.xcode.assembler}"
+    version="${package.xcode.version}"
+    >
+    <common-defines>
+    </common-defines>
+    <common-options>
+      -isysroot ${package.osx_config.platformSdksDir}MacOSX.sdk
+    </common-options>
+    <system-includedirs>
+    </system-includedirs>
+    <template>
+      <commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%objectfile%"
+        -c "%sourcefile%"
+      </commandline>
+      <responsefile>
+        <commandline>
+          @%responsefile%
+        </commandline>
+      </responsefile>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <system-includedir>-isystem "%system-includedir%"</system-includedir>
+    </template>
+  </assembler>
+
+  <property name='lib.responsefile.separator' value='${nant.endline}'/>
+  <property name='lib.template.responsefile.objectfile' value='%objectfile%'/>
+  <librarian
+    path="${package.xcode.archiver}"
+    version="${package.xcode.version}"
+    >
+    <common-options>
+      -syslibroot ${package.osx_config.platformSdksDir}MacOSX.sdk
+      -o "%liboutputname%"
+    </common-options>
+    <template>
+      <commandline>
+        %options%
+        %objectfiles%
+      </commandline>
+      <responsefile>
+        <commandline>
+          %options% 
+          -filelist %responsefile%
+        </commandline>
+        <contents>
+          %objectfiles%
+        </contents>
+      </responsefile>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </librarian>
+
+  <linker
+    path="${package.xcode.linker}"
+    version="${package.xcode.version}"
+    >
+    <common-options>
+      -isysroot ${package.osx_config.platformSdksDir}MacOSX.sdk
+    </common-options>
+    <system-librarydirs>
+    </system-librarydirs>
+    <system-libs>
+    </system-libs>
+    <template>
+      <commandline>
+        %options%
+        %objectfiles%
+        %librarydirs%
+        %libraryfiles%
+      </commandline>
+      <responsefile>
+        <commandline>
+          @%responsefile%
+        </commandline>
+      </responsefile>
+      <librarydir>-L "%librarydir%"</librarydir>
+      <libraryfile>"%libraryfile%"</libraryfile>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </linker>
+
+</project>

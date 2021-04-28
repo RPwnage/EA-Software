@@ -1,0 +1,111 @@
+<project xmlns="schemas/ea/framework3.xsd">
+  <!-- Utility Program to make sure that we don't break a contract that Framework and Proxy Components should not depend on other components. -->
+  
+  
+  <!-- 
+  
+                                          DO NOT MODIFY THE CONTENTS OF THIS FILE. 
+                                          DO NOT MODIFY THE CONTENTS OF THIS FILE. 
+                                          DO NOT MODIFY THE CONTENTS OF THIS FILE. 
+  
+  
+  If you are modifying this file to fix a build error because some "dependency on a component" are missing, 
+  most likely you are making a mistake. Talk to fellow Blaze devs before making this change.
+  
+  If you are modifying this file to fix a build error because some "os level/project wide level" things have changed, that's okay (but talk to fellow Blaze devs first).
+  -->
+  
+  
+  <!-- We intentionally do not derive from "BlazeProgram" partialmodule here to make sure that this program accidentally fails to 
+  do it's job because someone added the dependencies there. This is not a maintenance headache as this file should be rarely modified. -->
+  <Program name="depchecker">
+    <includedirs>
+      ${blazeserver.common.includedirs}
+      ${package.dir}/tools/depchecker
+    </includedirs>
+
+    <dependencies>
+      <auto>
+        ${blazeserver.common.dependencies}
+        blazeserver/framework
+        blazeserver/framework_gen
+        blazeserver/proxycomponents
+        blazeserver/outboundgrpc
+        blazeserver/grpc_helpers
+      </auto>
+    </dependencies>
+
+    <libraries if="${config-system} =='pc64'" append="true">
+      <includes name="ws2_32.lib" asis="true"/>
+      <includes name="DbgHelp.lib" asis="true"/>
+      <includes name="RpcRT4.lib" asis="true"/>
+    </libraries>
+
+    <config>
+      <defines>
+        ${blazeserver.common.defines}
+      </defines>
+
+      <buildoptions>
+        <option name="buildset.cc.options">
+          ${option.value}
+          ${blazeserver.cc.options??}
+          ${blazeserver.cc.sanitizer.options??}
+        </option>
+        <option name="buildset.link.options" if="${config-system} == 'pc64'">
+          ${option.value}
+          -ignore:4099
+          -ignore:4221
+          /NODEFAULTLIB:libcmt  <!-- Fix for link errors after adding zlib package -->
+          /opt:noref
+          /opt:noicf
+          /incremental
+        </option>
+        <option name="buildset.link.options" if="${config-system} == 'pc64' and ${config-name} == 'debug'">
+          ${option.value}
+          /NODEFAULTLIB:libcmtd   <!-- Fix for link errors after adding grpc package -->
+        </option>
+        <option name="buildset.link.options" if="${blazeserver.asan_enabled??false}">
+          ${option.value}
+          -shared-libasan
+        </option>
+
+        <option name="buildset.link.options" if="${config-system} == 'unix64'">
+          ${option.value}
+          -fuse-ld=lld
+          -rdynamic
+          -lpthread
+          -lpcap
+          -luuid
+        </option>
+        <!-- generating map files increases the link time -->
+        <option name="generatemapfile" value="off" if="${config-system} == 'unix64'"/>
+        <option name="debugfastlink" value="on" if="${config-system} == 'pc64'"/>
+
+      </buildoptions>
+
+      <warningsuppression>
+        ${blazeserver.common.warningsuppression}
+      </warningsuppression>
+    </config>
+    
+    <headerfiles>
+      <includes name="${package.dir}/tools/depchecker/**.h"/>
+    </headerfiles>
+
+    <sourcefiles>
+      <includes name="${package.dir}/tools/depchecker/**.cpp"/>
+      <includes name="${package.builddir}/gen/blazerpcerrors.cpp"/>
+      <includes name="${package.builddir}/gen/blazerpcproxy.cpp"/>
+    </sourcefiles>
+
+    <bulkbuild enable="true" partial="true" SplitByDirectories="true"/>
+
+    <buildsteps>
+      <do if="${config-system} == 'unix64'">
+        <postbuild-step targetname="prepforcontainer"/>
+      </do>
+    </buildsteps>
+    
+  </Program>
+</project>

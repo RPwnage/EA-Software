@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package eadp.messagebus;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+import "eadp/annotations.proto";
+import "google/protobuf/wrappers.proto";
+
+option java_package = "com.ea.gs.messagebus.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "PreRegistrationProto";
+
+service PreRegistrationAdmin {
+    option (eadp.grpc.service_mapping) = {
+        ports: [ S2S, S2S_ADMIN]
+        scopes: {
+            key: "S2S"
+            value: "gs_messagebus_prereg_admin"
+        }
+        scopes: {
+            key: "S2S_ADMIN"
+            value: "gs_messagebus_prereg_admin"
+        }
+
+    };
+
+
+
+    rpc GetProducerByKey(ProducerKey) returns (PreRegistrationProducerAdminResponse);
+
+    rpc GetProducersByTopicNamePattern(TopicNamePattern) returns (PreRegistrationProducerAdminResponse);
+
+    rpc AddProducerTopicNamePatterns(TopicNamePatterns) returns (PreRegistrationProducerAdminResponse);
+
+    rpc DeleteProducerTopicNamePatterns(TopicNamePatterns) returns (PreRegistrationProducerAdminResponse);
+
+    rpc GetAllProducers(google.protobuf.Empty) returns (PreRegistrationProducerAdminResponse);
+
+    rpc UpsertProducer(ProducerEntity) returns (PreRegistrationProducerAdminResponse);
+
+    rpc DeleteProducer(ProducerKey) returns (PreRegistrationProducerAdminResponse);
+
+    // Insert or update configuration property for the Producer.
+    rpc UpsertProducerConfigProperty(ProducerConfigOverride) returns (PreRegistrationProducerAdminResponse);
+
+    rpc DeleteProducerConfigProperty(ProducerKey) returns (PreRegistrationProducerAdminResponse);
+
+    rpc GetConsumerByKey(ConsumerKey) returns (PreRegistrationConsumerAdminResponse);
+
+    rpc GetConsumersByTopicNamePattern(TopicNamePattern) returns (PreRegistrationConsumerAdminResponse);
+
+    rpc AddConsumerTopicNamePatterns(TopicNamePatterns) returns (PreRegistrationConsumerAdminResponse);
+
+    rpc DeleteConsumerTopicNamePatterns(TopicNamePatterns) returns (PreRegistrationConsumerAdminResponse);
+
+    rpc GetAllConsumers(google.protobuf.Empty) returns (PreRegistrationConsumerAdminResponse);
+
+    rpc UpsertConsumer(ConsumerEntity) returns (PreRegistrationConsumerAdminResponse);
+
+    rpc DeleteConsumer(ConsumerKey) returns (PreRegistrationConsumerAdminResponse);
+
+}
+
+message PreRegistrationProducerAdminResponse {
+    // The response status message.
+    google.rpc.Status status = 1;
+    repeated ProducerEntity producer_list = 2;
+}
+
+// ID or a business key of the Producer entity.
+message ProducerKey {
+    oneof key {
+        uint64 id = 1;
+        string client_id = 2;
+    }
+}
+
+// Producer entity from Pre-Registration database.
+message ProducerEntity {
+    // ID of the Producer.
+    uint64 id = 1;
+    // The unique client ID.
+    string client_id = 2;
+    bool is_active = 3;
+    bool is_external = 4;
+    int32 max_topics = 5;
+    string description = 6;
+    repeated string patterns = 7;
+    google.protobuf.Timestamp created_timestamp = 8;
+    google.protobuf.Timestamp modified_timestamp = 9;
+    ProducerConfigOverride config_override_properties = 10;
+}
+
+// Config properties for the parent Consumer entity which override the default values.
+message ProducerConfigOverride {
+    enum AckType {
+        ACKNOWLEDGMENT_LEADER_ONLY = 0;
+        ACKNOWLEDGMENT_ALL = 1;
+        ACKNOWLEDGMENT_NONE = 2;
+    }
+    // The ID of the entity.
+    uint64 id = 1;
+    // The reference to the parent Producer.
+    string client_id = 2;
+    // The number of acknowledgments the producer requires the leader to have received before considering a request complete.
+    AckType ack = 3;
+    // The size of the TCP send buffer (SO_SNDBUF) to use when sending data.
+    google.protobuf.Int32Value send_buffer_bytes = 4;
+    // Max retry count when publishing a record.
+    google.protobuf.UInt32Value max_publish_record_retries = 5;
+    google.protobuf.Timestamp created_timestamp = 6;
+    google.protobuf.Timestamp modified_timestamp = 7;
+    // The Producer record batch size in bytes.
+    google.protobuf.UInt32Value batch_size = 8;
+    // The total bytes of memory the Producer can use to buffer records waiting to be sent to the server.
+    google.protobuf.UInt32Value buffer_memory = 9;
+    // The upper bound on the delay for batching Producer records.
+    google.protobuf.UInt32Value linger_ms = 10;
+}
+
+message PreRegistrationConsumerAdminResponse {
+    // The response status message.
+    google.rpc.Status status = 1;
+    repeated ConsumerEntity consumer_list = 2;
+}
+
+// ID or a business key of the Consumer entity.
+message ConsumerKey {
+    oneof key {
+        uint64 id = 1;
+        string client_id = 2;
+    }
+}
+
+// Consumer entity from Pre-Registration database.
+message ConsumerEntity {
+    // ID of the Consumer.
+    uint64 id = 1;
+    // The unique client ID.
+    string client_id = 2;
+    bool is_active = 3;
+    string description = 4;
+    repeated string patterns = 5;
+    google.protobuf.Timestamp created_timestamp = 6;
+    google.protobuf.Timestamp modified_timestamp = 7;
+}
+
+
+message TopicNamePatterns {
+    oneof subscriber_key {
+        ConsumerKey consumer_key = 1;
+        ProducerKey producer_key = 2;
+    }
+    // The list of the topic name patterns.
+    repeated string patterns = 3;
+}
+
+message TopicNamePattern {
+    string pattern = 1;
+}

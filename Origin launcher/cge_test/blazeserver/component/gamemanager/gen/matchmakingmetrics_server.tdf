@@ -1,0 +1,215 @@
+/*! ************************************************************************************************/
+/*!
+    \file matchmakingmetrics_server.tdf
+
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="gamemanager/tdf/matchmaker.h"]
+#include "gamemanager/gen/scenarios.tdf"
+
+
+namespace Blaze
+{
+
+namespace GameManager
+{
+
+[description="Matchmaking Diagnostic's counts", trackChanges=true]
+class MatchmakingRuleDiagnosticCounts
+{
+    [tag="ases", description="Count of requests/MMsessions that had this rule/criteria."]
+    uint64_t mSessions;
+
+    [tag="cgea", description="For create mode matchmaking. Count of MMsessions that were evaluated for this rule/criteria."]
+    uint64_t mCreateEvaluations;
+
+    [tag="cgeb", description="For create mode matchmaking. Count of MMsessions that were evaluated for this rule/criteria, that matched."]
+    uint64_t mCreateEvaluationsMatched;
+
+    [tag="fgra", description="For find mode matchmaking. Count of requests that tried to find games using the rule/criteria."]
+    uint64_t mFindRequests;
+
+    [tag="fgrb", description="For find mode matchmaking. Count of the requests that could match at least one game, using the rule/criteria, at the time MM session was started."]
+    uint64_t mFindRequestsHadGames;
+    
+    [tag="fgrc", description="For find mode matchmaking. Count of games that were matchable by the rule/criteria, for the request, at the time MM session was started."]
+    uint64_t mFindRequestsGamesVisible;
+};
+
+[description="Diagnostics for rule sub category/criteria, broken down by its possible/desired values", trackChanges=true]
+typedef map<string(-1), MatchmakingRuleDiagnosticCounts> DiagnosticsByRuleCriteriaValueMap;
+
+[description="Diagnostics for a rule, broken down by sub category/criteria", trackChanges=true]
+typedef map<string(-1), DiagnosticsByRuleCriteriaValueMap> DiagnosticsByRuleCategoryMap;
+
+[description="Diagnostics for a subsession, broken down by rule", trackChanges=true]
+typedef map<RuleName, DiagnosticsByRuleCategoryMap> DiagnosticsByRuleMap;
+
+[description="Container for the subsession's Matchmaking diagnostics", trackChanges=true]
+class MatchmakingSubsessionDiagnostics
+{
+    [tag="ases", description="Count of Matchmaking sessions had diagnostics tracked for this subsession. Sessions that failed to start etc are not included"]
+    uint64_t mSessions;
+
+    [tag="cgea", description="For create mode matchmaking. Total create mode evaluations using this subsession."]
+    uint64_t mCreateEvaluations;
+    [tag="cgeb", description="For create mode matchmaking. Total create mode evaluations using this subsession, that matched."]
+    uint64_t mCreateEvaluationsMatched;
+
+    [tag="fgrv", description="For find mode matchmaking.  Total open to matchmaking games present, at the time MM session was started"]
+    uint64_t mFindRequestsGamesAvailable;
+    
+    [tag="rdia", description="Map of diagnostics broken down by rule"]
+    DiagnosticsByRuleMap mRuleDiagnostics;
+};
+
+[trackChanges=true]
+class MatchmakingMetrics
+{
+    [tag="treq", description="Total number of sessions made for this sub session.", default=0]
+    uint32_t mTotalRequests;
+
+    [tag="tngr", description="Total number of sessions made by solo users.", default=0]
+    uint32_t mTotalNonGroupRequests;
+    [tag="tgr", description="Total number of sessions made by groups (1+ user).", default=0]
+    uint32_t mTotalGroupRequests;
+    [tag="tpig", description="Total number of players that matchmade via group requests.", default=0]
+    uint32_t mTotalPlayersInGroupRequests;
+    typedef map<uint32_t, uint32_t> RequestsBySizeMap;
+    [tag="tpi2", description="Total number of MM requests by group size, including non-grouped single users (size=1)."]
+    RequestsBySizeMap mTotalRequestsBySize;
+
+    [tag="tjng", description="Total number of sessions that finalized in create game mode and joined a newly created game", default=0]
+    uint32_t mTotalJoinedNewGames;
+    [tag="tcng", description="Total number of sessions that finalized as the leader and created a new game", default=0]
+    uint32_t mTotalCreatedNewGames;
+    [tag="tjeg", description="Total number of sessions that have successfully joined an existing game session.", default=0]
+    uint32_t mTotalJoinedExistingGame;
+    [tag="ttmo", description="Total number of sessions that timed out (no match)", default=0]
+    uint32_t mTotalTimeouts;
+    [tag="tcan", description="Total number of sessions that got canceled.", default=0]
+    uint32_t mTotalCanceled;
+    [tag="tter", description="Total number of sessions that got terminated.", default=0]
+    uint32_t mTotalTerminated;
+    [tag="tqvf", description="Total number of sessions that failed due to qos validation failure.", default=0]
+    uint32_t mTotalQOSValidationFailure;
+    [tag="tcas", description="Total number of sessions that got canceled due to another session finishing first.", default=0]
+    uint32_t mTotalOtherSubSessionSuccess;
+    [tag="tsdm", description="Aggregate of the time of all the successful requests, in milliseconds", default=0]
+    uint64_t mTotalSuccessDurationMs;
+    [tag="tpcg", description="Aggregate of the player count in game of all the successful requests.", default=0]
+    uint32_t mTotalPlayerCountInGame;
+    [tag="tmpc", description="Aggregate of the game capacity of all the successful requests.", default=0]
+    uint32_t mTotalMaxPlayerCapacity;
+    [tag="tgpf", description="Aggregate of game percentage full of all the successful requests.", default=0]
+    uint32_t mTotalGamePercentFullCapacity;
+    [tag="fits", description="Aggregate Fit Score of all successful requests", default=0]
+    uint64_t mTotalFitScore;
+    [tag="mfit", description="Max Fit Score", default=0]
+    uint64_t mMaxFitScore;
+    
+    [tag="pixf", description="The number of calls to ExternalSession APIs that failed and are considered 'player-impacting'.", default=0]
+    uint64_t mExternalSessionFailuresImpacting;
+    [tag="nixf", description="The number of calls to ExternalSession APIs that failed and are considered 'non-player-impacting'.", default=0]
+    uint64_t mExternalSessionFailuresNonImpacting;
+
+    [tag="udia", description="Aggregate Matchmaking subsession diagnostics"]
+    MatchmakingSubsessionDiagnostics mDiagnostics;
+};
+
+typedef map<SubSessionName, MatchmakingMetrics> SubSessionMetricsMap;
+ 
+class ScenarioMatchmakingMetrics
+{
+    [tag="coda", description="The metrics for this scenario."]
+    MatchmakingMetrics mMetrics;
+    [tag="scmm", description="Sub session Metrics map"]
+    SubSessionMetricsMap mSubSessionMetrics;
+};
+
+typedef map<ScenarioVersion, ScenarioMatchmakingMetrics> ScenarioVersionMatchmakingMetricsMap;
+typedef map<ScenarioVariantName, ScenarioVersionMatchmakingMetricsMap> ScenarioVariantMatchmakingMetricsMap;
+typedef map<ScenarioName, ScenarioVariantMatchmakingMetricsMap> ScenarioMatchmakingMetricsMap;
+ 
+class GetMatchmakingMetricsResponse
+{
+   [tag="nsmm",description="Non Scenario Matchmaking Metrics"]
+   MatchmakingMetrics mNonScenarioMetrics;
+   [tag="smam",description="Scenario Matchmaking Metrics"]
+   ScenarioMatchmakingMetricsMap mScenarioMatchmakingMetricsMap;
+};
+
+class MatchmakingGameMetrics
+{
+    [tag="tdgs", description="Aggregate of the time spent in game session, in seconds", default=0]
+    uint64_t mTotalDurationInGameSession;
+    [tag="tgsp", description="Aggregate of the time spent in game, in seconds", default=0]
+    uint64_t mTotalDurationInMatch;
+    [tag="tgpp", description="Total number of games played per player.", default=0]
+    uint32_t mTotalPlayers;
+    [tag="tlme", description="Total left match early.", default=0]
+    uint32_t mTotalLeftMatchEarly;
+    [tag="tfim", description="Total matches finishes.", default=0]
+    uint32_t mTotalFinishedMatches;
+};
+
+typedef map<SubSessionName, MatchmakingGameMetrics> SubSessionGameMetricsMap;
+
+class ScenarioMatchmakingGameMetrics
+{
+    [tag="coda", description="The metrics for this scenario."]
+    MatchmakingGameMetrics mMetrics;
+    [tag="scmm", description="Sub session Metrics map"]
+    SubSessionGameMetricsMap mSubSessionMetrics;
+};
+
+typedef map<ScenarioVersion,ScenarioMatchmakingGameMetrics> ScenarioVersionMatchmakingGameMetricsMap;
+typedef map<ScenarioVariantName, ScenarioVersionMatchmakingGameMetricsMap> ScenarioVariantMatchmakingGameMetricsMap;
+typedef map<ScenarioName, ScenarioVariantMatchmakingGameMetricsMap> ScenarioMatchmakingGameMetricsMap;
+  
+class GetMatchmakingGameMetricsResponse
+{
+   [tag="nsmm",description="Non Scenario Matchmaking Game Metrics"]
+   MatchmakingGameMetrics mNonScenarioMetrics;
+   [tag="smam",description="Scenario Matchmaking Game Metrics"]
+   ScenarioMatchmakingGameMetricsMap mScenarioMatchmakingMetricsMap;
+};
+
+class SubSessionDetails
+{
+    [tag="sttm",description="Start time for subsession"]
+    int64_t mStartTime;
+    [tag="ettm",description="End time for subsession"]
+    int64_t mEndTime;
+};
+
+typedef map<SubSessionName, SubSessionDetails> SubSessionDetailsMap;
+
+class ScenarioDetails
+{
+    [tag="cond",description="Configuration timestamp for scenario info", default="0s"]
+    TimeValue mConfigurationDate;
+    [tag="time",description="Timeout for scenario", default=0]
+    int64_t mTimeout;
+    [tag="hash",description="Scenario Hash", default=0]
+    ScenarioHash mHash;    
+    [tag="ssim",description="SubSession Details Map"]
+    SubSessionDetailsMap mSubSessionDetailsMap;
+};
+ 
+typedef map<ScenarioVersion, ScenarioDetails> ScenarioVersionDetailsMap;
+typedef map<ScenarioVariantName, ScenarioVersionDetailsMap> ScenarioVariantDetailsMap;
+typedef map<ScenarioName, ScenarioVariantDetailsMap> ScenarioDetailsMap;
+ 
+class GetScenarioDetails
+{
+    [tag="scim",description="scenario info map"]
+    ScenarioDetailsMap mScenarioDetailsMap;
+};
+
+} // namespace GameManager
+} // namespace Blaze

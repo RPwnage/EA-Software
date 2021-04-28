@@ -1,0 +1,135 @@
+[headername="framework/tdf/inetfilter.h"]
+#include "framework/gen/inetfilter.tdf"
+
+namespace Blaze
+{
+namespace DynamicInetFilter
+{
+const uint32_t MAX_GROUP_LENGTH = 64;
+const uint32_t MAX_OWNER_LENGTH = 64;
+const uint32_t MAX_COMMENT_LENGTH = 160;
+
+[ description = "Unique identifier for an entry." ]
+typedef uint32_t RowId;
+
+[ description = "This RowId is reserved. It will never be assigned to any entry." ]
+const RowId INVALID_ROW_ID = 0;
+
+[ description = "Group name. A group of subnets is referenced through the notation 'DynamicInetFilterGroup:(Group)' in a list of IP ranges in a .cfg file. Is always non-empty." ]
+typedef string(MAX_GROUP_LENGTH) Group;
+[ description = "Owner of the subnet. Not used by Blaze, it is tracked for administrative purposes. Is always non-empty." ]
+typedef string(MAX_OWNER_LENGTH) Owner;
+[ description = "Free-form comment. Not used by Blaze, it is tracked for administrative purposes. Can be empty." ]
+typedef string(MAX_COMMENT_LENGTH) Comment;
+
+[ description = "One subnet entry as kept in the DB",tdfid="hash", trackChanges = true]
+class Entry
+{
+    [tag="rid", default=INVALID_ROW_ID, description="Unique identifier for an entry."]
+    RowId mRowId;
+
+    [tag="grp", description="Group name. Subnets are organized by group during lookups. Is always non-empty."]
+    Group mGroup;
+
+    [tag="ownr", description="Owner of the subnet. Not used by Blaze, it is tracked for administrative purposes. Is always non-empty."]
+    Owner mOwner;
+
+    [tag="snet", description="IPv4 subnet specification, in CIDR format. '0.0.0.0/0' is the whole world, 'a.b.c.d/32' is a single host."]
+    CidrBlock mSubNet;
+
+    [tag="comm", description="Free-form comment. Not used by Blaze, it is tracked for administrative purposes. Can be empty."]
+    Comment mComment;
+};
+
+[tdfid = "hash", trackChanges=true]
+class ReplicatedInetFilterReplicationReason
+{
+    enum Reason
+    {
+        MAP_CREATED = 0,
+        MAP_DESTROYED,
+        OBJECT_CREATED,
+        OBJECT_UPDATED,
+        OBJECT_DESTROYED
+    };
+    
+    [tag="rsn"] Reason mReason;
+};
+
+[ description = "Request to slave for adding a new entry to DynamicInetFilter." ]
+class AddRequest
+{
+    [tag="grp", description="Group name. Subnets are organized by group during lookups. Must be non-empty."]
+    Group mGroup;
+    
+    [tag="ownr", description="Owner of the subnet. Not used by Blaze, it is tracked for administrative purposes. Is always non-empty."]
+    Owner mOwner;
+    
+    [tag="snet", description="IPv4 subnet specification, in CIDR format. '0.0.0.0/0' is the whole world, 'a.b.c.d/32' is a single host. Must be specified."]
+    CidrBlock mSubNet;
+    
+    [tag="comm", description="Free-form comment. Not used by Blaze, it is tracked for administrative purposes. Optional."]
+    Comment mComment;
+};
+
+[ description = "Response from slave when adding a new entry to DynamicInetFilter." ]
+class AddResponse
+{
+    [tag="rid", default=INVALID_ROW_ID, description="Unique identifier for the newly created entry."]
+    RowId mRowId;
+};
+
+[ description = "Request to slave for modifying the contents of an entry in DynamicInetFilter." ]
+class UpdateRequest
+{
+    [tag="rid", default=INVALID_ROW_ID, description="Identifier for the entry that should be changed. Must be specified, and refer to an entry that exists."]
+    RowId mRowId;
+    
+    [tag="grp", description="New contents for the group portion of the entry. Must be non-empty."]
+    Group mGroup;
+    
+    [tag="ownr", description="New contents for the owner portion of the entry. Must be non-empty."]
+    Owner mOwner;
+    
+    [tag="snet", description="New contents for the group portion of the entry. Must be specified."]
+    CidrBlock mSubNet;
+    
+    [tag="comm", description="New contents for the comment portion of the entry. If not specified, it is assumed to be empty."]
+    Comment mComment;
+};
+
+[ description = "Request to slave for removing an entry in DynamicInetFilter." ]
+class RemoveRequest
+{
+    [tag="rid", default=INVALID_ROW_ID, description="Identifier for the entry that should be removed. Must be specified, and refer to an entry that exists."]
+    RowId mRowId;
+};
+
+[ description = "Request to slave for retrieving the subset of DynamicInetFilter entries matching the specified criteria." ]
+class ListRequest
+{
+    [tag="rid", default=INVALID_ROW_ID, description="If specified, only return the entry which has the specified identifier. Optional."]
+    RowId mRowId;
+    
+    [tag="grp", description="If specified, only return entries with the specific group. Optional."]
+    Group mGroup;
+    
+    [tag="ownr", description="If specified, only return entries with the specific owner. Optional."]
+    Owner mOwner;
+    
+    [tag="snet", description="If specified, only return entries whose subnets partially or fully overlap with the specified subnet. Optional."]
+    CidrBlock mSubNet;
+};
+
+[ description = "List of entries." ]
+typedef list<Entry> Entries;
+
+[ description = "Response to List request - contains the DynamicInetFilter entries matching the specified criteria." ]
+class ListResponse
+{
+    [tag="ents", description="All entries which match the specified search criteria."]
+    Entries mEntries;
+};
+
+}
+}//Blaze

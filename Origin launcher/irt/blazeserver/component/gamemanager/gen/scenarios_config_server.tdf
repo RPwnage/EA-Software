@@ -1,0 +1,161 @@
+/*! ************************************************************************************************/
+/*!
+    \file scenarios_config_server.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/frameworkconfigdefinitions_server.h"]
+#include "framework/gen/frameworkconfigdefinitions_server.tdf"
+
+[headername="gamemanager/tdf/gamemanager.h"]
+#include "gamemanager/gen/gamemanager.tdf"
+
+[headername="gamemanager/tdf/scenarios.h"]
+#include "gamemanager/gen/scenarios.tdf"
+
+// For StartMatchmakingRequest
+[headername="gamemanager/tdf/matchmaker.h"]
+#include "gamemanager/gen/matchmaker.tdf"
+
+// for MatchmakingFilterMap
+[headername="gamemanager/tdf/matchmaking_properties_config_server.h"]
+#include "gamemanager/gen/matchmaking_properties_config_server.tdf"
+
+[headername="gamemanager/tdf/inputsanitizers_server.h"]
+#include "gamemanager/gen/inputsanitizers_server.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+
+typedef string(64) ExpandedRuleName;        // Name of the rule being used, may have two parts (ex. "Predefined_AvoidGamesRule", "gameAttributeRule.gameModeRule")
+typedef string(32) ScenarioCustomRuleName;  // Custom name for a given rule (Used by GOSCC) (ex. "myGameModeRule")
+
+typedef map<ExpandedRuleName, ScenarioAttributeMapping> ScenarioRuleAttributes;
+
+typedef list<ScenarioCustomRuleName> ScenarioRuleNameList;
+typedef map<ScenarioCustomRuleName, ScenarioRuleAttributes> ScenarioRuleMap;        // Map of ScenarioCustomRuleName to Rule Attributes.
+
+typedef list<ScenarioAttributeName> ScenarioAttributeList;
+
+
+class SubSessionConfig
+{
+    [tag="fmap", reconfigurable="yes", description="List of filters for this subsession session."]
+    MatchmakingFilterList mFiltersList;
+
+    [tag="rlst", reconfigurable="yes", description="The list of rules used by this session. Each name must map to something in the rules map."]
+    ScenarioRuleNameList mRulesList;
+
+    [tag="sst", reconfigurable="yes", default="0s", description="When does this session start."]
+    TimeValue mSessionStartTime;
+
+    [tag="set", reconfigurable="yes", default="0s", description="When does the session end. Defaults to run until the scenario ends."]
+    TimeValue mSessionEndTime;
+
+    [tag="ssna", reconfigurable="yes", description="If any of these attributes are missing, then the subsession will be skipped. No error will be returned, and the scenario will continue without the subsession."]
+    ScenarioAttributeList mSkipSubSessionIfNotSetAttributes;
+
+    [tag="prto", reconfigurable="yes", default="0s", description="Optional override for the player reservation timeout. This changes the reservation timeout of the joining user."]
+    TimeValue mPlayerReservationTimeout;
+    
+    [tag="mmst", reconfigurable="yes", description="Session settings used."]
+    MatchmakingSessionData mMatchmakingSettings;
+
+    [tag="cga", reconfigurable="yes", description="CreateGame attribute mappings.  Templates do the same thing in a clear way, so prefer those if possible."]
+    ScenarioAttributeMapping mCreateGameAttributes;
+
+    [tag="cgt", reconfigurable="yes", description="CreateGameTemplate used by the Scenario to define the GameCreationData.  If both are used, attribute override order is cg template base & attributes -> cg attributes -> global attributes."]
+    TemplateName mCreateGameTemplate;
+};
+typedef map<SubSessionName, SubSessionConfig> SubSessionConfigMap;
+
+class ScenarioConfig
+{
+    [tag="set", reconfigurable="yes", description="How long does the scenario last."]
+    TimeValue mTotalDuration;
+
+    [tag="ttmw", reconfigurable="yes", default="30m", description="The time window for adjusting ttm estimates. When the most recent previous ettm calculation approaches this age, the new measurement is weighted to account for about two thirds of the new estimate."]
+    TimeValue mMatchEstimateFalloffWindow;
+
+    [tag="edso", reconfigurable="yes", description="List of external data sources api's used to override this scenario."]
+    DataSourceNameList mExternalDataSourceApiList;
+
+    [tag="atov", reconfigurable="yes", description="Map of attributes to replace in the client defined values."]
+    TemplateAttributes mAttributeOverrides;
+
+    [tag="sbss", reconfigurable="yes", description="Session settings used."]
+    SubSessionConfigMap mSubSessions;
+
+    [tag="sani", reconfigurable="yes", description="The list of input sanitizers used by this Scenario."]
+    SanitizerNameList mInputSanitizers;
+
+    [tag="vari", reconfigurable="yes", description="The list of subsessions held by variant."]
+    VariantsMap mVariants;
+
+    [tag="vart", reconfigurable="yes", default="A", description="The default variant."]
+    ScenarioVariantName mDefaultVariant;
+
+    [tag="usrv", reconfigurable="yes", description="The users who map to particular variant."]
+    UserVariantsMap mUserVariants;
+
+    [tag="reco", description="The trigger id set up in EADP EM server used for scenario variants A/B test."]
+    string(128) mTriggerId;
+};
+typedef map<ScenarioName, ScenarioConfig> ScenarioMap;
+
+class ScenariosConfig
+{
+    [tag="glat", reconfigurable="yes", description="The global attributes used by all scenarios. Typically only used for GOSCC attributes."]
+    ScenarioAttributeMapping mGlobalAttributes;
+
+    [tag="glrl", reconfigurable="yes", description="The global rules used by all scenarios."]
+    ScenarioRuleMap mGlobalRules;
+
+    [tag="scrm", reconfigurable="yes", description="This defines the rule lists used by the scenarios."]
+    ScenarioRuleMap mScenarioRuleMap;
+
+    [tag="gftm", reconfigurable="yes", description="This defines the global filters used by the scenarios."]
+    MatchmakingFilterList mGlobalFilters;
+
+    [tag="gsan", reconfigurable="yes", description="This defines the global input sanitizers used by the scenarios.  References the inputs sanitizers."]
+    SanitizerNameList mGlobalInputSanitizers;
+
+    [tag="scn", reconfigurable="yes", description="The scenarios themselves."]
+    ScenarioMap mScenarios;
+
+    [tag="ssl", reconfigurable="yes", default=8, description="The max number of subsessions per-scenario."]
+    uint32_t mScenarioSubsessionLimit;
+
+    [tag="ttmw", reconfigurable="yes", default="30m", description="The time window for adjusting ttm estimates for non-scenario-specific ttm. When the most recent previous ettm calculation approaches this age, a new datapoint is weighted to account for about two thirds of the new estimate."]
+    TimeValue mGlobalMatchEstimateFalloffWindow;
+
+    [tag="ccur", reconfigurable="yes", default = "15s", description="How often does the Scenario Census Cache get updated.  The cache is used by the criteria/variants system."]
+    TimeValue mCensusCacheUpdateRate;
+
+    [tag="sssd", reconfigurable="yes", default = true, description="If enabled, subsessions will start decayed to their StartTime, rather than starting at decay 0."]
+    bool mStartSubsessionsDecayed;
+    
+    [tag="ttid", reconfigurable="yes", description="The title Id(used for scenario variants A/B test when sending reco request to recommendation service)."]
+    string(64) experimentManagerTitleId;
+};
+
+
+class ScenarioRuleAttributeTdfMember
+{
+    [tag="name", reconfigurable="yes", description="The name of the attribute."]
+    ScenarioAttributeTdfMemberName mName;
+
+    [tag="req", reconfigurable="yes", description="Is this attribute required for the rule to be enabled?"]
+    bool mRequired;
+};
+
+typedef map<ScenarioAttributeName, ScenarioRuleAttributeTdfMember> ScenarioRuleAttributeTdfMemberMapping;       // Reusing ScenarioAttributeName here.
+typedef map<RuleName, ScenarioRuleAttributeTdfMemberMapping> ScenarioRuleAttributeMap;                          // Used by GameManagerServerPreconfig.
+
+} // namespace GameManager
+} // namespace Blaze

@@ -1,0 +1,309 @@
+// Util Types used in the Util Component
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/qosdatatypes.h"]
+#include "framework/gen/qosdatatypes.tdf"
+
+namespace Blaze
+{
+namespace Util
+{
+class ClientData
+{
+   [tag="lang"] uint32_t mLocale;
+   [tag="ctry"] uint32_t mCountry;
+   [tag="type"] ClientType mClientType;
+   [tag="iito"] bool mIgnoreInactivityTimeout;
+   [tag="svcn"] ServiceName mServiceName;
+};
+
+class FetchClientConfigRequest
+{
+   [tag="cfid"] string(64) mConfigSection;
+};
+
+[description="Contains all entries in client config of util.cfg which will be also passed to client side."] 
+class FetchConfigResponse
+{
+    [tag="conf",allowref=true] map<string(64),string(512), ignorecase> mConfig;
+};
+
+class LocalizeStringsRequest
+{
+   typedef list<string(64)> StringIdsList;
+   [tag="lsid"] StringIdsList mStringIds;
+   [tag="lang"] uint32_t mLocale;
+};
+
+class LocalizeStringsResponse
+{
+    [tag="smap"] map<string(64),string(4096), ignorecase> mLocalizedStrings;
+};
+
+class UserText
+{    
+    [tag="utxt"] string(1024) mText;
+};
+
+class UserStringList
+{    
+    [tag="utxt"] list<UserText> mTextList;
+};
+
+[description="Contains Telemetry Server Information."]
+class GetTelemetryServerResponse
+{
+    [tag="adrs"] string(64) mAddress;
+    [tag="port"] uint32_t mPort;
+    [tag="skey"] string(512) mKey;
+    // Due to backward compatibility reasons, mKey above contains non-utf8 data in string. This is not allowed in protobuf/grpc.
+    // So we create an alternate member that protobuf clients can request to fill.  
+    [tag="bkey", description="To be used from grpc clients."] 
+    blob mKey2;
+        
+    [tag="disa"] string(1024) mDisable;
+    [tag="nook"] string(1024) mNoToggleOk;
+    [tag="stim"] string(8) mUseServerTime;
+    [tag="filt"] string(1024) mFilter;
+    [tag="spct"] uint32_t mSendPercentage;
+    [tag="sdly"] uint32_t mSendDelay;
+    [tag="loc"] uint32_t mLocale;
+    [tag="ctry"] uint32_t mCountry;
+    [tag="anon"] bool mIsAnonymous;
+    [tag="sess"] string(32) mSessionID;
+    [tag="minr"] bool mUnderage;
+    [tag="svnm"] string(64) mTelemetryServiceName;
+    [tag="edct"] bool mEnableDisconnectTelemetry;
+    [tag="purl", description="The PIN url to establish the connection to."] string(256) mPinUrl;
+    [tag="penv", description="The PIN environment to use."] string(32) mPinEnvironment;
+};
+
+[description="Contains Ticker Server Information."]
+class GetTickerServerResponse
+{
+    [tag="adrs"] string(64) mAddress;
+    [tag="port"] uint32_t mPort;
+    [tag="skey"] string(512) mKey;
+};
+
+[description="Parameters for obtaining telemetry server information."]
+class GetTelemetryServerRequest
+{
+    [tag="snam"] ServiceName mServiceName;
+    [tag="key2", description="Set to true if a grpc client. Then, use mKey2 member from GetTelemetryServerResponse."] 
+    bool mUseKey2;
+};
+
+class PingResponse
+{
+    [tag="stim"] uint32_t mServerTime;
+};
+
+class PreAuthRequest
+{
+    [tag="cinf"] ClientInfo mClientInfo;
+    [tag="cdat"] ClientData mClientData;
+    [tag="fccr"] FetchClientConfigRequest mFetchClientConfig;
+    [tag="ladd"] uint32_t mLocalAddress;
+};
+
+typedef list<uint16_t> ComponentIdList;
+
+class PreAuthResponse
+{
+    [tag="sver", description="Server version."]
+    string(256) mServerVersion;
+    
+    [tag="plat", description="Server platform."]
+    string(256) mPlatform;
+
+    [tag="Inst", description="Service name."]
+    ServiceName mServiceName;
+
+    [tag="clid", description="Nucleus clientId associated with this service name."]
+    string(MAX_NUCLEUS_CLIENT_ID_LENGTH) mClientId;
+
+    [tag="relt", default="unknown", description = "The release type for this service name. Supplied as the 'rel' parameter for PIN events."]
+    string(256) mReleaseType;
+
+    [tag="cids", description="List of components configured on the server."]
+    ComponentIdList mComponentIds;
+    
+    [tag="conf", description="Contains all entries in client config of util.cfg which will be also passed to client side."]
+    FetchConfigResponse mConfig;
+
+    [tag="qoss", description="Contains all info in QosSettings of util.cfg which will be also passed to client side."]
+    Blaze::QosConfigInfo mQosSettings;
+
+    [tag="nasp", description="Persona namespace."]
+    string(32) mPersonaNamespace;
+
+    [tag="asrc", description="Authentication source"]
+    string(64) mAuthenticationSource;
+
+    [tag="rsrc", description="Registration source"]
+    string(64) mRegistrationSource;
+
+    [tag="pild", description="Title-specific identifier for legal documents retrieval"]
+    string(64) mLegalDocGameIdentifier;
+    
+    [tag="minr", default=false, description="Underage support"]
+    bool mUnderageSupported;
+       
+    [tag="esrc", default="", description="The Entitlement Source"]
+    string(64) mEntitlementSource;
+
+    [tag="maid", description="Uniquely identify the machine"] 
+    uint32_t mMachineId;
+};
+
+enum TelemetryOpt
+{
+    [tag="tmot", description="Telemetry opt of out."]
+    TELEMETRY_OPT_OUT = 0,
+
+    [tag="tmin", description="Telemetry opt of in."]
+    TELEMETRY_OPT_IN = 1
+};
+
+class UserOptions
+{
+    [tag="tmop", description="Describe user options"]
+    TelemetryOpt mTelemetryOpt;
+
+    [tag="uid", default=0, description="The ID of the user whose data is to be fetched, 0 means own's settings. Otherwise, requires PERMISSION_TELEMETRY_TOGGLE"] 
+    BlazeId mBlazeId;
+};
+
+class PostAuthRequest
+{
+    [tag="udid"]  string(UNIQUE_DEVICE_ID_MAX) mUniqueDeviceId;
+    [tag="dsui"] int32_t mDirtySockUserIndex;
+    [tag="key2", description="Set to true if a grpc client. Then, use mKey2 member from GetTelemetryServerResponse."] 
+    bool mUseKey2;
+};
+
+class PostAuthResponse
+{
+    [tag="tele", description="Telemetry server info"]
+    GetTelemetryServerResponse mTelemetryServer;
+
+    [tag="tick", description="Ticker server info"]
+    GetTickerServerResponse mTickerServer;
+    
+    [tag="urop", description="user options"]
+    UserOptions mUserOptions;
+};
+
+// User Settings
+// -------------
+ 
+const uint32_t  USER_SETTING_DATA_LENGTH   = 20000;
+const uint32_t  USER_SETTING_KEY_LENGTH    =   32;
+
+typedef string(USER_SETTING_KEY_LENGTH) UserSettingKey;
+typedef string(USER_SETTING_DATA_LENGTH) UserSettingData;
+
+typedef map<UserSettingKey, UserSettingData, ignorecase> UserSettingsDataMap;
+
+class UserSettingsResponse
+{
+    [tag="key"]  UserSettingKey mKey;
+    [tag="data"] UserSettingData mData;
+};
+
+class UserSettingsLoadRequest
+{
+    [tag="uid", default=0, description="The ID of the user whose data is to be fetched, 0 means own's settings. Otherwise, requires PERMISSION_OTHER_USER_SETTINGS_VIEW"]
+                 BlazeId mBlazeId;
+    [tag="key"]  UserSettingKey mKey;
+};
+
+class UserSettingsSaveRequest
+{
+    [tag="uid",  default=0, description="The ID of the user whose data is to be saved,0 means own's settings. Otherwise, requires PERMISSION_OTHER_USER_SETTINGS"]
+                 BlazeId mBlazeId;
+    [tag="key"]  UserSettingKey mKey;
+    [tag="data"] UserSettingData mData;
+};
+
+class UserSettingsLoadAllRequest
+{   
+    [tag="uid", description="The ID of the user whose data is to be fetched,0 means own's settings. Otherwise, requires PERMISSION_OTHER_USER_SETTINGS_VIEW"]
+                BlazeId mBlazeId;
+};
+
+class UserSettingsLoadAllResponse
+{
+    [tag="smap"]  UserSettingsDataMap mDataMap;
+};
+
+class UserSettingsLoadMultipleRequest
+{
+    [tag="uid", description="The ID of the user whose data is to be fetched, 0 means own's settings. Otherwise, requires PERMISSION_OTHER_USER_SETTINGS_VIEW"]
+    BlazeId mBlazeId;
+
+    [tag="keys", description="Keys (settings) of the user to be fetched, empty list means ALL settings. There is no key validation, and duplicate keys are ignored."]
+    list<UserSettingKey> mKeys;
+};
+
+class UserSettingsLoadMultipleResponse
+{
+    [tag="smap", description="Key-value map of settings."]
+    UserSettingsDataMap mDataMap;
+};
+
+[description="enumeration for various join modes to the game, a game must be open to one of this join mode to be joined, check GameSettings enumeration."]
+enum FilterResult
+{
+    [description="Passed the filter"]
+    FILTER_RESULT_PASSED          = 0, 
+    [description="Specifies the string contains offensive text"]
+    FILTER_RESULT_OFFENSIVE       = 0x1,
+    [description="Not filtered"]
+    FILTER_RESULT_UNPROCESSED     = 0x2,    
+    [description="Specifies the string exceeds the maximum limit"]
+    FILTER_RESULT_STRING_TOO_LONG = 0x3,
+    [description="Did not pass the filter for other reason"]
+    FILTER_RESULT_OTHER           = 0x4    
+};
+
+class FilteredUserText
+{
+    [tag="dirt"] FilterResult mResult;
+    [tag="utxt"] string(512) mFilteredText;
+};
+
+class FilterUserTextResponse
+{    
+    [tag="tlst"] list<FilteredUserText> mFilteredTextList;
+};
+
+class SetConnectionStateRequest
+{    
+    [tag="actv", default=true] bool mIsActive;
+};
+
+class GetUserOptionsRequest
+{
+    [tag="uid", default=0, description="The ID of the user whose data is to be fetched, 0 means own's settings. Otherwise, requires PERMISSION_TELEMETRY_VIEW"] 
+    BlazeId mBlazeId;
+};
+
+[generateProto = false]
+class SuspendUserPingRequest
+{   
+    [tag="tval", default="0s", description="The time for which the ping is to be kept suspended."] TimeValue suspendTime;
+};
+
+class DeleteUserSettingsRequest
+{  
+    [tag="uid", default=0, description="The ID of the user whose UserSettings data is to be deleted, 0 means own's settings. Otherwise, requires PERMISSION_OTHER_USER_SETTINGS "]
+     BlazeId mBlazeId;
+    [tag="key"]  UserSettingKey mKey;
+};
+
+}
+}
+

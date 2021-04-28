@@ -1,0 +1,48 @@
+# Documentation - https://docs.docker.com/compose/compose-file/
+# (make sure to read the documentation of the version number specified below - currently 3.8)
+# We try and use the known versions of following containers currently to keep things stable.
+
+version: "3.8"
+services:
+
+  # Used by the test-blaze-service-mesh client to send messages on the S2S service edge Mesh Data Plane.
+  envoy-test-egress:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/envoy-mesh-node:3.0.0
+    volumes:
+      - ./../../../etc/ssl:/certs
+    # ports:
+      # - 8002:8002
+    environment:
+      # Common Container Configuration
+      MESH_SERVICE: eadp.blaze
+      MESH_NODE_REGION: local
+      MESH_NODE_ZONE: local
+      MESH_NAMESPACE: eadp.edge
+      JAEGER_ENABLED: 0
+      # Admin page: http://localhost:8002/
+      ENVOY_ADMIN_LISTENER_PORT: 8002
+      ENVOY_XDS_HOST: servicemesh.int.gameservices.ea.com
+      ENVOY_LOG_LEVEL: info
+      #
+      # TLS Configuration
+      ENVOY_CLIENT_TLS_ENABLED: 1
+      ENVOY_CLIENT_CERT_CA: /certs/ca-certs/ea-sha1.pem
+      ENVOY_CLIENT_CERT_PRIVATE_KEY: /certs/nucleus/integration-key-decrypt.pem
+      ENVOY_CLIENT_CERT_PUBLIC_KEY: /certs/nucleus/integration-cert.crt
+      #
+      # Consumer specific Container Configuration
+      EGRESS_CLIENTSPACE: test-blaze-service-mesh
+      # TODO: Put your Blaze server's default service name here
+      EGRESS_SERVERSPACE: gosblaze-johndoe-common
+      EGRESS_MESH_ID: INT
+
+  test-blaze-service-mesh:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/testblazeservicemesh:0.1
+    depends_on:
+      - envoy-test-egress
+    command:
+      - -insecure=true
+      - -target_host=envoy-test-egress
+      - -target_port=10000
+      # TODO: Put your Blaze server's PC product name here (not the common platform!)
+      - -product_name=gosblaze-johndoe-pc

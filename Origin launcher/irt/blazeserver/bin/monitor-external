@@ -1,0 +1,553 @@
+#!/opt/local/bin/python
+
+# monitor-external
+#
+# 2010/07/19 (cadam) First version
+#
+# This script is to be used in combination with the monitor application
+# It is responsible for external functions such as mailing
+
+# IMPORTS #
+import commands, os, signal, sys, time
+
+import logging, re
+from bugsentry import CrashReport
+import hashlib
+import smtplib
+from email.mime.text import MIMEText
+
+import ConfigParser
+import socket
+
+# GLOBALS #
+options = {'-t': 'type', '-p': 'pidfile', '-i': 'pid', '-exit': 'exitcode', '-sig': 'signal', '-cw': 'cwindow', '-ct': 'ctotal', '-s': 'status', '-m': 'message', '-l': 'logfile'}
+variables = {}
+
+coreFileTimeStrBugsentry = ''
+
+# Allows a title to customize the server SKU to align with their client SKU names in BugSentry.
+customBugSentrySkuInfo = {}
+# Example 1:
+# customBugSentrySkuInfo['studioName'] = "eav"
+# customBugSentrySkuInfo['titleName'] = "ufc4"
+# customBugSentrySkuInfo['titleVersion'] = "21"
+# Example 2:
+# customBugSentrySkuInfo['studioName'] = "fb"
+# customBugSentrySkuInfo['titleName'] = "FIFA21"
+# customBugSentrySkuInfo['titleVersion'] = ""
+
+
+# FUNCTIONS #
+
+# Determine the BugSentry SKU string for the given Blaze service name
+def getBugSentrySku( blazeServiceName, blazeVersion ):
+    if 'studioName' in customBugSentrySkuInfo:
+        studioName = customBugSentrySkuInfo['studioName']
+    else:
+        studioName = "gos"
+
+    if 'titleName' in customBugSentrySkuInfo:
+        titleName = customBugSentrySkuInfo['titleName']
+    else:
+        titleName = None
+
+    if 'titleVersion' in customBugSentrySkuInfo:
+        titleVersion = customBugSentrySkuInfo['titleVersion']
+    else:
+        titleVersion = None
+
+    titlePlatform = None
+    titleSuffixList = None
+
+    if blazeServiceName and blazeServiceName!= 'unknown':
+        try:
+            # <title>-<version>-<platform>-<suffix_1>...-<suffix_n>
+            serviceNameParts = blazeServiceName.split('-')
+
+            if titleName is None:
+                titleName = serviceNameParts[0]
+
+            if titleVersion is None:
+                titleVersion = serviceNameParts[1]
+
+            titlePlatform = serviceNameParts[2]
+
+            if len(serviceNameParts) > 3:
+                titleSuffixList = serviceNameParts[3:]
+        except IndexError:
+            logger.debug("Failed to determine BugSentry SKU name parts for service name " + blazeServiceName)
+
+    if not titleName:
+        # Without a title name, we don't have much to go on; return legacy SKU format
+        return 'ea.gos.blazeserver.unknown.%s' % (blazeVersion)
+
+    if titleVersion is None:
+        titleVersion = blazeVersion
+
+    if titlePlatform is None:
+        titlePlatform = "unknown"
+
+    # <company>.<studio>.<title>.<version>.<suffix_1>...<suffix_n>.<platform>.Blaze
+    skuParts = []
+    skuParts.append("ea")
+    skuParts.append(studioName)
+    skuParts.append(titleName)
+    if titleVersion:
+        skuParts.append(titleVersion)
+
+    if titleSuffixList is not None:
+        skuParts.extend(titleSuffixList)
+
+    skuParts.append(titlePlatform)
+    skuParts.append("Blaze")
+
+    return '.'.join(skuParts)
+
+# move the core file if there is one
+# and add the data to the email content
+# Return whether there was a core.
+def handlecore():
+    logger.debug('handling core')
+
+    try:
+        if (variables['pid'] == '-1'):
+            command = 'ls -1rt ../etc/core.* | tail -1 '
+            pid = commands.getoutput(command).split('core.')[1]
+        else:
+            pid = variables['pid']
+    except:
+        logger.exception('exception:')
+
+    # (init these variables before possibly earlying out, as they may be used by caller)
+    variables['pid'] = pid
+    variables['backtrace'] = '[no core file]'
+
+    # if there is no core for the specified process skip the core processing
+    if not os.path.isfile('core.' + pid):
+        return False
+
+    logger.debug('handling core file(%s)' % pid)
+
+    try:
+        coreFileTime = time.gmtime(os.stat('core.' + pid).st_ctime)
+    except OSError:
+        (type, value,traceback) = sys.exc_info()
+        logger.debug('cannot stat corefile(%s) error(%s)' % ('core.' + pid, value))
+        logger.exception('exception:')
+
+    # determine if core dump is from an opt build
+    logger.debug('determining build type: ' + ' core.' + pid)
+    buildTypeCommand='gdb --batch ' + variables['dir'] + '/blazeserver' + ' core.' + pid + ' --eval-command="info address Blaze::gProcessController"'
+    logger.debug('buildTypeCommand: ' + buildTypeCommand)
+
+    buildType = commands.getoutput(buildTypeCommand)
+
+    isOptBuild = False
+    y = re.search(r'in a file compiled without debugging', buildType)
+    if y:
+        logger.debug('core is from a build compiled without debugging')
+        isOptBuild = True
+
+    logger.debug('getting back trace')
+    gdbBackTraceCommand = ''
+    if isOptBuild:
+        gdbBackTraceCommand='gdb --batch -x ' + variables['info-core-opt-script'] + ' ' + variables['dir'] + '/blazeserver' + ' core.' + pid
+    else:
+        gdbBackTraceCommand='gdb --batch -x ' + variables['info-core-script'] + ' ' + variables['dir'] + '/blazeserver' + ' core.' + pid
+
+    # get the backtrace information
+    logger.debug('Get core info:' + gdbBackTraceCommand)
+    coreInfo = commands.getoutput(gdbBackTraceCommand)
+
+    # remove all the unwanted data from the backtrace
+    variables['backtrace'] = 'Core was generated by' + coreInfo.split('Core was generated by')[1]
+    variables['backtrace'] = 'Core located at ' + variables['coredir'] + '\n' + variables['backtrace']
+
+    global coreFileTimeStrBugsentry
+    coreFileTimeStrBugsentry = time.strftime('%Y-%m-%d %H:%M:%S',coreFileTime)
+    coreFileTimeStr = time.strftime('%Y%m%d_%H%M%S', coreFileTime)
+    # move the core file
+    logger.debug('moving to:' + coreFileTimeStr)
+
+    variables['coredir'] = os.path.join( variables['coredir'] , coreFileTimeStr )
+
+    os.makedirs( variables['coredir'] )
+
+    # write backtrace to a file
+    try:
+        infoCoreLogName=variables['coredir'] + '/info-core.'+ variables['pid'] +'.log'
+        f = open(infoCoreLogName, 'w')
+        f.write(coreInfo)
+        f.close()
+    except:
+        (type, value,traceback) = sys.exc_info()
+        logger.debug('Cannot write info-core report to a file.' % (value) )
+
+    os.system('mv core.' + variables['pid'] + ' ' + variables['coredir'])
+    os.system('cp ' + variables['dir'] + '/blazeserver' + ' ' + variables['coredir'])
+    os.system('cp ../lib/*.so* ' + variables['coredir'])
+    os.system('mkdir -p ' + variables['coredir'] + '/log')
+
+    #copies over log files
+    blazeserver = variables['pidfile'].split('monitor_')[1][:-4]
+    os.system('cp ../log/*' + blazeserver + '* ' + variables['coredir'] + "/log")
+
+    logger.debug('coredir: '+ variables['coredir'])
+
+    # try to gzip the core dump
+    try:
+        logger.debug('Gzipping core file: core.' + pid)
+        os.system('gzip ' + variables['coredir'] + '/core.' + pid)
+    except:
+        logger.debug('Failed to gzip core file')
+        logger.exception('exception:')
+
+    return True
+
+# compose and send email
+def mail():
+    nowTimeStr = time.strftime('%Y%m%d_%H%M%S', time.gmtime())
+    logger.info('mail ' + nowTimeStr )
+    hostname = commands.getoutput('hostname')
+    sender = ''
+    recipients = ''
+    subject = ''
+    content = '\n\n*Server:*\n' + hostname + '\n\n*Instance:*\n' + variables['MAIL_SENDER'] + '\n\n*Time:*\n' + nowTimeStr + '\n\n'
+    priority = False
+
+    crashed = handlecore()
+
+    if crashed:
+        logger.debug('mail coredir: '+ variables['coredir'])
+    else:
+        logger.debug('mail coredir: [no core file was found]')
+
+    # determine the signal name
+    signame = 'UNKNOWN'
+    if int(variables['signal']) == signal.SIGINT:
+        signame = 'SIGINT'
+    elif int(variables['signal']) == signal.SIGTERM:
+        signame = 'SIGTERM'
+    elif int(variables['signal']) == signal.SIGABRT:
+        signame = 'SIGABRT'
+    elif int(variables['signal']) == signal.SIGKILL:
+        signame = 'SIGKILL'
+    elif int(variables['signal']) == signal.SIGSEGV:
+        signame = 'SIGSEGV'
+    elif int(variables['signal']) == signal.SIGILL:
+        signame = 'SIGILL'
+    elif int(variables['signal']) == signal.SIGFPE:
+        signame = 'SIGFPE'
+
+    sender = variables['MAIL_SENDER']
+    recipients = variables['MAIL_RECIPIENTS']
+
+    if variables['type'] == 'restart':
+        variables['status'] = 'ERROR'
+        variables['message'] = 'Blaze server on ' + hostname + ' has been restarted at ' + nowTimeStr + ' due to a crash.'
+
+        subject = '[Blaze Server][Monitor] Blaze server restarted on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The Blaze server associated with the Monitor PID file "' + variables['pidfile'] + '" has died.\n'
+        content = content + 'The process number of the terminated server is "' + variables['pid'] + '".\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The server died with signal ' + variables['signal'] + ' - ' + signame + ' (' + variables['exitcode'] + ').\n\n'
+        content = content + 'The server has crashed ' + variables['ctotal'] + ' time(s) in the past ' + variables['cwindow'] + ' minute(s) on ' + hostname + '.\n'
+    elif variables['type'] == 'overcrashes':
+        variables['status'] = 'ERROR'
+        variables['message'] = 'Blaze server has crashed ' + variables['ctotal'] + ' time(s) in the past ' + variables['cwindow'] + ' minute(s) on ' + hostname + '.'
+
+        subject = '[Blaze Server][Monitor] Blaze server crashed too many times on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The server died with signal ' + variables['signal'] + ' - ' + signame + ' (' + variables['exitcode'] + ').\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The most recent restart occurred in the server associated with the Monitor PID file ' + variables['pidfile'] + ', process number ' + variables['pid'] + '.\n'
+        content = content + 'Monitor has restarted the server this time, but will not restart the server again if Blaze crashes one more time within the specified interval.'
+        content = content + '  However, in the case that this happens, a high priority e-mail alert will be sent out.\n'
+    elif variables['type'] == 'overrestart':
+        variables['status'] = 'CRITICAL'
+        variables['message'] = 'Blaze server shutdown and will not be restarted.  It was restarted ' + variables['ctotal'] + ' time(s) in the past ' + variables['cwindow'] + ' minute(s) on ' + hostname + '.'
+
+        subject = '[Blaze Server][Monitor] Blaze server restart too many times on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The server died with signal ' + variables['signal'] + ' - ' + signame + ' (' + variables['exitcode'] + ').\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The most recent restart occurred in the server associated with the Monitor PID file ' + variables['pidfile'] + ', process number ' + variables['pid'] + '.\n'
+        content = content + 'Monitor will not restart the server again.  Note this is not because of a crash, see previous restart emails for more information on the exit signal'
+        content = content + '(is likely a server startup issue due to config error)\n'
+    elif variables['type'] == 'notrestarted':
+        variables['status'] = 'CRITICAL'
+        variables['message'] = 'Blaze server has crashed but did not get restarted because too many crashes have occurred in the recent timeframe.'
+
+        subject = '[Blaze Server][Monitor] Blaze server crashed but did not get restarted on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The server died with signal ' + variables['signal'] + ' - ' + signame + ' (' + variables['exitcode'] + ').\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The most recent restart occurred in the server associated with the Monitor PID file ' + variables['pidfile'] + ', process number ' + variables['pid'] + '.\n'
+        content = content + 'The server has crashed ' + variables['ctotal'] + ' time(s) in the past ' + variables['cwindow'] + ' minute(s).\n'
+        priority = True
+    elif variables['type'] == 'fatal':
+        variables['status'] = 'FATAL'
+        variables['message'] = 'Blaze server on ' + hostname + ' exited due to a fatal error at ' + nowTimeStr + '.'
+
+        subject = '[Blaze Server][Monitor] Blaze server encountered a fatal error on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The Blaze server associated with the Monitor PID file "' + variables['pidfile'] + '" encountered a fatal error.\n'
+        content = content + 'The process number of the terminated server is "' + variables['pid'] + '".\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The server was terminated due to a fatal error (' + variables['exitcode'] + ').\n'
+        priority = True
+    elif variables['type'] == 'killed':
+        variables['status'] = 'WARNING'
+        variables['message'] = '\nBlaze server on ' + hostname + ' was killed manually at ' + nowTimeStr + '.'
+
+        subject = '[Blaze Server][Monitor] Blaze server killed on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The Blaze server associated with the Monitor PID file "' + variables['pidfile'] + '" was killed.\n'
+        content = content + 'The process number of the terminated server is "' + variables['pid'] + '".\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The server was killed with signal ' + variables['signal'] + ' - ' + signame + ' (' + variables['exitcode'] + ').\n'
+    elif variables['type'] == 'shutdownCrash':
+        variables['status'] = 'ERROR'
+        variables['message'] = '\nBlaze server on ' + hostname + ' has crashed  at ' + nowTimeStr + '.'
+
+        subject = '[Blaze Server][Monitor] Blaze server crashed on ' + hostname
+        content = variables['message'] + '\n*** The server will not be restarted since it was set to shutdown (WITHOUT RESTART)***\n\n'
+        content = content + '*Cause:*\n'
+        content = content + 'The Blaze server associated with the Monitor PID file "' + variables['pidfile'] + '" has crashed while shutting down.\n'
+        content = content + '*Cause:*\n' + 'The process number of the crashed server is "' + variables['pid'] + '".\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The server crashed with signal ' + variables['signal'] + ' - ' + signame + ' (' + variables['exitcode'] + ').\n'
+    elif variables['type'] == 'failed':
+        variables['status'] = 'FAILED'
+        variables['message'] = 'Blaze server on ' + hostname + ' failed to start at ' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + ' due to a configuration issue.'
+
+        subject = '[Blaze Server][Monitor] Blaze server failed to start on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The Blaze server associated with the Monitor PID file "' + variables['pidfile'] + '" failed to start.\n'
+        content = content + 'The process number of the terminated server is "' + variables['pid'] + '".\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The server was unable to start due to a configuration issue (' + variables['exitcode'] + ').\n'
+        priority = True
+    elif variables['type'] == 'aborted':
+        variables['status'] = 'WARNING'
+        variables['message'] = 'Blaze server on ' + hostname + ' was aborted at ' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '.'
+
+        subject = '[Blaze Server][Monitor] Blaze server aborted on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The Blaze server associated with the Monitor PID file "' + variables['pidfile'] + '" was aborted after the attempted kill failed.\n'
+        content = content + 'The process number of the terminated server is "' + variables['pid'] + '".\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The server was aborted with signal ' + variables['signal'] + ' - ' + signame + ' (' + variables['exitcode'] + ').\n'
+    elif variables['type'] == 'masterterm':
+        variables['status'] = 'CRITICAL'
+        variables['message'] = 'Blaze server on ' + hostname + ' has lost its connection to the master at ' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '.'
+
+        subject = '[Blaze Server][Monitor] Blaze server was unable to recover on ' + hostname
+        content = variables['message'] + content + '*Cause:*\n'
+        content = content + 'The Blaze server associated with the Monitor PID file "' + variables['pidfile'] + '" has been unable to recover.\n'
+        content = content + 'The process number of the terminated server is "' + variables['pid'] + '".\n\n'
+        content = content + '*Additional Information:*\n'
+        content = content + 'The server lost its connection to the master and was unable to recover the connection (' + variables['exitcode'] + ').\n'
+        priority = True
+    else:
+        printusage()
+        return
+
+    # show the backtrace
+    corefile = variables['coredir'] + '/core.' + variables['pid']
+    if crashed:
+        content = content + '\n\n*Core info (' + corefile + '):*\n' + variables['backtrace']
+    else:
+        content = content + '\n\n*Core info (' + corefile + '):*\n' + 'None\n'
+
+    # show the tail of the log
+    # the filter is '_2' because we want the rotated log (appended with datetime) and not usersessions, metrics or other
+    # (e.g. blaze_slave?_usersessions.log)--feels like a bit of a hack, but it should last until the next millenium
+    logfile = os.path.join( variables['logdir'] , 'blaze_' ) + variables['pidfile'].split('_')[1].replace('.pid', '_2')
+
+    logfile = commands.getoutput('ls ' + logfile + '* | sort | tail -1')
+
+    # if there is no log file, skip in email
+    if logfile.find('No such file or directory') == -1:
+        content = content + '\n\n*Log (' + logfile + '):*\n' + '{noformat}\n' + commands.getoutput('tail -n 25 ' + logfile) + '{noformat}\n'
+    else:
+        content = content + '\n\nFailed to find log file ' + logfile + '*\n'
+
+    email_msg = MIMEText(content)
+    email_msg['Subject'] = subject
+    email_msg['From'] = sender
+    email_msg['To'] = recipients
+
+    recipients_list = [r.strip() for r in recipients.split(',')]
+
+    mailer = smtplib.SMTP('localhost')
+    mailer.sendmail(sender, recipients_list, email_msg.as_string())
+    mailer.quit()
+
+    logger.debug('mail sender: ' + sender)
+    logger.debug('mail recipients: ' + ', '.join(recipients_list))
+    logger.debug('mail sent: '+ variables['coredir'])
+    status()
+
+    if crashed:
+        # Send the BugSentry crash report
+        try:
+            crashReport = CrashReport()
+            crashReport.stack = crashReport.findstack(variables['backtrace'])
+
+            tm=re.search(r'mBuildTarget: (?P<target>[\w-]+)',variables['backtrace'])
+            if tm!=None:
+                target=tm.group('target')
+            else:
+                target="unknown"
+
+            blazeVersion = "unknown"
+            clm=re.search(r'mVersion: Blaze (?P<blazeVersion>[0-9.]+).*\(CL# (?P<changelist>[\d]+)\)',variables['backtrace'])
+            if clm!=None:
+                changelist=clm.group('changelist')
+                blazeVersion=clm.group('blazeVersion')
+            else:
+                changelist="unknown"
+
+            serviceName = variables['servicename']
+            clm=re.search(r'service name: (?P<serviceName>[a-zA-Z0-9\-]+)',variables['backtrace'])
+            if clm!=None:
+                coreInfoServiceName = clm.group('serviceName')
+                if coreInfoServiceName != 'unknown':
+                    serviceName = coreInfoServiceName
+
+            crashReport.buildsig = 'blazeserver-%s-%s' % (target,changelist)
+            crashReport.systemConfig = commands.getoutput('uname -a')
+
+            crashReport.sku = getBugSentrySku(serviceName, blazeVersion)
+
+            global coreFileTimeStrBugsentry
+            crashReport.createtime = coreFileTimeStrBugsentry
+            crashReport.catId = hashlib.md5(' '.join(crashReport.stack.split()[0:3])).hexdigest()
+
+            # limit the size of the contextData to avoid http error 400
+            if (len(variables['backtrace']) > 20000):
+                crashReport.contextdata = variables['backtrace'][0:20000] + "\n\nreport truncated..."
+            else:
+                crashReport.contextdata = variables['backtrace']
+
+            message = crashReport.send(variables.get('environment', 'test'))
+            crashReport.saveToFile(variables['coredir'])
+
+            logger.debug(message)
+        except:
+            logger.exception('exception:')
+
+
+# read configuration file monitor.cfg
+def readconfig():
+    MONITOR_CONFIG  = os.path.join( os.path.dirname(__file__), "monitor.cfg")
+
+    config = ConfigParser.SafeConfigParser()
+    config.read([MONITOR_CONFIG])
+
+    variables['MAIL_RECIPIENTS'] = config.get("MONITOR", "recipients")
+    variables['MAIL_NOT_RESTARTED_RECIPIENTS'] = config.get("MONITOR", "recipients")
+
+    sender = config.get("MONITOR", "sender")
+    if '@' in sender:
+        variables['MAIL_SENDER'] = sender
+    else:
+        variables['MAIL_SENDER'] = '{0}@{1}'.format(sender, socket.gethostname())
+
+    variables['SENDMAIL_PATH'] = config.get("MONITOR", "sendmail")
+
+    variables['logdir'] = config.get("MONITOR", "logDir")
+    variables['coredir'] = config.get("MONITOR", "coreDir")
+
+    coreDirBasename = os.path.basename(os.path.normpath(variables['coredir']))
+    if coreDirBasename != '.':
+        variables['servicename'] = coreDirBasename
+    else:
+        variables['servicename'] = 'unknown'
+
+    variables['environment'] = config.get("MONITOR", "env")
+
+# rotate the log files
+def rotatelog():
+    rotatelogCommand='cp' + variables['logfile'] + ' ' + variables['logfile'][:-4] + '_' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '.log.died'
+    logger.info('rotate log:' + rotatelogCommand)
+    commands.getoutput(rotatelogCommand)
+
+# return the status of the server
+def status():
+    if variables['status'] == 'OK':
+        variables['message'] = commands.getoutput(variables['dir'] + '/' + 'blazeserver' + ' -v').split('\n')[0]
+
+    statuslog = open(os.path.join( variables['logdir'], 'status.log'), 'w')
+    statuslog.write(variables['status'] + ': ' + variables['message'] + '\n')
+    statuslog.close()
+
+# print usage instructions
+def usage():
+    print 'Usage: monitor-external <function>'
+    print '       mail -t=<restart, overcrashes, notrestarted> -p=<PID file name> -i=<PID # of crashed process> -cw=<Crash window> -ct=<# of times crashed in crash window>'
+    print '       status -s=<OK, WARNING, CRITICAL> -m=<Message>'
+    print '       rotatelog -l=<Died log file name>'
+
+# MAIN #
+variables['dir'] = os.getcwd().replace('/etc', '/bin')
+variables['rundir'] = os.path.abspath(os.path.dirname(__file__))
+
+# find the info-core and info-core-opt scripts which can be in the <blaze>/bin directory or in the
+# run (ie. tools) directory of the deployment
+for script_path in ['dir', 'rundir']:
+    info_script = os.path.join(variables[script_path], 'info-core')
+    if os.path.exists(info_script):
+        variables['info-core-script'] = info_script
+        break
+for script_path in ['dir', 'rundir']:
+    info_opt_script = os.path.join(variables[script_path], 'info-core-opt')
+    if os.path.exists(info_opt_script):
+        variables['info-core-opt-script'] = info_opt_script
+        break
+
+# read config
+readconfig()
+
+# get options and call function
+for option in sys.argv[2:]:
+    option = option.split('=')
+    variables[options[option[0]]] = option[1]
+
+logger = logging.getLogger('monitor')
+hdlr = logging.FileHandler(os.path.join( variables['logdir'], 'monitor-external.log'))
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+logger.setLevel(logging.DEBUG)
+
+logger.debug('monitor-external is invoked')
+logger.debug(os.environ)
+
+try:
+    logger.info("info-core: " + variables['info-core-script'])
+except KeyError:
+    logger.info("no info-core")
+
+try:
+    logger.info("info-core-opt: " + variables['info-core-opt-script'])
+except KeyError:
+    logger.info("no info-core-opt")
+
+try:
+    if len(sys.argv) == 1:
+        usage()
+    elif sys.argv[1] == 'handlecore':
+        handlecore()
+    elif sys.argv[1] == 'mail':
+        mail()
+    elif sys.argv[1] == 'rotatelog':
+        rotatelog()
+    elif sys.argv[1] == 'status':
+        status()
+    else:
+        usage()
+except:
+    logger.exception('exception:')

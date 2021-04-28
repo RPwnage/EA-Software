@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package eadp.qoscoordinator;
+
+import "google/rpc/status.proto";
+import "eadp/annotations.proto";
+
+option java_package = "com.ea.gs.qoscoordinator.grpc";
+option java_outer_classname = "QosCoordinatorAdminProto";
+option java_multiple_files = true;
+
+// This is the service that QOS Servers and admin tools will use
+service QOSCoordinatorAdmin{
+    option (eadp.grpc.service_mapping) = {
+        ports: [ S2S, S2S_ADMIN]
+        scopes: {
+            key: "S2S"
+            value: "gs_qos_coordinator_trusted"     // used by blaze to communicate with QosCoordinator
+        }
+        scopes: {
+            key: "S2S_ADMIN"
+            value: "gs_qos_coordinator_admin"       // used by admins/GOSCC to communicate to QOS Coordinator
+        }
+    };
+
+    // add/update a qos profile
+    rpc CoordinatorConfig (CoordinatorConfigRequest) returns (CoordinatorConfigResponse) {};
+
+    // get the QosProfile configuration for the specofied profile name
+    rpc GetConfig (GetConfigRequest) returns (GetConfigResponse) {};
+
+    // get the list of available ping sites for the specified profile name (used by blaze)
+    rpc AvailablePingSites (AvailablePingSitesRequest) returns (AvailablePingSitesResponse) {};
+}
+
+//QosClientControl overrides that should be executed before doing any QosTests
+message ConfigOverride{
+    string control = 1;                     // dirty sdks four character code identifier,
+    int32 value = 2;                        // integer value
+    string pValue = 3;                      // string value
+}
+
+message Test{
+    string testName = 1;                    // name of the test, available values are "START", "rtt", "bwUp", "bwDown"
+    int32 probeCountUp = 2;                 // number of probes to send to the server
+    int32 probeSizeUp = 3;                  // minimum size of the probe, the probe will be padded with extra data to reach this size
+    int32 probeCountDown = 4;               // number of probes there server should respond with for each probe received
+    int32 probeSizeDown = 5;                // minimum size of the probe, the probe will be padded with extra data to reach this size
+    int32 timeout = 6;                      // maximum amount of time before giving up on completing the test
+    int32 minTimeBetweenProbes = 7;         // minimum amount of time between each probe sent from the client
+    int32 timeTillResend = 8;               // if we haven't got the expected number of responses back in this much time, we will send more probes
+    int32 initSyncTimeout = 9;              // the amount of time we might wait to synchronize all requests together
+    int32 resendExtraProbeCount = 10;       // in the case of finding packet loss, we request the lost packets again with a few extras, to reduce the chance that those are lost too
+    int32 acceptableLostProbeCount = 11;    // typically we would receive (uProbeCountUp * uProbeCountDown) probes, this indicates how many less probes we can receive without triggering a re-send
+    Action nextAction = 12;                 // specifies the next action to be performed
+}
+
+
+message Action{
+    // Specifies a score threshold and defines next steps depending on if the threshold is crossed.
+    int32 scoreThreshold = 1;
+    string aboveTestName = 2;                // available values are "START", "rtt", "bwUp", "bwDown" and "DONE"
+    string aboveTestTarget = 3;              // available values are "ALL", HIGHEST", "LOWEST", DONE"
+    string belowTestName = 4;                // available values are "START", "rtt", "bwUp", "bwDown" and "DONE"
+    string belowTestTarget = 5;              // available values are "ALL", HIGHEST", "LOWEST", DONE"
+}
+
+message CoordinatorConfigRequest{
+    repeated string pingSites = 1;                  // list of pingsites available for the profile
+    repeated ConfigOverride configOverrides = 2;    // list of clientOverrides that should eb executed before the tests
+    repeated Test tests = 3;                        // list of the tests available for the profile
+    string profileName = 4;                         // profile name
+    string poolName = 5;                            // pool name
+}
+
+message CoordinatorConfigResponse{
+    google.rpc.Status status = 1;
+    string message = 2;                            // Error message when the call fails.
+}
+
+message GetConfigRequest{
+    string profileName = 1;                        // profile name
+}
+
+message GetConfigResponse{
+    google.rpc.Status status = 1;                  // grpc response status
+    repeated string pingSites = 2;                 // list of pingsites available for the profile
+    repeated ConfigOverride configOverrides = 3;   // list of clientOverrides that should eb executed before the tests
+    repeated Test tests = 4;                       // lists of tests to be performed by the clients
+    string profileName = 5;                        // the name of the profile
+    string poolName = 6;                           // the pool name
+
+    int32 profileVersion = 7;
+}
+
+message AvailablePingSitesRequest{
+    string profileName = 1;                         // profile name
+}
+
+message AvailablePingSitesResponse{
+    google.rpc.Status status = 1;
+    repeated AvailablePingSite PingSites = 2;       // list of available ping sites
+    string selectedQosProfile = 3;                  // blaze is asking for a profile names as the service name. If an entry is not found, the coordinator will provide a default profile
+                                                    // NOTE: as the service name has the format <title>-<year>-<platform>-<...>-..<..> before using the default profile,
+                                                    // the search is retried by trimming items after the last "-", one by one
+    int32 profileVersion = 4;
+}
+
+message AvailablePingSite{
+    string SiteName = 1;                            // ping site name
+    string Ip = 2;                                  // ping site address
+}

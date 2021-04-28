@@ -1,0 +1,414 @@
+group protobuf : protobufbase;
+
+logInfo(msg) ::= <<
+// TdfToProto INFO: <msg>
+>>
+
+logWarn(msg) ::= <<
+// TdfToProto WARN: <msg>
+>>
+
+logError(msg) ::= <<
+// TdfToProto ERROR: <msg>
+>>
+
+logUnsupportedMapKeyType(keytype) ::= <<
+eadp.blaze.protobuf.GRPC_UNSUPPORTED_MAP_KEY(<keytype>)
+>>
+
+logUnsupportedMapValueType(valuetype) ::= <<
+eadp.blaze.protobuf.GRPC_UNSUPPORTED_MAP_VALUE(<valuetype>)
+>>
+
+logUnsupportedTypeInUnion(type) ::= <<
+eadp.blaze.protobuf.GRPC_TYPE_IN_UNION(<type>)
+>>
+
+logUnsupportedTypeInList(type) ::= <<
+eadp.blaze.protobuf.GRPC_UNSUPPORTED_TYPE_IN_LIST(<type>)
+>>
+
+singleClass(fileNode, classNode, defTable) ::= <<>>
+
+
+//
+// import files
+//
+// Omit importing files having includeproto false. Also, skip TDF #include *non*-generated-file statements, as protoc can 'import' other generated .protos (non-generated includes can only be handled via plugin).
+// (Side: wrapping this in a fn, rather than in place, can avoid excess white space)
+printImports(fileNode) ::= <<
+<fileNode.Includes:{<if(it.includeproto)><if(it.generated)><it.relativeProtoPath; format="includeproto"><endif><endif>}; separator="\n">
+>>
+
+
+// Reasons for using some options explicitly:
+    // C# needs an explicit namespace as protoc 'base_namespace' uses it explicitly and some clients may be interested in that option.
+
+    // Objective-C classes are not affected by package attribute in proto file as the language has no support for namespaces. Apple recommends to add 3+ letters as prefix.
+    // We generate a longer prefix as we are auto generating proto files. While slightly ugly, it avoids collision with rest of the things in code base .
+
+    // Java usual convention is to use reverse-domain as namespace.
+
+file(fileNode, defTable) ::= <<
+syntax = "proto3";
+
+<if(fileNode.HasNamespace)>
+package <fileNode.ProtoPackageName>;
+
+option csharp_namespace = "<fileNode.ProtoPackageName>";
+option go_package = "<fileNode.ProtoPackageName; format="goPackageImportPath">;<fileNode.ProtoPackageName; format="goPackage">";
+option java_package = "<fileNode.ProtoPackageName; format="javaPackage">";
+option objc_class_prefix = "<fileNode.ProtoPackageName; format="objcPrefix">";
+<else>
+package eadp.blaze;
+
+option csharp_namespace = "eadp.blaze";
+option go_package = "<"eadp.blaze"; format="goPackageImportPath">;<"eadp.blaze"; format="goPackage">";
+option java_package = "<"eadp.blaze"; format="javaPackage">";
+option objc_class_prefix = "<"Eadp_Blaze"; format="objcPrefix">";
+<endif>
+
+
+import "eadp/blaze/protobuf/commonincludes.proto";
+<printImports(fileNode)>
+
+option (eadp.blaze.protobuf.file_options) = { //file
+    proto_root: "<fileNode.protoRootDir>"<if(fileNode.Includes)>,
+    <printImportsFileOptions(fileNode=fileNode)><endif>
+};
+<printGenerateExplicitIncludeWrappers(fileNode)>
+
+<fileNode.Defs:{<defineHelper(node=it)>}; separator="\n">
+
+
+<if(fileNode.MultipleNamespaces)><logError({Multiple namespaces found in a tdf file. This is not supported. Break up the source tdf.})><endif>
+>>
+
+defineHelper(node) ::="<if(node.Category)><({define<node.Category>})()><elseif(node.Filename)><else><namespace(node=node)><endif>"
+
+defineNAMESPACE() ::= "<namespace(...)>"
+defineENUM() ::= "<enum(...)>"
+defineBITFIELD() ::= "<bitfield(...)>"
+defineCLASS() ::= "<if(node.IsFwdDecl)><classfwddecl(...)><else><class(...)><endif>"
+defineUNION() ::= "<union(...)>"
+defineCONST() ::= "<const(...)>"
+defineTYPEDEF() ::= "<typedef(...)>"
+
+tdfProtoTypeNameMap ::= [
+    "bool" : "bool",
+    "char8_t" : "int32",
+    "int8_t" : "int32",
+    "uint8_t" : "uint32",
+    "int16_t" : "int32",
+    "uint16_t" : "uint32",
+    "int32_t" : "int32",
+    "uint32_t" : "uint32",
+    "int64_t" : "int64",
+    "uint64_t" : "uint64",
+    "ComponentId" : "uint32",
+    "EntityType" : "uint32",
+    "EntityId" : "int64",
+    "float" : "float",
+
+    "default" : "WTF!"
+]
+
+tdfProtoWrapeprTypeNameMap ::= [
+    "bool" : "google.protobuf.BoolValue",
+    "char8_t" : "google.protobuf.Int32Value",
+    "int8_t" : "google.protobuf.Int32Value",
+    "uint8_t" : "google.protobuf.UInt32Value",
+    "int16_t" : "google.protobuf.Int32Value",
+    "uint16_t" : "google.protobuf.UInt32Value",
+    "int32_t" : "google.protobuf.Int32Value",
+    "uint32_t" : "google.protobuf.UInt32Value",
+    "int64_t" : "google.protobuf.Int64Value",
+    "uint64_t" : "google.protobuf.UInt64Value",
+    "ComponentId" : "uint32",
+    "EntityType" : "uint32",
+    "EntityId" : "int64",
+    "float" : "google.protobuf.FloatValue",
+
+    "default" : "WTF!"
+]
+
+tdfProtoPrimTypeNameMap ::= [
+    "bool" : "bool",
+    "int32_t" : "int32",
+    "uint32_t" : "uint32",
+    "int64_t" : "int64",
+    "uint64_t" : "uint64",
+    "EntityId" : "int64",
+    "float" : "float"
+]
+
+printTypeRef(typeRef) ::= "<if(typeRef.ScopedSymbolName)><printTypeRefInner(typeRef=typeRef)><elseif(typeRef.TypeRef)><printTypeRefInner(typeRef=typeRef.TypeRef)><else>BADTYPE!!!<endif>"
+printTypeRefFullScope(typeRef) ::= "<if(typeRef.ScopedSymbolName)><printTypeRefInner(typeRef=typeRef,fullScope=\"true\")><else><printTypeRefInner(typeRef=typeRef.TypeRef,fullScope=\"true\")><endif>"
+printTypeRef2(typeRef, fullScope)::= "<if(typeRef.ScopedSymbolName)><printTypeRefInner(typeRef=typeRef,fullScope=fullScope)><else><printTypeRefInner(typeRef=typeRef.TypeRef,fullScope=fullScope)><endif>"
+printTypeRef3(typeRef, fullScope, classNameOnly,macroSafeCommas)::= "<if(typeRef.ScopedSymbolName)><printTypeRefInner(typeRef=typeRef,fullScope=fullScope, classNameOnly=classNameOnly, macroSafeCommas=macroSafeCommas)><else><printTypeRefInner(typeRef=typeRef.TypeRef,fullScope=fullScope, classNameOnly=classNameOnly, macroSafeCommas=macroSafeCommas)><endif>"
+printTypeRef4(typeRef) ::= "<if(typeRef.ScopedSymbolName)><printTypeRefInner(typeRef=typeRef,useOriginal=\"true\")><else><printTypeRefInner(typeRef=typeRef.TypeRef,useOriginal=\"true\")><endif>"
+printTypeRef5(typeRef) ::= "<if(typeRef.ScopedSymbolName)><printTypeRefInner(typeRef=typeRef,useWrapper=\"true\")><elseif(typeRef.TypeRef)><printTypeRefInner(typeRef=typeRef.TypeRef,useWrapper=\"true\")><else>BADTYPE!!!<endif>"
+printTypeRefInner(typeRef, fullScope, classNameOnly, macroSafeCommas, embedValue, useOriginal, useWrapper) ::= "<({printTypeRef<typeRef.Symbol.Category>})()>"
+
+
+// Helpers to print custom options for containers(map/list) in order to facilitate correct code gen on server side
+// Helpers are needed because of when printContainerCustomOptions is called on the original field, it may be using a typedef (even though the actual category is map/list).
+// So below we take care of typedef by calling the same print function again but this time with the correct TypeRef.
+
+printContainerCustomOptions(typeRef) ::= "<if(typeRef.ScopedSymbolName)><printTypeRefInnerContainerCustomOptions(typeRef=typeRef)><elseif(typeRef.TypeRef)><printTypeRefInnerContainerCustomOptions(typeRef=typeRef.TypeRef)><else>BADTYPE!!!<endif>"
+printTypeRefInnerContainerCustomOptions(typeRef, fullScope, classNameOnly, macroSafeCommas, embedValue) ::= "<({printTypeRef<typeRef.Symbol.Category>CONTAINERCUSTOMOPTIONS})()>"
+
+// NOTE: will always print a comma and newline, if there's anything to print, first:
+printTypeRefMAPCONTAINERCUSTOMOPTIONS() ::= <<
+<if(typeRef.Symbol.KeyType.ActualCategoryIntPrimitive)>,
+key_tdf_type: "<printTypeRef4(typeRef=typeRef.Symbol.KeyTypeRef)>"<endif><if(typeRef.Symbol.KeyType.ActualCategoryEnum)>,
+key_is_enum: true,
+key_tdf_type: "<printTypeRefFullScope(typeRef=typeRef.Symbol.KeyTypeRef)>"<endif><if(typeRef.Symbol.ValueType.ActualCategoryIntPrimitive)>,
+value_tdf_type: "<printTypeRef4(typeRef=typeRef.Symbol.ValueTypeRef)>"<endif><if(typeRef.ScopedAttributes.Comparator)>,
+has_ignore_case: true<endif><if(typeRef.Symbol.ValueType.ActualCategoryMap)>,
+value_is_proxy: true<endif><if(typeRef.Symbol.ValueType.ActualCategoryList)>,
+value_is_proxy: true<endif>
+>>
+printTypeRefLISTCONTAINERCUSTOMOPTIONS() ::= <<
+<if(typeRef.Symbol.ValueType.ActualCategoryIntPrimitive)>,
+value_tdf_type: "<printTypeRef4(typeRef=typeRef.Symbol.ValueTypeRef)>"<endif><if(typeRef.Symbol.ValueType.ActualCategoryMap)>,
+value_is_proxy: true<endif><if(typeRef.Symbol.ValueType.ActualCategoryList)>,
+value_is_proxy: true<endif>
+>>
+printTypeRefTYPEDEFCONTAINERCUSTOMOPTIONS() ::= "<printContainerCustomOptions(typeRef.Symbol.TypeRef)>"
+// - End helpers to print custom options for containers
+
+// NOTE: will always print a comma and newline, if there's anything to print, first:
+printCustomOptions(typeRef) ::=<<
+<if(tdfProtoPrimTypeNameMap.(typeRef.Symbol.Name))>,
+prim_type_is_same: true<endif><if(typeRef.Symbol.ActualCategoryMap)><printContainerCustomOptions(typeRef)><endif><if(typeRef.Symbol.ActualCategoryList)><printContainerCustomOptions(typeRef)><endif>
+>>
+
+
+printTypeRefLIST() ::=<<
+<if(typeRef.Symbol.ValueType.ActualCategoryList)><printTypeRefLISTStruct(embedValue="true")><elseif(typeRef.Symbol.ValueType.ActualCategoryMap)><printTypeRefLISTStruct(embedValue="true")><elseif(typeRef.Symbol.ValueType.ActualCategoryStruct)><printTypeRefLISTStruct()><elseif(typeRef.Symbol.ValueType.ActualCategoryBlob)><printTypeRefLISTStruct()><else><printTypeRefLISTPrimitive()><endif>
+>>
+
+printTypeRefLISTPrimitive() ::= "repeated <printTypeRef2(typeRef=typeRef.Symbol.ValueTypeRef,fullScope=\"true\")>"
+
+printTypeRefLISTStruct(embedValue) ::= "<if(embedValue)><printContainerEmbeddedValueMsg()><endif>repeated <printContainerValue()>"
+
+// Helper to print the value type in a list or map. If the value is getting embedded, this helper prints the message type we generate on the fly as the value type
+printContainerValue() ::=<<
+<if(embedValue)><member.Name>_msg<else><printTypeRef3(typeRef=typeRef.Symbol.ValueTypeRef, fullScope="true",classNameOnly=classNameOnly,macroSafeCommas=macroSafeCommas)><endif>
+>>
+
+// Helper to print the actual on the fly message we generate to deal with the incompatible containers.
+printContainerEmbeddedValueMsg() ::=<<
+message <member.Name>_msg
+{
+    option (eadp.blaze.protobuf.msg_options) = { //ContainerEmbeddedValue
+        description: "",
+        message_is_proxy: true
+    };
+    <printTypeRef3(typeRef=typeRef.Symbol.ValueTypeRef, fullScope="true",classNameOnly=classNameOnly,macroSafeCommas=macroSafeCommas)> value = 1 [(eadp.blaze.protobuf.field_options) = { //ContainerEmbeddedValue field
+        <printBasicClassMemberMsgOptions(member=member)><printCustomOptions(typeRef=typeRef.Symbol.ValueTypeRef)>
+    }];
+}<\n>
+>>
+
+
+printTypeRefMAPInner(embedValue) ::= <<
+<if(typeRef.Symbol.KeyType.ActualCategoryEnum)><printTypeRefMAPStructEnumKey(embedValue)><else><printTypeRefMAPStruct(embedValue)><endif>
+>>
+
+printTypeRefMAP() ::= <<
+<if(typeRef.Symbol.KeyType.ActualCategoryFloatPrimitive)><logUnsupportedMapKeyType({float})><elseif(typeRef.Symbol.KeyType.ActualCategoryBlob)><logUnsupportedMapKeyType({blob})><elseif(typeRef.Symbol.KeyType.ActualCategoryClass)><logUnsupportedMapKeyType({class})><elseif(typeRef.Symbol.ValueType.ActualCategoryList)><printTypeRefMAPInner(embedValue="true")><elseif(typeRef.Symbol.ValueType.ActualCategoryMap)><printTypeRefMAPInner(embedValue="true")><elseif(typeRef.Symbol.ValueType.ActualCategoryStruct)><printTypeRefMAPInner()><elseif(typeRef.Symbol.ValueType.ActualCategoryBlob)><printTypeRefMAPInner()><else><if(typeRef.Symbol.KeyType.ActualCategoryEnum)><printTypeRefMAPPrimitiveEnumKey()><else><printTypeRefMAPPrimitive()><endif><endif>
+>>
+
+printTypeRefMAPPrimitive() ::= "map\<<printTypeRef2(typeRef=typeRef.Symbol.KeyTypeRef,fullScope=\"true\")>,<printTypeRef2(typeRef=typeRef.Symbol.ValueTypeRef,fullScope=\"true\")> \>"
+printTypeRefMAPStruct(embedValue) ::= "<if(embedValue)><printContainerEmbeddedValueMsg()><endif>map\<<printTypeRef3(typeRef=typeRef.Symbol.KeyTypeRef, fullScope=\"true\",classNameOnly=classNameOnly,macroSafeCommas=macroSafeCommas)>, <printContainerValue()>\>"
+
+printTypeRefMAPPrimitiveEnumKey() ::= "map\<int32, <printTypeRef2(typeRef=typeRef.Symbol.ValueTypeRef,fullScope=\"true\")> \>"
+printTypeRefMAPStructEnumKey(embedValue) ::= "<if(embedValue)><printContainerEmbeddedValueMsg()><endif>map\<int32, <printContainerValue()>\>"
+
+printTypeRefINT_PRIMITIVE() ::= "<if(useOriginal)><typeRef.Symbol.Name><elseif(useWrapper)><tdfProtoWrapeprTypeNameMap.(typeRef.Symbol.Name)><else><tdfProtoTypeNameMap.(typeRef.Symbol.Name)><endif>"
+printTypeRefFLOAT_PRIMITIVE() ::= "<if(useWrapper)><tdfProtoWrapeprTypeNameMap.(typeRef.Symbol.Name)><else><tdfProtoTypeNameMap.(typeRef.Symbol.Name)><endif>"
+printTypeRefBLOB() ::= "<if(useWrapper)>google.protobuf.BytesValue<else>bytes<endif>"
+printTypeRefSTRING() ::= "<if(useWrapper)>google.protobuf.StringValue<else>string<endif>"
+printTypeRefCLASS() ::= "<printTypeRefDEFAULT()>"
+printTypeRefUNION() ::= "<printTypeRefDEFAULT()>"
+printTypeRefVARIABLE() ::= "google.protobuf.Any"
+printTypeRefGENERIC() ::= "eadp.blaze.protobuf.generic"
+printTypeRefBITFIELD() ::= "<printTypeRefDEFAULT()>"
+printTypeRefENUM() ::= "<printTypeRefDEFAULT()>"
+printTypeRefOBJECT_TYPE() ::= "eadp.blaze.protobuf.ObjectType"
+printTypeRefOBJECT_ID() ::= "eadp.blaze.protobuf.ObjectId"
+printTypeRefTIMEVALUE() ::= "eadp.blaze.protobuf.TimeValue"
+printTypeRefTYPEDEF() ::= "<if(useOriginal)><printTypeRef4(typeRef.Symbol.TypeRef)><elseif(useWrapper)><printTypeRef5(typeRef.Symbol.TypeRef)><else><printTypeRef(typeRef.Symbol.TypeRef)><endif>"
+
+printTypeRefDEFAULT() ::= <<
+<typeRef.Symbol.FullName; format="protoFullyQualified">
+>>
+
+
+//
+// namspace template
+//
+namespace(node) ::= <<
+<node.Defs:{<defineHelper(node=it)>};  separator="\n">
+>>
+
+//
+// include file template
+// Note this is called by the printImportsFileOptions helper.
+//
+printInclude(node) ::= <<
+<node.relativeProtoPath; format="includeproto">
+>>
+
+
+//
+// enum template
+//
+// ProtoC requires allow_alias option set in enum definition if enum contains two entries with the same numeric value. On top of that, if you unilaterly go ahead and add allow_alias option always, it
+// trips if two different entries do not refer to same numeric value. While this probably is a good safety feature for new proto files, it is a problem for us. Instead of modifying source tdfs (or tdf grammar),
+// we add the option as well as two magic entries to each enum (to help with the transition).
+enum(node) ::= <<
+<if(node.generateProto)><\n>
+enum <node.Name>
+{
+    <if(node.addProtoAlias)>    option allow_alias = true;<endif>
+    option (eadp.blaze.protobuf.enum_options) = { //enum
+        description: "<if(node.description)><node.description; format="stripnl"><endif>"<if(node.FullName)>,
+        full_name: "<node.FullName>" /*eatdf*/<endif>
+    };
+
+    <enumMemberFirst(member=first(node.Members), node=it)>
+
+    <rest(node.Members):enumMemberRest(member=it); separator="\n\n">
+}
+<endif>
+>>
+
+enumMemberFirst(member, node) ::= <<
+<member.Name> = <member.MemberNumber> [(eadp.blaze.protobuf.enum_value_options) = { //enum member
+    description: "<if(member.description)><member.description; format="stripnl"><endif>"<if(member.nameoverride)>,
+    nameoverride: "<member.nameoverride>"<endif>
+} ];
+>>
+
+enumMemberRest(member) ::= <<
+<member.Name> = <member.MemberNumber> [(eadp.blaze.protobuf.enum_value_options) = { //enum member
+    description: "<if(member.description)><member.description; format="stripnl"><endif>"<if(member.nameoverride)>,
+    nameoverride: "<member.nameoverride>"<endif>
+} ];
+>>
+
+//
+// Bitfield template
+//
+bitfield(node) ::= <<
+<if(node.generateProto)><\n>
+message <node.Name>
+{
+    option (eadp.blaze.protobuf.msg_options) = { //bitfield
+        <printBasicClassMsgOptions(node=node)><if(node.FullName)>,
+        full_name: "<node.FullName>" /*eatdf*/<endif>,
+        tdf_type: "bitfield"
+    };
+
+    <node.Members:{member|<if(member.Bool)>bool <else>uint32 <endif><member.Name> = <member.MemberNumberOneBased> [
+    (eadp.blaze.protobuf.field_options) = { //bitfield member
+        <printBasicClassMemberMsgOptions(member=member)>,
+        bit_size: <member.BitSize>
+    }
+];}; separator="\n">
+}
+<endif>
+>>
+
+//
+// class template
+// Stick a responseStatus on each message. While it is not ideal, it helps with auto generation of proto files from tdf files.
+class(node) ::= <<
+<if(node.generateProto)><\n>
+message <node.Name>
+{
+    option (eadp.blaze.protobuf.msg_options) = { //class
+        <printBasicClassMsgOptions(node=node)><if(node.FullName)>,
+        full_name: "<node.FullName>" /*eatdf*/<endif>
+    };
+
+    <node.Defs:{<defineHelper(node=it)>};  separator="\n\n">
+    <node.Members:classMemberDef(member=it); separator="\n\n">
+}<\n>
+<endif>
+>>
+
+classMemberDef(member) ::= <<
+<if(member.UseProtobufWrapper)><printTypeRef5(member.TypeRef)><elseif(member.default)><if(!member.zerodefault)><printTypeRef5(member.TypeRef)><else><printTypeRef(member.TypeRef)><endif><else><printTypeRef(member.TypeRef)><endif> <member.Name; format="java"> = <member.ProtobufTagValue> [
+    (eadp.blaze.protobuf.field_options) = { //class member
+        <printBasicClassMemberMsgOptions(member=member)><printCustomOptions(typeRef=member.TypeRef)>
+    }
+];
+>>
+
+
+//
+// class Fwd Declare template
+// allows custom plugin to add the C++ forward declaration to generated output.
+//
+classfwddecl(node) ::= <<
+<if(node.baseTdf)>
+message GenerateFwdDecl__<{<fileNode.InputFile; format="baseFile">}; format="pascal">__<node.Name; format="baseFile"> { option (eadp.blaze.protobuf.msg_options) = {
+    generate_fwd_decl: { subclass: "<node.Name>", base_proto: "<node.baseTdf>" } }; }<\n>
+<endif>
+>>
+
+//
+// union template
+//
+union(node) ::= <<
+<if(node.generateProto)><\n>
+message <node.Name>
+{
+    option (eadp.blaze.protobuf.msg_options) = { //union
+        <printBasicClassMsgOptions(node=node)><if(node.FullName)>,
+        full_name: "<node.FullName>" /*eatdf*/<endif>
+    };
+
+    oneof u
+    {
+        <node.Members:unionMemberDef(member=it); separator="\n\n">
+    }
+}
+<endif>
+>>
+
+unionMemberDef(member) ::= <<
+<if(member.TypeRef.Symbol.ActualCategoryMap)><logUnsupportedTypeInUnion({map})><elseif(member.TypeRef.Symbol.ActualCategoryList)><logUnsupportedTypeInUnion({list})><else><printTypeRef(member.TypeRef)> <member.Name; format="java"> = <member.ProtobufTagValue> [
+    (eadp.blaze.protobuf.field_options) = { //union member
+        <printBasicClassMemberMsgOptions(member=member)>
+    }
+];
+<endif>
+>>
+
+//
+// const template
+// Implementation for complete transition - <if(!node.IsStringLen)><logError({Ignored const node '<node.Name>'. Reimplementation needed.})><endif>
+const(node) ::= <<
+>>
+
+//
+// typedef template
+typedef(node) ::= <<
+>>
+
+printGenerateExplicitIncludeWrapper(node) ::= <<
+>>
+
+//
+// typedef template
+printGenerateExplicitIncludeWrappers(fileNode) ::= <<
+>>
+
+
+
+

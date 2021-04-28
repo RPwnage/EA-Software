@@ -1,0 +1,421 @@
+[ headername="psnsessioninvitation/tdf/psnsessioninvitation.h" ]
+#include "psnsessioninvitation/gen/psnsessioninvitation.tdf"
+
+[ headername="psnbaseurl/tdf/psnbaseurl.h" ]
+#include "psnbaseurl/gen/psnbaseurl.tdf"    //for PsnErrorResponse
+
+namespace Blaze
+{
+namespace PSNServices
+{
+
+[
+    id = core/3001,
+    description = "PSN Session Invitation service proxy",
+    details = "Proxy component for the PSN Session Invitation REST service",
+    proxyOnly = true, //side: the proxy's Base URL is internally overridden in our calls, using an explicitly specified PSN Base URL.
+    http = {
+        payloadEncoderSubType = "NORMAL"
+    }
+]
+component PSNSessionInvitation
+{
+    errors
+    {
+        [ description = "External session authentication error, possibly due to invalid/expired token." ]
+        PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED = 1; //http 401
+        [ description = "The specified resource does not exist." ]
+        PSNSESSIONINVITATION_RESOURCE_NOT_FOUND = 2; //http 404
+        [ description = "Request to the resource or operation was refused. This may be due to the client or Blaze Server configuration not using the correct title id, the title not having its PSN DevNet service for the ClientId properly configured, or, the client being currently signed out from PSN." ]
+        PSNSESSIONINVITATION_ACCESS_FORBIDDEN = 3; //http 403
+        [ description = "Invalid or malformed request parameters." ]
+        PSNSESSIONINVITATION_BAD_REQUEST = 4; //http 400
+        [ description = "The request's parameters were incorrect/invalid." ]
+        PSNSESSIONINVITATION_CONFLICTING_REQUEST = 5; //http 409
+        [ description = "The external service's rate limit was exceeded." ]
+        PSNSESSIONINVITATION_TOO_MANY_REQUESTS = 6; //http 429
+        [ description = "The external session service is currently unavailable, possibly due to momentary downtime, updates or service maintenance." ]
+        PSNSESSIONINVITATION_SERVICE_UNAVAILABLE = 7; //http 503
+        [ description = "The external session service had an unspecified internal error. Check with Sony for potential issues." ]
+        PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR = 8; //http 500
+    }
+
+    slave
+    {
+        methods
+        {
+            [
+                id = 1,
+                description = "Get the users' NP Session Ids",
+                details = "Get the NP Session Ids for the sessions the user is currently in",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/users/{accountId}/sessions",
+                    method = "GET",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    custom_response_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    addEncodedPayload = false // No payload
+                }
+            ]
+            GetNpSessionIdsResponse getNpSessionIds(GetNpSessionIdsRequest);
+
+            // test helper:
+            [
+                id = 2,
+                description = "Get info on an NP Session",
+                details = "Get info on an NP Session. This now uses the GET MultiSessions Sony method for multiple service label support.",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions?fields=@default,members,sessionLockFlag&npLanguage={language}",
+                    method = "GET",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-SESSION-IDS"  = "sessionId",
+                        "X-NP-RateLimit" = "header.npRateLimit",
+                        "Accept-Language"= "header.acceptLanguage"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    addEncodedPayload = false // No payload
+                }
+            ]
+            GetNpSessionResponse getNpSession(GetNpSessionRequest);
+
+            [
+                id = 3,
+                description = "Create a NP Session",
+                details = "Create the NP Session, and join caller to it",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_CONFLICTING_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions",
+                    method = "POST",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        409 = PSNSESSIONINVITATION_CONFLICTING_REQUEST,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    requestPayloadBlob = "body",
+                    addEncodedPayload = true
+                }
+            ]
+            PostNpSessionResponse postNpSession(PostNpSessionRequest);
+
+            [
+                id = 4,
+                description = "Join a NP Session",
+                details = "Join the caller to the NP Session",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_CONFLICTING_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions/{sessionId}/members?npTitleId={npTitleId}",
+                    method = "POST",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        409 = PSNSESSIONINVITATION_CONFLICTING_REQUEST,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    addEncodedPayload = false // No payload
+                }
+            ]
+            void postNpSessionMember(PostNpSessionMemberRequest);
+
+            [
+                id = 5,
+                description = "Leave a NP Session",
+                details = "Leave the caller from the NP Session",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions/{sessionId}/members/me",
+                    method = "DELETE",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    addEncodedPayload = false // No payload
+                }
+            ]
+            void deleteNpSessionMember(DeleteNpSessionMemberRequest);
+
+            [
+                id = 6,
+                description = "Get the NP session's custom data",
+                details = "Get the NP session's custom data",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions/{sessionId}/sessionData",
+                    method = "GET",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    addEncodedPayload = false // No payload
+                }
+            ]
+            void getNpSessionData(GetNpSessionDataRequest); // note: response is plain binary data, handled internally, not via code gen'd interface
+
+            // test helper:
+            [
+                id = 7,
+                description = "Get the NP session's custom changeable data",
+                details = "Get the NP session's custom changeable data",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions/{sessionId}/changeableSessionData",
+                    method = "GET",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    addEncodedPayload = false // No payload
+                }
+            ]
+            void getNpSessionChangeableData(GetNpSessionChangeableDataRequest); // note: response is plain binary data, handled internally, not via code gen'd interface
+
+            [
+                id = 8,
+                description = "Update the NP session's custom changeable data",
+                details = "Update the NP session's custom changeable data",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_CONFLICTING_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions/{sessionId}/changeableSessionData",
+                    method = "PUT",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        409 = PSNSESSIONINVITATION_CONFLICTING_REQUEST,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    requestPayloadBlob = "body",
+                    addEncodedPayload = true
+                }
+            ]
+            void putNpSessionChangeableData(PutNpSessionChangeableDataRequest);
+
+            [
+                id = 9,
+                description = "Update the NP session's image",
+                details = "Update the NP session's image",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_CONFLICTING_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions/{sessionId}/sessionImage",
+                    method = "PUT",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        409 = PSNSESSIONINVITATION_CONFLICTING_REQUEST,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    requestPayloadBlob = "body",
+                    addEncodedPayload = true
+                }
+            ]
+            void putNpSessionImage(PutNpSessionImageRequest);
+
+            [
+                id = 10,
+                description = "Update the NP session's basic properties",
+                details = "Update the NP session's sessionPrivacy, sessionMaxUser, sessionName, and sessionStatus",
+                requires_authentication = false,
+                client_export = false,
+                errortype = PsnErrorResponse,
+                errors = { PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED, PSNSESSIONINVITATION_RESOURCE_NOT_FOUND, PSNSESSIONINVITATION_ACCESS_FORBIDDEN, PSNSESSIONINVITATION_BAD_REQUEST, PSNSESSIONINVITATION_CONFLICTING_REQUEST, PSNSESSIONINVITATION_TOO_MANY_REQUESTS, PSNSESSIONINVITATION_SERVICE_UNAVAILABLE, PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR },
+                http = {
+                    resource = "v1/npServiceLabels/{serviceLabel}/sessions/{sessionId}",
+                    method = "PUT",
+                    custom_request_headers = {
+                        "Authorization"  = "header.authToken",
+                        "X-NP-RateLimit" = "header.npRateLimit"
+                    },
+                    custom_error_headers = {
+                        "X-RateLimit-Next-Available" = "rateLimitNextAvailable",
+                        "X-RateLimit-TimePeriod" = "rateLimitTimePeriod",
+                        "X-RateLimit-Limit" = "rateLimitLimit",
+                        "X-RateLimit-Remaining" = "rateLimitRemaining"
+                    },
+                    status_code_errors = {
+                        400 = PSNSESSIONINVITATION_BAD_REQUEST,
+                        401 = PSNSESSIONINVITATION_AUTHENTICATION_REQUIRED,
+                        403 = PSNSESSIONINVITATION_ACCESS_FORBIDDEN,
+                        404 = PSNSESSIONINVITATION_RESOURCE_NOT_FOUND,
+                        409 = PSNSESSIONINVITATION_CONFLICTING_REQUEST,
+                        429 = PSNSESSIONINVITATION_TOO_MANY_REQUESTS,
+                        500 = PSNSESSIONINVITATION_SERVICE_INTERNAL_ERROR,
+                        503 = PSNSESSIONINVITATION_SERVICE_UNAVAILABLE
+                    },
+                    requestPayloadMember = "body"
+                }
+            ]
+            void putNpSessionUpdate(PutNpSessionUpdateRequest);
+            
+        }
+    }
+}
+
+
+}
+}

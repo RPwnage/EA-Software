@@ -1,0 +1,48 @@
+Practical example of how I added the new Ipps/Ompps tests in OTPTests:
+
+First, because those metrics need to be tested in the bare metal environment instead of cloud I added the datasource where the bare metal metrics aggregator was configured to push data (asked Erik about this).
+
+For adding a new datasource in the test script I added the following lines in QueryPrometheus.py (line 26):
+
+    # Bare metal data sources
+    PROMETHEUS_URL["gameplay-services-gs-qos-metrics"] = "/gs-qos-metrics/gameplay-services-production-qos-rules/api/prom/api/v1/"
+
+
+Then in OTPTests I followed the next steps:
+    1. Changed gBlazeServiceName , gRedirector and gEnv to the blazeserver used by the the bare metal instances (in this case: "gsqa-franken-pc" with "test" environment)
+        1.1 Those parameters are used to overwrite the config file of the stress clients.
+    2. Changed gDefaultDatasource to the newly added datasource "gameplay-services-gs-qos-metrics"
+        2.1 This parameter is used as the source for the queries
+    3 Because those metrics are gameserver metrics and not aggregated by the voip server, it has different dimensions so I added a new helper function called: getGameServerMetricsParameters()
+        3.1 This function returns the metric parameters for those queries: setting env to gEnv and service to gBlazeServiceName
+    4. Following the example from the other metrics I added a new helper function called: getIppsOppsQueries()
+        4.1 In this function I create a dictionary called queries and another dictionary called expected_range
+        4.2 The queries dictionary has: 
+            4.2.1 keys equal to metric name (for example "gameserver_odmpps_g", followed by _g in the end that stand for gauge)  
+            4.2.2 value corresponding to the query: "gameserver_odmpps{" + getGameServerMetricsParameters() + "}" filling the dimensions using the newly added helper function
+        4.3 The expected range function has:
+            4.3.1 keys equal to metric name (for example "gameserver_odmpps_g", followed by _g in the end that stand for gauge) 
+            4.3.2 value corresponding to the expected range of that query (Thomas informed me that the mean and median should always return around 30) so for those metrics I added the expected range: "25:35"
+    5. In Case1 which is the sanity check test for all OTP metrics (it tests all metrics) I added (at line 435):
+            ### Ipps/Ompps Queries ###
+            IppsQueries, IppsExpectedRange = getIppsOppsQueries()
+            IppsResults = QueryPrometheus.queryList(IppsQueries, testStartTime, testStopTime)
+            err = QueryPrometheus.checkResultIsInRange(IppsResults, IppsExpectedRange)
+
+            IppsStats = QueryPrometheus.calculateResultsStats(IppsResults)
+
+            for stat in IppsStats.keys():
+                if IppsStats[stat]["max_value"] == 0 or ( IppsStats[stat]["total_rise"] == 0 and IppsStats[stat]["total_fall"] == 0):
+                    SetupAndHelpers.logLine("FAIL", "Found no change in value for " + str(stat))
+                    err = -1
+
+        5.1 First, I get the IppsQueries and the expected range
+        5.2 Then I query the metrics in the time frame that the test ran
+        5.3 I check that every query is in the expected range
+        5.4 I calculate some stats around the returned data (max_value, total_rise, total_fall, min_value, average, fall_count, fall_rise)
+        5.5 I check that total_rise and total_fall are different by 0, meaning that the metric has changed and was not a flat 0.
+        5.6 The checkResultIsInRange() and calculateResultsStats() log errors and fails if something is not right.
+
+    6. Run the test, wait 10 minutes and check the results :) 
+
+    7. After this I added Case4, a test dedicated only to Ipps/Opps metrics with different trigger actions: validation is done using the usual functions: checkResultIsInRange, calculateResultsStats and compareChanges.

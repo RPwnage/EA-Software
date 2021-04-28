@@ -1,0 +1,90 @@
+<project>
+    <!-- Copyright 2007-2016 Electronic Arts Inc.  All rights reserved. -->
+
+    <!-- Create a partial module that has all the necessary information for building our samples -->
+    <PartialModule name="BlazeSample" buildtype="${buildtype??Program}">
+        <dependencies>
+            <auto>
+                coreallocator
+                BlazeSDK/BlazeSDK
+                DirtySDK
+                EAAssert
+                EABase
+                EACallstack
+                EAIO
+                EAJson
+                EASTL
+                EAStdC   <!--connapitest samples uses sprintf -->
+                EATDF
+                EAThread
+                PPMalloc
+                PyroSDK
+                TelemetrySDK
+                PinTaxonomySDK
+                zlib
+            </auto>
+        </dependencies>
+
+        <config>
+            <warningsuppression>
+                <!-- Visual Studio specific suppressions -->
+                <do if="${config-compiler} == 'vc'">
+                    -wd4263 <!-- member function does not override any base class virtual member function -->
+                    -wd4264 <!-- no override available for virtual member function from base class; function is hidden -->
+                    -wd4548 <!-- expression before comma has no effect; expected expression with side-effect; Wing: need this because xlocale in VC lib messed -->
+                    -wd4625 <!-- copy constructor could not be generated because a base class copy constructor is inaccessible -->
+                    -wd4626 <!-- assignment operator could not be generated because a base class assignment operator is inaccessible -->
+
+                    <do if="${config-vs-version??} == '14.0'">
+                        -wd5026 <!-- move constructor was implicitly defined as deleted because a base class move constructor is inaccessible or deleted -->
+                        -wd5027 <!-- move assignment operator was implicitly defined as deleted because a base class move assignment operator is inaccessible or deleted -->
+                    </do>
+
+                    <do if="${Dll??false}">
+                        -wd4251   <!-- class 'X' needs to have dll-interface to be used by clients of class 'Y' -->
+                    </do>
+                </do>
+                <!-- GCC/Clang specific suppressions -->
+                <do if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    -Wno-multichar
+                </do>
+
+                <!-- XboxOne specific suppressions -->
+                <do if="${config-system} == 'capilano'">
+                    -wd4127 <!-- conditional expression is constant -->
+                    -wd4265 <!-- 'type': class has virtual functions, but destructor is not virtual --> <!-- XDK -->
+                    -wd4371 <!-- 'type': layout of class may have changed from a previous version of the compiler due to better packing of member 'type::member' -->
+                    -wd4555 <!-- expression has no effect; expected expression with side-effect --> <!-- XDK -->
+                    -wd4946 <!-- reinterpret_cast used between related classes: 'type1' and 'type2' -->
+                    -wd4986 <!-- 'type': exception specification does not match previous declaration --> <!-- XDK -->
+                </do>
+
+            </warningsuppression>
+
+            <buildoptions>
+                <option name="buildset.link.options" if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+                    ${option.value}
+                    -rdynamic
+                </option>
+                <option name="buildset.link.options" if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                    ${option.value}
+                    /OPT:REF
+                </option>
+                <!-- since we specify /OPT:REF to silence the warning about incremental linking just disabled it -->
+                <option name="incrementallinking" value="off" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+            </buildoptions>
+
+            <defines>
+                <do if="${dirtysdk_debug_enable??false}">
+                    DIRTYCODE_LOGGING=1
+                </do>
+                <do if="${dirtysdk_debug_disable??false}">
+                    DIRTYCODE_LOGGING=0
+                </do>
+            </defines>
+        </config>
+
+        <copylocal value="true"/>
+    </PartialModule>
+</project>
+

@@ -1,0 +1,908 @@
+group tdfheaderfile : base;
+
+file(fileNode, defTable) ::= <<
+<standardFileHeader()>
+<openIncludeGuard()>
+<includeFiles()>
+<fileNode.Defs:{<defineHelper(node=it)>};  separator="\n">
+
+namespace EA
+{
+namespace Allocator
+{
+namespace detail
+{
+// template function specializations needed to support CORE_DELETE() macro for TDF types
+<fileNode.Defs:{<deleteObjectHelper(node=it)>}>
+} //detail
+} //Allocator
+} //EA
+
+namespace EA
+{
+namespace TDF
+{
+<fileNode.Defs:{<postDefineHelper(node=it)>}; separator="">
+} //TDF
+} //EA
+
+<closeIncludeGuard()>
+<standardFileFooter()>
+>>
+
+namespace(node) ::= <<
+namespace <node.Name>
+{
+<node.Defs:{<defineHelper(node=it)>};  separator="\n">
+
+<if(node.ExplicitRegistrationRequired)>
+void <dllApiMacro()> <fileNode.InputFile;format="baseFile">RegisterTdfs();
+void <dllApiMacro()> <fileNode.InputFile;format="baseFile">DeregisterTdfs();
+<\n>
+<endif>
+} //<node.Name>
+>>
+
+
+
+
+deleteObjectHelper(node) ::= <<
+<if(node.Category)><({deleteObject<node.Category>})()><endif>
+>>
+deleteObjectNAMESPACE() ::= <<
+<node.Defs:{<deleteObjectHelper(node=it)>}>
+>>
+deleteObjectENUM() ::= ""
+deleteObjectBITFIELD() ::= ""
+deleteObjectCLASS() ::= <<
+<if(!node.IsFwdDecl)>
+template \<\>
+inline void DeleteObject(Allocator::ICoreAllocator*, ::<printTypeRefFullScope(node.TypeRef)>* object) { delete object; }<\n>
+<endif>
+>>
+deleteObjectUNION() ::= <<
+template \<\>
+inline void DeleteObject(Allocator::ICoreAllocator*, ::<printTypeRefFullScope(node.TypeRef)>* object) { delete object; }<\n>
+>>
+deleteObjectCONST() ::= ""
+deleteObjectTYPEDEF() ::= ""
+deleteObjectCUSTOM_ATTRIBUTE() ::= ""
+
+
+defineHelper(node) ::= "<if(node.Category)><({define<node.Category>})()><elseif(node.Filename)><includeFile(node=node)><else><namespace(node=node)><endif>"
+defineNAMESPACE() ::= "<namespace(...)>"
+defineENUM() ::= "<enum(...)>"
+defineBITFIELD() ::= "<bitfield(...)>"
+defineCLASS() ::= "<if(node.IsFwdDecl)>class <node.Name>;<else><class(...)><endif>"
+defineUNION() ::= "<union(...)>"
+defineCONST() ::= "<if(node.IsString)><stringConst(...)><else><if(node.IsExterned)><externedConst(...)><else><const(...)><endif><endif>"
+defineTYPEDEF() ::= "<typedef(...)>"
+defineCUSTOM_ATTRIBUTE() ::= "<customattribute(...)>"
+
+includeFiles() ::= <<
+<if(fileNode.InputParams.FirstHeaderName)>#include \<<(fileNode.InputParams.FirstHeaderName)>\><endif>
+
+#include "EAAssert/eaassert.h"
+#include "EATDF/tdf.h"
+#include "EAStdC/EASprintf.h"
+#include "EAStdC/EAString.h"
+#if !EA_TDF_REGISTERALL
+#include \<eathread/eathread_mutex.h\>
+#endif
+<if(fileNode.generateProto)>#include \<google/protobuf/message.h\><endif>
+>>
+
+//////////////////////////////////////////////
+/////////////Protobuf Message Interface////////
+//////////////////////////////////////////////
+
+// Oddly enough, implementing New() below with right type (<node.Name>* New() const override { return nullptr; })) chokes up VS 2015 (Tried Version 14.0.24720.00 Update 1).
+// It generates pdbs with lot of code injection around the MessageLite variation of the New() resulting in pretty hefty pdb files and ultimately starts complaining about
+// lack of space (it seemed from task manager like Linker choked out on heap space). So as a workaround, we return the google::protobuf::Message* which solves the issue.
+// Fortunately, we don't use this method so it has no direct impact on us.
+ProtobufMessageInterface(node) ::= <<
+
+public:
+    //+ Begin Protobuf Message interface
+
+    //+ placeholders. gRPC do not need these but we are forced to override them because they are pure virtual
+    inline google::protobuf::Message* New() const override { return nullptr; }
+    inline google::protobuf::Metadata GetMetadata() const override { return google::protobuf::Metadata(); }
+    //-
+
+    //+ Protobuf methods used by gRPC - See proto_utils.h in grpc package
+    void Clear() override;
+    bool IsInitialized() const override;
+    size_t ByteSizeLong() const override;
+
+    bool MergePartialFromCodedStream(::google::protobuf::io::CodedInputStream* input) override;
+    void SerializeWithCachedSizes(::google::protobuf::io::CodedOutputStream* output) const override;
+    ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(bool deterministic, ::google::protobuf::uint8* output) const override;
+    ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const override
+    {
+        return InternalSerializeWithCachedSizesToArray(false, output);
+    }
+
+    inline int GetCachedSize() const override
+    { 
+        return mProtobufCachedSize; 
+    }
+    
+    std::string InitializationErrorString() const override
+    {
+        return std::string();
+    }
+    //- Protobuf methods used by gRPC
+
+    std::string GetTypeName() const override;
+
+    //+ Support for variable tdf
+    static void sSerializeWithCachedSizes(const void*, ::google::protobuf::io::CodedOutputStream* output);
+    static bool sMergePartialFromCodedStream(void*, ::google::protobuf::io::CodedInputStream* input);
+    //-
+    
+    //- End Protobuf Message interface
+
+  
+private:
+    mutable int mProtobufCachedSize = 0;
+    bool mProtobufFirstClearCall = true;
+>>
+
+//////////////////////////////////////////////
+/////////////customattribute Templates////////
+//////////////////////////////////////////////
+
+customattribute(node) ::= <<
+
+#if EA_TDF_INCLUDE_CUSTOM_TDF_ATTRIBUTES
+// custom attribute <node.Name>
+class <dllApiMacro()> <node.Name>Attribute
+{
+    NON_COPYABLE(<node.Name>Attribute);
+public:
+
+    <node.Name>Attribute(uint32_t tdfId, uint32_t tag, <node.Members:customAttributeMemberConstructorHelper(member=it); separator=", ">)
+    :
+<node.Members:{        m<it.Name>(a<it.Name>)}; separator=",\n">
+      {
+          addAttributeToMap(tdfId, tag, *this);
+      };
+
+    //proposed to rename to find
+    static const <node.Name>Attribute* get<node.Name>Attribute(const Tdf& tdf, uint32_t tag);
+
+    <node.Members:{<customAttributeMemberRefHelper(member=it)>}; separator="\n\n">
+
+private:
+    typedef eastl::vector_map\<uint64_t,<node.Name>Attribute*\> <node.Name>AttributeMap;
+
+    static void addAttributeToMap(uint32_t tdfId, uint32_t tag, <node.Name>Attribute &attr);
+    static <node.Name>AttributeMap& getMap();
+
+};  //class <node.Name>Attribute
+#endif //EA_TDF_INCLUDE_CUSTOM_TDF_ATTRIBUTES
+
+>>
+
+customAttributeMemberConstructorHelper(member) ::= "<({customAttributeMemberConstructor<member.TypeRef.Symbol.ActualCategory>})()>"
+
+customAttributeMemberConstructorINT_PRIMITIVE() ::= "<printTypeRef(member)> a<member.Name>"
+customAttributeMemberConstructorSTRING() ::= "const char8_t* a<member.Name>"
+
+customAttributeMemberRefHelper(member) ::= "<({customAttributeMemberRef<member.TypeRef.Symbol.ActualCategory>})()>"
+
+customAttributeMemberRefINT_PRIMITIVE() ::= <<
+<printTypeRef(member)> m<member.Name>;
+inline <printTypeRef(member)> get<member.Name>() const { return m<member.Name>; }
+>>
+
+customAttributeMemberRefSTRING() ::= <<
+const char8_t* m<member.Name>;
+inline const char8_t* get<member.Name>() const { return m<member.Name>; }
+>>
+
+//////////////////////////////////////////////
+/////////////Include Declaration//////////////
+//////////////////////////////////////////////
+includeFile(node) ::= <<#include "<if(node.packageName)><node.packageName>/<elseif(fileNode.InputParams.HeaderPrefix)><fileNode.InputParams.HeaderPrefix>/<endif><node.headername>">>
+
+
+//////////////////////////////////////////////
+/////////////Constant Templates///////////////
+//////////////////////////////////////////////
+
+const(node) ::= <<
+<if(node.description)>
+/*! \brief <node.description> */
+
+<endif>
+<if(!node.Scope.CategoryNamespace)>static <endif>const <printTypeRef(node)> <node.Name> = <if(!node.ValueRef)><node.Value><node.ValueString><else><printTypeRef(node.ValueRef)><endif>;
+>>
+
+externedConst(node) ::= <<
+<if(node.description)>
+/*! \brief <node.description> */
+
+<endif>
+<if(!node.Scope.CategoryNamespace)>static <else>extern <dllApiMacro()> <endif>const <printTypeRef(node)> <node.Name>;
+>>
+
+stringConst(node) ::= <<
+<if(node.description)>
+/*! \brief <node.description> */
+
+<endif>
+<if(!node.Scope.CategoryNamespace)>static <else>extern <dllApiMacro()> <endif>const char8_t *<node.Name>;
+>>
+
+//////////////////////////////////////////////
+/////////////Enum Templates//////////////////
+//////////////////////////////////////////////
+
+enum(node) ::= <<
+/*! ***************************************************************/
+/*!    \brief <if(node.description)><node.description><else>Needs a description.<endif>
+<if(node.details)>
+        <node.details>
+
+<endif>
+
+*******************************************************************/
+enum <node.Name>
+{
+    <trunc(node.Members):enumMember(member=it, comma=","); separator="\r\n">
+    <enumMember(member=last(node.Members))>
+};
+<if(node.generateProto)>bool <node.Name>_IsValid(int);<endif>
+
+/*! \cond INTERNAL_DOCS */
+<if(!node.Scope.CategoryNamespace)>static <else><dllApiMacro()> <endif>const char8_t *<node.Name>ToString(<node.Name> value);
+<if(!node.Scope.CategoryNamespace)>static <else><dllApiMacro()> <endif>bool Parse<node.Name>(const char8_t* name, <node.Name> &result);
+<if(!node.Scope.CategoryNamespace)>static <else><dllApiMacro()> <endif>const EA::TDF::TypeDescriptionEnum& Get<node.Name>EnumMap();
+<if(!node.Scope.CategoryNamespace)>static<else>extern <dllApiMacro()><endif> const EA::TDF::TypeDescriptionEnum& s<node.NonNamespaceScope:{<it>};separator="_">_EnumMapRef;
+
+<if(!node.tdfIdRegistration)>
+#if EA_TDF_REGISTER_ALL<\n>
+<endif>
+<if(!node.Scope.CategoryNamespace)>static<else>extern <dllApiMacro()><endif> const EA::TDF::TypeRegistrationNode s<node.NonNamespaceScope:{<it>};separator="_">_REGISTRATION_NODE;   
+<if(!node.tdfIdRegistration)>
+#endif
+<endif>    
+
+
+/*! \endcond INTERNAL_DOCS */
+
+>>
+
+enumMember(member, comma) ::= <<
+<member.Name><if(member.Value)> = <member.Value; format="hex"><endif><comma><if(member.description)> ///\< <member.description><endif>
+>>
+
+//////////////////////////////////////////////
+/////////////Bitfield Templates///////////////
+//////////////////////////////////////////////
+
+// For protobuf support, bitfield generated class now derives from the google::protobuf::Message class. That class explicitly deletes copy ctors and assignment operators.
+// This means compiler does not generate those ctors implicitly and that results to a build error when we try to copy a bitfield. So below we provide a simple(and correct) 
+// implementation for that. 
+
+// 1. The copy ctor and assignment helper are not wrapped in EA_TDF_INCLUDE_COPY_CONSTRUCTOR as setting that to 0 would work for other classes but not this (due to explicit deletion
+// of these in the Message class).   
+// 2. Bitfield generated class does not take allocator instance in the default ctor as no mem allocation is needed. 
+
+bitfield(node) ::= <<
+/*! ***************************************************************/
+/*! \class <node.Name>
+    \brief <if(node.description)><node.description><else>Needs a description.<endif>
+
+<if(node.details)>    <node.details><endif>
+*******************************************************************/
+class <dllApiMacro()> <node.Name> : public EA::TDF::TdfBitfield<if(node.generateProto)>, public google::protobuf::Message <endif>
+{
+public:
+    //+ Provided explicitly - See the comment in the tdfheaderfile.stg for an explanation.
+   <node.Name>() : TdfBitfield(){}
+   <node.Name>(const <node.Name>& rhs) : TdfBitfield(rhs){}
+   <node.Name>& operator=(const <node.Name>& rhs) { TdfBitfield::operator =(rhs); return *this;}
+   //-
+
+<node.Members:{member|<if(member.Bool)>
+    /*! ***************************************************************/
+    /*! \name <member.Name; format="pascal">
+        \brief <if(member.description)><member.description><else>Field needs a description.<endif>
+    *******************************************************************/
+    inline void set<member.Name; format="pascal">(bool value) { if (value) set<member.Name; format="pascal">(); else clear<member.Name; format="pascal">(); }
+    inline void set<member.Name; format="pascal">() { mBits |= <member.BitMask; format="hex">; }
+    inline void clear<member.Name; format="pascal">() { mBits &= ~(<member.BitMask; format="hex">); }
+    inline bool get<member.Name; format="pascal">() const { return ((mBits & <member.BitMask; format="hex">) == <member.BitMask; format="hex">); }
+<else>
+    /*! ***************************************************************/
+    /*! \name <member.Name>
+        \brief <if(member.description)><member.description><else>Field needs a description.<endif>
+
+        \note Only the first <member.BitSize> bits of this value are valid.
+    *******************************************************************/
+    inline void set<member.Name>(uint32_t value) { mBits |= ((value \<\< <member.BitStart>) & <member.BitMask; format="hex">); }
+    inline uint32_t get<member.Name>() const { return ((mBits & <member.BitMask; format="hex">) \>\> <member.BitStart>); }
+<endif>}; separator="\n\n">
+
+    virtual const EA::TDF::TypeDescriptionBitfield& getTypeDescription() const override;
+
+<if(!node.tdfIdRegistration)>
+#if EA_TDF_REGISTER_ALL<\n>
+<endif>
+    static EA::TDF::TypeRegistrationNode REGISTRATION_NODE;      
+
+<if(!node.tdfIdRegistration)>
+#endif
+<endif>    
+    
+<if(node.generateProto)><ProtobufMessageInterface(node)><endif>
+};
+>>
+
+//////////////////////////////////////////////
+/////////////Typedef Templates////////////////
+//////////////////////////////////////////////
+
+typedef(node) ::= <<
+<if(node.description)>
+/*! \brief <node.description> */
+<else>
+/*! \brief Needs a description. */
+<endif>
+
+typedef <printTypeRef(node.TypeRef)> <node.Name>;
+>>
+
+
+//////////////////////////////////////////////
+/////////////Class Templates//////////////////
+//////////////////////////////////////////////
+
+class(node) ::= <<
+/*! ***************************************************************/
+/*! \class <node.Name>
+    \brief <if(node.description)><node.description><else>Needs a description.<endif>
+
+<if(node.details)>    <node.details><endif>
+    \nosubgrouping
+*******************************************************************/
+class <dllApiMacro()> <node.Name> : public EA::TDF::Tdf<if(node.generateProto)>, public google::protobuf::Message <endif>
+{
+public:
+    <node.Defs:{<defineHelper(node=it)>};  separator="\n\n">
+
+    /*! ***************************************************************/
+    /*! \name Constructor/Destructor
+    *******************************************************************/
+    <node.Name>(EA::Allocator::ICoreAllocator& allocator EA_TDF_DEFAULT_ALLOCATOR_ASSIGN, const char8_t* debugMemName = EA_TDF_DEFAULT_ALLOC_NAME);
+#if EA_TDF_INCLUDE_COPY_CONSTRUCTOR
+    inline <node.Name>(const <node.Name>& rhs) : EA::TDF::Tdf() { rhs.copyInto(*this); }
+    inline <node.Name>& operator=(const <node.Name>& rhs) { rhs.copyInto(*this); return *this; }
+#endif
+
+<if(node.Members)>    
+    typedef enum { MEMBER_<first(node.SortedMembers).Name; format="tu"> = 0<rest(node.SortedMembers):{, MEMBER_<it.Name>}; format="tu"> } MemberIndices;
+    static const size_t TDF_MEMBER_COUNT = <length(node.SortedMembers)>;
+<endif>
+
+    <node.Members:{static const uint32_t TAG_<it.Name;format="toUpper"> = <it.TagValue;format="hex">;}; separator="\n">
+
+    <node.Members:classMemberGSHelper(member=it); separator="\n\n">
+    <printTypeRef(node)>* clone(EA::Allocator::ICoreAllocator& allocator EA_TDF_DEFAULT_ALLOCATOR_ASSIGN, const char8_t* allocName = "<printTypeRef(node)>::clone") const override;
+
+    /*! ***************************************************************/
+    /*! \brief Deep copy this object into the given object.
+
+        \param newObj the object to copy all of this object's data into
+    *******************************************************************/
+    inline void copyInto(<printTypeRef(node)>& newObj, const EA::TDF::MemberVisitOptions& options = EA::TDF::MemberVisitOptions()) const { EA::TDF::Tdf::copyInto(newObj, options); }
+
+<if(node.trackChanges)>
+#if EA_TDF_INCLUDE_CHANGE_TRACKING
+    inline bool isSet() const override { return isSetRecursive(); }
+    
+    inline void markSet() override {}
+    
+    inline void clearIsSet() override { clearIsSetRecursive(); }
+    
+    inline void markMemberSet(uint32_t memberIndex, bool isSet) override { mIsSetBits.set(memberIndex, isSet); }
+    
+    inline bool isMemberSet(uint32_t memberIndex) const override { return mIsSetBits.test(memberIndex); }
+    
+    <node.Members:isSetHelper(member=it); separator="\n\n">
+#endif //EA_TDF_INCLUDE_CHANGE_TRACKING<\n>
+<endif>
+
+    const EA::TDF::TypeDescriptionClass& getClassInfo() const override;
+    static const EA::TDF::TdfId TDF_ID = (EA::TDF::TdfId)<node.tdfid; format="hex">;
+
+<if(!node.tdfIdRegistration)>
+#if EA_TDF_REGISTER_ALL<\n>
+<endif>
+    static EA::TDF::TypeRegistrationNode REGISTRATION_NODE;      
+<if(!node.tdfIdRegistration)>
+#endif
+<endif>    
+    
+    /*! \cond INTERNAL_DOCS */
+
+protected:
+    <node.Members:classMemberDefHelper(member=it); separator="\n">
+<if(node.trackChanges)>
+#if EA_TDF_INCLUDE_CHANGE_TRACKING
+    typedef eastl::bitset\<<length(node.Members)>\> changes_bitset_type;
+    changes_bitset_type mIsSetBits;
+#endif //EA_TDF_INCLUDE_CHANGE_TRACKING<\n>
+<endif>
+private:
+
+#if !EA_TDF_INCLUDE_COPY_CONSTRUCTOR
+    <node.Name>(const <node.Name>& rhs);
+    <node.Name>& operator=(const <node.Name>& rhs);
+#endif
+
+/*! \endcond*/
+
+    friend struct EA::TDF::TypeDescriptionSelector\<<node.Name>\>;
+
+<if(node.Members)>
+    static const EA::TDF::TdfMemberInfo TDF_MEMBER_INFO[TDF_MEMBER_COUNT];
+<endif>
+
+
+<if(node.generateProto)><ProtobufMessageInterface(node)><endif>
+};
+
+typedef EA::TDF::tdf_ptr\<<node.Name>\> <node.Name>Ptr;
+>>
+
+//////////////////////////////////////////////
+/////////////Class Is Set Helper//////////////
+//////////////////////////////////////////////
+
+isSetHelper(member) ::= <<
+<({isSet<member.TypeRef.Symbol.ActualCategory>})()>
+>>
+isSetPRIMITIVE() ::= <<inline bool is<member.Name; format="pascal">Set() const { return isMemberSet(<member.SortedMemberNumber>); }>>
+isSetAGGREGATE() ::= <<inline bool is<member.Name; format="pascal">Set() const { return get<member.Name>().isSet(); }>>
+isSetSTRING() ::= "<isSetPRIMITIVE()>"
+isSetENUM() ::= "<isSetPRIMITIVE()>"
+isSetINT_PRIMITIVE() ::= "<isSetPRIMITIVE()>"
+isSetFLOAT_PRIMITIVE() ::= "<isSetPRIMITIVE()>"
+isSetUNION() ::= "<isSetAGGREGATE()>"
+isSetBITFIELD() ::= "<isSetPRIMITIVE()>"
+isSetCLASS() ::= "<! intentionally empty, we don't support recursive isSet() on objects !>"
+isSetVARIABLE() ::= <<inline bool is<member.Name; format="pascal">Set() const { return m<member.Name>.isSet(); }>>
+isSetGENERIC() ::= <<inline bool is<member.Name; format="pascal">Set() const { return m<member.Name>.isSet(); }>>
+isSetTYPEDEF() ::= ""
+isSetBLOB() ::= "<isSetAGGREGATE()>"
+isSetCONST() ::= ""
+isSetOBJECT_TYPE() ::= "<isSetPRIMITIVE()>"
+isSetOBJECT_ID() ::= "<isSetPRIMITIVE()>"
+isSetTIMEVALUE() ::= "<isSetPRIMITIVE()>"
+isSetMAP() ::= "<isSetAGGREGATE()>"
+isSetLIST() ::= "<isSetAGGREGATE()>"
+
+//////////////////////////////////////////////
+/////////////Class Get/Set Helpers////////////
+//////////////////////////////////////////////
+
+classMemberGetterSetterComment() ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name>
+    \brief <if(member.description)><member.description><else>Field needs a description.<endif>
+*******************************************************************/
+>>
+
+classMarkSet() ::= "<if(node.trackChanges)>EA_TDF_TDF_MARK_SET(MEMBER_<member.Name; format=\"tu\">);<endif>"
+
+classMemberGSHelper(member) ::= "<({classMemberGS<member.TypeRef.Symbol.ActualCategory>})()>"
+
+classMemberGSENUM() ::= "<classMemberGSPRIMITIVE(...)>"
+classMemberGSOBJECT_TYPE() ::= "<classMemberGSPRIMITIVE(...)>"
+classMemberGSOBJECT_ID() ::= "<classMemberGSPRIMITIVE(...)>"
+classMemberGSTIMEVALUE() ::= "<classMemberGSREFERENCE(...)>"
+classMemberGSFLOAT_PRIMITIVE() ::= "<classMemberGSPRIMITIVE(...)>"
+classMemberGSINT_PRIMITIVE() ::= "<classMemberGSPRIMITIVE(...)>"
+classMemberGSLIST() ::= "<if(member.TypeRef.Symbol.CategoryTypedef)><classMemberGS_Struct()><else><classMemberGS_StructFullArgs(typeName={<listTypeNameFromMember()>}, doTypeDef=member.FirstDef)><endif>"
+classMemberGSMAP() ::= "<if(member.TypeRef.Symbol.CategoryTypedef)><classMemberGS_Struct()><else><classMemberGS_StructFullArgs(typeName={<mapTypeNameFromMember()>}, doTypeDef=1)><endif>"
+classMemberGSUNION() ::= "<classMemberGS_Struct()>"
+classMemberGSBITFIELD() ::= "<classMemberGS_Struct()>"
+classMemberGSBLOB() ::= "<classMemberGS_Struct()>"
+classMemberGSCLASS() ::= "<classMemberGS_Struct()>"
+
+// Get returns a copy of the object
+classMemberGSPRIMITIVE() ::= <<
+<classMemberGetterSetterComment()>
+inline <printTypeRef(member)> get<member.Name>() const { return m<member.Name>; }
+inline void set<member.Name>(<printTypeRef(member)> val) { <classMarkSet()> m<member.Name> = val; }
+>>
+
+// Get returns a reference to the object 
+classMemberGSREFERENCE() ::= <<
+<classMemberGetterSetterComment()>
+inline <printTypeRef(member)>& get<member.Name>() { <classMarkSet()> return m<member.Name>; }
+inline const <printTypeRef(member)>& get<member.Name>() const { return m<member.Name>; }
+inline void set<member.Name>(const <printTypeRef(member)>& val) { <classMarkSet()> m<member.Name> = val; }
+>>
+
+classMemberGSSTRING() ::= <<
+<classMemberGetterSetterComment()>
+inline const char8_t* get<member.Name>() const { return m<member.Name>.c_str(); }
+inline EA::TDF::TdfString& get<member.Name>AsTdfString() { <classMarkSet()> return m<member.Name>; }
+inline const EA::TDF::TdfString& get<member.Name>AsTdfString() const { return m<member.Name>; }
+inline size_t get<member.Name>MaxStringLength() const { return <printTypeList(member.TypeRef.ActualScopedAttributes.SizeConstant)><if(!member.TypeRef.ActualScopedAttributes.GenConstant)> + 1<endif>; }
+inline void set<member.Name>(const char8_t* val) { <classMarkSet()> m<member.Name>.set(val); }
+>>
+
+classMemberGSVARIABLE() ::= <<
+<classMemberGetterSetterComment()>
+inline Tdf* get<member.Name>() { return m<member.Name>.get(); }
+inline const Tdf* get<member.Name>() const { return m<member.Name>.get(); }
+inline void set<member.Name>(EA::TDF::Tdf &val, EA::Allocator::ICoreAllocator& allocator EA_TDF_DEFAULT_ALLOCATOR_ASSIGN) { m<member.Name>.set(val); }
+inline void clear<member.Name>() { m<member.Name>.clear(); }
+>>
+
+classMemberGSGENERIC() ::= <<
+<classMemberGetterSetterComment()>
+inline EA::TDF::GenericTdfType& get<member.Name>() { return m<member.Name>; }
+inline const EA::TDF::GenericTdfType& get<member.Name>() const { return m<member.Name>; }
+inline void clear<member.Name>() { m<member.Name>.clear(); }
+>>
+
+
+classMemberGS_Struct() ::= "<classMemberGS_StructFullArgs(typeName={<printTypeRef(member)>})>"
+classMemberGS_StructFullArgs(typeName, doTypeDef) ::= <<
+<classMemberGetterSetterComment()>
+<if(doTypeDef)>typedef <printTypeRef(member)> <typeName>;<endif>
+<if(node.Parent.usePtrOption)>
+#if defined(TDF_USE_PTR) <usePtrHelper(node.Scope.FullNameList)>
+/*! **** DEPRECATED *****/
+<classMemberGS_StructInner(1)>
+#else
+
+<endif>
+<classMemberGS_StructInner()>
+<if(node.Parent.usePtrOption)>
+#endif
+<endif>
+>>
+
+// Would like print the protobuf list size caches separately but that is tricky with the typedef and the antlr stuff...so just putting it right next to getter/setter (similar to typedef stuff)
+classMemberGS_StructInner(isPtr) ::= <<
+<if(!member.IsConst)>
+inline <memberType()> get<member.Name>() {<if(member.TypeRef.Symbol.ActualCategoryBitField)> <classMarkSet()><endif> return <memberVar()>; }
+
+<endif>
+inline const <memberType()> get<member.Name>() const { return <memberVar()>; }
+<if(member.allowref)>
+/* set<member.Name>() - Sets a POINTER to the <printTypeRef(member)> reference provided. */
+/* This does NOT make a copy of the data.  Values passed into set<member.Name>() must persist for as long as this class does. */
+/* To copy data into this class, call val.copyInto( thisClass.get<member.Name>() ); instead. */
+inline void set<member.Name>(<if(member.IsConst)>const<endif> <printTypeRef(member)>& val) { m<member.Name>Ptr = const_cast\<<printTypeRef(member)>*\>(&val); }
+<endif>
+
+<if(member.TypeRef.Symbol.ActualCategoryList)>
+private:
+mutable int m<member.Name>_ProtobufCachedSize = 0;
+public:
+<endif>
+>>
+
+memberVar() ::= "<if(member.allowref)><if(!isPtr)>*<endif>m<member.Name>Ptr<else><if(isPtr)>&<endif>m<member.Name><endif>"
+memberType() ::= "<typeName><if(isPtr)>*<else>&<endif>"
+
+//////////////////////////////////////////////
+///////Class Member Define Helpers////////////
+//////////////////////////////////////////////
+
+classMemberDefHelper(member) ::= "<classMemberDefMap.(member.TypeRef.Symbol.ActualCategory)>"
+classMemberDefMap ::= [
+    "LIST"      : "<if(member.TypeRef.Symbol.CategoryTypedef)><classMemberDef({<printTypeRef(member)>})><else><classMemberDef({<listTypeNameFromMember()>})><endif>",
+    "MAP"       : "<if(member.TypeRef.Symbol.CategoryTypedef)><classMemberDef({<printTypeRef(member)>})><else><classMemberDef({<mapTypeNameFromMember()>})><endif>",
+    "VARIABLE"  : "EA::TDF::VariableTdfBase m<member.Name>;",
+    "GENERIC"  : "EA::TDF::GenericTdfType m<member.Name>;",
+    default     : "<classMemberDef({<printTypeRef(member)>})>"
+]
+
+classMemberDef(typeName) ::= <<
+<typeName> m<member.Name>;
+<if(member.allowref)>
+/* This m<member.Name>Ptr holds a reference to the value accessed by the get/set functions.  */
+/* It points to m<member.Name> by default, but may be changed by calling set<member.Name>(). */
+/* Since set<member.Name>() does not copy data, it is the calling code to maintain the data pointer to, for the lifespan of this class. */
+<typeName> *m<member.Name>Ptr;<endif>
+>>
+
+
+
+mapTypeNameFromMember() ::=  <<
+<member.Name; format="pascal">Map
+>>
+
+listTypeNameFromMember() ::=  <<
+<if(member.TypeRef.Symbol.ValueType.ActualCategoryString)>String<if(member.TypeRef.Symbol.ValueType.CategoryString)><member.Name><else><member.TypeRef.Symbol.ValueType.Name; format="pascal"><endif><elseif(member.TypeRef.Symbol.ValueType.CategoryBlob)>TdfBlob<else><member.TypeRef.Symbol.ValueType.Name; format="pascal"><endif>List
+>>
+
+//////////////////////////////////////////////
+/////////////Union Templates//////////////////
+//////////////////////////////////////////////
+
+
+union(node) ::= <<
+/*! ***************************************************************/
+/*! \class <node.Name>
+<if(node.description)>    \brief <node.description><endif>
+<if(node.details)>    <node.details><endif>
+
+    \nosubgrouping
+*******************************************************************/
+class <dllApiMacro()> <node.Name> : public <if(node.trackChanges)>EA_TDF_TRACK_CHANGES_BASE_CLASS_UNION()<else>EA::TDF::TdfUnion<endif><if(node.generateProto)>, public google::protobuf::Message <endif>
+{
+public:
+    <node.Defs:{<defineHelper(node=it)>};  separator="\n\n">
+
+    /*! ***************************************************************/
+    /*! \name Constructor/Destructor
+    *******************************************************************/
+    <node.Name>(EA::Allocator::ICoreAllocator& allocator EA_TDF_DEFAULT_ALLOCATOR_ASSIGN, const char8_t* debugMemName = EA_TDF_DEFAULT_ALLOC_NAME);
+#if EA_TDF_INCLUDE_COPY_CONSTRUCTOR
+    <node.Name>(const <node.Name>& rhs) : <if(node.trackChanges)>EA_TDF_TRACK_CHANGES_BASE_CLASS_UNION()<else>EA::TDF::TdfUnion<endif>(EA_TDF_GET_DEFAULT_ICOREALLOCATOR, nullptr) { rhs.copyInto(*this); }
+    <node.Name>& operator=(const <node.Name>& rhs) { rhs.copyInto(*this); return *this; }
+#endif
+  
+    typedef enum { MEMBER_<first(node.SortedMembers).Name; format="tu"> = 0<rest(node.SortedMembers):{, MEMBER_<it.Name>}; format="tu"><if(node.SortedMembers)>, <endif>MEMBER_UNSET = INVALID_MEMBER_INDEX } Member;
+    static const size_t TDF_MEMBER_COUNT = <length(node.SortedMembers)>;
+
+    <node.Members:{static const uint32_t TAG_<it.Name;format="toUpper"> = <it.TagValue;format="hex">;}; separator="\n">
+    
+    <node.Members:unionMemberGSHelper(member=it); separator="\n\n">
+
+    /*! ***************************************************************/
+    /*! \name getActiveMember
+    *******************************************************************/
+    inline Member getActiveMember() const { return (Member) getActiveMemberIndex(); }
+   
+    /*! ***************************************************************/
+    /*! \brief Replicate a (deep copy) of this object into the given object.
+
+        \param newObj the object to copy all of this object's data into
+    *******************************************************************/
+    inline void copyInto(<node.Name>& newObj, const EA::TDF::MemberVisitOptions& options = EA::TDF::MemberVisitOptions()) const
+    {
+        EA::TDF::TdfUnion::copyInto(newObj, options);
+    }
+
+    const EA::TDF::TypeDescriptionClass& getClassInfo() const override;
+    static const EA::TDF::TdfId TDF_ID = (EA::TDF::TdfId)<node.tdfid; format="hex">;
+
+<if(!node.tdfIdRegistration)>
+#if EA_TDF_REGISTER_ALL<\n>
+<endif>
+    static EA::TDF::TypeRegistrationNode REGISTRATION_NODE;  
+<if(!node.tdfIdRegistration)>
+#endif
+<endif>    
+
+    
+/*! \cond INTERNAL_DOCS */
+private:
+<if(node.allocInPlace)>
+    union MemberUnion
+    {
+        <node.Members:{member|char8_t m<member.Name; format="pascal">[sizeof(<printTypeRef(member)>)];}; separator="\n">
+    };
+
+    EA_ALIGNED(char8_t, mBuffer[sizeof(MemberUnion)+1], EA_PLATFORM_PTR_SIZE);
+
+<endif>
+#if !EA_TDF_INCLUDE_COPY_CONSTRUCTOR
+    <node.Name>(const <node.Name>& rhs);
+    <node.Name>& operator=(const <node.Name>& rhs);
+#endif
+/*! \endcond*/
+
+    friend struct EA::TDF::TypeDescriptionSelector\<<node.Name>\>;
+
+<if(node.Members)>
+    static const EA::TDF::TdfMemberInfo TDF_MEMBER_INFO[TDF_MEMBER_COUNT];
+<endif>
+
+<if(node.generateProto)>
+<ProtobufMessageInterface(node)>
+    //+ Special members for Protobuf oneof
+    void clear_u();
+    //-
+<endif>
+
+};
+typedef EA::TDF::tdf_ptr\<<node.Name>\> <node.Name>Ptr;
+>>
+
+//////////////////////////////////////////////
+/////////////Union Get/Set Helpers////////////
+//////////////////////////////////////////////
+
+
+
+unionMemberGSHelper(member) ::= "<unionMemberGSMap.(member.TypeRef.Symbol.ActualCategory)>"
+unionMemberGSMap ::= [
+    "INT_PRIMITIVE"     :   "<unionMemberGSPRIMITIVE()>",
+    "FLOAT_PRIMITIVE"   :   "<unionMemberGSPRIMITIVE()>",
+    "ENUM"              :   "<unionMemberGSPRIMITIVE()>",
+    "TIMEVALUE"         :   "<unionMemberGSREFERENCE()>",
+    "STRING"            :   "<unionMemberGSSTRING()>",
+    "OBJECT_TYPE"       :   "<unionMemberGS_Struct(typeName={<printTypeRef(member)>}, setByAssign={true})>",
+    "OBJECT_ID"         :   "<unionMemberGS_Struct(typeName={<printTypeRef(member)>}, setByAssign={true})>",
+    "LIST"              :   "<if(member.TypeRef.Symbol.CategoryTypedef)><unionMemberGS_Struct(typeName={<printTypeRef(member)>})><else><unionMemberGS_Struct(typeName={<listTypeNameFromMember()>}, doTypeDef=1)><endif>",
+    "MAP"               :   "<if(member.TypeRef.Symbol.CategoryTypedef)><unionMemberGS_Struct(typeName={<printTypeRef(member)>})><else><unionMemberGS_Struct(typeName={<mapTypeNameFromMember()>}, doTypeDef=1)><endif>",
+    default             :   "<unionMemberGS_Struct(typeName={<printTypeRef(member)>})>"
+]
+
+unionMemberGSPRIMITIVE() ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name>
+<if(member.description)>    \brief <member.description><endif>
+*******************************************************************/
+inline <printTypeRef(member)> get<member.Name>() const { EA_ASSERT((getActiveMemberIndex() == MEMBER_<member.Name; format="tu">)); return *reinterpret_cast\<<printTypeRef(member)>*\>(mValue.asAny()); }
+void set<member.Name>(const <printTypeRef(member)>& val) { switchActiveMember(MEMBER_<member.Name; format="tu">); mValue.set(val); }
+>>
+
+unionMemberGSREFERENCE() ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name>
+<if(member.description)>    \brief <member.description><endif>
+*******************************************************************/
+inline <printTypeRef(member)>& get<member.Name>() { <if(node.trackChanges)>EA_TDF_UNION_MARK_SET();<endif> EA_ASSERT((getActiveMemberIndex() == MEMBER_<member.Name; format="tu">)); return *reinterpret_cast\<<printTypeRef(member)>*\>(mValue.asAny()); }
+inline const <printTypeRef(member)>& get<member.Name>() const { EA_ASSERT((getActiveMemberIndex() == MEMBER_<member.Name; format="tu">)); return *reinterpret_cast\<const <printTypeRef(member)>*\>(mValue.asAny()); }
+void set<member.Name>(const <printTypeRef(member)>& val) { switchActiveMember(MEMBER_<member.Name; format="tu">); mValue.set(val); }
+>>
+
+unionMemberGSSTRING() ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name>
+<if(member.description)>    \brief <member.description><endif>
+*******************************************************************/
+const char8_t* get<member.Name>() const { return (getActiveMemberIndex() == MEMBER_<member.Name; format="tu">) ? mValue.asString().c_str() : nullptr; }
+inline EA::TDF::TdfString& get<member.Name>AsTdfString() { <if(node.trackChanges)>EA_TDF_UNION_MARK_SET();<endif> EA_ASSERT((getActiveMemberIndex() == MEMBER_<member.Name; format="tu">)); return mValue.asString(); }
+inline const EA::TDF::TdfString& get<member.Name>AsTdfString() const { EA_ASSERT((getActiveMemberIndex() == MEMBER_<member.Name; format="tu">)); return mValue.asString(); }
+inline size_t get<member.Name>MaxStringLength() const { return <member.TypeRef.ActualScopedAttributes.SizeConstant><if(!member.TypeRef.ActualScopedAttributes.GenConstant)> + 1<endif>; }
+void set<member.Name>(const char8_t* val) { switchActiveMember(MEMBER_<member.Name; format="tu">); mValue.set(val); }
+>>
+
+unionMemberGS_Struct(typeName, setByAssign, doTypeDef) ::= <<
+/*! ***************************************************************/
+/*! \name <member.Name>
+<if(member.description)>    \brief <member.description><endif>
+*******************************************************************/
+<if(doTypeDef)>typedef <printTypeRef(member)> <typeName>;<endif>
+<if(!member.IsConst)>
+<typeName>* get<member.Name>() { <if(node.trackChanges)>EA_TDF_UNION_MARK_SET();<endif> return (getActiveMemberIndex() == MEMBER_<member.Name; format="tu">) ? reinterpret_cast\<<typeName>*\>(mValue.asAny()) : nullptr; }
+
+<endif>
+const <typeName>* get<member.Name>() const { return (getActiveMemberIndex() == MEMBER_<member.Name; format="tu">) ? reinterpret_cast\<<typeName>*\>(mValue.asAny()) : nullptr; }
+void set<member.Name>(const <typeName><if(setByAssign)>&<else>*<endif> val) { switchActiveMember(MEMBER_<member.Name; format="tu">); <if(setByAssign)>mValue.set(val);<else>if (val != nullptr) mValue.set(*val);<endif> }
+>>
+
+
+//////////////////////////////////////////////
+/////////////Post Define Helpers//////////////
+//////////////////////////////////////////////
+
+
+postDefineHelper(node) ::= "<if(node.Category)><({postDefine<node.Category>})()><elseif(node.Filename)><else><postDefineNamespace(node=node)><endif>"
+postDefineNamespace(node) ::= "<node.Defs:{<postDefineHelper(node=it)>};  separator=\"\">"
+postDefineENUM() ::= <<
+template \<\> 
+struct TypeDescriptionSelector\<<printTypeRefFullScope(node.TypeRef)>\>
+{
+    static const EA::TDF::TypeDescriptionEnum& get() 
+{
+        static EA::TDF::TdfEnumInfo enumInfo[<length(node.Members)>] = {
+           <node.Members:{EA::TDF::TdfEnumInfo(<if(it.nameoverride)>"<it.nameoverride>"<else>"<it.Name>"<endif>, (int32_t)<printTypeRefFullScope(it)>)}; separator=",\n">
+        };
+        static EA::TDF::TypeDescriptionEnum result(enumInfo, <length(node.Members)>, <node.tdfid; format="hex">, "<printTypeRefFullScope(node)>"); 
+        return result; 
+}
+};
+
+>>
+postDefineBITFIELD() ::= <<
+template \<\> 
+struct TypeDescriptionSelector\<<printTypeRefFullScope(node.TypeRef)>\>
+{
+    static const EA::TDF::TypeDescriptionBitfield& get()
+    {
+        static EA::TDF::TypeDescriptionBitfieldMember bitfieldMembers[<length(node.Members)>] = {
+            <node.Members:{EA::TDF::TypeDescriptionBitfieldMember("<it.Name>", <it.BitSize>, <it.Bool>, <it.BitStart>, <it.BitMask; format="hex">)}; separator=",\n">
+        };
+<if(node.tdfIdRegistration)>
+        static const EA::TDF::TypeDescriptionBitfield result(&EA::TDF::TdfBitfield::createBitfield\<<node.TypeRef>\>, bitfieldMembers, <length(node.Members)>, <node.tdfid; format="hex">, "<printTypeRefFullScope(node)>");
+
+<else>
+#if EA_TDF_REGISTER_ALL<\n>
+        static const EA::TDF::TypeDescriptionBitfield result(&EA::TDF::TdfBitfield::createBitfield\<<node.TypeRef>\>, bitfieldMembers, <length(node.Members)>, <node.tdfid; format="hex">, "<printTypeRefFullScope(node)>");
+#else
+#if EA_TDF_THREAD_SAFE_TYPEDESC_INIT_ENABLED
+       EA::Thread::AutoMutex mMutex(EA::TDF::TypeDescription::mTypeDescInitializationMutex);
+#endif
+        static const EA::TDF::TypeDescriptionBitfield result(&EA::TDF::TdfBitfield::createBitfield\<<node.TypeRef>\>, bitfieldMembers, <length(node.Members)>, <node.tdfid; format="hex">, "<printTypeRefFullScope(node)>");
+#endif
+
+<endif>
+        return result; 
+    }
+};
+
+
+>>
+postDefineCLASS() ::= <<
+<if(!node.IsFwdDecl)>
+<node.Defs:{<postDefineHelper(node=it)>};  separator="">
+template \<\> 
+struct TypeDescriptionSelector\<<printTypeRefFullScope(node.TypeRef)>\>
+{
+    static const EA::TDF::TypeDescriptionClass& get() 
+    {
+<if(node.tdfIdRegistration)>
+       static const EA::TDF::TypeDescriptionClass result(EA::TDF::TDF_ACTUAL_TYPE_TDF, <printTypeRefFullScope(node)>::TDF_ID, "<node.Name>", "<printTypeRefFullScope(node)>", (EA::TDF::TdfCreator) &EA::TDF::Tdf::createInstance\<<printTypeRefFullScope(node)>\>, <if(node.Members)><printTypeRefFullScope(node)>::TDF_MEMBER_INFO, <printTypeRefFullScope(node)>::TDF_MEMBER_COUNT<else>nullptr, 0<endif>, &<printTypeRefFullScope(node)>::REGISTRATION_NODE);<\n>
+<else>
+#if EA_TDF_REGISTER_ALL<\n>
+       static const EA::TDF::TypeDescriptionClass result(EA::TDF::TDF_ACTUAL_TYPE_TDF, <printTypeRefFullScope(node)>::TDF_ID, "<node.Name>", "<printTypeRefFullScope(node)>", (EA::TDF::TdfCreator) &EA::TDF::Tdf::createInstance\<<printTypeRefFullScope(node)>\>, <if(node.Members)><printTypeRefFullScope(node)>::TDF_MEMBER_INFO, <printTypeRefFullScope(node)>::TDF_MEMBER_COUNT<else>nullptr, 0<endif>, &<printTypeRefFullScope(node)>::REGISTRATION_NODE);<\n>
+#else
+#if EA_TDF_THREAD_SAFE_TYPEDESC_INIT_ENABLED
+       EA::Thread::AutoMutex mMutex(EA::TDF::TypeDescription::mTypeDescInitializationMutex);
+#endif
+       static const EA::TDF::TypeDescriptionClass result(EA::TDF::TDF_ACTUAL_TYPE_TDF, <printTypeRefFullScope(node)>::TDF_ID, "<node.Name>", "<printTypeRefFullScope(node)>", (EA::TDF::TdfCreator) &EA::TDF::Tdf::createInstance\<<printTypeRefFullScope(node)>\>, <if(node.Members)><printTypeRefFullScope(node)>::TDF_MEMBER_INFO, <printTypeRefFullScope(node)>::TDF_MEMBER_COUNT<else>nullptr, 0<endif>, nullptr);<\n>
+#endif
+
+<endif>
+       return result; 
+    }
+};
+
+<elseif(node.baseTdf)>
+template \<\> 
+struct TypeDescriptionSelector\<<printTypeRefFullScope(node.TypeRef)>\>
+{
+    static const EA::TDF::TypeDescriptionClass& get() 
+    {
+       return EA::TDF::TypeDescriptionSelector\<<printTypeRefFullScope(node.baseTdf)>\>::get();
+    }
+};
+
+<endif>
+>>
+postDefineUNION() ::= <<
+<node.Defs:{<postDefineHelper(node=it)>};  separator="">
+template \<\> 
+struct TypeDescriptionSelector\<<printTypeRefFullScope(node.TypeRef)>\>
+{
+    static const EA::TDF::TypeDescriptionClass& get() 
+    {
+<if(node.tdfIdRegistration)>
+       static const EA::TDF::TypeDescriptionClass result(EA::TDF::TDF_ACTUAL_TYPE_UNION, <printTypeRefFullScope(node)>::TDF_ID, "<node.Name>", "<printTypeRefFullScope(node)>", (EA::TDF::TdfCreator) &EA::TDF::Tdf::createInstance\<<printTypeRefFullScope(node)>\>, <if(node.Members)><printTypeRefFullScope(node)>::TDF_MEMBER_INFO, <printTypeRefFullScope(node)>::TDF_MEMBER_COUNT<else>nullptr, 0<endif>, &<printTypeRefFullScope(node)>::REGISTRATION_NODE);<\n>
+<else>
+#if EA_TDF_REGISTER_ALL<\n>
+       static const EA::TDF::TypeDescriptionClass result(EA::TDF::TDF_ACTUAL_TYPE_UNION, <printTypeRefFullScope(node)>::TDF_ID, "<node.Name>", "<printTypeRefFullScope(node)>", (EA::TDF::TdfCreator) &EA::TDF::Tdf::createInstance\<<printTypeRefFullScope(node)>\>, <if(node.Members)><printTypeRefFullScope(node)>::TDF_MEMBER_INFO, <printTypeRefFullScope(node)>::TDF_MEMBER_COUNT<else>nullptr, 0<endif>, &<printTypeRefFullScope(node)>::REGISTRATION_NODE);<\n>
+#else
+#if EA_TDF_THREAD_SAFE_TYPEDESC_INIT_ENABLED
+       EA::Thread::AutoMutex mMutex(EA::TDF::TypeDescription::mTypeDescInitializationMutex);
+#endif
+       static const EA::TDF::TypeDescriptionClass result(EA::TDF::TDF_ACTUAL_TYPE_UNION, <printTypeRefFullScope(node)>::TDF_ID, "<node.Name>", "<printTypeRefFullScope(node)>", (EA::TDF::TdfCreator) &EA::TDF::Tdf::createInstance\<<printTypeRefFullScope(node)>\>, <if(node.Members)><printTypeRefFullScope(node)>::TDF_MEMBER_INFO, <printTypeRefFullScope(node)>::TDF_MEMBER_COUNT<else>nullptr, 0<endif>, nullptr);<\n>
+#endif
+
+<endif>
+       return result; 
+    }
+};
+
+
+>>
+postDefineCONST() ::= ""
+postDefineTYPEDEF() ::= ""
+postDefineNAMESPACE() ::="<postDefineNamespace(...)>"
+postDefineCUSTOM_ATTRIBUTE() ::=  ""

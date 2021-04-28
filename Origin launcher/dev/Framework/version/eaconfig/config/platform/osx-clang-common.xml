@@ -1,0 +1,267 @@
+<!--
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <include file="osx-common.xml"/>
+
+  <optionset name="config-options-common">
+    <option name="postprocess">
+      osx-postprocess
+    </option>
+    <option name="buildset.cc.includedirs">
+      ${option.value}
+      ${cc.includedirs??}
+    </option>
+    <option name="buildset.cc.system-includedirs">
+      ${option.value}
+      ${cc.system-includedirs}
+    </option>
+    <option name="buildset.cc.defines">
+      ${option.value}
+      ${valgrind-define}
+      ${cc.common-defines}
+    </option>
+    <option name="buildset.cc.options">
+      ${option.value}
+      ${cc.common-options}
+      -Wno-deprecated-register
+    </option>
+    <option name="liboutputname" value="%outputdir%/${lib-prefix}%outputname%${lib-suffix}" />
+    <option name="buildset.lib.options">
+      ${lib.common-options}
+    </option>
+    <option name="buildset.link.options">
+      ${option.value}
+      ${link.common-options}
+      -lc++
+      -weak_framework Foundation
+      -weak_framework QuartzCore
+      -weak_framework IOKit
+      -weak_framework IOSurface
+      -weak_framework AppKit
+      -weak_framework Security
+      -weak_framework AudioToolBox
+      -weak_framework CoreServices
+      ${osx-extra-frameworks??}
+      -lpthread
+    </option>
+  </optionset>
+
+  <!-- Copy link.librarydirs from gcc proxy/non-proxy, so that GeneateBuildOptionSet will copy it to created build optionset -->
+  <optionset name="config-options-program">
+    <option name="clanguage" value="off"/>
+    <option name="buildset.link.librarydirs">
+      ${link.system-librarydirs}
+    </option>
+    <option name="buildset.link.libraries">
+      ${link.system-libs}
+    </option>
+    <option name="linkoutputname"    value="%outputdir%/%outputname%${exe-suffix}" />
+    <option name="linkoutputmapname" value="%outputdir%/%outputname%.map" />
+    <option name="postbuildtarget">
+      ${option.value}
+      copy-asset-files.osx
+    </option>
+  </optionset>
+  
+  <optionset name="config-options-library">
+    <option name="clanguage" value="off"/>
+    <option name="liboutputname" value="%outputdir%/${lib-prefix}%outputname%${lib-suffix}" />
+    <option name="buildset.lib.options">
+      ${option.value}
+      ${lib.common-options}
+    </option>
+  </optionset>
+
+  <optionset name="config-options-dynamiclibrary" >
+    <option name="generatedll"                          value="on" />
+    <option name="clanguage" value="off"/>
+    <option name="buildset.name"                        value="DynamicLibrary" />
+    <option name="buildset.tasks"                       value="asm cc link" />
+    <option name="buildset.cc.defines">
+      ${option.value}
+      EA_DLL
+    </option>
+    <option name="buildset.link.librarydirs">
+      ${link.system-librarydirs}
+    </option>
+    <option name="buildset.link.libraries">
+      ${link.system-libs}
+    </option>
+    <option name="linkoutputname"     value="%outputdir%/${lib-prefix}%outputname%${dll-suffix}" />
+    <option name="impliboutputname"   value="%outputdir%/${lib-prefix}%outputname%${dll-suffix}"/>
+  </optionset>
+
+  <!-- 
+  The old optionset are still needed to have enable_objc_arc either not set or explicitly turned off 
+  because old code using this optionset may not properly handle -fobjc_arc build option. 
+  -->
+  <optionset name="config-options-osxcpplibrary" fromoptionset="config-options-library">
+    <option name="clanguage" value="off"/>
+    <option name="buildset.name" value="OSXCPPLibrary"/>
+    <option name="buildset.cc.options">
+      ${option.value}
+      -x c++
+    </option>
+  </optionset>
+
+  <optionset name="config-options-osxobjclibrary" fromoptionset="config-options-library">
+    <option name="buildset.name" value="ObjectiveCLibrary"/>
+    <option name="cc.cpp11" value="off"/>
+    <option name="clanguage" value="on"/>
+    <option name="objective_c_cpp" value="on"/>
+    <option name="buildset.cc.options">
+      ${option.value}
+      -x objective-c
+    </option>
+  </optionset>
+
+  <!-- 
+  The followings are defined to match what is added to new ios_config with same builtset name that
+  adds build option enable_objc_arc (ie -fobjc-arc) set default.
+  Application of the -fobjc-arc compiler and linker flag is done in osx-clang-generate-options.cs file!
+  -->
+  <optionset name="config-options-osx.objective.cpp.library" fromoptionset="config-options-library">
+    <option name="clanguage" value="off"/>
+    <option name="objective_c_cpp" value="on"/>
+    <option name="buildset.name" value="ObjCppLibrary"/>
+    <option name="buildset.cc.options">
+      ${option.value}
+      -x objective-c++
+    </option>
+    <option name="enable_objc_arc"  value="on" if="${osx.enable_objc_arc??true}"/>
+    <option name="enable_objc_arc"  value="off" unless="${osx.enable_objc_arc??true}"/>
+  </optionset>
+
+  <optionset name="config-options-osx.objective.c.library" fromoptionset="config-options-library">
+    <option name="cc.cpp11" value ="off"/>
+    <option name="clanguage" value="on"/>
+    <option name="objective_c_cpp" value="on"/>
+    <option name="buildset.name" value="ObjCLibrary"/>
+    <option name="buildset.cc.options">
+      ${option.value}
+      -x objective-c
+    </option>
+    <option name="enable_objc_arc"  value="on" if="${osx.enable_objc_arc??true}"/>
+    <option name="enable_objc_arc"  value="off" unless="${osx.enable_objc_arc??true}"/>
+  </optionset>
+
+  <optionset name="config-options-osx.console.program" fromoptionset="config-options-program">
+    <option name="osx-console" value ="on"/>
+    <option name="buildset.name" value="OsxConsoleProgram"/>
+  </optionset>
+
+  <optionset name="config-options-osx.c.console.program" fromoptionset="config-options-program">
+    <option name="osx-console" value ="on"/>
+    <option name="cc.cpp11" value ="off"/>
+    <option name="clanguage" value="on"/>
+    <option name="buildset.name" value="OsxCConsoleProgram"/>
+  </optionset>
+
+  <optionset name="config-options-osx.objective.cpp.program" fromoptionset="config-options-program">
+    <option name="clanguage" value ="off"/>
+    <option name="objective_c_cpp" value="on"/>
+    <option name="buildset.name" value="ObjCppProgram"/>
+    <option name="buildset.cc.options">
+      ${option.value}
+      -x objective-c++
+    </option>
+    <option name="enable_objc_arc"  value="on" if="${osx.enable_objc_arc??true}"/>
+    <option name="enable_objc_arc"  value="off" unless="${osx.enable_objc_arc??true}"/>
+  </optionset>
+
+  <optionset name="config-options-osx.objective.c.program" fromoptionset="config-options-program">
+    <option name="cc.cpp11" value ="off"/>
+    <option name="clanguage" value ="on"/>
+    <option name="objective_c_cpp" value="on"/>
+    <option name="buildset.name" value="ObjCProgram"/>
+    <option name="buildset.cc.options">
+      ${option.value}
+      -x objective-c
+    </option>
+    <option name="enable_objc_arc"  value="on" if="${osx.enable_objc_arc??true}"/>
+    <option name="enable_objc_arc"  value="off" unless="${osx.enable_objc_arc??true}"/>
+  </optionset>
+
+  <optionset name="config-options-osx.objective.cpp.console.program" fromoptionset="config-options-osx.objective.cpp.program">
+      <option name="osx-console" value ="on"/>
+      <option name="buildset.name" value="OsxObjCppConsoleProgram"/>
+  </optionset>
+
+  <optionset name="config-options-osx.objective.c.console.program" fromoptionset="config-options-osx.objective.c.program">
+      <option name="osx-console" value ="on"/>
+      <option name="buildset.name" value="OsxObjCConsoleProgram"/>
+  </optionset>
+
+	<optionset name="config-options-osx.objective.cpp.appextension" fromoptionset="config-options-program">
+		<option name="buildset.name" value="ObjCppAppExtension"/>
+		<option name="app-extension" value="on"/>
+		<option name="clanguage" value ="off"/>
+		<option name="objective_c_cpp" value="on"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x objective-c++
+		</option>
+		<option name="buildset.link.options">
+			${option.value}
+			-e _NSExtensionMain
+			-fobjc-link-runtime
+			-Xlinker -rpath -Xlinker @executable_path/../Frameworks
+		</option>
+		<option name="enable_objc_arc"  value="on" if="${osx.enable_objc_arc??true}"/>
+		<option name="enable_objc_arc"  value="off" unless="${osx.enable_objc_arc??true}"/>
+	</optionset>
+
+	<optionset name="config-options-osx.objective.c.appextension" fromoptionset="config-options-program">
+		<option name="buildset.name" value="ObjCAppExtension"/>
+		<option name="app-extension" value="on"/>
+		<option name="cc.cpp11" value ="off"/>
+		<option name="clanguage" value ="on"/>
+		<option name="objective_c_cpp" value="on"/>
+		<option name="buildset.cc.options">
+			${option.value}
+			-x objective-c
+		</option>
+		<option name="buildset.link.options">
+			${option.value}
+			-e _NSExtensionMain
+			-fobjc-link-runtime
+			-Xlinker -rpath -Xlinker @executable_path/../Frameworks
+		</option>
+		<option name="enable_objc_arc"  value="on" if="${osx.enable_objc_arc??true}"/>
+		<option name="enable_objc_arc"  value="off" unless="${osx.enable_objc_arc??true}"/>
+	</optionset>
+
+	<!-- The old optionset need to have enable_objc_arc explicitly turned off as old code using this optionset may not properly handle -fobjc_arc build option. -->
+	<optionset name="config-options-osxobjcpplibrary" fromoptionset="config-options-osx.objective.cpp.library">
+		<option name="buildset.name" value="ObjectiveCPPLibrary"/>
+		<option name="enable_objc_arc"  value="off"/>
+	</optionset>
+
+  <optionset name="osx.buildoptionsets">
+    <option name="config-options-osxobjcpplibrary" value="ObjectiveCPPLibrary"/>
+    <option name="config-options-osxcpplibrary" value="OSXCPPLibrary"/>
+    <option name="config-options-osxobjclibrary" value="ObjectiveCLibrary"/>
+    <option name="config-options-osx.console.program" value="OsxConsoleProgram"/>
+    <option name="config-options-osx.c.console.program" value="OsxCConsoleProgram"/>
+    <option name="config-options-osx.objective.cpp.library" value="ObjCppLibrary"/>
+    <option name="config-options-osx.objective.c.library" value="ObjCLibrary"/>
+    <option name="config-options-osx.objective.cpp.program" value="ObjCppProgram"/>
+    <option name="config-options-osx.objective.c.program" value="ObjCProgram"/>
+    <option name="config-options-osx.objective.cpp.console.program" value="OsxObjCppConsoleProgram"/>
+    <option name="config-options-osx.objective.c.console.program" value="OsxObjCConsoleProgram"/>
+    <option name="config-options-osx.objective.cpp.appextension" value="ObjCppAppExtension"/>
+    <option name="config-options-osx.objective.c.appextension" value="ObjCAppExtension"/>
+  </optionset>
+
+  <!-- Clear properties that are already appended to the optionset-->
+  <property name="cc.options" />
+  <property name="cc.defines" />
+  <property name="cc.includedirs"/>
+  <property name="link.options"/>
+  <property name="link.libraries"/>
+  <property name="link.librarydirs"/>
+  <property name="lib.options"/>
+
+</project>

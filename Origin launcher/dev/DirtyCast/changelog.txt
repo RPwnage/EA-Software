@@ -1,0 +1,3088 @@
+EADP Game Services DirtyCast Server 15.1.7.0.2 - April 20, 2021
+    BufferedSocket
+        Moved integration with TcpMetrics module from BufferedSockets to VoipGameServer/GameServer to migrate
+        from a "1 Netlink socket to 1 INET socket pattern" to a "1 Netlink socket per process pattern".
+
+        Enhanced implementation to now cache internally source port and destination port of the underlying TCP sockets.
+        For server sockets (created with accept()), the info is cache as soon as BufferSocketOpen() is executed. For
+        client sockets (created with connect()), the info is case as soon as BufferSocketInfo('stat') is executed and
+        returns 'connected'.
+
+        Added BufferedSocketInfo('dstp') and BuffereSocketInfo('srcp') to query destination port and source port
+        associated underlying tcp socket.
+
+        Added BufferedSocketControl('rcvq') and BuffereSocketControl('sndq') to pass in newly sampled recv/send
+        buffered size for the underlying tcp socket. Sampling done externally via TcpMetrics module.
+
+    Build
+        Removed the #have in the changelist generation. We have moved to using jenkins to generate our images and
+        builds. Given that it always builds at tip at the time, there is no need to keep the #have there. The #have
+        changelist doesn't work correctly with jenkins with causes it to not generate the changelist properly.
+
+        Fixed unneeded regenerations of the version file on docker by switch the auto-generated host name with "docker".
+        Each build with docker changes the hostname to an auto-generated hash. Instead of using that we will use the
+        "docker" to signal it was a docker based build. In this case, the hostname isn't important as we know that we
+        are using a consistent building environment.
+
+    Cloud Pods (ALL)
+        Changed the scripts to be able to specify the modes of operation you want to build. In certain branches we don't
+        want to build the images for each operating mode. For example FIFA/Madden/NHL don't need build images for QoS or
+        CC.
+
+        Changed the build image to create an account that runs on the same account as the user who invokes the build to
+        prevent files on the filesystem being owned by root. There was trouble with maintaining the build boxes because
+        there were many files owned by root requiring us to blow away folders after the build is complete. To avoid
+        having to do this we make it so the build pipeline can pass in the current user information so that the
+        container can create files that will be owned by the current user.
+
+    Cloud Pods (OTP)
+        Updated the parsing of input parameters from the gameserver_launch.sh to align with the VS does. We don't want
+        to try to figure out any defaults in the script. If the chart doesn't provide an override then we don't take
+        any overrides. If the default needs to change it can just be changed directly in the script.
+
+        Changing the gameserver to run 70 containers to running 1 container with 70 processes. The high density of
+        containers has caused us trouble when scaling down instances. Using the 1 container for all the processes was
+        one of our initial options but we didn't put much thought into until now.
+
+    Cloud Pods (QoS Server)
+        Changed the QoS server startup script to use ip instead of hostname, which is advertised to the
+        coordinator/clients, like we have been doing on BM for quite some time. Having the client do too many DNS
+        lookups at once has caused failures on ps4.
+
+    CommonMetrics
+        Added new sdkver dimension to voipmetrics.server.cores metric.
+
+    ConciergeDiagnostic
+        Added "CCS status" to the diagnostic info printed for "/status"
+
+        Changed pod state strings in _VoipServer_strProcessStates[] from capital letters to lower-case letters such
+        that states get displayed in lower case in the diagnostic page (for consistency with other status info
+        in that page).
+
+        Changed implementation of _VoipConciergeDiagnosticQueryConnSet() when building with DirtySDK 15.1.7.0.1 and
+        beyond such that iNumTalkers and topology-related send mask are now retrieved from the game-specific mapping
+        instead of the VoipTunnelClientT structure.
+
+    ConciergeMetrics
+        Added new voipmetrics.ccs.status conveying a boolean 1 (server is online - known to CCS),
+        0 (server is offline - unknown to CCS).
+
+        Fixed the TODO relating to the tracking of products by never removing products from the data structure. The old
+        system worked by reporting inactive products from a temporary copy of the last product list reported that were
+        removed. We kept a fixed size map on the metrics side which will stop working if the source map size grows
+        larger than 64. After some analysis it was clear that we shouldn't remove products from the map and just
+        continue to report them as zero clients. We don't save much memory by removing the products from the map and
+        just reporting zero is consistent to how other metrics are being reported.
+
+    ConciergeService
+        Added ConciergeServiceRefT::eCcsStatus that can have value 'offline' (unknown to CCS) or 'online' (known to
+        CCS). Status goes offline if registration/heartbeat has been failing for more than 1 min.
+
+        Removed ConciergeServiceRefT::bRegistered value because its meaning overlapped with
+        ConciergeServiceRefT::strPingSite[] being initialized or not.  It also got misused starting with fix for
+        GOS-32408  (it was not meant to be reset after being set).
+
+        Enhanced implementation to now trigger asynchronous token acquisition from a unique location (supporting
+        both initial registration and subsequent heartbeats)
+
+        Added ConciergeServiceStatus('offl') that can be used by external code to query whether the CCS status is
+        'offline' (unknown to CCS) or not.
+
+        Added new variables to manage validity of cached token and eliminated the usage of an "extended expiration
+        period" to drive the token acquisition retries.
+
+    GameServer
+        Moved integration with TcpMetrics module from BufferedSockets to VoipGameServer/GameServer to migrate
+        from a "1 Netlink socket to 1 INET socket pattern" to a "1 Netlink socket per process pattern".
+
+    GameServerDiagnostic
+        Changed implementation of _VoipServerDiagnosticGameServerCurGame() when building with DirtySDK 15.1.7.0.1
+        and beyond such that GameInfo.VoipSessionInfo.uVoiceDataDropMetric is used instead of
+        GameInfo.uVoiceDataDropMetric.
+
+    GameServerNetworkAdapter
+        Fixed a bug where we are passing in the wrong config parameter. GameServerLinkCreate expects redundancy timeout
+        but instead we were passing redundancy period. This is causing the redundancy to stay active longer than
+        expected.
+
+    GameServerOiMetrics
+        Added parameter pLink to GameServerOiMetricsCallback(), GameServerOiMetricsHandler, and all function prototypes. 
+        
+        Added metrics handlers for _GameServerOiMetricsLatency, _GameServerOiMetricsLocalPacketLoss, and 
+        _GameServerOiMetricsRemotePacketLoss. 
+        
+        Changed GameServerOiAccumulatorT values now be a union supporting either uint64_t or float values.
+        These changes will allow us to see the percentiles for packetloss and latency on the Grafana graphs.
+
+    RestApi
+        Added new _RestApiCompleteCb() static function used as the ProtoHttpServCleanupCbT callback registered with
+        protohttpserv.
+
+        Added new RestApiCompleteCbT callback exercised from restapi to give a chance to higher level code to free
+        resources associated with http req/resp transaction when it completes or when it is abandoned.
+
+        Added new RestApiCallback() function for registering the new RestApiCompleteCbT callback.
+
+    ServerMetrics
+        Changed ServerMetricsFormatEx() to take additional parameter eValuesType and to change existing parameter 
+        pMetricValues to become a void pointer. 
+        
+        Added SERVERMETRICS_ERR_UNSUPPORTED_VALUETYPE, ServerMetricsValuesE enum, and _ServerMetricsWriteMetric(). 
+
+    TokenApi
+         Fixed logging of the cert validity as in certain instances we were the to date being put in the from date by
+         using two buffers.
+
+    TcpMetrics
+        Refactored usage of TcpMetrics to work around high cost of send operations on netlink socket impacting
+        server's main loop. Experimentation showed that sendto() or sendmsg() on a message-oriented non-blocking
+        NETLINK socket takes > 500 us. Note: recvmsg() is significantly less costly: < 10 us - no good
+        explanation at the moment about why send is so costl, but it's a fact. For the voipserver specifically:
+        Previous implementation implied a single netlink socket per buffered socket (one per gameserver).
+        Every one second, the voipserver would perform sendmsg() on each one of these netlink sockets resulting
+        in 70 long send operations all done in the same update loop. Moreover, because the request message is
+        formatted to request socket info for sockets bound to the port that the voipserver listens on (regardless
+        of what the dest port of the associated tcp connection was), the kernel would reply with 71 responses
+        since the listening sockets and the sockets created with accept() are all locally bound to the same port
+        (the dest port of the associated tcp connection is what distinguish them) resulting in 70 times the same
+        71 responses from the kernel, i.e. a total of 4970 messages with duplicated information. The new
+        implementation is now using a single netlink socket per voipserver, and it aims at sending only on
+        such request per second expecting 71 responses back only for that request, thus limiting the costly send
+        operation to one per metric update cycle... and eliminating the duplicated response messages.
+            * Added uSrcPort and uDstPort o TcpMetricsT.
+            * Added new prototype for event callback: TcpMetricsCbT
+            * Added new pCallback parameter to TcpMetricsSocketOpen()
+            * Added bind() call after socket() call when creating the netlink socket. This is good practice to
+              have control on what netlink endpoint identifier is associated with our socket. Not addressing any
+              known-specific bug however.
+            * Fixed TcpMetricsQueryRecv() not using a recv buffer (aBuffer) large enough to store all responses from
+              kernel.
+            * Replaced usage of sendmsg() with sendto() in TcpMetricsQuerySend() to make the code easier to understand.
+            * Replaced usage of recvmsg() with recvfrom() in TcpMetricsQueryRecv() to make the code easier to
+              understand.
+            * Fixed TcpMetricsQueryRecv() not appropriately resetting pHdr to beginning of aBuffer before each call to
+              recvmsg().
+            * Changed processing of NLMSG_DONE in TcpMetricsQueryRecv() such that we now only return from the function
+              when EWOULDBLOCK (or a recv error) is detected.
+            * Changed implementation of TcpMetricsQueryRecv() to now invoke the TcpMetricsCbT callback for each kernel
+              response with the TcpMetricsT parameter newly filled up with TcpMeticsT::uSrcPort and
+              TcpMeticsT::uDstPort such that higher layer can associate the event with the right AF_INET socket.
+
+    VoipConcierge
+        Renamed VoipConciergeRefT::uLastCCSRegistrationAttempt() to VoipConciergeRefT::uLastHostNameQueryAttempt
+        because it better describes what the variable is exactly used for.
+
+        Enhanced _VoipoConciergeUpdateCCS() to enforce delaying call to ConciergeServiceRegister() until
+        VoipServerStatus() returns a valid host name.
+
+        Added VoipConciergeStatus('offl') which is a pass-through to ConciergeServiceStatus('offl').
+
+        Added new _VoipConciergeRestApiCompleteCb() static function used as the RestApiCompleteCbT callback
+        registered with restapi.
+
+        Changed multiple areas of the module to now take into account that the VoipTunnelClientT structure now uses
+        an array of VoipTunnelGameMappingT to track multiple concurrent games for a given user when building with
+        DirtySDK 15.1.7.0.1 and beyond. Code was tailored for changes to internal arrangement of VoipTunnelClientT
+        and VoipTunnelGameT, and removal of VoipTunnelSuspendInfoT.
+
+    VoipGameServer
+        Moved integration with TcpMetrics module from BufferedSockets to VoipGameServer/GameServer to migrate
+        from a "1 Netlink socket to 1 INET socket pattern" to a "1 Netlink socket per process pattern".
+
+        Changed multiple areas of the module to now take into account that the VoipTunnelClientT structure now uses
+        an array of VoipTunnelGameMappingT to track multiple concurrent games for a given user when building with
+        DirtySDK 15.1.7.0.1 and beyond. However, because OTP does not leverage that feature, the module always
+        uses the first entry in that array of mappings.
+
+        Changed _VoipServerDispatch_nusr() to use new synopsis of VoipTunnelClientListAdd() when building with
+        DirtySDK 15.1.7.0.1 and beyond. The former synopsis implied passing in a VoipTunnelClientT pointer but the
+        format of that structure has changed to something that is not longer appropriate to be used as an input to
+        VoipTunnelClientListAdd().
+
+        Changed _VoipServerVoipTunnelEventCallback() to retrieve the game idx associated with the event from the
+        event data instead of the client structure when building with DirtySDK15.1.7.0.1 and beyond.
+
+        Added GameServerT::uGameId to track unique game identifier associated with each single registered game server.
+
+    VoipServer
+        Removed superfluous iResult local variable in _VoipServerAttemptFQDNLookup().
+
+        Enhanced multiple debug printf and modified some other to now take into account that the VoipTunnelClientT
+        structure now uses an array of VoipTunnelGameMappingT to track multiple concurrent games for a given user
+        when building with DirtySDK15.1.7.0.1 and beyond.
+
+        Changed VoipServerSend() to now take into account that the VoipTunnelClientT structure now uses an array
+        of VoipTunnelGameMappingT to track multiple concurrent games for a given user when building with
+        DirtySDK 15.1.7.0.1 and beyond. Also added a comment flagging that broadcast support in VoipServerSend()
+        seems to be deadcode not used by any of our operating modes (CC, OTP, QOS).
+
+        Changed the UDP metrics to report the maximum over the reporting interval (60s) instead of the last sample.
+
+EADP Game Services DirtyCast Server 15.1.7.0.1 - January 27, 2021
+    BufferedSocket
+        Disabled the metrics collection as we were seeing a larger than expect overhead per socket.
+
+    ConciergeService
+        Changed the maximum header we can append to 8k to future proof the size of JWTs growing.
+
+    Cloud Pods (ALL)
+        Updated the base image to use bionic-20200921 and pinned mono to 6.8.
+
+        create_containers.sh
+            Cleanup the create containers pushing / cleanup logic as it was outputting errors when none existed based
+            on the inputs and wasn't cleaning all the images.
+
+            Changed the behavior to clean the images regardless of whether we push or not.
+
+        launch scripts
+            Changed OIv2 metrics reporting originated from the launch script to now use bash built-in UDP transmission
+            capability instead of relying on netcat utility. This way we are no longer vulnerable to the script
+            breaking because of used netcat options not being supported with the version of netcat installed in the
+            container image (like it happened recently with the -4 option no longer working).
+
+            Added the switch "--wait=false" to "kubectl delete pod" to avoid the command hanging upon a process crash
+            when pods deployed on newer EA cloud control plane.
+
+    Cloud Pods (GsrvStress)
+        Updated the launch script to work with stateful sets.
+
+        Updated the launch script to assign the hostname which was queried from kubernetes based on the node name.
+
+    Cloud Pods (Qos Bot)
+        Updated the launch script to work with stateful sets.
+
+    CommonMetrics
+        Added a metric for the certificate expiration that we expose from tokenapi.
+
+    GameServer
+        Removed link mode from the gameserver, the configurations will assume dist mode from now on.
+
+    GameServerBlaze
+        Changed the behavior to immediately eject ourselves as a host if there are no longer any actively connected
+        users. After discussion with the Blaze developers on the matter they informed that we don't need to stick around
+        as a host if there are no users connected.
+
+        Added the ability to configure a gameserver with custom attributes that will be passed into the create game
+        template.
+
+    GameServerPkt
+        Removed support for the broadcast send flags which were only used for link mode.
+
+    QosService
+        Changed the maximum header we can append to 8k to future proof the size of JWTs growing.
+
+    Shared
+        Added support for processing JWT tokens from our REST API.
+
+    VoipConcierge
+        Fixed _VoipConciergeUpdateCCS() to reset pVoipConcierge->uLastCCSRegistrationAttempt when the module is in
+        'registered' state. This is to avoid registration resuming with an invalid
+        pVoipConcierge->uLastCCSRegistrationAttempt when registration with CCS is lost.
+
+
+EADP Game Services DirtyCast Server 15.1.7.0.0 - October 23, 2020
+    BufferedSocket
+        Added a new tcpmetrics module that can query the queues of the TCP socket.
+
+        Changed the behavior when we exit the game to shrink the memory allocated above the default if we needed the
+        buffer to grow.
+
+    Build
+        Fixed building when sanitizers are enabled by disabling the delete operators which are defined by the sanitizer
+        library within clang.
+
+        Updated the Docker images to use an Ubuntu18 base instead of CentOS7. The compiler packages dropped support for
+        CentOS distro hence the move to Ubuntu.
+
+        Added check for successful code build and exit with error code upon failure.
+
+    Cloud Pods (ALL)
+        create_containers.sh
+            Fixed the script to execute nant script correctly, nant is not in out path but a local script we need to
+            execute.
+
+            Added removal of build container if code build fails. Added check for buildoutput folder and removal of
+            buildoutput image if folder is missing.
+
+    Cloud Pods (QoS Bot)
+        Added the ability to either run one stress bot, where the tty will be directed to stdout (Kibana) for long
+        running validation processes; or TOTAL_CLIENTS where the tty will only go to file for many bot stress runs.
+
+        Fixed a bug where -debuglevel was not being set properly.
+
+    CommonMetrics
+        Added metrics handlers for reporting the new following new metrics to the metrics agent:
+        voipmetrics.inbkernlate.<game|voip>.min, voipmetrics.inbkernlate.<game|voip>.max,
+        voipmetrics.inbkernlate.<game|voip>.avg
+
+    DirtyCast
+        Added support to request JWT to be used for our authentication in all our operating modes.
+
+    GameServer
+        Fixed use after free by moving the NetPrintfHook to main.c from within gameserver.c.
+
+        Fixed the code executed when the new access token is received from the voipserver to now perform the call to
+        GameServerControl('accs') after the call to GameServerBlazeDisconnect() to avoid the newly cached token to be
+        immediately invalided by the call to GameServerBlazeDisconnect() dispatching the onDisconnected event.
+
+        Added integration to make use of subspace configuration if provided.  Use configs:
+        -gameserver.subspace.sidekick.port - when port is 0 (by default) subspace sidekick is disabled, normal
+        operation 5005.
+        -gameserver.subspace.sidekick.addr - the address of the subspace sidekick, "127.0.0.1" by default
+        -gameserver.subspace.provisionmin - the minimum number of minutes between subspace provisions (default 60 min)
+        -gameserver.subspace.provisionmax - the required number of seconds between subspace provisions (default 30 sec)
+
+    GameServerBlaze
+        Fixed issue with handling incoming players/connections before the createGameFromTemplate RPC callback returns by
+        using GameManagerAPIListener::onGameCreated. Before this change we had a race condition for players joining very
+        close to when we are creating the game, the game listener would not be registered early enough to notify the
+        voipserver of the new game.
+
+        Enhanced the kick logic to use the active players in the game to find the client id instead of depending on the
+        cached state. Given that the cached state might not always be up to date, it is flawed to assume we can find the
+        client based on that information.
+
+        Enhanced the logic for detecting when to re-attempt connecting to blaze and simplified how it is executed to
+        avoid possible race conditions resulting on gameserver remaining offline for an unreasonable period of time.
+        Changes are:
+            * Eliminated the notion of initial connect delay.  Connect delay is always the same now (initial and
+              subsequent) and it is initialized using rand() to make sure gameservers use different values.
+            * Introduced a  new static function _MoveToNextState() to centralize logging of state transition and
+              state-specific re-initialization of the timer used to detect when to re-attempt connecting to blaze.
+            * When the gameserverblaze layer detects that it is time to re-attempt connecting to blaze, it no longer
+              explicitly initiates it. It rather clears the internally cached token and relies on the gameserver
+              layer detecting that the cached token is no longer valid to request a new one and then re-perform
+              the GameServerBlazeDisconnect()/GameServerBlazeLogin() sequence.
+
+    GameServerMetrics
+        Added voip server dimension "subspace:0/1"; 0 off, 1 on.
+
+    GameServerOiMetrics
+        Added game server dimension "subspace:0/1/2"; 0 off, 1 provisioned, 2 not-provisioned.
+
+    Logger
+        Switched to the ds_gmtoffset over ds_timezone to fix offset when DST is active.
+
+    QosService
+        Improve registration with QoS Coordinator by re-creating protohttp whenever a communication error occurs, this
+        is to provide the best chance of recovery by coming from a clean state.
+
+    QosServer
+        Added ability to override the hmac key generated by the qos server.  Usage:
+        -voipserver.overridesitekey=<new key>
+
+        Added integration to make use of subspace configuration if provided.  Use configs:
+        -voipserver.subspace.local.port - subspace gave us this port to use in place of our own (0, default disabled)
+        -voipserver.subspace.local.addr - subspace provided us this address to use in place of our own
+
+    QosStress
+        Added a feature so that a particular sites info can be overridden when the profile is fetched from the
+        coordinator, this allows you to easily target a particular QoS server for debug purposes.  Usage:
+        QoS Stress additional command line args:
+        -overridesitename=<site> -overridesiteaddr=<new ip> -overridesitekey=<new key> -overridesiteport=<new port>
+        Be sure to also use the qos server args:
+        -voipserver.overridesitekey=<new key>
+
+        Added ability to use multiple QoS profiles at once to have the stress bot overcome the 32 ping site limit.  To
+        make use of this, use qosprofile=profile0,profile1,profile2
+
+    ServerMetrics
+        Adjusted the debug level to print out the metrics datagrams to level 3.
+
+        Fixed incorrect FOR loop in ServerMetricsFormatEx() resulting in only the first sample of the array being
+        repeated multiple times in the metrics payload and all subsequent samples in the array being incorrectly
+        dropped.
+
+    Stress
+        Added a container build batch file for building the stress clients.
+
+    StressBlaze
+        Changed the behavior of the stress clients to unset the game start time when the game is finished to prevent
+        going into the failure state.
+
+        Fixed the state transition so that only the admin player goes into kWaitingForPlayer and only when it has
+        completed the join to the game. Without this change we have non-admin clients moving into states that they
+        should not be in, it only is meaningful for admin players.
+
+        Added configurations for the MIN_PLAYER_COUNT and DESIRED_PLAYER_COUNT attributes for our scenario matchmaking
+        which are required for changing the size of the games we are testing.
+
+    StressGamePlayMetrics
+        Changed the mode dimension to be set to the game mode that is being tested to help segregate the metrics.
+
+        Added the gpvs dimension to be set to the game protocol version string that is being tested to help segregate
+        the metrics.
+
+    Stunnel
+        Updated to the latest stunnel version available on Ubuntu18 repos.
+
+    TokenApi
+        Fixed the logging of the tokenapi acquisition response by adding a newline as otherwise the first prints gets
+        timestamped twice.
+
+        Fixed bug with the body of the token request being incorrectly formatted due to the body never being reset
+        after a successful request.
+
+    UdpMetrics
+        Removed support for CentOS6 when gathering the udp metrics (queue sizes).
+
+    VoipGameServer
+        Changed stuck game detection logic from:
+            Stuck game =  game active for more than 1 hour and player count is 0.
+        to:
+            Stuck game =  game active and player count has been 0 for 5 min.
+
+    VoipMetrics
+        Removed the voipmetrics app from the solution and support for dual reporting to both graphite and the
+        aggregator.
+
+    VoipServer
+        Removed the local address from the voipserver since it is not used and log the front address we care about
+        instead.
+
+        Enhanced game and voip traffic receive paths to now calculate the inbound kernel-induced packet latency and
+        to update the new accumulator created to eventually report voipmetrics.inbkernlate.<game|voip>.min,
+        voipmetrics.inbkernlate.<game|voip>.max, voipmetrics.inbkernlate.<game|voip>.avg
+
+        Added module subspaceapi, which makes calls to the subspace-sidekick app to provision proxy ip/port through
+        subspace networks.
+
+    VoipServerConfig
+        Changed the parsing of addresses so that the 172.16.0.0/12 block was treated as private to prevent it being
+        selected over other private addresses. When an addresses is not in the private block of parsing it takes
+        priority over the other addresses. We don't want this to occur because it causes the docker private address to
+        be chosen when doing local development.
+
+
+EADP Game Services DirtyCast Server 15.1.7.0.0 - October 23, 2020
+    BufferedSocket
+        Added a new tcpmetrics module that can query the queues of the TCP socket.
+
+        Changed the behavior when we exit the game to shrink the memory allocated above the default if we needed the
+        buffer to grow.
+
+    Build
+        Fixed building when sanitizers are enabled by disabling the delete operators which are defined by the sanitizer
+        library within clang.
+
+        Updated the Docker images to use an Ubuntu18 base instead of CentOS7. The compiler packages dropped support for
+        CentOS distro hence the move to Ubuntu.
+
+        Added check for successful code build and exit with error code upon failure.
+
+    Cloud Pods (ALL)
+        create_containers.sh
+            Fixed the script to execute nant script correctly, nant is not in out path but a local script we need to
+            execute.
+
+            Added removal of build container if code build fails. Added check for buildoutput folder and removal of
+            buildoutput image if folder is missing.
+
+    Cloud Pods (QoS Bot)
+        Added the ability to either run one stress bot, where the tty will be directed to stdout (Kibana) for long
+        running validation processes; or TOTAL_CLIENTS where the tty will only go to file for many bot stress runs.
+
+        Fixed a bug where -debuglevel was not being set properly.
+
+    CommonMetrics
+        Added metrics handlers for reporting the new following new metrics to the metrics agent:
+        voipmetrics.inbkernlate.<game|voip>.min, voipmetrics.inbkernlate.<game|voip>.max,
+        voipmetrics.inbkernlate.<game|voip>.avg
+
+    DirtyCast
+        Added support to request JWT to be used for our authentication in all our operating modes.
+
+    GameServer
+        Fixed use after free by moving the NetPrintfHook to main.c from within gameserver.c.
+
+        Fixed the code executed when the new access token is received from the voipserver to now perform the call to
+        GameServerControl('accs') after the call to GameServerBlazeDisconnect() to avoid the newly cached token to be
+        immediately invalided by the call to GameServerBlazeDisconnect() dispatching the onDisconnected event.
+
+        Added integration to make use of subspace configuration if provided.  Use configs:
+        -gameserver.subspace.sidekick.port - when port is 0 (by default) subspace sidekick is disabled, normal
+        operation 5005.
+        -gameserver.subspace.sidekick.addr - the address of the subspace sidekick, "127.0.0.1" by default
+        -gameserver.subspace.provisionmin - the minimum number of minutes between subspace provisions (default 60 min)
+        -gameserver.subspace.provisionmax - the required number of seconds between subspace provisions (default 30 sec)
+
+    GameServerBlaze
+        Fixed issue with handling incoming players/connections before the createGameFromTemplate RPC callback returns by
+        using GameManagerAPIListener::onGameCreated. Before this change we had a race condition for players joining very
+        close to when we are creating the game, the game listener would not be registered early enough to notify the
+        voipserver of the new game.
+
+        Enhanced the kick logic to use the active players in the game to find the client id instead of depending on the
+        cached state. Given that the cached state might not always be up to date, it is flawed to assume we can find the
+        client based on that information.
+
+        Enhanced the logic for detecting when to re-attempt connecting to blaze and simplified how it is executed to
+        avoid possible race conditions resulting on gameserver remaining offline for an unreasonable period of time.
+        Changes are:
+            * Eliminated the notion of initial connect delay.  Connect delay is always the same now (initial and
+              subsequent) and it is initialized using rand() to make sure gameservers use different values.
+            * Introduced a  new static function _MoveToNextState() to centralize logging of state transition and
+              state-specific re-initialization of the timer used to detect when to re-attempt connecting to blaze.
+            * When the gameserverblaze layer detects that it is time to re-attempt connecting to blaze, it no longer
+              explicitly initiates it. It rather clears the internally cached token and relies on the gameserver
+              layer detecting that the cached token is no longer valid to request a new one and then re-perform
+              the GameServerBlazeDisconnect()/GameServerBlazeLogin() sequence.
+
+    GameServerMetrics
+        Added voip server dimension "subspace:0/1"; 0 off, 1 on.
+
+    GameServerOiMetrics
+        Added game server dimension "subspace:0/1/2"; 0 off, 1 provisioned, 2 not-provisioned.
+
+    Logger
+        Switched to the ds_gmtoffset over ds_timezone to fix offset when DST is active.
+
+    QosService
+        Improve registration with QoS Coordinator by re-creating protohttp whenever a communication error occurs, this
+        is to provide the best chance of recovery by coming from a clean state.
+
+    QosServer
+        Added ability to override the hmac key generated by the qos server.  Usage:
+        -voipserver.overridesitekey=<new key>
+
+        Added integration to make use of subspace configuration if provided.  Use configs:
+        -voipserver.subspace.local.port - subspace gave us this port to use in place of our own (0, default disabled)
+        -voipserver.subspace.local.addr - subspace provided us this address to use in place of our own
+
+    QosStress
+        Added a feature so that a particular sites info can be overridden when the profile is fetched from the
+        coordinator, this allows you to easily target a particular QoS server for debug purposes.  Usage:
+        QoS Stress additional command line args:
+        -overridesitename=<site> -overridesiteaddr=<new ip> -overridesitekey=<new key> -overridesiteport=<new port>
+        Be sure to also use the qos server args:
+        -voipserver.overridesitekey=<new key>
+
+        Added ability to use multiple QoS profiles at once to have the stress bot overcome the 32 ping site limit.  To
+        make use of this, use qosprofile=profile0,profile1,profile2
+
+    ServerMetrics
+        Adjusted the debug level to print out the metrics datagrams to level 3.
+
+        Fixed incorrect FOR loop in ServerMetricsFormatEx() resulting in only the first sample of the array being
+        repeated multiple times in the metrics payload and all subsequent samples in the array being incorrectly
+        dropped.
+
+    Stress
+        Added a container build batch file for building the stress clients.
+
+    StressBlaze
+        Changed the behavior of the stress clients to unset the game start time when the game is finished to prevent
+        going into the failure state.
+
+        Fixed the state transition so that only the admin player goes into kWaitingForPlayer and only when it has
+        completed the join to the game. Without this change we have non-admin clients moving into states that they
+        should not be in, it only is meaningful for admin players.
+
+        Added configurations for the MIN_PLAYER_COUNT and DESIRED_PLAYER_COUNT attributes for our scenario matchmaking
+        which are required for changing the size of the games we are testing.
+
+    StressGamePlayMetrics
+        Changed the mode dimension to be set to the game mode that is being tested to help segregate the metrics.
+
+        Added the gpvs dimension to be set to the game protocol version string that is being tested to help segregate
+        the metrics.
+
+    Stunnel
+        Updated to the latest stunnel version available on Ubuntu18 repos.
+
+    TokenApi
+        Fixed the logging of the tokenapi acquisition response by adding a newline as otherwise the first prints gets
+        timestamped twice.
+
+        Fixed bug with the body of the token request being incorrectly formatted due to the body never being reset after
+        a successful request.
+
+    UdpMetrics
+        Removed support for CentOS6 when gathering the udp metrics (queue sizes).
+
+    VoipGameServer
+        Changed stuck game detection logic from:
+            Stuck game =  game active for more than 1 hour and player count is 0.
+        to:
+            Stuck game =  game active and player count has been 0 for 5 min.
+
+    VoipMetrics
+        Removed the voipmetrics app from the solution and support for dual reporting to both graphite and the
+        aggregator.
+
+    VoipServer
+        Removed the local address from the voipserver since it is not used and log the front address we care about
+        instead.
+
+        Enhanced game and voip traffic receive paths to now calculate the inbound kernel-induced packet latency and
+        to update the new accumulator created to eventually report voipmetrics.inbkernlate.<game|voip>.min,
+        voipmetrics.inbkernlate.<game|voip>.max, voipmetrics.inbkernlate.<game|voip>.avg
+
+        Added module subspaceapi, which makes calls to the subspace-sidekick app to provision proxy ip/port through
+        subspace networks.
+
+    VoipServerConfig
+        Changed the parsing of addresses so that the 172.16.0.0/12 block was treated as private to prevent it being
+        selected over other private addresses. When an addresses is not in the private block of parsing it takes
+        priority over the other addresses. We don't want this to occur because it causes the docker private address to
+        be chosen when doing local development.
+
+
+EADP Game Services DirtyCast Server 15.1.6.0.5 - August 19, 2020
+    Cloud pods (All)
+        Enhanced backupToS3.py script to append aws account to bucket name. This change is required to work around
+        s3 bucket name not being re-usable from account to account without being explicitely shared via the AWS
+        console.
+
+        Changed container launch scripts to no longer pass s3 bucket input parameter to backupToS3.py script.
+
+        Removed the frontaddr fallback; if the service account is not properly setup as we want to catch this issue as
+        early as possible.
+
+        Added the hostname to the voipserver command line parameters that is driven by the metadata query in k8s instead
+        of requiring the servers do a reverse lookup.
+
+    Cloud pods (QoS)
+        Fixed missing escape after the configuration with causing the following lines to improperly parse.
+
+    Dirtycast
+        Added new api (DirtyCastReadinessFileCreate/DirtyCastReadinessFileRemove) that adds/removes a file that
+        can be used to implement kubernetes readiness probe.
+
+    QosServer
+        Added new 'read' status selector that returns if ready state is reached or not.
+
+    VoipConcierge
+        Fixed DirtyCast CC to consider drain completed only when the number of active games goes to zero instead of
+        when the number of active clients goes to 0.  This is necessary to avoid DirtyCast prematurely exiting after
+        active clients count reaches 0 and then suddenly increases again because a subsequent conn request comes in
+        for a still existing conn set, resulting in draining being incorrecly considered complete even if
+        connections are still around.
+
+        Added new 'read' status selector that returns if ready state is reached or not.
+
+    VoipGameServer
+        Changed detection of 'stuck game' logic to no longer include games that have player(s) and that last for
+        more than 24h. We detected few such instances in production (1 player remaining in game while in state
+        POST_GAME) and they resulted in 'unwanted' alerts. We are ok with the small amount of server resources
+        being consumed abnormally long here considering that the case is very rare. Nor Blaze nor DirtyCast have
+        any logic right now to explicitly hard limit duration of any game state.
+
+        Added new 'read' status selector that returns if ready state is reached or not.
+
+    VoipServer
+        Added instrumentation to create/remove readiness file when necessary.
+
+        Fixed uCurrentStateStart not being correctly initialized for the 'RUNNING' state minimal duration to be
+        enforced properly.
+
+        Fixed a benign problem found during regression. While in 'exiting' state, the readiness file gets correctly
+        removed, but then incorrectly re-created because the 'pVoipServer->bReady" boolen gets reset. That boolean
+        should never be reset as readiness file creation is a one-time process that is not supposed to be re-attempted.
+
+        Removed the fallback hack we put in for dev server CC hosting servers back during the original implementation
+        of that mode.
+
+EADP Game Services DirtyCast Server 15.1.6.0.4 - June 3, 2020
+    GameServerOiMetrics
+        Fixed gameserver metrics missing deployment info 2 dimension.
+
+    VoipConcierge
+        Fixed DirtyCast CC to consider drain completed only when the number of active games goes to zero instead of
+        when the number of active clients goes to 0. This is necessary to avoid DirtyCast prematurely exiting after
+        active clients count reaches 0 and then suddenly increases again because a subsequent conn request comes in
+        for a still existing conn set, resulting in draining being incorrecly considered complete even if connections
+        are still around.
+
+EADP Game Services DirtyCast Server 15.1.6.0.3 - April 21, 2020
+    Build
+        Fixed the version generation within a docker container by exporting the P4CLIENT from sync.sh
+
+        Added removal of build container if code build fails.
+
+        Added check for buildoutput folder and removal of buildoutput image if folder is missing.
+
+        Added check for successful code build and exit with error code upon failure.
+
+    ConciergeMetrics
+        Removed unused CONCIERGE_AUTOSCALE_DIMENSIONS_FORMAT.
+
+    ConciergeService
+        Changed the error handling in ConsiergeServiceRegister() to avoid spamming when TokenApiAcquisitionAsync()
+        returns 'too soon'.
+
+        Fixed the reading of non-RSA keys for the connection made to the coordinators by just loading the file as
+        tokenapi does.
+
+        Added support for reloading the cert/key files for the nucleus connection when the file changes.
+
+    Cloud pods (All)
+        Added "Auto Scale 2" feature for OTP and upgraded CC's auto scaling solution to match.  Details are best seen
+        here: https://developer.ea.com/pages/viewpage.action?spaceKey=TEAMS&title=DirtyCast+Autoscaling+2.0
+
+        Added a 'deployinfo2' config param that can be used to specify the kubernetes namespace to populate the new
+        deployinfo2 dimension with.
+
+        Fixed incorrect environment variable names for executable name.
+
+        Changed base/dockerfile to now download docker engine from download.docker.com. On the 31st of March 2020,
+        Docker shut down the legacy APT and YUM repositories hosted at dockerproject.org and dockerproject.com. These
+        repositories haven't been updated with the latest releases of Docker and so the packages hosted there contain
+        security vulnerabilities. Removing these repositories is to make sure that people downloan the latest version
+        of Docker ensuring their security and providing the best experience possible.
+
+    Cloud pods (OTP)
+        Added support for new METRICS_MAX_ACC_CYCLES config param in gameserver_launch.sh
+
+    Cloud pods (CC stress client)
+        Added support for CC stress client pod.
+
+    DirtyCast Metrics
+        Added a 'deployinfo2' dimension to all our metrics to allow for per-namespace visualization in Grafana with
+        usage of new metrics agent (1 gostatsd per node - 1 prom server per cluster).  In CondciergeMetrics,
+        GameServerMetrics, StressGameplayMetrics, QosStressMetrics, QosMetrics, GameServerPkt, GameServerConfig
+
+    GameServer
+        Added new config parameter gameserver.metricsaggregator.maxaccumulationcycles
+        0 --> Feature Disabled: multi-value lines not used in metrics payload
+        N --> Feature Enabled: multi-value lines used with N accumulation cycles
+
+    GameServerBlaze
+        Changed the behavior to destroy the blazehub on disconnection to ensure that we always reload our cert/key
+        files used for mTLS.
+
+    GameServerOiMetrics
+        Changed metrics datagram packing for 'timer' metrics. Samples for a common metric are cumulated over an
+        interval and then concatenated on a unique line. This result in optimized packet and less datagrams sent to the
+        metrics agent.
+
+        Changed implementation to properly compile in the right usage of GameServerDistStatus() selectors depending on
+        which version of DirtySDK the server is being built against. Two GameServerDistStatus selectors were indeed
+        renamed starting with the Trama code line.
+            GameServerDistStatus('idps') in Shrike became GameServerDistStatus('icnt') in Trama
+            GameServerDistStatus('odmp') in Shrike became GameServerDistStatus('ocnt') in Trama
+
+        Improved calculation of inputdrops, idpps, and odmpps metrics.
+
+        Removed GameServerOiMetricsReset() as it had no utility.
+
+        Merged some internal data structures to reduce complexity. The original organization was no longer justified
+        after some othe recent code changes.
+
+        Added the concept of an "idpps grace period" at the beginning of a game: an idpps rate below 27 is tolerated
+        but is not contributing to idpps metric. The grace period ends for a given player as soon as the first idpps
+        sample equal or larger than 27 is detected.
+
+        Fixed possibility of metrics collected at very end of game 1 not being flushed out to the metrics agent until
+        beginning of game 2.  Fix consists in clearing the accumulators from GameServerOiMetricsControl('gend')
+
+    Logger
+        Added the gmt offset to the log lines used in dirtycast logging.  This helps us understand the local time the
+        system is logging when pulling logs from various servers.
+
+    Main
+        Removed any usage of DirtyCastLogPrintf() from _SignalProcess(). Motivation: In the cloud, we are seeing some
+        rare cases of our DirtyCast pods hanging upon the cloud signaling SIGTERM. In the voipserver container's log,
+        we can see the container's launch script successfully generating the signal, but the log line expected from the
+        voipserver's _SignalProcess() handler is not showing up and the symptoms suggest a deadlock caused by usage
+        of DirtyCastLogPrintf() from within the signal handler concurrently with DirtyCastLogPrintf() being used in
+        the main thread.
+
+    NetGameDistServ
+        Moved some metrics sampling interval validation logic to where it belongs, from gameserveroimetrics.c
+        to netgamedistserv.c
+
+    QosService
+        Fixed the reading of non-RSA keys for the connection made to the coordinators by just loading the file as
+        tokenapi does.
+
+        Added support for reloading the cert/key files for the nucleus connection when the file changes.
+
+    ServerMetrics
+        Fixed incorrect worst-case length calculation for "metric type" field in _ServerMetricsFormatDatadog()
+
+        Added metric formatting error codes: SERVERMETRICS_ERR_ENTRY_TOO_LARGE and
+        SERVERMETRICS_ERR_ACCUMULATION_OVERFLOW
+
+        Added new helper function ServerMetricsFormateEx() for metrics datagram formatting with support for multi-value
+        lines.
+
+        Enhanced error handling in _ServerMetricsFormatDatadog() to catch error scenarios where a single line does not
+        even fit in a metric datagram
+
+    Shared
+        Added support for the inotify interface on linux for watching for file changes.
+
+    Stress
+        Added netgamelink stream support for stress clients.
+
+        Added MetricsTester python scripts suite to stress client run folder.
+
+        Refactoring the main stress module to have a C-style interface.
+
+    StressBlaze
+        Removed the call to express create account, this is no longer supported by blaze.
+
+        Switched to use admin to progress the game state instead of platform host as that no longer works.
+
+    TokenApi
+        Changed the meaning of the return code of TokenApiAcquisitionAsync() to be able to return 'too soon' error.
+
+        Added support for reloading the cert/key files for the nucleus connection when the file changes.
+
+    VoipConcierge
+        Changed implementation to keep retrying registration with CCS instead of explicitly exiting upon attempt failing.
+
+        Fixed usage of ambiguous index while accessing an array in the context of a sizeof()
+
+EADP Game Services DirtyCast Server 15.1.6.0.2 - November 1, 2019
+    Build
+        Removed CentOS6 support as it is difficult to support both versions of CentOS given the requirement to support
+        two versions of Framework (Framework 7.x vs Framework 8.x). If CentOS6 support is needed Shrike.x line should be
+        used.
+
+        Upgraded docker build gcc version from gcc-c++-4.8.5-36.el7.x86_64 to gcc-c++-4.8.5-39.el7.x86_64, because the
+        older version is no longer available.
+
+    GameServerMetrics
+        Increased the rate of "voipmetrics.clients.maximum" and "voipmetrics.games.maximum" to the normal push rate,
+        up from 5 min.
+
+    Logger
+        Refactored _LoggerTryRotate() to be a private function that is now called from _LogWriterFunc() to have log
+        rotation done by the logger thread.
+
+        Removed HashTblMutex field and added ErrLogMutex field in LoggerRefT.
+
+        Added use of ErrLogMutex field within _LogError() to ensure main thread does not try to log errors when
+        the error log file is closed.
+
+        Refactored LoggerRefT to remove Category and Output buffer tables since we only have one of each. Refactored
+        _LogAddEntry(), _LogLoadConfiguration(), _LogDestroyConfiguration(), LoggerCreate(), and _LogWriterFunc() to
+        reflect that we only have a single Default CategoryCfgT.
+
+        Changed _LogLoadConfiguration() to fail logger creation if category configuration cannot be read.
+
+    ServerMetrics
+        Improve debug logging by including DirtyCastGetLastError in SocketSendto error prints.
+
+    TokenApi
+        The tokenapi logging was updated to try to help diagnose issues now that we are manually pulling certificates
+        for local development. If engineers run into issues it should be much easier to pinpoint what action would need
+        to be taken to get unblocked.
+
+    VoipConcierge
+        Fixed a scenario where dirtycast CC could exit without announcing it properly to the CCS.
+
+    VoipServer
+        Removing the certificates from perforce and adding instructions to what needs to be done to onboard with
+        ESS/vault for local development.
+
+EADP Game Services DirtyCast Server 15.1.6.0.1 - October 9, 2019
+    Cloud pods
+        Fixed incorrect syntax used when initializing local variable in signal handler.
+
+    ConciergeService
+        Added ConciergeServiceStatus('regi') to provide higher layer with a mechanism to find out whether CCS
+        registration is done or not.
+
+    GameServer
+        Added support for older SDKs
+        Used the older initialize call for the BlazeHub for clients before Shrike.1.
+        Implemented the getLocalAddress(uint32_t) and the traditional matchmaking callbacks for clients before Shrike.0.
+
+    GameServerBlaze
+        Fixed issue with connecting to the server after claiming a disconnect reservation when the connection slots
+        change by decoupling the network and blaze layer slotting concepts.
+
+    GameServerMetrics
+        Added 2 new gauge metrics
+            lpacklost: percentage of local packet lost(sent from gameservers aggregated on voipservers)
+            rpacklost: percentage of remote packet lost (sent from gameservers aggregated on voipservers)
+
+        Fixed the player removal reasons metric not being sent properly.
+
+    GameServerOiMetrics
+        Added the new gameserveroimetrics module to allow gameservers to send oi metrics directly
+
+        Added 3 new timer metrics:
+            idpps:      input dist packets per second (per client)
+            inputdrop:  input dist packets dropped per second (per client)
+            odmpps:     output dist multi packets per second (per gameserver)
+
+    Logger
+        Allow rotation of the log file to fail, but let the process continue.
+
+    Stress
+        Added module to output results from the game server stress bot to oiv2.
+
+    StressBlaze
+        Added the ability to set the gameprotocolversion string on the stress clients.
+
+    TokenApi
+        Fixed _TokenApiCacheInsert() passing wrong key reference to HashStrAdd() resulting in hash table pointing
+        to non-persistent memory.
+
+        Enhanced log line announcing successful completion of token info query from Nucleus to now have visibility
+        on exact token involved.
+
+    UdpMetrics
+        Adding the ability to query the udpmetrics for OIv2 for CentOS6 based systems by running the querying of
+        /proc/net/udp6 from a worker thread.
+
+    VoipConcierge
+        Fixed pod incorrectly announcing (to the CCS) full capacity instead of no capacity while the pod is in zombie
+        state and minimal state duration has not yet been reached. In that scenario, the early exit in
+        _VoipConciergeAutoScalingUpdate() is hit and result in the pCapacity parameter not being updated.
+
+        Moved call to ConciergeServiceRegister() from VoipConciergeInitialize() to VoipConciergeProcess() such that
+        it can be delayed until the host FQDN is known.
+
+    VoipGameServer
+        Adjusted the timing check for receiving from the gameserver to trigger only on a higher value to align with the
+        voipserver main loop.
+
+        Fixed print when adding a new user to the VS we had the GSID and the clientId swapped.
+
+    VoipServer
+        Isolated implementation of FQDN lookup into a static function such that the logic can be used from within
+        both _VoipServerInitialize() and VoipServerStatus('host').
+
+        Fixed the stall logging on client removal to correctly print any stall saved we have in iUserData0 instead of
+        trying to re-calculate a stall.
+
+        Added new voipserver startup params to set the UDP send and receive buffer size.
+
+    VoipServerConfig
+        Set the default to 212992 for udp buffers.
+
+EADP Game Services DirtyCast Server 15.1.5.0.3 - August 15, 2019
+    Cloud Pods (OTP)
+        gameserver_launch.sh
+            Changed the DPA allocation to change the identifier to include the index instead of appending it to the pod
+            name.
+
+            Added metrics aggregator settings.
+
+    ConciergeMetrics
+        Increased size of _ConciergeMetrics_aPreviousProductsMap[] from 16 to 64.
+
+        Fixed incorrect copy logic in _ConciergeMetricsSaveProductMap()
+
+    DirtyCast
+        Modified DirtyCastLoggerIdle() to only attempt performing LoggerTryRotate() every 10 sec... as opposed to
+        attempting every time it is  pumped.
+
+    GameServer
+        Added support for older SDKs
+        Used the older initialize call for the BlazeHub for clients before Shrike.1.
+        Implemented the getLocalAddress(uint32_t) and the traditional matchmaking callbacks for clients before Shrike.0.
+
+        Added support for game server to sent metrics directly to metrics aggregator. Currently we are reporting idpps and odmpps.
+
+    GameServerConfigT
+        Added metrics aggregator settings to startup parameters.
+
+    GameServerMetrics
+        Modified metrics logic to not send metrics when the product is uninitialized.
+
+    GameServerOiMetrics
+        Added this new module to handle metrics send directly to metrics aggregator.
+
+        Modified implementation to properly compile in the right usage of GameServerDistStatus() selectors depending on
+        which version of DirtySDK the server is being built against. Two GameServerDistStatus selectors were renamed
+        starting with the Trama code line.
+            GameServerDistStatus('idps') in Shrike became GameServerDistStatus('icnt') in Trama
+            GameServerDistStatus('odmp') in Shrike became GameServerDistStatus('ocnt') in Trama
+
+    GameServerPkt
+        Added deploy info and hostname to GameServerConfigInfoT. Voipserver will now send these info to the game server.
+
+    Logger
+        Fixed _LogAddEntry() to only signal the mutex once at the very end of the function.
+
+        Fixed _LogWriterFunc() to no longer call fwrite()/fflush() while the pCfg->Mutex is locked. This way, main
+        thread is no longer at the mercy of IO delays.
+
+        Fixed LoggerTryRotate() to use a NetCritTry() instead of a NetCritEnter()
+
+    ServerMetrics
+        Fixed incorrect while loop condition in _ServerMetricsSend() that could result in out-of-bound access at
+        the end of the back buffer.
+
+        Added logging about expansion of back buffer.
+
+        Added additional error logging.
+
+        Added GameServerStatus('rate') which returns the effective fixed rate.
+
+    StressBlaze
+        Added the ability to set the gameprotocolversion string on the stress clients.
+
+    TokenApi
+        Fixed _TokenApiCacheInsert() passing wrong key reference to HashStrAdd() resulting in hash table pointing
+        to non-persistent memory.
+
+        Enhanced log line announcing successful completion of token info query from Nucleus to now have visibility
+        on exact token involved.
+
+    UdpMetrics
+        Added the ability to query the udpmetrics for OIv2 for CentOS6 based systems by running the querying of
+        /proc/net/udp6 from a worker thread.
+
+    VoipGameServer
+        Adjusted the timing check for receiving from the gameserver to trigger only on a higher value to align with the
+        voipserver main loop.
+
+    VoipMetrics
+        Fixed the inb/otb latency metrics to be a gauge instead of a counter.
+
+    VoipServerConfig
+        Added new voip server startup parameters to set udp buffer sizes (voipserver.udprbufsize, voipserver.udpsbufsize)
+
+EADP Game Services DirtyCast Server 15.1.6.0.0 - July 24, 2019
+    VoipMetricsApp
+        Removed the polling of udp stats from the VMApp now that we are querying the metrics using the AF_NETLINK
+        socket.
+
+EADP Game Services DirtyCast Server 15.1.5.0.2 - July 5, 2019
+    Cloud pods (ALL)
+        packaging
+            Changed the core location in the upload to s3 script to be based on how our nodepool is configured.
+
+    Cloud pods (CC)
+        stunnel_launch.sh
+             Added creation of ready file once sync file has been read and stunnel is being started. This is
+             required for more robust synchronization between voipserver and stunnel.
+
+        voipserver_launch.sh
+            Added support for new env vars: MONITOR_WRN_PCTSERVERLOAD, MONITOR_ERR_PCTSERVERLOAD,
+            AUTOSCALE_THRESHOLD_DETECTION_DELAY, AUTOSCALE_STATE_MIN_DURATION, AUTOSCALE_BASE_MAX_DURATION,
+            AUTOSCALE_EXTRA_ACTIVE_MAX_DURATION, AUTOSCALE_ZOMBIE_MAX_DURATION.
+
+            Added a new OIv2 metric (voipmetrics.events.voipservercrash) generated from within
+            voipserver_launch.sh whenever the voipserver quits abnormally.
+
+            Fixed the value of exit_code not being the return code of the vs process but rather being
+            the return code of an 'echo' command when the exit handler is executed.
+
+            Before starting the voipserver process, we now wait for the stunnel container to created the
+            ready file. This is necessary to eliminate a possible race condtion where the voipserver
+            registers with the CCS before stunnel is up and running.
+
+    Cloud pods (GameStress)
+        Added a containerized stress client that mimics what the gsmulti script does.
+
+    CommonDiagnostic
+        debug build only - added new debug action usable from diagnostic port. Can be used to force autoscale
+        state transitions without adding real load. format:
+            /action?fake_pctserverload=<off, empty, normal, warning, error>
+
+    ConciergeDiagnostic
+        Added autoscale state and 'extra' state sub-state to voipserver diagnostic page.
+
+    ConciergeMetrics
+        Added two new OIv2 metrics: voipmetrics.autoscaling.state & voipmetrics.autoscaling.extrasubstate.
+        Those metrics are used to monitor autoscaling behavior and to drive cloud fabric's autoscaling intelligence.
+
+    GameServer
+        Added support for passing the client certificates on the gameserver connection to the blazeserver.
+
+    GameServerBlaze
+        Fixed the unregistering the gamemanager listener on shutdown of the application.
+
+    GameServerMetrics
+        Added a metric for getting the maximum games supported that is helpful for graphing avilable and offline
+        percentages.
+
+    Stress
+        Added the ability to write client stats to csv to allow for graphing our client side metrics.
+
+        Added the ability to add extra command line parameters when launching the stress app.
+
+        Added support to build on older SDKs.
+
+    StressGamePlay
+        Changed the logic to make sure dist sends packets to the configured sizes and not to send CRC data unless that
+        feature is enabled.
+
+        Added the gameserver remote client id as an identifier in the client stats we write to csv.
+
+        Removed the CRC feature from the stress client as it is getting in the way of our features that we need at this
+        time.
+
+        Fixed the module to run at the correct rate we expect by using a more precise calculation. The calculation of
+        our rate is based on our target packets per second, which would result in partial millisecond. For example,
+        1000/30 = 33.33ms. By truncating the .33ms we were causing the stress client to run faster which caused it to
+        not mimic what are game client do in this situation.
+
+        Changed the module to correctly use the netgamedist flow control features.
+
+        Added input and output queue stats from NetGameDist, calculated our input rtt and number of inputs dropped by
+        the server based on our sequence numbers.
+
+        Added the epoch to the csv stats that we track.
+
+    UdpMetrics
+        Implemented the replacement from querying from /proc/net/udp using AF_NETLINK sockets.
+
+    TokenApi
+        Changed implementation to delay the reset of the bActive flag on requests to eliminate the possibility of
+        a request being re-used in the context of the callback registered with tokenapi. If that happens, then
+        it can result in corrupting pRequest->pCbList since the callback can alter the list while
+        _TokenApiInfoQueryFireCallback() is looping through it.
+
+        Improved some debug printf.
+
+    VoipConcierge
+        Added autoscaling state machine.
+        Related Confluence doc:
+            https://loginiwa.ea.com/iwaservice/?fromURI=https%3A%2F%2Fea.okta.com%2Fapp%2Fconfluence_onprem
+            %2Fexkcwi8a5phWY6uXy0x7%2Fsso%2Fsaml%3FRelayState%3Dhttps%253A%252F%252Fdeveloper.ea.com%252Fpages
+            %252Fviewpage.action%253FspaceKey%253DTEAMS%2526title%253DCC%252Bautoscaling%252Buser%252Bguide
+
+        debug build only - Added VoipConciergeControl(fpct') which can be used to artificially force autoscaling state
+        transitions.
+
+        Added VoipConciergeStatus('maxl') which can be used to find out if the server's cpu load is steadily over the
+        'max load threshold'.
+
+        Added VoipConciergeStatus('fail') which can be used to find out if the server has enered the "max load" state
+        (can't accept more clients)
+
+        Added VoipConciergeStatus('asst') which returns the autoscaling state.
+
+        Added VoipConciergeStatus('asss') which returns the autoscaling substate while in 'extra' state.
+
+    VoipServer
+        Fixed servermetrics push during shutdown crashing if metrics aggregator support is disabled.
+
+    VoipServerConfig
+        Added support for new config parameters:  autoscale.thresholddetectiondelay, autoscale.stateminduration,
+        autoscale.basemaxduration, autoscale.extraactivemaxduration, autoscale.zombiemaxduration
+
+EADP Game Services DirtyCast Server 15.1.5.0.1 - April 9, 2019
+    Cloud pods (ALL)
+        base/Dockerfile
+            Switched getting p4 cli client from the official perforce repo.
+
+            Changed the java package from ea-jdk to java-1.8.0-openjdk-devel which puts java in the path.
+
+    Cloud pods (CC)
+        Removed querying host name from AWS, the internal logic of getting the hostname in the VS is sufficient.
+
+        Added the ability to get the public/private API addresses in a platform agnostic manner using kubectl.
+
+        Changed port assigned to request the specific protocol it wants from DPA.
+
+    Cloud pods (OTP)
+        Added the ability to get the public/private API addresses in a platform agnostic manner using kubectl.
+
+        Changed port assigned to request the specific protocol it wants from DPA.
+
+    Cloud pods (QoS Bot)
+        Changed port assigned to request the specific protocol it wants from DPA.
+
+    Cloud pods (QoS Server)
+        Removed querying host name from AWS, the internal logic of getting the hostname in the VS is sufficient.
+
+        Added the ability to get the public/private API addresses in a platform agnostic manner using kubectl.
+
+        Changed port assigned to request the specific protocol it wants from DPA.
+
+    GameServerBlaze
+        Added support for host injection in DirtyCast to support virtual games.
+
+        Fixed issues with rejoining a game which you had a disconnect reservation with by aligning the client and server
+        flows.
+
+    VoipConcierge
+        Removed call to RestApiUpdate() from _VoipConciergeTokenCb().  RestApiUpdate() is already called from
+        VoipConciergeProcess(). The additional call to RestApiUpdate() from _VoipConciergeTocenCb() was originally
+        added to speed up responsiveness of request processing but it opened the door for nested execution paths
+        that turned out to be hard to stabilize.
+
+EADP Game Services DirtyCast Server 15.1.5.0.0 - January 23, 2019
+    *** NOTE: Linux Build requires a CentOS7 host, the toolchain does not support CentOS6 (building or running) ***
+
+    Build
+        Removed unncessary warning suppression on windows.
+
+        Fixed the build time calculation to be based on the version generation and not the diagnostic page sources.
+
+        Fixed the build qosstress build script to correctly set the C source to use the C build settings.
+
+        Fixed the version generation after the readme for BlazeSDK was changed to markdown.
+
+        Unified the build settings for the libraries to use the C options.
+
+        Prevent the reading of the sdk version during version generation from breaking the build, just log warnings
+        instead.
+
+        Added debug output about what version we are generating when running generation.
+
+        Fixed the nant script on newer systems CentOS7 by removing unneeded code.
+
+        Added support for building with clang for bare metal systems / cloud systems.
+
+    Cloud pods (ALL)
+        base/Dockerfile
+            Updated the dockerfile for our base image to add mono which is required for the new Framework versions.
+
+        create_containers.sh
+            Added --rm to the packaging `docker run` commands to remove containers when exiting.
+
+        packaging/dockerindocker.sh
+            Added the ability to tag to a different repository.
+
+        runbase/stress
+            Added a new stressbase image to use when stress testing DirtyCast in the cloud. The image contains perf
+            which allows us to get performance information and build flame graphs.
+
+    Cloud pods (CC)
+        Removed duplicated signal trapping setup in voipserver_launch.sh.
+
+    Cloud pods (OTP)
+        Removed unneeded commands that restarted the entire pod instead of just the container when a process dies.
+
+        Fixed the cloud launch scripts for OTP mode to clean up their ports.
+
+        Removed the BOM character at the top of the OTP launch script.
+
+        Added file logging to the gameserver and voipserver in the OTP pod.
+
+        Fixed the dockerignore to include the logger configuration for the OTP pod.
+
+        Added a configuration for maxgamesize that can be passed from the shared config between the VS/GS.
+
+        Added a configuration to the voipserver OTP configuration for max games which controls the max number of
+        gameserver a voipserver will support.
+
+        Removed the SECURE_BLAZEAPI and added INDEX to be used to acquire the diagnostic port.
+
+        Removed the log verbosity from the launch scripts to allow it to be passed via extra configs.
+
+        Removed the nucleus endpoint environment variable.
+
+        Updated the voipserver OTP Dockerfile to remove the RUN actions for sed.
+
+        Added redundancylimit configuration which needs to be set by games based on their packet sizes.
+
+        Simplified the log directory and names used for the VS/GS.
+
+        Changed the OTP launch scripts to drive the logging from the LOGGER_CONFIG environment variable.
+
+        Added support to upload logs/core files to S3.
+
+        Removed duplicated signal trapping setup in gameserver_launch.sh.
+
+        Removed duplicated signal trapping setup in voipserver_launch.sh.
+
+    Cloud pods (QoS Bot)
+        Added support for running the QoS Bot in the cloud.
+
+    Cloud pods (QoS Server)
+        Updated command line arguments to closely match what has been used in production via Servulator deploys.
+
+        Removed unneeded commands that restarted the entire pod instead of just the container when a process dies.
+
+        Removed the BOM character at the top of the QoS launch script.
+
+        Removed duplicated signal trapping setup in voipserver_launch.sh.
+
+    DirtyCast
+        Changed the support for dual logging to not be dependent on the deployinfo of the voipserver.
+
+        Fixed the handling in cases that we might send zero bytes in a ProtoHttpPost.
+
+        Changed the default logging level to be 1 to align with our DirtySDK pattern.
+
+    GameServer
+        Added a memclr to the gameserver packet to prevent sending over uninitialized memory when communicating with the
+        voipserver.
+
+        Fixed the assignment of the diagnostic urls for the gameserver mode to use the correct public IP address.
+
+    GameServerBlaze
+        Added log filtering for the pings to the blazeserver which are very spammy.
+
+        Changed the implementation to wait to cleanup the game until we have transitioned back into the pool.
+
+        Fixed the miscalculation in the 'nusr' selector which is used for draining.
+
+        Fixed build after traditional matchmaking was removed, scenario matchmaking is the supported way to matchmake.
+
+    GameServerLink
+        Fixed the 'stat' call to pass the iBufSize correctly down to NetGameLink.
+
+        Added the ability to override the commudp default unack limit. We are seeing the send rate drop off in cases
+        with higher latency.
+
+        Changed the unack limit to default to 3k for the server.
+
+    GameServerNetworkAdapter
+        Changed the configuration of the gameserverlink/gameserverdist to be based upon the capacity of the game instead
+        of configuration.
+
+        Removed getLocalAddress(uint32_t uUserIndex), userIndex has no effect on our local address.
+
+    Logger
+        Changed the implementation to no longer depend on EAThread and instead use the DirtySDK threading primitives.
+
+        Changed the logger to be a C-file.
+
+        Fixed possible truncation of bz2 output string during rotation.
+
+        Fixed QosBot logging from printing two time stamps.
+
+    LogParse
+        Allow for disabling of GeoIP support if it ever comes to that.
+
+    QosMetrics
+        Added a metric to track the frequency we receive probes that have no return port set.
+
+        Removed several metrics that we were not making use of.
+
+    QosServer
+        Various logging improvements to help track down some anomalies.
+
+    QosService
+        Change the secure key rotation rate, the keys are valid twice as long (80s->160s).
+        This will result in a reduced rate of hmac errors due to the client using too old of a key by about 50%.
+
+    RestApi
+        Added PCRE support to parse the REST API request.
+
+        Changed the implementation so that it is not so directly tied with protohttpserv but also at the same time don't
+        hide that this is what we use under the hood.
+
+    ServerMetrics
+        Fixed an issue where if the metrics socket couldn't be bound it would spam:
+        servermetrics: cannot open socket for pushing metrics to metrics aggregator
+
+    Stress
+        Updated our template scenarios.cfg used for dirtycast stress testing.
+
+        Disabled the automatic timestamping of NetPrintf as we do our own timestamping in the stress clients, this
+        causes double timestamping.
+
+        Removed call to NetConn 'apol' control which has not been supported since dev8.
+
+        Removed unused configurations fields.
+
+    StressBlaze
+        Fixed build after connapiadapter changes mMaxNumEndpoints no longer exists, updated mMaxNumVoipPeers instead to
+        maintain the same behavior.
+
+        Removed hosted platform configuration.
+
+        Fixed build error due to change of function terminology.
+
+        Fixed crash when voip is disabled in the game, check to make sure we have a valid VoipRefT.
+
+        Cleaned up override interfaces and callbacks internal to this module.
+
+        Changed the startGame logic to not to add one for the host player counts as they are already included in that
+        calculation.
+
+        Fixed the game transitions when in dedicated server games (CLIENT_SERVER_DEDICATED) to not instantly go into the
+        IN-GAME state. Due to the fact that dedicated server games automatically transition with the call to
+        initGameComplete, we no longer want onPreGame to call startGame in this case.
+
+        Fixed login when disconnected from the blaze. The issue was caused by the game of login attempt variable which
+        needed to be reset on disconnect from blaze.
+
+    StressGamePlay
+        Fixed 'gsrv' usage to capture the result correctly for success.
+
+        Fixed the packet size calculation when crc checks are disabled.
+
+        Fixed crash caused by send callback being invoked after modules have been cleaned up.
+
+        Fixed assignment of the netgamedist index by offsetting the connapi index by 1.
+
+        Changed the input rate configuration to be set based on the packet rate we are configured to.
+
+        Fixed the uninstall of the send callback to correctly reinstall overwritten callbacks.
+
+        Moved the uninstall/install callbacks to be in the scope of the game connection as to limit the scope.
+
+        Fixed the NetGameDistMultiSetup call to pass in the correct number of players. This call was being made
+        incorrectly as in certain cases m_iNumberOfPlayers was not yet set, which leads to incorrect behavior.
+
+    Stunnel
+        Removed the baremetal stunnel scripts as they are no longer used.
+
+    TokenApi
+        Changed the implementation to silence a clang warning. Clang doesn't like when you add to a string, where it
+        would prefer you index into it instead.
+
+    VoipConcierge
+        Changed the logic so that validation of the token is the first validation that happens.
+
+        Changed the concierge code to not process any new hosted connection requests while we are getting tokeninfo.
+
+    VoipServer
+        Removed the checks for QoS server mode where possible, instead check for the resource that is needed for the
+        operation.
+
+        Added the ability for the application to add firewall rules for itself to improve the development workflow.
+
+        Increased size of buffer used to read in command line parameter as it proved to be too small with all the
+        config params used when running CC in the cloud (see voipserver_launch.sh)
+
+    VoipServerConfig
+        Renamed iMaxTunnels to iMaxClients as this is the concept that it represents. This allows us to shared across
+        all operations modes.
+
+        Changed the config parsing to default the nucleus endpoint based on environment.
+
+EADP Game Services DirtyCast Server 15.1.4.0.5 - December 20, 2018
+    Cloud pods
+        base/dockerfile
+            Upgraded gcc-c++ package from gcc-c++-4.8.5-28.el7_5.1.x86_64 to gcc-c++-4.8.5-36.el7.x86_64
+
+        backupToS3
+            Fixed the backup script to correctly pick up the core files.
+
+        STUNNEL container
+            *** ACTION FOR GS OPS  ***
+            Removed baked-in CA cert. That cert now needs to be dynamically mounted as a secret volume when
+            the container is instantiated. Cloud clusters now need to be added a stunnel-ca-cert secret
+            to run stunnel successfully.
+
+            create_container.sh
+                Removed the cert copy step from the build process.
+
+            stunnel/Dockerfile
+                Removed the step for baking the cert into the container
+
+            stunnel/stunnel.conf
+                Removed the hardcoded cert path.
+
+                Disabled logging to file within the container. Logging to stdout is enough to get what
+                we need in centralized logging (Kibana).
+
+            stunnel/stunnel_launch.sh
+                Added a step for altering the stunnel.conf file with the right CA cert to use
+                before starting the stunnel process
+
+                Fixed verbosity level not propagating down successfully. Verbosity level is now
+                enforced via the stunnel.conf file.
+
+        VoipServer container
+            *** ACTION FOR GS OPS ***
+            Removed the nucleus clients certs from the container as they will be passed in via secrets.
+
+            voipserver/.dockerignore
+                Removed the allowance of the certificate files from the ignore rules.
+
+            voipserver/Dockerfile
+                Removed adding the certificate directory.
+
+            voipserver/voipserver_launch.sh
+                Changed the launch script to now depend on the following environment variables: NUCLEUS_CERT and
+                NUCLEUS_KEY. To ensure that the secret has both the cert and key contained you need to use the following
+                command: kubectl create secret generate <name> --from-file=nucleus.crt=<cert file>
+                --from-file=nucleus.key=<key file>.
+
+    ConciergeMetrics
+        Fixed implementation of voipmetrics.clients.maximum to report the same as voipmetrics.clients.active when
+        the voipserver is in "draining" state.  While a voipserver is draining, it no longer really contributes to
+        the "available capacity" except for the clients that it continues to serve for a while. By updating the
+        "maximum" metrics accordingly, we have more meaningful capacity dashboards.
+
+        Fixed implementation of voipmetrics.games.available to report the same as voipmetrics.games.active when
+        the voipserver is in "draining" state.  While a voipserver is draining, it no longer really contributes
+        to the "available capacity" except for the already existing games that it continues to serve for a while.
+        By updating the "maximum" metrics accordingly, we have more meaningful capacity dashboards.
+
+        Fixed implementation of voipmetrics.clients.active to report 0 clients (instead of not reporting anything)
+        when the number of clients for a given product goes back down to 0.  By doing so, we have more
+        meaningful/accurate capacity dashboards in Grafana because we no longer see the old count sticking
+        around for few aggregator flush cycles and consequently skewing the real capacity count.
+
+    DirtyCast
+        Added DirtyCastReadinessFileCreate() which creates the local file used as the 'readiness' indicator for
+        the cloud fabric.
+
+        Added DirtyCastReadinessFileRemove() which removes the local file used as the 'readiness' indicator for
+        the cloud fabric.
+
+    Logger
+        Added the ability to prune old log files after a configured time (default=30d). This feature is disabled by
+        default to not interfere with our bare metal deployments.
+
+    Main
+        Added calls to DirtyCastReadinessFileCreate() and DirtyCastReadinessFileRemove() when module starts and exits.
+
+    ServerMetrics
+        Added 'rate' control selector to allow for dynamically changing the metrics reporting rate.
+
+        Fixed metrics reporting logic such that the first attempt to report metrics happens as soon as the
+        server starts instead of being delayed by a full initial report cycle interval. It improves
+        responsiveness of our metrics dashboards.
+
+        Enhanced _ServerMetricsReportUpdate() robustness with an explicit check for the previous report cycle to
+        be completely flushed before initiating a new report cycle.
+
+        Added 'push' control selector as a mechanism that can be used to force an immediate metrics reporting iteration
+        instead of waiting until the end of the interval.   (building block for upcoming autoscaling support)
+
+        Fixed inapropriate superfluous call to SocketSendto() at the end of all metrics reporting cycle.
+        It results in erroneous spamming in the voipserver log file.
+        symptom ==>  "servermetrics: attempt to push metrics datagram #XX to metrics aggregator - content (size: 0 bytes)
+
+    VoipServer
+        Improved ifempty shutdown code path such that metrics reporting path is exercised before explicitly
+        exiting. This helps with eliminating "ephemeral stalled metrics" skewing our dashboards when containers
+        terminate before sending zeroed metrics.
+
+        Added 'push' control selector as a mechanism that can be used to force an immediate metrics reporting
+        iteration instead of waiting until the end of the interval.
+        (building block for upcoming autoscaling support)
+
+    VoipServerConfig
+        Added new config parameter "voipserver.metricsaggregator.finalrate" to specify the reporting rate
+        during the new "final metrics report" phase.  Default value: 3 sec
+
+        Added new config parameter "voipserver.finalmetricsreportduration" to specify the max duration of
+        the "final metrics report" phase.  Default value: 10 sec
+
+EADP Game Services DirtyCast Server 15.1.4.0.4 - October 29, 2018
+    ConciergeService
+        Changed the heartbeating to occur quicker after an error occurs to prevent being removed from the directory and
+        give CCS a large expiration time to give us even more time.
+
+    TokenApi
+        Changed the access token parsing to adjust the expiration time to give the users more leeway in acquiring new
+        tokens before expiration occurs.
+
+EADP Game Services DirtyCast Server 15.1.4.0.3 - August 24, 2018
+    Cloud pods
+        cc/voipserver_launch.sh
+            Modified bash script to upload files to the right S3 buckets depending on what the CLUSTER_NAME value is.
+
+    ConciergeMetrics
+        Fixed logic error when looping through the different products resulting in the metrics of only the first product
+        being reported.
+
+    GameServer
+        Changed the default configuration for environment to prod.
+
+    QosMetrics
+        Added metrics to count frequency we receive probes that are less than the minimum size.
+
+    QosServer
+        Enhanced various logging to help track down some rare errors.
+
+        Enhanced error checking, so that received data is at least the size of a probe before processing it.
+
+    QosService
+        Fixed backwards compatibility build break issue with versions of DirtySDK pre 15.1.1.7.2
+
+    VoipConcierge
+        Increased VOIPCONCIERGE_BODY_SIZE from 32K to 256K to resolve DirtyCast CC mode not accepting hosted connection
+        requests for games with more than 12 players.
+
+        Modified the stack-allocated buffers used to build responses to use the new
+        VOIPCONCIERGE_RESPONSE_BODY_SIZE (32K) to avoid unnecessary allocation of huge buffers on the stack since
+        responses are much smaller than inbound requests.
+
+EADP Game Services DirtyCast Server 15.1.4.0.2 - July 18, 2018
+    Cloud pods
+        cc/voipserver_launch.sh
+            Added support for passing "extra config" to the main workload binary.
+
+        create_containers.sh
+            Fixed the portion of the script generating the stunnel container not being executed from the right
+            directory.
+
+        net-tools
+            Added dockerfile to create the net-tools container image used to instantiate a debug pod with
+            tcpdump and iproute toolset (ss, ip, etc.) on a specific node in the cloud cluster.
+
+    DirtyCast
+       Fixed the build time calculation to be based on the version generation and not the diagnostic page sources.
+
+    Logging
+       Changed QosServer and QosBot to log 100MB before rotating logs, up from 1MB.
+
+    QosService
+        Fixed an issue where if one heartbeat from QoS server to QoS coordinator was lost the QosServer would be
+        identified as being offline.
+
+        Fixed bug where http errors to the QosCoordinator will eventually put the QosServer in a bad state due to
+        leaking http2 streams.
+
+        Added leeway to allow the QosServer to fetch a new token before it has actually expired.
+
+    QosServer
+        Changed to give control to QoS coordinator to be in charge of setting valid server request id range.
+
+        Increased logging level of some error prints, when a metric can show the event already.
+
+    VoipServer
+        Fixed crash when attempting to dynamically change debug level if in QoS2.0 mode or running without metrics.
+
+EADP Game Services DirtyCast Server 15.1.4.0.1 - June 1, 2018
+    Build
+        Fixed a unix build break by removing EASTL_SIZE_T_32BIT=1 from unix-masterconifg.xml
+
+    Cloud pods
+        cc/Dockerfile
+            Added voipserver_logger.cfg to the set of files "added" by docker to the final prod container.
+
+        cc/.dockerignore
+            Added voipserver_logger.cfg to the set of files "added" by docker to the final prod container.
+
+        cc/voipserver_launch.sh
+            Added -logger.cfgfile=voipserver_logger.cfg
+            -logger.logfile=VS_Linux_CCS_0000\voipserver0000.log config parameters to the voipserver start line. (Until
+            the cloud team provide us with a mechanism for rebuilding a log file from centralized logging and
+            until the cloud team fixes the log ordering issue with kibana, we want to play safe and exercise
+            centralized logging by logging to stdout and additionally log to a file within the container with the goal
+            to save that file (and the rotated archives) to AWS S3.
+
+            Instrumented cleanup handler to make sure new python script is invoked when voipserver container dies.
+
+            Added validation around KUBECTL_WEB_SERVICE_HOST and KUBECTL_WEB_SERVICE_PORT being defined at startup.
+
+            Fixed a bug where parameter -voipserver.nucleus should have been -voipserver.nucleusaddr
+
+        otp/voipserver_launch.sh
+            Fixed a bug where parameter -voipserver.nucleus should have been -voipserver.nucleusaddr
+
+        runbase/dockerfile
+            Added boto3 and dependencies to runbase image (required for containers to be able to
+            save log/core files to AWS S3 buckets)
+
+            Added the new python script to the runbase image
+
+        qos/voipserver_launch.sh
+            Fixed a bug where parameter -voipserver.nucleus should have been -voipserver.nucleusaddr
+
+    CommonMetrics
+        Fixed calls to DirtyCastCollectUdpMetrics which were using the wrong port when in Qos server mode, this was
+        resulting in a spam of "dirtycast: unable to locate port 4096 in udp table".
+
+    ConciergeMetrics
+        Changed "dirtycastid" dimension with "host" and "port" dimensions
+
+        Added "deployinfo", "env" and "site" to the common metric dimensions.
+
+    DirtyCast
+        Added a bDualLogging field to the LogConfigT struct to allow enabling/disabling logging to both logfile and
+        stdout. Changed _DirtyCastLog() to take the new config param into account.  Changed DirtyCastLoggerCreate()
+        to turn on dual logging if the "-voipserver.deployinfo" config param indicates that DirtyCast is running in the cloud.
+
+        Fixed incorrect usage of %A in ds_snzprintf and DirtyCastLogPrintf by passing sockaddr pointers instead.
+
+    GameServerBlaze
+        Fixed the creation of the game failing on validating the ping site configuration. DirtyCast GameServers would
+        attempt to validate their ping sites using the QoS 1.0 pingsite alias which no longer exist. We will remove the
+        validation step as the blazeserver will validate on create. Both solutions end up with similar results so we
+        didn't need to do the validation ourselves.
+
+    GameServerMetrics
+        Changed "dirtycastid" dimension with "host" and "port" dimensions
+
+        Added a metrics back buffer that will automatically resize. Will now send one datagram per cycle until back buffer is empty.
+        Before the back buffer is empty no new metrics will be added to the back buffer.
+
+    Logger
+        Added rotation time parameter to the logger so we can change how fast we rotate logs.
+        We will now rotate logs when: on startup or 1MB is reached or the rotation time is reached.
+        Rotation time can be set in the logger cfg
+
+    QosMetrics
+        Changed "dirtycastid" dimension with "host" and "port" dimensions
+
+    QosService
+        Added retry and logging when sending heartbeat to Qos coordinator failed.
+
+    QosStress
+        Added OIv2 metrics integration to stress bot.
+
+        Added wrapping for managing the stress bot via Servulator.
+
+        Changed logging to make use of use of the DirtyCast logger.
+
+    RestApi
+        Fixed the receiving code to correctly offset into the body buffer when doing multiple receives in a single
+        request.
+
+    start_tunnel.py
+        Fixed the rotation thread exiting early due to a race condition in the creation of the log files by checking for
+        the existance of files.
+
+    ServerMetrics
+        Added ServerMetricsFormatFloat to allow reporting floating point metrics.
+
+    VoipConcierge
+        Fixed potential host name clamping in VoipConciergeInitialize.
+
+        Fixed the handling of requests with larger amounts of connections by increasing our connection storage. The
+        arrays in our post request and response can only hold 32 connections. This is only okay when the number of
+        clients in the full mesh is 8 or below. For games with much larger games/groups this starts breaking, which
+        corrupts memory and stack depending on which struct it hits.
+
+    VoipGameServer
+        Fixed so we don't try to attempt to allocate the tunnel if adding to the voiptunnel fails. We depend on the
+        data that is in the voiptunnel client to track data, which is later used for cleanup. If we don't have this no
+        cleanup will occur.
+
+EADP Game Services DirtyCast Server 15.1.4.0.0 - March 28, 2018
+    Cloud pods
+        Added script to install and uninstall debugging tools in a cloud pod.
+
+        Added -voipserver.deployinfo="$POD_NAME" to voipserver start line.
+
+        Added Docker files for packaging and deploying Qos2.0 servers, very similar to concierge setup.
+
+    ConciergeMetrics
+        Fixed the dirtycastid dimension format from "hostname:port" to "hostname_port" because OIv2 does not like
+        the ":" in there.
+
+    CommonMetrics
+        Removed the UdpMetricsT input parameter from the handling functions and only collected that data in the
+        instances that they are needed.
+
+        Fixed packet counters being incorrectly reported in kilopackets per second instead of packets per seconds.
+
+        Added a dynamically allocated scratch pad used to help generate metrics.
+
+    DirtyCast
+        Implemented DirtyCastGetPid function so that we don't need to wrap all getpid calls in platform define checks.
+
+        Fixed the stdout logging to not include the log separator character which is only needed for file logging. This
+        makes it so that we don't see the invalid character in our stdout logging.
+
+        Fixed invalid assumption about contents of /proc/net/udp6 in _DirtyCastParseUdpTable()
+
+    GameServerBlaze
+        Changed the implementation to seed the rand on all platforms, not just linux. The behavior is not platform
+        dependent and would like it to be properly seeded.
+
+        Removed the GameDestroyed function in the network adapter. Given that the network mesh is destroyed we can do
+        the work of clean up there instead.
+
+        Fixed some logging on linux, the PRIu64 and PRId64 are not showing the expected results. Switched to using llu
+        and lld respectively.
+
+        Changed the way the connection address is generated for NetGameUtil, to match the logic from non-DirtyCast
+        servers.
+
+    GameServerLink
+        Changed the disconnect code to handle peer disconnects so they are treated as graceful by deleting the client.
+
+    GameServerMetrics
+        Fixed an issue with accessing a nullptr in _GameServerMetricsClientRemoveReason()
+
+    Logger
+        Changed the implementation to depend on DirtySDK to get the timestamp for logging.
+
+    QosDiagnostic
+        Added diagnostic pages for Qos2.0, the diagnostic page displays all available metrics.
+
+    QosMetrics
+        Added OIv2 based metrics for Qos2.0 mode.
+
+    QosServer
+        In Qos2.0 mode DirtyCast plays the role of the Qos Server.  The Qos server registers with a Qos Coordinator,
+        which advertises its availability.  The Coordinator will direct clients to send UDP packets to the
+        Qos Server, while conducting latency and bandwidth tests.  The Qos Server responds to incoming probe packets
+        with probe packets containing additional timing information.
+
+    QosService
+        Added QosService component, which handles fetching a nucleus token and registering with the QosCoordinator.
+
+    ServerDiagnostic
+        Created a common diagnostics module to allow us to share code between the common aspects between all the
+        operating modes.
+
+    ServerMetrics
+        Added per metric rate configurations that control how often we send. Due to the large number of metrics, we
+        have to send in multiple packets. This change was made to try to send smaller packets when we don't need to send
+        data that is known not to change.
+
+    stunnel
+        Removed the unused frontend address lookup function we never ended up using in start_tunnel.py
+
+        stunnel_launch.sh (cc-hosting-server pod launch script) - Changed SIGTERM handler to block until the voipserver
+        has completed draining... so that the voipserver still gets the DELETE req from the CCS during draining.
+
+    VoipServer
+        Passed the iValue to the 'spam' control of ServerMetrics when the base voipserver's control get called.
+
+        Added new operating mode for Qos 2.0.
+
+    VoipServerCommon
+        Added parameter to VoipServerSocketOpen allowing you to specify the address you wish to bind to.
+
+    VoipServerConfig
+        Added new config param "voipserver.deployinfo":  defaults to "servulator" for non-EAcloud deployment; expects
+        a pod name config for EAcloud deployment.
+
+        Added new params for configuring Qos2.0.
+        -voipserver.mode=qosserver enabled qos mode.
+        -voipserver.qosmaxclients, specify the number of Qos clients the server expect to be able to handle per second.
+        -voipserver.qosprobeport, set the port where udp probes will be received by the Qos server.
+        -voipserver.qoscaddr, set the address of the Qos coordinator to register with.
+
+    VoipServerMetrics
+        Fixed the dirtycastid dimension format from "hostname:port" to "hostname_port" because OIv2 does not like
+        the ":" in there.
+
+EADP Game Services DirtyCast Server 15.1.4.0.0-pr2 - February 5, 2018
+    Build
+        Replaced former obsoleted dockerfiles with brand new structure better adapted to new EADP cloud
+        (kubernetes-based).
+
+    CommonMetrics
+        Fixed a typo in a DirtyCast metrics name:  "voipmetrics.games.gamespackets" corrected to
+        "voipmetrics.games.gamepackets"
+
+        Fixed usage of 'uerr', 'urcv' and 'usnt' control selectors such that the unsigned 64-bit input makes it
+        correctly into the module.
+
+    GameServerMetrics
+        Added removal reasons metric where we track the number of players leaving the game for a specific reason.
+
+    stunnel
+        Changed the default logging level to 3. The log writing is causing a stall when handling connections from the
+        CCS.
+
+        Changed how long we sleep for between checking the size of the log file for rotation to 1hr.
+
+        Reduced the idle timeout to 5 minutes from the default 12 hours. Leaving an idle connection open for 12 hours
+        can use extra resources that we don't feel that this is worth spending on.
+
+    VoipConcierge
+        Fixed a bug introduced in _VoipConciergeDecodeConsoleJson(). Because memcmp() is used to compare console info,
+        it is required to memset the game console local var to guarantee that bytes after the string null terminators
+        (struct internal fields) do not alter the comparison results.
+
+    VoipGameServer
+        Changed the gameserver mode to specify the index is is adding a user to. This change allows us to be more
+        explicit in how we are adding users.
+
+    VoipServer
+         Fixed implementation of 'uerr', 'urcv' and 'usnt' control selectors which were incorrectly casting the
+         unsigned 64-bit input.
+
+EADP Game Services DirtyCast Server 15.1.4.0.0-pr1 - December 7, 2017
+    CommonMetrics
+        Moved the ClientsAdded and GamesCreated stat to the shared area on the voipserver to allow it to be reported from
+        commonmetrics. In an attempt to remove duplicated code we moved things that can be retrieved from the base
+        voipserver level.
+
+        Fixed implementation of voipmetrics.packets.udprecv - voipmetrics.packets.udpsent - voipmetrics.packets.udperror
+        counters to no longer save the last used value in the "reset metric" phase but rather right after populating the
+        packet payload. The intent is to avoid usage a usage pattern involving two distinct calls to
+        DirtyCastCollectUdpMetrics() under the assumption that they will return the same values becuase invoked
+        in the same frame... which is a bad assumption.
+
+        Fixed the error handling of "voipmetrics.packets.udprecv" and "voipmetrics.packets.udpsend" metric counters to
+        cover the possibility of the collection of these metrics from the OS occasionally failing.
+
+    ConciergeDiagnostic/GameServerDiagnostic
+        Changed the server information to be printed as unsigned which is the type it is represented in. This prevents
+        the diagnostic pages showing bogus values because of type mismatches.
+
+    ConciergeMetrics
+        Added dirtycastid common dimension. Also fixed diagnostic info to show the proper hostname when running in the cloud.
+
+    DirtyCast
+        Removed use of _NetLib_bCritEnabled, this is not referenced anymore and can be controlled by the -singlethreaded
+        startup parameter via NetConn.
+
+        Switched from using the EA_PLATFORM_* defines to use the DIRTYCODE_* platform defines which are backed up by EABase.
+        Which allows us to remove the explicit defines from our build scripts.
+
+        Added support for a new config parameter allowing to pass a frontend IP address override at the command line or
+        in the config file.  Required to eventually run DirtyCast in the cloud where the public IP of a VM needs to be
+        passed to DirtyCast because the VM is "NATed".
+
+    GameServer
+        Refactored the GameServer to use a C style API and changed its sources to C.
+
+        Removed the code dealing with requiring an extra slot for the gameserver itself. We don't need to take up space
+        in the client lists, the information that we need for the gameserver can be stored in other places. This makes
+        it easier to reason with the code dealing with the client list.
+
+        Added the gamemode to the GameServerGameT structure to allow us to log the information about what type of game
+        is being played.
+
+        Removed the GPS Host data from the game data structure as it is not used for anything.
+
+    GameServerBlaze
+        Removed redirector error handling bug workaround that is no longer needed.
+
+        Removed redundant calls to connectToEndpoint / disconnectToEndpoint in the network adapter which are already
+        being called by the GameManagerAPI.
+
+        Added handling for the GAMESERVERBLAZE_ERROR_STUCK in the GetErrorName function.
+
+        Refactored the GameServerBlaze module to use a C style API. This change is in support of moving multiple of our
+        modules to be C files.
+
+        Removed the ConnectionManagerListener as the only callback function we used no longer exists.
+
+        Refactored the module to break up the dependency between MeshEndpoint::getConnectionGroupId (local) and
+        MeshEndpoint::getLocalLowLevelConnectivityId (remote). We don't want to keep having to check that these always
+        align, which will allow the Blaze developers to make changes to how these are generated to not be
+        interchangeable.
+
+        Changed the code to use the full 64-bit game id when logging and generating a game name. To help match up between
+        the blazeserver and gameserver logs we want to provide the game id information non truncated.
+
+        Removed the LoginManagerListener callback for forgotten password events which was removed from the interface.
+
+        Switched the gameserver to use a create game template, which is the direction that the Blaze team has been
+        moving. Removed the JoinInProgress game settings as the client can specify what game settings it wants at reset
+        time. Removed the configuration for peer voip, game teams can choose to update our template to set whatever voip
+        topology they want.
+
+    GameServerConfig
+        Removed unused data from the configuration structures.
+
+        Removed the unused GameServerLobbyStateE enum.
+
+    GameServerDist
+        Removed unused code to get the diststream. NetGameDist streams were moved to NetGameLink streams a while ago so
+        this code isn't needed.
+
+    GameServerLink
+        Moved the connection time metrics down to the GameServerLink layer from the network adapter to more closely
+        align with what is done in ConnApi.
+
+        Added logging for the outstanding stall time on the client when removing from the client list. When
+        investigating a disconnect event this helps to understand if clients were having connection troubles.
+
+    GameServerMetrics
+        Added dirtycastid common dimension. Also fixed diagnostic info to show the proper hostname when running in
+        the cloud.
+
+    GameServerStat
+        Removed the duplicated, unused or unnecessary stats.
+        uStartupTime, uAverageLatency, uMaximumLatency - unused
+        uUpBand, uDownBand, uUpPackets, uDownPackets - aggregated by the voipserver
+        uCurrentClients - tracked by gameserverblaze
+
+    Logger
+        Removed standalone logger support, our logger are only deployed in a way where they are embedded in our
+        application.
+
+    Memtrack
+        Changed the module to internally use zmemtrack instead of using the duplicated code that existed before. Now
+        that DirtyCast depends on the DirtySDK common contribs it can take advantage of this.
+
+    RestApi
+        Refactored the implementation to deal with non-null terminated data. When using an octet stream we would run
+        into problems with reading and writing.
+
+        Changed the logging for the request/response bodies only to print using NetPrintWrap if we are using a text based
+        content type.
+
+    VoipConcierge
+        Added logging and diagnostic information that concierge modes provides to add information derived from the
+        voiptunnel. To allow for better monitoring of a running server we want to tell how many users per game and their
+        status more easily. Status pages were also created that can be used similarly to the ones we have in the gameserver
+        mode to query the information.
+
+        Enhanced the request parsing to be easier to read and to setup the data in such a way that it will be easier to
+        validate.
+
+        Enhanced validation of console information to make sure that clients in the json list information do not
+        provided inconsistent data.
+        For instance:
+        If the clients have a matching client index but mismatching other data that will cause issues later.
+        If the tag mismatching this will generate a different client id.
+        If the key mismatching we would refcount the tunnel for the client id which is not be desired.
+
+        Changed the monitor updates to use the defined flags instead of hard-coded values.
+
+        Tailored for voipservercomm api change:  VoipServerExtractLatency() was renamed to VoipServerExtractNetGameLinkLate()
+
+    Stress
+        Added a  configuration to turn on CRC checking for DIST data.
+
+        Added the client type to the Blaze login request.
+
+    VoipGameServer
+        Fixed the voipserver not properly updating the "echo" field of outbound netgamelink sync messages with the
+        time at which the voipserver is sending over the socket. Without doing so, the e2e latency metric of dirtycast
+        is incorrectly including the gs-to-vs latency. e2e latency is supposed to only be the networking latency between
+        the client and the voipserver. Fix is leveraging the new VoipServerTouchNetGameLinkEcho() function in voipservercomm.
+
+    VoipServer
+        Added logging when the voiptunnel client is being removed if the last time we received data was over 1.5s. When
+        investigating a disconnect event this helps to understand if clients were having connection troubles.
+
+        Added the "voipserver.tunnelflushrate" configuration to determine the packet flush rate on voip server tunnels.
+
+        Fixed the error handling of "voipmetrics.packets.udprecv" and "voipmetrics.packets.udpsend" metric counters to properly
+        initialize the values. Skipping this results in the  delta value being populated with an absolute value for the first
+        data point for these metrics.
+
+    VoipServerComm
+        Added VoipServerTouchNetGameLinkEcho() to be used by the voipserver to intercept gameserver-to-client
+        netgamelink traffic and update the sync.echo fields found with the voipserver timestamp.
+
+        Renamed VoipServerExtractLatency() to VoipServerExtractNetGameLinkLate(). Also enhanced implementation
+        of VoipServerExtractNetGameLinkLate() to no longer ignore CommUdp multipackets and to attempt retrieving
+        latency info from those too. As a consequence of this change, the return code of the function was
+        changed to ">0=success; 0=no latency info found; <0=failure".
+
+        Eliminated code duplication between commudp and voipservercomm by moving shared code to a new file
+        called CommUDPUtil.
+
+    WinMain
+        Removed the need for the winmain.h header in the console apps and cleaned up the winmain.h header. To try to
+        limit the dependency for winmain to the actual application that use a GUI, we've reworked the code so that we
+        only use signals we expect.
+
+        Increased the maximum amount of data that we keep in the DirtyCast application windows to 1mb (from 24kb).
+
+EADP Game Services DirtyCast Server 15.1.3.0.5 - October 10, 2017
+    Telemetry
+        Updated to TelemetrySDK version 14.2.3
+
+EADP Game Services DirtyCast Server 15.1.3.0.4 - August 30, 2017
+    CommonMetrics
+        Added metrics handlers for the voip traffic stats (bytes & packets), the game traffic stats (bytes & packets)
+        and the new "talking" clients "average over interval".
+
+        Updated the UDP recv and send queue stats to use timers as histogram is not supported by the backend.
+
+        Updated the fetching of the udp and voipserver stats to be done at the commonmetrics level.
+
+    ConciergeDiagnostic/VoipServerDiagnostic
+        Fixed status function to properly calculate the total count of inbound/outbound bytes in Mb
+        and not Kb.
+
+        Extended the output of /status and /metrics queries via the diagnostic port to now show "talking clients",
+        game-specific bandwidth stats (bytes & packets) and voip-specific bandwidth stats (bytes & packets).
+
+    DirtyCast
+        Updated DirtyCastCollectUdpMetrics() to take in a structure instead of individual parameters to make it easier
+        to call.
+
+    GameServerMetrics
+        Changing the dimensions to be comma delimited. The colon is used for separating the key/values with the
+        dimension.
+
+    ServerMetrics
+        Increased SERVERMETRICS_DATAGRAM_SIZE from 512 to 1024.
+
+        Disabled the async received thread for the servermetrics udp socket. Using the async receive thread is
+        generating errors and we currently do not have a use for it.
+
+        Fixed the timer metrics to use the correct tag 'ms' instead of 't'.
+
+        Fixed the bFailed flag to be set to FALSE on reset. Reset is called when you are in a failure status so we
+        want it to be reset correctly.
+
+    stunnel
+        Updated the start_tunnel.py script to use the version of stunnel installed via puppet. This allows us to not
+        worry about managing our prebuilt versions of stunnel for deploys.
+
+        Updated the stunnel startup in start_tunnel.py to better handle edge case failures. We now make sure to
+        terminate any running stunnel processes when not reloading to make sure that start_tunnel.py always remains the
+        parent process to allow Servulator to monitor health.
+
+    VoipConcierge
+        Enhanced the logging and diagnostic information that concierge modes provides for the information derived from
+        the voiptunnel.
+
+        Enhanced _VoipConciergeValidateJson to make sure the indices that are found in the request data are not occupied
+        already in the VoipTunnel state from a previous request.
+
+        Enhanced the validation for the client index to make sure it doesn't exceed our supported range.
+
+    VoipMetrics
+        Added voip and game traffic counters to voip metrics. Both in bytes and packets per second.
+        New metric entries are:
+        VOIPMETRIC_CurrGameBandwidthKpsUp, VOIPMETRIC_CurrGameBandwidthKpsDn, VOIPMETRIC_PeakGameBandwidthKpsUp,
+        VOIPMETRIC_PeakGameBandwidthKpsDn, VOIPMETRIC_TotlGameBandwidthMbUp, VOIPMETRIC_TotlGameBandwidthMbDn,
+        VOIPMETRIC_CurrVoipBandwidthKpsUp, VOIPMETRIC_CurrVoipBandwidthKpsDn, VOIPMETRIC_PeakVoipBandwidthKpsUp,
+        VOIPMETRIC_PeakVoipBandwidthKpsDn, VOIPMETRIC_TotlVoipBandwidthMbUp, VOIPMETRIC_TotlVoipBandwidthMbDn,
+        VOIPMETRIC_CurrPacketRateUp, VOIPMETRIC_CurrPacketRateDn, VOIPMETRIC_PeakPacketRateUp,
+        VOIPMETRIC_PeakPacketRateDn, VOIPMETRIC_TotPacketRateUp, VOIPMETRIC_TotlPacketRateDn,
+        VOIPMETRIC_CurrGamePacketRateUp, VOIPMETRIC_CurrGamePacketRateDn, VOIPMETRIC_PeakGamePacketRateUp,
+        VOIPMETRIC_PeakGamePacketRateDn, VOIPMETRIC_TotlGamePacketRateUp, VOIPMETRIC_TotlGamePacketRateDn,
+        VOIPMETRIC_CurrVoipPacketRateUp, VOIPMETRIC_CurrVoipPacketRateDn, VOIPMETRIC_PeakVoipPacketRateUp,
+        VOIPMETRIC_PeakVoipPacketRateDn, VOIPMETRIC_TotlVoipPacketRateUp, VOIPMETRIC_TotlVoipPacketRateDn,
+        VOIPMETRIC_ClientsTalking
+
+        Renamed "gamepkts" to "tunnelinfo" as the header used with rcal, rsub, dpkt.
+
+        Replaced "Totl" with "Total" in the name of some metrics to align naming pattern across all metric names.
+
+    VoipMetricsApp
+        Updated _MonitorPrintMetrics(), which prints the metrics to standard output, to support the new metrics. Also
+        fixed the formatting for UDPERR, UDPSENT, UDPRECV, UDPSENTQ and UDPRECVQ.
+
+    VoipServer
+        Added "talking clients" average calculation over the metric sampling interval.
+
+        Added iNumTalkingClients field to VoipTunnelGameT.
+
+        Updated a select number of metrics from gauges to counters. These metrics are:
+        voipmetrics.gamestats.clients.removed.pregame, voipmetrics.gamestats.clients.removed.ingame,
+        voipmetrics.gamestats.clients.removed.postgame, voipmetrics.gamestats.clients.removed.migrating,
+        voipmetrics.gamestats.clients.removed.other, voipmetrics.gamestats.games.ended.pregame,
+        voipmetrics.gamestats.games.ended.ingame, voipmetrics.gamestats.games.ended.postgame,
+        voipmetrics.gamestats.games.ended.migrating, voipmetrics.gamestats.games.ended.other,
+        voipmetrics.latency.bin.<0-7>, voipmetrics.packets.udprecv, voipmetrics.packets.udpsent,
+        voipmetrics.packets.udperr
+
+        Updated the metrics reporting code to allow explicit reporting to the aggregators from the diagnostic callbacks.
+        To allow for dual reporting we now drive the reporting interval on the VoipMetrics flush rate.
+
+EADP Game Services DirtyCast Server 15.1.3.0.3 - July 12, 2017
+    GameServerDist
+        Tailored for recent changes to NetGameDistServ api. NetGameDistServ no longer supports the notion of a
+        "started" game as it proved to be completely broken. NetGameDistServStartGame()/NetGameDistServStopGame()
+        were removed. When a game is started or stopped (like during a blaze match replay), the game code running
+        on the client is in charge of exercising the netgamedist flow control.
+
+    GameServerLink
+        Updating the module to clear the global send callback on destroying the gameserverlink.
+        If another game is created we want to ensure that we only have one send callback registered.
+
+EADP Game Services DirtyCast Server 15.1.3.0.2 - June 01, 2017
+    Monitor
+        Correcting log path assignment in bugsentry_monitor.py
+
+    StressBlaze
+        Updated all the functions that take a callback to update to the new signatures
+
+    VoipGameServer
+        Change this voipserver sub module to automatically acquire new Nucleus tokens when they expire
+
+EADP Game Services DirtyCast 2015 15.1.3.0.0 - March 31, 2017
+    Build
+        Switched over to using Visual Studio 2015 by default.
+
+        Updated the mkver script to use the CL number of the synced version of the code instead of the tip of the
+        branch.
+
+        Added a version of the PinTaxonomySDK to the masterconfig to support the new telemetry dependancy.
+
+        Added a dependancy on the LegacyDirtySDK for the tagfield module.
+
+    ConfigFile
+        Removed the http and socket expression support for this module, these were never used for any of the DirtyCast
+        cases.
+
+    DirtyCast
+        Updated locations that use memcpy/memcpy_s to use ds_memcpy/ds_memcpy_s.
+        Updated locations that use memset to use ds_memclr for clearing memory.
+
+        Created DIRTYCAST_CalculateArraySize() macro.
+
+    CommonMetrics
+        New file populated with metric-specific datagram formatting handlers.
+
+    ConciergeMetrics.
+        New file populated with metric-specific datagram formatting handlers.
+
+    GameServer
+        Removed the must exit functionality as it was always set to false.
+
+        Removed support for expressLogin.
+
+        Removed dead code in _GameServerUpdateGame().
+
+        Added the product name initialization to the 'conf' message construction code.
+
+        Removed support for peer-hosted failover and peer-to-peer failover network topologies.
+
+    GameServerBlaze
+        Added encrypted connection between DirtyCast game server and Blaze servers.
+
+        Removed support for peer-hosted failover and peer-to-peer failover network topologies.
+
+    GameServerConfig
+        Removed the following unused config params from the gameserver config file and the gameserver config parsing
+        source code.
+            gameserver.xlspsitename
+            gameserver.xlspserviceid
+            gameserver.lobbyxuid
+            gameserver.lobbyport
+            gameserver.lobbyplatform
+            gameserver.region
+            gameserver.uselobby
+            gameserver.allowprofanenames
+            gameserver.blazedebugstatrate
+            gameserver.mode
+            gameserver.gameminsize
+            gameserver.gamemaxsize
+
+        gameserver.lobbyusername, gameserver.lobbypassword and gameserver.lobbypersona are no longer supported config parameters
+        as they were only needed with expressLogin
+
+        Removed support for peer-hosted flag.
+
+    GameServerNetworkAdapter
+         Refactored to improve the way DirtyCast is integrated with the BlazeSDK
+
+         Added tracking of connection statistics
+
+    GameServerMetrics
+        New file populated with metric-specific datagram formatting handlers.
+
+        Added the product dimension to all metrics being reported by a VS operating in "gameserver" mode. Uses the new
+        VoipGameServerStatus('prod') selector.
+
+    GameServerPkt
+        Added strProductId field to GameServerConfigInfoT.  GameServers can now pass the common blaze service name to the
+        voipserver such that it can be added as a "product" dimension to the datadog-formatted metrics.
+
+        Removed the reflector boolean.
+
+    Scripts
+        Removed unused deploy scripts: "//gos-stream/ml/DirtyCast/GameServer/run/gs" and "//gos-stream/ml/DirtyCast/run/vs"
+
+    ServerDiagnostic
+        Fixed module memory being freed with wrong mem tag.
+
+        Created SERVERDIAGNOSTIC_MEMID constant for usage with dirtymem functions.
+
+    ServerMetrics
+        Brand New internal module.
+
+    Stress
+        Updated stress tester for connection concierge.
+
+        Removed support for peer-to-peer and peer-hosted failover topologies.
+
+        Updated stress tester to support scenario based matchmaking. Blaze deprecated support for the legacy based rules
+        we used which required the move to scenarios.
+
+    stunnel
+        Updated the start_tunnel.py script to check if the stunnel process is active before deciding if we should start
+        the application versus reload our configuration. Previously, if at any time stunnel would not shutdown
+        cleanly (crash, box went offline), the script would not properly detect active.  This would cause the script to
+        keep attempting to reconfigure the non running application instead of starting it up.
+
+    VoipConcierge
+        Removed support for ProtoHttpServ HTTPS configuration, which allowed us to refactor the initial configuration to
+        be more clear.
+
+        Added support for overriding announced host name with value extracted from config file (or cmd line parameter).
+
+        Added a product map to track the different products that hosted connections belong to. Size of product map is
+        dynamically expanded when it gets completely filled up.
+
+        Added new status selector 'prod' to be used by conciergemetrics to access the internal product map.
+
+        Added new status selector 'actv' returning the number of active clients (per product, per tunnel vers).
+
+    VoipMetrics
+        Renamed VOIPMETRIC_TotlBandwidthMpsUp/VOIPMETRIC_TotlBandwidthMpsDn to
+        VOIPMETRIC_TotlBandwidthMbUp/VOIPMETRIC_TotlBandwidthMbDn as the metric is not a rate but a total byte
+        accumulator. So the unit should be Mb (Megabytes) and not Mps (Megabit/sec).
+
+        Fixed gamestats not showing "removed clients" and "ended games" for game state "migrating".
+
+    VoipMetricsApp
+        Calculated the new connection time to graphite at the time of failure, not before the next connection attempt.
+        After an intensive review of how we were using timer for connection, we concluded that if the math worked out on
+        the negative side with a large time grap, it would stay that way for a 24.8 day window where we would not be
+        able to connect. In order to prevent this case from happening in the future, we wanted to limit the scope of
+        how we use our timers. When any fatal error happens during connection attempt or while we have an active
+        connection open, we will reset the timer and state so we can re-establish a connection.
+
+    VoipGameServer
+        Added strProductId field to VoipGameServerRefT.
+
+        Added code to locally save the product id received in an inbound gameserver's 'conf' message.
+
+        Added new 'prod' status selector to surface up the product id to higher level code.
+
+        Removed the reflector concept used for failover network topologies.
+
+    VoipServer
+        Replaced an inline hardcoded value with the already existing constant (VOIPSERVER_VS_STATRATE) that is meant
+        for that purpose.
+
+        Now creates/destroys new ServerMetrics module when datadogd reporting is enabled.
+
+    VoipServerConfig
+        Added support for reporting to a datadogd aggregator. Turned off by default. Can be enabled in the config file
+        or with cmd line arguments. Added support for 3 new config params:
+            voipserver.metricsaggregator.port
+            voipserver.metricsaggregator.rate
+            voipserver.metricsaggregator.addr.
+        Feature is disabled when port is 0. (which is the default)
+
+        Fixed gameserver.port parameter not being correctly enforced to override the uApiPort.
+
+        Removed parsing code for "voipserver.platform" parameter as it is no longer used.
+
+
+EADP Game Services DirtyCast 2015 Winter 2.3.0 - October 19, 2016
+    Build
+        Disable mapfile generation as they are unused and doing so improves linking time.
+
+        Add some additional suppressions for VS2015 builds relating to move constructors and move assignment operators.
+
+        Trim the list of dependencies for building the GameServer. With BlazeSDK defining its public dependencies, we no longer have to
+        explicitly add them to our dependency list.
+
+        Add stricter warnings to the unix build.
+
+        Remove some unused includes from GameServer, QosStress and Stress
+
+    DirtyCast
+        Enforce the use of tunneling in every configuration:
+        Connections via ProtoTunnel is how we currently exercise game/voip connectivity. To make code a bit
+        easier to manage we are enforcing this policy and deprecating the ability to disable tunneling.
+
+        Refactor the virtualized ports to be fixed now that tunneling is always enabled.
+        In scenarios where tunneling is used we want to use fixed port mappings so we don't need to remap
+        the virtual ports. This makes the logic at the network player much simplier when working with these
+        virtual ports.
+
+        Update the read stream function to use a named pipe instead of an anonymous pipe to read from stdout/stderr to allow using freopen
+        With Visual Studio 2015, Microsoft has rewritten parts of the CRT (C Runtime). In particular they have changed how the interaction with FILE * works.
+        This causes our previous code we used for controlling logging to the GUI window to no longer work.
+
+        Incorporate the functionality of the log class into the dirtycast module.
+        The log class what is just a wrapper for configuration and calling log.  We are already doing some wrapping of it in the dirtycast module so it made more sense
+        to just to have all the wrapping down in one place.
+
+    GameServer
+        Remove configuration of voip and game port at the gameserver level, change the gameserver to only advertise the tunnel port
+        The tunnel port is only information that the clients need to establish a connection.
+
+        Update the gameserver.cfg to define linkstream instead of diststream.
+        The diststream configuration usage has been long since removed but that is not apparent when looking at the file.
+
+        Added the gameserver.maxspectators configuration for spectators.
+
+    GameServerLink
+        Remove the game port configuration for the GameServerLink module. This is always fixed and doesn't change so there
+        is no need to have it configured. With this we remove the uSrcPort from the game data packet as this is never used.
+
+        Add 'stat'/'qlat' selectors for the client's NetGameLinkRefT via the 'stat'/'qlat' selector in GameServerLink
+        In preperation for reporting qos metrics we want to be able to get the appropriate client information from the module.
+        Currently there is no other way to get access to this data.
+
+    LogParse
+        Have the LogParse build depend on the new DirtySDK common contrib instead of manually including the source files into the build.
+
+    stunnel
+        Update the tunnel_cmd.sh script that Servulator calls to output the ports we are listening to connections on.
+
+        Redirect stunnel stderr output to a file via the start_tunnel.py script.
+        We lose the stderr output due to the fact that Servulator eats all the stdout/stderr output that is not logged to a file.
+        To ensure that we have all the information we need when debugging issues we want to redirect the logging to a new file we can grab via Servulator.
+
+    TokenApi
+        Set the ProtoSSL 'skep' option to allow for our HTTP connection to use lower TCP keep-alive values (5min).
+        We were seeing that our connection was being closed on Production by the Online firewall.
+        To work around this issue, we are using lower keep-alive options so the connection will remain open.
+
+    VoipMetricsApp
+        Add more logging around the state of the graphite connection/reporting to help debug connection issues when they arise.
+
+    VoipServer
+        Cleaned up the management of the game port:
+        Previously we went through the whole port list to find the ports to open but we really only needed to open one port,
+        so simplified it by just being explicit of the port we are opening.
+
+        Change so we bring down the poll when doing ProtoSSL RSA operations when communicating with CCS or Nucleus
+        Previously we only brought the poll time down when communicating with Nucleus. Since we need to use client certs for CCS communication
+        we need to also bring the poll time down when it is doing those types of operations.
+
+        Added warnings and errors to the monitor page for UDP diagnostic statistics.
+
+    VoipConcierge
+        Update the check expiration function to no longer check for number of players, instead we check for active connection sets.
+        The check for number of players caused the potential to leak connection sets if an empty connection set was never cleaned up by our clients.
+        While I was there I clarified some of the comments in the function and some trailing whitespace in the file.
+
+        Return an error 500 instead of 403 when there are issues communicating with Nucleus for token validation requests.
+        It is not a fault of the caller that there is an issue communicating with Nucleus. This an issue with the server itself and a 500 should
+        be returned in that instance.
+
+    VoipGameServer
+        Check the max number of game servers and not current number of game servers when validating input to return GameServerT.
+        The array is allocated with max number so you don't need to check the current number of active gameservers.
+        The current state is stored with the data of the gameserver.
+
+    VoipServerConfig
+        Remove the unused configuration: voipport, tunneling, tunnelmode and port map settings.
+
+        Initialize the address when querying for interfaces incase it gets checked before assignment.
+
+EADP Game Services DirtyCast 2015 Winter 2.2.3 - September 19, 2016
+    TokenApi
+        Set the ProtoSSL 'skep' option to allow for our HTTP connection to use lower TCP keep-alive values (5min)
+
+EADP Game Services DirtyCast 2015 Winter 2.2.2 - September 06, 2016
+    VoipConcierge
+        Return an error 500 instead of 403 when there are issues communicating with Nucleus for token validation requests
+
+    VoipGameServer
+        Changed to check the max number of game servers and not current number of game servers when validating input to return GameServerT
+
+    VoipServer
+        Change so we bring down the poll when doing ProtoSSL RSA operations when communicating with CCS or Nucleus
+
+EADP Game Services DirtyCast 2015 Winter 2.2.1 - July 13, 2016
+    VoipConcierge
+         Update the check expiration function to no longer check for number of players, instead we check for active connection sets
+         The check for number of players caused the potential to leak connection sets if an empty connection set was never cleaned up by our clients.
+
+EADP Game Services DirtyCast 2015 Winter 2.2.0 - June 09, 2016
+    Build
+        Updated the scripts to set initializeself on the package. This removes duplication of include directories throughout the build scripts.
+
+        Removed the DIRTYCAST define from the build, this was just a duplication of the "config" property.
+        Updated the version.h generation to use the "config" property instead of relying upon the DIRTYCAST define.
+
+        Fix -Wmissing-prototype warning on Linux. As the function was instead it should be set to static and use a leading underscore based on our
+        coding standard.
+
+        Align the output and program names in the build scripts, so to more easily configure the output name by type in one location.
+
+        Add support for VS2015 in DirtyCast
+
+        Fix an issue in the build scripts where the build options were not being set for the DCLibrary partial module.
+        The buildoption was not nested correctly under the config section.
+
+    ConciergeService
+        Do not check if the access token is valid when validating if we should check token expiration or heartbeat. This allows us to recover from
+        errors without relying on the access token data to be filled out.
+
+        Default the CCS host on module creation.
+
+    DirtyCast
+        Renamed internal port variables appropriately and added a new voipserver.port command parameter.
+
+        Switch the winmain source from C++ to C file
+
+        Removed the bXbox from GameServerConfigInfoT as this is no longer needed. This was artifact of Xbox360 support.
+
+        Initialize the default token expiration time on request failure to 30s.
+
+    GameServer
+        Do not account for the GameServer itself when making the Create Game request to the blazeserver. This artificially pads the max size of the
+        game which can cause problems in other areas like matchmaking.
+
+    GameServerBlaze
+        Removed tunnel mode concept from prototunnel.
+
+        Update the check for the debug level for logging to ensure that we only print when the level is greater than and not equal to.
+        This is consistent to how we do logging in our DirtyCast/DirtySDK modules.
+
+    IPMask
+        Add support to control if all the local address should be added to the masks.
+
+    RestApi
+        Modify the 'spam' control to always pass >0 iValue to ProtoHttpServ 'spam' get the information we want in the logs.
+
+    stunnel
+        Add support for rotating logs. Added a rotate command to the tunnel_cmd.sh that rotates the file, creates a new log and issues the
+        rotate signal to stunnel which reopens the log file. The start_tunnel.py script will issue this command when the log reaches a
+        certain size.
+
+        Drop the default logging level to 5 (notice).
+
+    TokenApi
+        Save the info query access token as this is used as the key into the token cache. This fixes an issue where the tokens were not being
+        cached properly causing the cache to never be used.
+
+    VoipServer
+        Remove the logging for last receive time. This information is not really useful and may cause confusion. The original intent was for tracking
+        stalls which we now have better systems for tracking
+
+    VoipServer (Concierge)
+        Changed the client data to contain two keys (client id / console tag) instead of the two pieces of data concatenated to create one key. This
+        allow each to be queried individually, which fixes an issue where we match to multiple clients that have similar names because of partial matching.
+
+        Remove redundant log prints when removing clients from the VoipTunnel.
+
+        Always use the resolved hostname when registering to the CCS. Using ip address makes it more complicated when dealing with more complex
+        networking setups.
+
+        Set the max supported request payload to 32k for allow for larger bulk requests.
+
+    VoipServerConfig
+        Fix sscanf parameter to use correct format given the type (%u instead of %d)
+
+        Add support for specifying a mask for the frontend address. On some hosts the voipserver selects the wrong frontend address so we want to allow
+        users to set a mask to allow them to filter which address is correct. Normally we would use DirtySDK to do this operation but that method does
+        not allow enough control of selecting the mask.
+
+    VoipMetricsApp
+        Switch the application to use C files
+
+        Initialize the graphite report and connect time. In some cases leaving these as zeros will not result in correct expect values when used in
+        conjunction with NetTickDiff. This will cause the VoipMetrics server to not connect or report to graphite.
+
+        Set the default graphite host to the FE address of eadp.gos.graphite-linedata.ea.com
+
+        Added new metrics deemed necessary after CCS stress tests. Since some of these metrics can be greater than uint32_t the type of all
+        metrics was increased to uint64_t.
+
+        Fixed DirtyCastCollectUdpMetrics to check for data in the udp6 table.
+
+EADP Game Services DirtyCast 2015 Winter 2.1.0 - March 31, 2016
+
+    Build
+        Switch the build output to go to corresponding run folders. This
+        allows us to remove the postbuild task that we were.
+
+        Switch to pc64 as the default build configuration on Windows.
+
+        Print out an error message from the nant.bat script for users
+        that do not build from the command line.
+
+    Deploy
+        Remove the old deploy configurations that were replaced by Servulator.
+
+    DirtyCast
+        Create a DirtyCastGetHostNameByAddr function which is used for getting
+        hostname when there are multiple interfaces on the host.
+
+        Create a DirtyCastLoggerConfig function that allows us to configure
+        the DirtyCast logger without having to create a direct dependency
+        to the logging code from the VoipServer.
+
+    GameServer
+        Switch to using the new Blaze::MeshEndpoint functions that are used
+        for getting the tunnel key, client ids used when adding new clients
+        to games.
+
+    GameServerLink
+        Fixed lpacklost calculation to be based on the stats lpacklost field instead of a difference of rpacksent and
+        lpackrcvd, which can sometimes be wrong.
+
+    RestApi
+        Created a RestApi module used to build a RESTful API built on top of
+        ProtoHttpServ.
+
+    TokenApi
+        Add support for querying token information from Nucleus.
+        Add token caching functionality when querying token
+        information from Nucleus.
+
+    VoipMetrics
+        Add support for new metrics used for Connection Concierge to track the
+        active client connections by prototunnel version.
+
+    VoipMetricsApp
+        Added support for reporting to Graphite / statsd from the VoipMetrics
+        application. This functionality is controlled via configuration and is
+        disabled by default.
+
+    VoipServer
+        Remove the usage of the VoipTunnel 'dcst' control (DirtyCast Hack).
+        This hack is no longer needed so we removed setting of this control.
+
+        Remove the usage of the DirtyNet 'virt' control, this control was not
+        being handled by the module.
+
+        Added support for tunning secure traffic to the VoipServer using
+        stunnel. New scripts were added to allow this program to work with Servulator.
+
+        Refactored the VoipServer to support multiple modes of operation. The previous
+        functionality was moved to either the common logic (voipserver.c) or GameServer
+        specific logic (voipgameserver.c). A Connection Concierge operating mode module was
+        created to handle the functionality specific to Connection Concierge (voipconcierge.c).
+
+        Created new diagnostic functions to be used with Connection Concierge (conciergediagnostic.c)
+
+        Added new certificates to be used to communicate with the CCS on
+        Integration.
+
+        Changed size restriction when parsing a commudp handshake packet to allow compatibility with commudp 1.1 and
+        future versions.
+
+    VoipServerComm
+        Moved the shared communication level functionality into its own file (voipservercomm.c)
+        to deal with CommUDP / DirtyNet usage on the VoipServer.
+
+        Use the NetGamePacketSyncT from netgamepkt.h to decode the sync
+        packets use for grabbing latency information.
+
+    WinMain
+        Switch to using WindowProc instead of DialogProc for handling messages
+        for pc64 builds. The DialogProc function does not work for this configuration
+        causing the messages to not be handled.
+
+EADP Game Services DirtyCast 2015 Winter 2.0.0 - October 22, 2015
+    Hasher
+        Moved the Hasher from DirtySDK to DirtyCast.
+
+    ServerDiagnostic
+        Take advantage of DirtySDK's ProtoHttpServ for serving the diagnostic pages
+
+EADP Game Services DirtyCast 2015 Winter 1.1.0 - July 09, 2015
+
+    QoSStress
+        Changed the stress test pattern to only do NetConnStartup and NetConnShutdown once rather than
+        for each test cycle. This slowed down the throughput of the stress test significantly.
+
+    VoipServer/GameServer
+        Changed the VoipServer to request the authentication token from
+        Nucleus and to have the GameServer request it from the VoipServer.
+        This will greatly decrease load on the servers when GameServers are
+        logging into the blazeserver at startup.
+
+    Build
+        Switched DirtyCast to build using Framework Structured XML.
+
+EADP Game Services DirtyCast 2015 Winter 1.0.1 - June 05, 2015
+
+    BugSentryScript
+        Added the final location of the core file to the BugSentry crash reports.
+
+        Divided BugSentry crash reports into sub categories based on server version and service name.
+
+    VoipServer
+        Added logging of source port to existing logging of source addr when first receiving data from a user.
+
+        Added logging of secure key when adding a user to a game.
+
+EADP Game Services DirtyCast 2015 Winter 1.0.0 - April 09, 2015
+
+    BugSentryScript
+        Added a new python script to send crash email alerts and BugSentry reports when dirtycast crashes.
+        Please contact GOS Operations to be added to the email alerts list.
+        For BugSentry information refer to https://docs.developer.ea.com/display/bugsentry/BugSentry
+
+    GameServer
+        Increased idle polling rate from once a second to five times a second (1000ms to 200ms polling rate).
+        The slow polling rate was found to cause RSA computation spread out over multiple frames (a new feature)
+        take too long and exceed the protocol timeout period.
+
+EADP Game Services DirtyCast 2015 Winter 0.3.0 - March 16, 2015
+
+    GameServerBlaze
+        Removed temporary hack to work around Blaze not being able to provide a
+        ConnectionGroupID for DirtyCast. Blaze is now fixed.
+
+EADP Game Services DirtyCast 2015 Winter 0.2.0 - January 28, 2015
+
+    GameServerBlaze
+        Fixed possible memory trashing bug when loading a certificate for trusted login.
+
+        Added temporary hack (will be removed in next release) to work around Blaze not being
+        able to provide a ConnectionGroupID for DirtyCast.
+
+    GameServerNetworkAdapter
+        Modified the GameSeverNetworkAdapter in order to build DirtyCast with the PS4 session lock support.
+
+
+EADP Game Services DirtyCast 2015 Winter 0.1.0 - December 4, 2014
+
+    GameServerBlaze
+        Replaced usage of machine id as a client identifier with the usage of the connection group id.
+        The usage of the connection group id implicitly allows for multiple virtual machines.
+        This change is also eliminating some possible client id collisions with the former implementation.
+        It is also addressing the Todo related to the initialization of the gamserverid in
+        GameServerBlazeC::ResetGame().
+
+
+EADP Game Services DirtyCast 2014 Spring 1.1.0 - July 10, 2014
+
+    GameServerNetworkAdapter
+        Tailored for new synopsis of getQosStatisticsForEndpoint()
+
+
+EADP Game Services DirtyCast 2014 Spring 1.0.0 - June 11, 2014
+
+    GameServerLink
+        Modified _GameServerLinkL2RPktLossDetection() to now return TRUE if pLink->uRedundancyThreshold is 0.
+        This allows for easily enabling the feature with just setting gameserver.redundancythreshold=0
+
+    QoSStress
+        Added -servicename parameter to NetConnStartup for the QosStress bot.
+
+    StressBlaze
+        Fixed a build error with a switch statement not handling every case.
+
+
+EADP Game Services DirtyCast 2014 Spring 0.6.0 - May 13, 2014
+
+    GameServer
+        Added logics to track total redundancy limit change count for the lifetime of the gameserver.
+
+    GameServerLink
+        Added a counter to track the number of times NetGameLinkControl('rlmt')  is used per client. Also improved
+        logging related to that feature.
+
+        Created GameServerLinkStatus().
+
+        Added code to appropriately populate uRlmtChangeCount field of GameServerLateInfoT.
+
+    GameServerPkt
+        Moved definitoin of GameServerStatHistoryT from gameserverpkt.h to voipserver.h
+
+        Added uRlmtChangeCount field to GameServerLateInfoT (used for 'late' packets). Used by gameserver to
+        periodically announce to voipserver recent delta in number of times rlmt selector was used since last update.
+
+    VoipMetrics
+         Added formating and parsing support for uRlmtChangeCount in VoipMetricsFormatXml() and VoipMetricParseXml()
+
+    VoipMetricsApp
+        Added support for new rlmt info to _MonitorPrintMetrics().
+
+    VoipServer
+        Added logics to track total redundancy limit change count for the lifetime of each gameserver.
+
+        Added support for accumulating rlmt count updates from all active gameservers.
+
+EADP Game Services DirtyCast 2014 Spring 0.5.0 - April 22, 2014
+
+    GameServer
+        Modified dirtycast to bump the connection redundancy limit (using 'rlmt') when local->remote packet loss is
+        detected.
+
+        4 new config parameters:  gameserver.redundancylimit, gameserver.redundancythreshold,
+        gameserver.redundancytimeout, gameserver.redundancyperiod
+
+        Increased diagnostic buffer size from 4kbytes to 8kbytes.
+
+        Added support for the server to server trusted login. There are now new command line arguments:
+        -gameserver.usetrustedlogin, which enables the trusted login, default is 1, if 0 it will use the express
+        login flow
+        -gameserver.certfilename, used to pass the certificate file path
+        -gameserver.keyfilename, used to pass the key file path
+        When used with servulator the cert/key files are expected to be found in "GameServer\run\certs" and
+        should be named, <gamename>-<platform>-<environment>.crt/key, if this file is not found the
+        default.crt/key will be used.
+
+    GameServerDiagnostic
+        Fixed byte count passed to SocketSend() when a formatting overflow occurs.
+
+        Added stats of connected client to gameserver status
+
+    GameServerLink
+        DirtySDK's SocketControl('push') no longer add recv timestamp to sockaddr struct automatically.
+        So we need to do it explicitly in DirtyCast.
+
+        Modified dirtycast to bump the connection redundancy limit (using 'rlmt') when local->remote packet loss is
+        detected.
+
+        Modified implementation such that all connection quality evaluation logics is now centralized in
+        _GameServerLinkPoorConnQuality().
+
+        Created GameServerLinkDiagnosticStatus().
+
+
+
+EADP Game Services DirtyCast 2014 Spring 0.4.0 - March 4, 2014
+
+    GameServerBlaze
+        Improved logging for best minimal default logging in production.
+
+EADP Game Services DirtyCast 2014 Spring 0.3.0 - February 5, 2014
+
+    GameServerBlaze
+        Fixed mUserRefCount being cleared inappropriately under some specific timing conditions, this could cause
+        the game server to crash.
+
+        Updates for changes to Blaze API GameManagerAPIListener::onPlayerAttributeUpdated().
+
+
+EADP Game Services DirtyCast 2014 Spring 0.2.0 - January 15, 2014
+
+    Build
+        PC and PC64 build fixes.
+
+        DirtyCast now uses TDF package.
+
+    GameServer
+        Increased debuglevel of 'ping' packet output above dbglevel 3.
+
+    GameServerBlaze
+        GameServerBlazeGameListenerC::onPlayerJoining() now tests Blaze version at run time instead of compile time.
+
+    GameServerLink-cust
+        Fixed buggy end condition of FOR loop in _GameServerLinkBroadcast
+
+    Log parser
+        Added explicit 'valid' tag for stall record, replacing the address == 0 check that did not work in all cases.
+
+    VoipServer
+        Increased debuglevel of 'ping' packet output above dbglevel 3.
+
+    VoipServerDiagnostic
+        Fixed bad print in gamestats metrics that could cause a crash on access.
+
+
+EADP Game Services DirtyCast 2013 Summer 1.4.0 - November 25, 2013
+
+    General
+        Fixed up Dirtycast to use TDF package.
+
+        Dirtycast C++ files now include EABase up front to avoid issues with UINT64_C and its cousins. Also fixed a few DC only
+        EATDF issues preventing the build from working.
+
+    GameServerBlaze
+        Fixed DirtyCast to properly internally reset the game when the game state transits to the RESETABLE state as a
+        result of some blaze server logics and not as a result of DirtyCast calling returnDedicatedServerToPool().
+
+        Set the game name to "" instead of the persona name "@dirtybot", so that the name is not visible from invites.
+
+        Fixed GameServerBlazeGameListenerC::onPlayerRemoved() to ignore reserved players.
+
+    GameServer/GameServerLink
+        Fixed Dirtycast to now use the client index specified by Blaze to guarantee that DirtyCast client list is
+        aligned with Blaze client list.    Under some matchmaking racing condition, it is possible for Blaze to
+        introduce a new player at the end of the list even if there are empty spots in the middle of the list.
+        When that occurred, DirtyCast would become misaligned because internally it would rather insert this new
+        client in the free spot in the middle of the list.
+
+
+EADP Game Services DirtyCast 2013 Summer 1.3.0 - October 15, 2013
+
+        No Changes. Bumping Version Number to match Blaze and DirtySDK.
+
+
+EADP Game Services DirtyCast 2013 Summer 1.2.1 - October 2, 2013
+    GameServerBlaze
+        Updated implementation of GameServerStateEventHandlerC::onDeAuthenticated() with appropriate clean up code
+        to address an issue where dirtycast dedicated servers were not going back to server pool upon multiple
+        disconnections from blaze server because mUserRefCount ended up not being reset correctly.
+
+        Updated to encrypt prototunnel data.
+
+        Changed the key used to encrypt prototunnel connections to use player UUIDs instead of machine IDs to provide
+        better security.
+
+        Fixed player slot index adjustments for p2p failover backwards compatibility.
+
+    LogParser
+        Added integration with GeoIP
+
+    VoipServer
+        Changed the key used to encrypt prototunnel connections to use player UUIDs instead of machine IDs to provide
+        better security.
+
+        Updated when using DS 13.3.1.2.1+ to override voip portflag setting to enable voip encryption.
+
+
+EADP Game Services DirtyCast 2013 Summer 1.2.0 - August 21, 2013
+
+    Build
+        Updated Framework version to 3.11.00
+
+    GameServerBlaze
+        Fixed an issue with the onPlayerRemoved logic which cause players not to be removed properly from the game
+        in fail over modes.
+
+    GameServerNetworkAdpater
+        Fixed xbox server address not being correctly filled with the local machine id.
+
+
+EADP Game Services DirtyCast 2013 Summer 1.1.0 - August 13, 2013
+
+    GameSever
+        Added Better logging for vs'conf'.
+
+        Added default game port of 7778 to match vs default with tunneling enabled.
+
+    GameServerBlaze
+        Fixed an integration issue with userId.
+
+        Fixed slot issue with failover mode topologies that prevented voip from working
+
+    GameServer.cfg
+        Removed gameserver.gameport=0 specification that would otherwise override the setting of the port 7778
+
+
+EADP Game Services DirtyCast 2013 Summer 1.0.0 - July 03, 2013
+
+    Build
+        Added Unix warning suppression for new Wno-unused-but-set-variable warning in gcc version 4.6 and greater.
+
+    GameServer
+        Added "Peer Hosted Fail Over" topology, "-peermode="phfo"
+
+    GameServerBlaze
+        Changed to use PROTOTUNNEL_MODE_GENERIC with MEMBER_XBOXCLIENTADDRESS if the platform isn't configured as xbl2.
+
+
+EADP Game Services DirtyCast 2013 Summer 0.5.0 - June 07, 2013
+
+    GameServer
+        Added tunnel mode to 'nusr' packet.
+
+    GameServerBlaze
+        Changed to pass tunnel mode to gameserver.cpp.
+
+    VoipServer
+        Removed global tunnel mode setting (no longer supported by prototunnel).
+
+        Added reading of tunnel mode from 'nusr' packet and storing it in the VoipTunnelClientT structure,
+        then passing it on to ProtoTunnel when allocating a tunnel for the client.
+
+    VoipTunnel
+        Added VoipTunnelClientT.uTunnelMode.
+
+
+EADP Game Services DirtyCast 2013 Summer 0.4.0 - May 06, 2013
+
+    Build
+        FW 3.03.01->3.07.00, added EAJson-1.02.05 to provide compatibility with BlazeSDK
+
+        Updated EASTL to 1.17.00
+
+        Upgraded to EABase 2.00.33
+
+    GameServer
+         Fixed link error for Vsnprintf8.
+
+    GameServerBlaze
+        Removed PC login flow.
+
+    StressBlaze
+        Removed PC login flow.
+
+
+EADP Game Services DirtyCast 2013 Summer 0.3.0 - April 08, 2013
+
+    GameServer
+        Cleaned up to use NetTickDiff(), changed fixed update rate to hard-coded 1000 when not in game.
+
+    GameServerMulti
+        Reduced start rate to 0.2s
+
+    Stress
+        Added LATE_RATE defaulting to 15s (same as voipmetrics rate we use during stress testing).
+
+        Added DEBUG_POLL config parameter to allow runtime poll rate monitoring (disabled by default).
+
+        Changed to mark game as not started when it ends.
+
+    StressBlaze
+        Instead of exiting on username login or persona login failure, sleep a second and then try again.
+
+        Changed to mark game as not started when it ends.
+
+        Changed game matchmaking to ensure max-sized games; adding at a specific rate is no longer required.
+
+    StressGamePlay
+        Made NetGameLinkStat printing function safer by including an early-out if the link ref is null.
+
+        Added SetGameEnded() so game begin/end status is accurate.
+
+        Added SetDebugPoll() for debug polling support.
+
+        Changed debug poll logging to be compiled in at all times, printing is controlled by config entry
+        (defaulting to off).
+
+        Changed to only send dist packets if the game is started; this helps prevent a situation where clients send
+        a flood of dist packets at the end of the game that result in the client removing itself from an already
+        ending game with an error logged.
+
+        Added per-second latency logging when not in game to better track latency at that time.
+
+    Voipmetrics
+        Added tracking of out-of-order packet discards.
+
+    VoipMetricsApp
+        Added tracking of out-of-order packet discards.
+
+    VoipServer
+        Added tracking of out-of-order packet discards.
+
+        Changed all GS-specific logging to start with [gs%03d] to make grepping easier.
+
+        Misc logging cleanup.
+
+        Cleane up to use NetTickDiff().oved ProtoTunnelUpdate() after gameserver update to improve latency
+        performance when minimal activity on server.
+
+        Added main loop timing warning if main loop takes too long if verbose>0.
+
+        Changed use of VoipTunnelClientListMatchFunc() with a sockaddr-matching function to use
+        VoipTunnelClientListMatchSockaddr().
+
+    VoipServerDiagnostic
+        Added tracking of out-of-order packet discards.
+
+
+EADP Game Services DirtyCast 2013 Summer 0.2.0 - March 14, 2013
+    GameServer
+        Fixed DirtyCast game server build after the LoginManagerListener::onLoginFailure() signature
+        was changed in BlazeSDK.
+
+    Stress
+        Fixed DirtyCast stress client build after the LoginManagerListener::onLoginFailure() signature
+        was changed in BlazeSDK.
+
+
+EADP Game Services DirtyCast 2013 Summer 0.1.0 - February 14, 2013
+    All
+        Added migrating state tracking.
+
+    Log Parser
+        Optimized _LogParseDateTime() to remove dependence on (very very slow) sscanf.
+
+        Performed minor cleanup plus sorting of stall event addresses
+
+        Added IP address parsing and summary in stall event processing.
+
+    Logger
+        Made compatibility changes for Windows
+
+EADP Game Services DirtyCast 2013 Winter 0.5.0 - November 26, 2012
+    Build
+        PC build:
+            * Now requires FW3.
+            * Updated the version number of several packages captured in the masterconfig file
+              in preparation for building only with FW3.
+
+        Unix build:
+            * Still on FW2. Will require FW3 in next release.
+
+
+EADP Game Services DirtyCast 2013 Winter 0.4.0 - November 2, 2012
+    Build
+        Updated scripts to resolve issues encountered with framework 3 multi-threaded builds.
+
+    GameServer
+        Adapted to new BlazeSDK api 'getLocalAddress(uint32_t userIndex)'
+
+        Log inbound and end-to-end latency on a single line to make them easier to individually track, and take up fewer lines of output.
+
+        Removed unnecessary spam from Blaze disconnection event logging.
+
+        Track no-input mode enable/disable events, and track last flow control input from client.
+
+        Added logging when a 1.5s or greater link-layer stall is detected on a client connection.
+
+        Added tracking of packet loss from client->server, and enable poor connection logging on a client connection if >2.5% packet loss
+        is observed over a one minute period.
+
+        Track and report MIGRATING state separately from OTHER for gamestats metrics and any transitions to MIGRATING state from
+        POST_GAME state is ignored for the purposes of metrics.
+
+    VoipServer
+        Added logging when a 1.5s or greater game packet stall is detected on a client connection.
+
+EADP Game Services DirtyCast 2013 Winter 0.3.0 - October 1, 2012
+    GameServer
+        Modified GameManagerAPIListener interface indirect join methods to indicate the player or local index that the dispatch was for.
+        This allowed for Ignition GameManagement to prevent duplicate connApi setups during setupGame.
+
+        Fixed web api 'action?debuglevel=' from stomping memory.
+
+    Shared
+        Refactored ipmask, added allowances for local addresses within hard-coded /20
+
+EADP Game Services DirtyCast 2013 Winter 0.1.0 - August 7, 2012
+    All (pre-release)
+        Updated for api changes made in DirtySDK 13.1.0.1.0 (pre-release)
+
+        Updated for api changes made in BlazeSDK 13.1.0.1.0 (pre-release)

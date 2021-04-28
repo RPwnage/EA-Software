@@ -1,0 +1,423 @@
+#!/bin/bash
+
+# fetch list of servers
+
+relative_path=$0
+let last_slash=-1
+for (( i=0;i<${#relative_path};i++ ))
+do
+  if [ "${relative_path:i:1}" = "/" ]; then
+    let last_slash=i+1
+  fi
+done
+if [ $last_slash -gt -1 ]; then
+  relative_path=${relative_path:0:$last_slash}
+else
+  relative_path="./"
+fi
+
+source $relative_path/common
+
+function usage {
+  echo "Usage: $0 servicename environment platform instance [options] {--component component {[@|!]variable[-min][+max][%deviation]}... }..."
+  echo "argument values:"
+  echo "  environment: prod | test | dev"
+  echo "  platform: pc | xbl2 | ps3"
+  echo "  instance: instance name (such as searchSlave or coreMaster) or - for all instances"
+  echo "  options:"
+  echo "       --noheader       do not print header header"
+  echo "       --nobuildinfo    do not print version, built time and source location"
+  echo "       --help           print usage (this information)"
+  echo "  component: component name, such as search or clubs"
+  echo "  variable: server status variable to fetch, such as SSGaugeActiveFGSessions or GaugeTotalUserSessions"
+  echo "            if prefixed with '+' sum is calculated and displayed at the bottom of table"
+  echo "            if prefixed with '@' that column is used to group rows; if groupping is specified then sums are calculated withing groups"
+  echo "            if suffix '-' followed by number 'min' is specified then column value (or column sum) is marked if it is less then 'min'" 
+  echo "            if suffix '+' followed by number 'max' is specified then column value (or column sum) is marked if it is greater then 'max'" 
+  echo "            if suffix '%' followed by number 'dev' is specified then column value is marked if the value (or column sum) deviates more than 'dev' percent from average column value (or average sum)" 
+}
+
+function headerborder {
+  if [ $printheader = "yes" ]; then
+    local i
+    let c=10*$1+20
+    for (( i=0;i<c;i++ ))
+    do
+      printf "%c" $2
+    done
+    printf "\n"
+  fi
+}
+
+function getnumber {
+  local i
+  local ch
+  str=$1
+  for (( i=0;i<${#str};i++ )) 
+  do
+    ch=${str:$i:1}
+    if [ -z $(echo $ch | sed -e 's/[0-9]//g') ]; then
+      echo -n $ch
+    else
+      break
+    fi
+  done
+}
+
+param_service_name=$1
+param_env=$2
+param_plat=$3
+param_instance=$4
+args=("$@")
+
+if [ $# -lt 7 ]; then
+  usage
+  exit 1
+fi
+
+compswitch="--component"
+component="usersessions"
+
+redirector=$(getredirector $param_env)
+
+let argc=4
+let columncount=0
+printsum="no"
+hastargets="no"
+sortk=-1
+printheader="yes"
+printbuildinfo="yes"
+
+while [ $argc -lt $# ]; do
+  cmd=${args[$argc]}
+  if [ $cmd = $compswitch ]; then
+     component=${args[$argc+1]}
+     let argc=argc+1
+  elif [ $cmd = "--noheader" ]; then
+     printheader="no"
+  elif [ $cmd = "--nobuildinfo" ]; then
+     printbuildinfo="no"
+  elif [ $cmd = "--help" ]; then
+     usage
+     exit 0
+  elif [ ${cmd:0:2} = "--" ]; then
+     echo "Uknown option: $cmd"
+     exit -1
+  else
+     variablename=${args[$argc]}
+     firstchar=${variablename:0:1}
+     issummable[$columncount]="no"
+
+     # test prefix
+     if [ $firstchar = "+" ]; then
+       variablename=${variablename:1}
+       issummable[$columncount]="yes"
+       printsum="yes"
+     elif [ $firstchar = "@" ]; then
+       variablename=${variablename:1}
+       let sortk=$columncount
+     fi
+
+     # test suffix
+     let suffixstart=${#variablename}
+     for (( i=1;i<${#variablename};i++ ))
+     do
+       ch=${variablename:$i:1}
+       let j=i+1
+       if [ $ch = "-" ]; then
+         # min
+         if [ $i -lt $suffixstart ]; then
+           let suffixstart=$i
+         fi
+         colmin[$columncount]=$(getnumber ${variablename:$j})
+         hastargets="yes"
+       elif [ $ch = "+" ]; then
+         # max
+         if [ $i -lt $suffixstart ]; then
+           let suffixstart=$i
+         fi
+         colmax[$columncount]=$(getnumber ${variablename:$j})
+         hastargets="yes"
+       elif [ $ch = "%" ]; then
+         #deviation
+         if [ $i -lt $suffixstart ]; then
+           let suffixstart=$i
+         fi
+         coldev[$columncount]=$(getnumber ${variablename:$j})
+         hastargets="yes"
+       fi
+     done
+     variablename=${variablename:0:$suffixstart}
+     
+     grepcmd[$columncount]=$component"."$variablename"="
+     header[$columncount]=$component"."$variablename
+     let columncount=columncount+1
+  fi
+  let argc=argc+1
+done
+
+valname=$(echo -n ${header[*]} | tr " " $'\n' | sort | tr $'\n' " " | tee)
+
+#
+# Print pretty header
+#
+
+
+if [ $printheader = "yes" ]; then
+  headerborder ${#header[*]} "-"
+
+  let maxlen=0
+  for h in ${header[*]} do 
+  do
+    if [ $maxlen -lt ${#h} ]; then
+      let maxlen=${#h}
+    fi
+  done
+
+  for (( i=0;i<maxlen;i+=9 )) do
+    printf "%20s" " "
+    for h in ${header[*]}
+    do
+      printf " %-9s" ${h:$i:9}
+    done
+    printf "\n"
+  done
+
+  headerborder ${#header[*]} "-"
+
+  if [ $hastargets = "yes" ]; then
+    printf "%-20s" "Target Min"
+    let colcount=${#header[*]}
+    for (( i=0;i<$colcount;i++ )) do
+      if [ -n "${colmin[$i]}" ]; then
+    printf "%9s " "${colmin[$i]}"
+      else
+    printf "%10s" " "
+      fi
+    done
+    printf "\n"
+    printf "%-20s" "Target Max"
+    for (( i=0;i<$colcount;i++ )) do
+      if [ -n "${colmax[$i]}" ]; then
+    printf "%9s " "${colmax[$i]}"
+      else
+    printf "%10s" " "
+      fi
+    done
+    printf "\n"
+    printf "%-20s" "Deviation"
+    for (( i=0;i<$colcount;i++ )) do
+      if [ -n "${coldev[$i]}" ]; then
+    printf "%9s " "%${coldev[$i]}"
+      else
+    printf "%10s" " "
+      fi
+    done
+    printf "\n"
+    headerborder ${#header[*]} "-"
+  fi
+fi # if $printheader
+
+oldifs=$IFS
+IFS=$'\n'
+
+servers=$(getservers $redirector $param_service_name $param_env $param_plat $param_instance "httpxml" 1)
+
+for server in $servers
+do
+  name=$(echo $server | awk '{ print $1 }')
+  addr=$(echo $server | awk '{ print $2 }')
+  curl ${curlOpts[*]} "http://$addr/blazecontroller/getStatus" | xsltproc $relative_path/getvaluesfromstatus.xslt - | sort >/tmp/"$name"_$$.txt &
+done
+
+wait
+
+sourcelocation=""
+version=""
+buildtime=""
+previnstance=""
+
+let row=0
+for server in $servers
+do
+  IFS=$'\n '
+  name=$(echo $server | awk '{ print $1 }')
+  filename=/tmp/"$name"_$$.txt
+
+  #check instance validity
+  cur_sourcelocation=$(grep "blazeinstance.sourcelocation" $filename | awk '{ print $2 }')
+  cur_version=$(grep "blazeinstance.version" $filename | awk '{ print substr($0, 24) }')
+  cur_buildtime=$(grep "blazeinstance.buildtime" $filename | awk '{ print substr($0, 26) }')
+
+  if [ "$buildtime" != "" ]; then
+    if [ "$version" != "$cur_version" -o "$sourcelocation" != "$cur_sourcelocation" -o "$buildtime" != "$cur_buildtime" ]; then
+      adderror "Version: (buildtime=$cur_buildtime, version=$cur_version, sourcelocation=$cur_courcelocation) on instance $name != (buildtime=$buildtime, version=$version, sourcelocation=$sourcelocation) on instance $previnstance"
+    fi
+  fi
+
+  sourcelocation="$cur_sourcelocation"
+  version="$cur_version"
+  buildtime="$cur_buildtime"
+  previnstance="$name"
+ 
+  resultbuf=$(cat $filename)
+  rm $filename
+  results[$row]=$name
+  IFS=$' '
+  let colcount=0
+  for gcmd in ${grepcmd[*]}
+  do
+    foundval=$(echo -n $resultbuf | grep $gcmd | awk '{ printf("%s ", $2) }') 
+    if [ ${#foundval} -eq 0 ]; then
+      results[$row]=${results[$row]}" n/a"
+    else
+      results[$row]=${results[$row]}" $foundval"
+      let colsum[colcount]=colsum[colcount]+$foundval
+    fi
+    let colcount=colcount+1
+  done
+  let row=row+1
+done
+
+buf=""
+let groupval=0
+cursumval=""
+declare -a sums
+let cn=0
+
+for (( i=0; i<$row; i++))
+do
+  let cn=0
+  rowval=(${results[$i]})
+  if [ $sortk -gt -1 ]; then
+    # groupping is enabled
+    groupcol=$sortk
+    groupval=${rowval[$groupcol+1]}
+    if [ $groupval = "n/a" ]; then
+      # groupping column is not found so disable groupping
+      let sortk=-1
+      printsum="no"
+    else
+      sumrow=(${sums[$groupval]})
+    fi
+  fi 
+  printf -v rowbuf "%-20s" ${rowval[0]}
+  for (( column=0; column<${#header[*]};column++ ))
+  do
+    flag=" "
+    actualrowval=${rowval[$column+1]}
+    if [ "$actualrowval" = "n/a" ]; then
+      columnval="n/a"
+      sumrow[cn]="n/a"
+      adderror "Variable ${header[$column]} was not found on instance ${rowval[0]}"
+    else
+      let columnval=${rowval[$column+1]}
+      if [ "${issummable[$column]}" != "yes" ]; then
+        # check min/max
+        if [ -n "${colmax[$column]}" ]; then
+          if [ ${colmax[$column]} -lt $columnval ]; then
+            flag="*"
+            adderror "Variable ${header[$column]}=$columnval exceeded target maximum of ${colmax[$column]} on instance ${rowval[0]}"
+          fi
+        fi
+        if [ -n "${colmin[$column]}" ]; then
+          if [ ${colmin[$column]} -gt $columnval ]; then
+            flag="*"
+            adderror "Variable ${header[$column]}=$columnval is less than target minimum of ${colmin[$column]} on instance ${rowval[0]}"
+         fi
+        fi
+      fi
+      if [ "${sumrow[cn]}" != "n/a" ]; then
+        let sumrow[cn]=${sumrow[$cn]}+columnval
+      fi
+    
+      # check for deviation
+      if [ -n "${coldev[$column]}" ]; then
+        let avg=${colsum[$column]}/$row
+        let okdev=avg*${coldev[$column]}/100
+        let dev=$columnval-$avg
+        if [ $dev -lt 0 ]; then
+          let dev=-dev
+        fi
+        if [ $okdev -lt $dev ]; then
+          flag="*"
+          adderror "Variable ${header[$column]} (deviation=$dev) exceeds target deviation of $okdev (${coldev[$column]}% of $avg (${colsum[$column]}/$row)) on instance ${rowval[0]}"
+        fi
+      fi
+    fi
+    printf -v rowbuf  "%s%9s%s" "$rowbuf" $columnval "$flag"
+    let cn=cn+1
+  done
+  if [ $printsum = "yes" ]; then
+    sums[$groupval]="${sumrow[@]}"
+  fi
+  printf -v buf "%s%s\n" "$buf" "$rowbuf"
+done
+
+if [ $sortk = "-1" ]; then
+  echo -n "$buf"
+  groupvals=( 0 )
+else
+  let sortcol=sortk+2
+  echo -n "$buf" | sort "-k$sortcol,$sortcol"
+  groupvals=$(echo -n "$buf" | awk "{ print \$$sortcol \" \" }" | sort -u | tr -d '\n')
+fi
+
+if [ $printsum = "yes" -a $cn -gt 0 ]; then
+  headerborder $columncount "="
+  for groupval in $groupvals
+  do
+    sumrow=(${sums[$groupval]})
+    printf "%-20s" "Total"
+    for (( i=0; i<$cn; i++ )) 
+    do
+     flag=" "
+     if [ ${issummable[$i]} = "yes" ]; then
+        if [ ${sumrow[$i]} != "n/a" ]; then
+          if [ -n "${colmax[$i]}" ]; then
+            if [ ${colmax[$i]} -lt ${sumrow[$i]} ]; then
+              flag="*"
+              if [ $sortk -gt -1 ]; then
+                groupmsg="for ${header[$sortk]}=$groupval"
+              else
+                groupmsg=""
+              fi      
+              adderror "Total of ${sumrow[$i]} for variable ${header[$i]} exceeds target maximum of ${colmax[$i]} $groupmsg"
+           fi
+          fi
+          if [ -n "${colmin[$i]}" ]; then
+            if [ ${colmin[$i]} -gt ${sumrow[$i]} ]; then
+              flag="*"
+              if [ $sortk -gt -1 ]; then
+                groupmsg="for ${header[$sortk]}=$groupval"
+              else
+                groupmsg=""
+              fi      
+              adderror "Total of ${sumrow[$i]} for variable ${header[$i]} is less than target minimum of ${colmin[$i]} $groupmsg"
+            fi
+          fi
+        fi
+        printf "%9s%s" ${sumrow[$i]} "$flag"
+      elif [ $i -eq $sortk ]; then
+        printf "%9s " $groupval
+      else
+        printf "%10s" " "
+      fi
+    done
+    printf "\n"
+  done
+fi
+
+headerborder $columncount "-"
+
+if [ $printbuildinfo = "yes" ]; then
+  echo "Version........... $version"
+  echo "Build time........ $buildtime"
+  echo "Source location... $sourcelocation"
+fi
+
+if [ $errorcount -gt 0 ]; then
+  printerrors
+  exit -1
+fi
+

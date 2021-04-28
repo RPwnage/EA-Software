@@ -1,0 +1,144 @@
+group rpcarsonclientcommandshelpersource : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+rootComponent(fileNode, node) ::= <<
+
+<standardFileHeader()>
+
+#include "EABase/config/eaplatform.h"
+#if defined EA_PLATFORM_WINDOWS
+    #include "winsock2.h"
+#endif
+#include "actions/clientcommandshelper.h"
+
+#include "shared/BlazeClientDefines.h"
+#include "framework/protocol/shared/heat2encoder.h"
+#include "framework/protocol/shared/heat2decoder.h"
+#include "shared/ArsonDefines.h"
+
+#include "BlazeTestHelpersWrapper.h"
+using namespace ArsonWrapper;
+
+
+<node.Subcomponents:helperDefinitions(component=it); separator="\n\n">
+
+<standardFileFooter()>
+
+>>
+
+helperDefinitions(component) ::= <<
+<if(!component.IsMaster)><component.Commands:helperDefinition(command=it); separator="\n\n"><endif>
+>>
+
+helperDefinition(command) ::= <<
+
+long CClientCommandsHelper_CG::Send_<component.Name;format="pascal"><component.Type;format="pascal">_<command.Name;format="pascal">Command(int32_t consoleHandle, Arson::ClientStructures::ArsonMetaData* metadata<if(command.RequestType)>, <elseif(command.ResponseType)>, <elseif(command.errortype)>, <endif><commandSig(req={void* req}, resp={void* rsp}, err={void* errorTdf}, sep=", ")>)
+{
+<if(command.RequestType)>
+    const <printTypeRefFullScope(command.RequestType)>* requestTdf = (<printTypeRefFullScope(command.RequestType)>*)req;
+<endif>
+
+<if(command.ResponseType)>
+    <printTypeRefFullScope(command.ResponseType)>* responseTdf = (<printTypeRefFullScope(command.ResponseType)>*)rsp;
+<endif>
+
+<if(command.errortype)>
+    <printTypeRefFullScope(command.errortype)>* errResponseTdf = (<printTypeRefFullScope(command.errortype)>*)errorTdf;
+<endif>
+
+    char szMethodName [ 200 ] = "";
+    SAFE_LOAD_STRING(szMethodName, sizeof( szMethodName ), "[TCM]<component.Name>.<command.Name;format="pascal">");
+    UtilitiesWrapper::StartProfiler(szMethodName);
+
+    long result = S_OK;
+    bool success = false;
+    size_t requestLen = 0;
+    size_t responseLen = 0;
+    <if(command.ResponseType)><printTypeRefFullScope(command.ResponseType)> tempResponse;<endif>
+    <if(command.errortype)><printTypeRefFullScope(command.errortype)> tempErrResponse;<endif>
+    uint8_t* request = nullptr;
+    uint8_t* response = nullptr;
+    Blaze::RawBuffer* rawRequest = nullptr;
+    Blaze::RawBuffer* rawResponse = nullptr;
+    Blaze::Heat2Encoder* heatEncoder = nullptr;
+    Blaze::Heat2Decoder* heatDecoder = nullptr;
+    char szOutput [ 200 ] = "";
+
+    rawRequest = new Blaze::RawBuffer(CONST_MAX_ROW_BUFFER_LEN);
+    heatEncoder = new Blaze::Heat2Encoder;
+
+    LOAD_CLIENT_NAME;
+    metadata->setComponentId(<component.SubComponentId>);
+    metadata->setCommandId(<command.id>);
+    metadata->setTimeoutInfinite(InlineIsTimeoutInfinite());
+
+    success = heatEncoder->encode(*rawRequest, *metadata);
+    <if(command.RequestType)>
+    success = heatEncoder->encode(*rawRequest, *requestTdf);
+    
+    // Heat encoder may now fail for edge test cases, e.g. non utf8 tdfstrings. Return appropriate code for validation
+    if (!success)
+    {
+        metadata->setArsonErrCode(ARSON_ERR_SYSTEM);
+        SAFE_LOAD_STRING(szOutput, sizeof( szOutput ), "Hub%2u Usr%2u - NOT Executing command <command.Name;format="pascal"> on component <component.Name>. Command aborted due to failure encoding request. Check request. For instance are TDF strings valid utf8?", metadata->getBlazeHubIndex(), metadata->getUserIndex());
+        LOG_INFOX(szOutput);
+        delete rawRequest;
+        delete heatEncoder;
+        delete heatDecoder;
+        UtilitiesWrapper::StopProfiler(szMethodName);
+        return( 0 );
+    }
+    <endif>
+
+    requestLen = rawRequest->size();
+    request = new uint8_t [ requestLen ];
+    ::memcpy(request, rawRequest->head(), requestLen);
+
+    //LOG_INFOX("Executing command <command.Name;format="pascal"> on component <component.Name>...");
+    SAFE_LOAD_STRING(szOutput, sizeof( szOutput ), "Hub%2u Usr%2u - Executing command <command.Name;format="pascal"> on component <component.Name>...", metadata->getBlazeHubIndex(), metadata->getUserIndex());
+    LOG_INFOX(szOutput);
+    result = BlazeTestHelpersWrapper::ExecuteCommand(consoleHandle, request, (unsigned int)requestLen, response, (unsigned int&)responseLen, metadata->getCommandTimeoutSec(), metadata->getCommandTimeoutSec());
+
+    rawResponse = new Blaze::RawBuffer(response, responseLen);
+    rawResponse->put(responseLen);
+    heatDecoder = new Blaze::Heat2Decoder();
+    heatDecoder->setBuffer(rawResponse);
+
+
+    if (result != 1) //should always have 1 response
+    {
+        LOG_ERRORX("InlineExecCommand failed for command <command.Name;format="pascal"> ");
+    }
+    else // decode response
+    {
+        success = heatDecoder->decode(*rawResponse, *metadata) == Blaze::ERR_OK;
+        //EA_ASSERT(success);
+        <if(command.ResponseType)>
+        success = heatDecoder->decode(*rawResponse, tempResponse) == Blaze::ERR_OK;
+        //EA_ASSERT(success);
+        tempResponse.copyInto(*responseTdf);
+        <endif>
+        <if(command.errortype)>
+        success = heatDecoder->decode(*rawResponse, tempErrResponse) == Blaze::ERR_OK;
+        //EA_ASSERT(success);
+        tempErrResponse.copyInto(*errResponseTdf);
+        <endif>
+    }
+
+    if( metadata->getBlazeErrCode() == Blaze::SDK_ERR_NOT_CONNECTED)
+    {
+        BlazeTestHelpersWrapper::BlazeSdkTimeout(true);
+    }
+
+    delete [] request;
+    delete [] response;
+    delete rawRequest;
+    delete rawResponse;
+    delete heatEncoder;
+    delete heatDecoder;
+    UtilitiesWrapper::StopProfiler(szMethodName);
+    return(result);
+}
+>>

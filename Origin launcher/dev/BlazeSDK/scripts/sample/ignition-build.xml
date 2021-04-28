@@ -1,0 +1,236 @@
+<project>
+    <!-- Copyright 2008-2016 Electronic Arts Inc.  All rights reserved. -->
+
+    <!-- define a local buildtype to be applied to the BlazeSample partial module that we include -->
+    <property name="buildtype" local="true" value="WindowsProgram" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+    <include file="${package.dir}/scripts/sample/_commonSampleSettings.xml"/>
+
+    <property name="package.Ignition.titleid" value="7A970EA1"/>
+    <property name="package.Ignition.PrimaryServiceConfigId" value="00000000-0000-0000-0000-00007a970ea1"/>
+    
+    <optionset name="ps5-shader-options">
+        <option name="psslc.embed" value="true"/>
+    </optionset>
+    
+    <dependent name="PyroSDK"/>
+    
+    <Program name="Ignition" frompartial="BlazeSample">
+        <includedirs>
+            ${package.dir}/samples
+        </includedirs>
+
+        <sourcefiles>
+            <includes name="${package.dir}/samples/Ignition/**/*.cpp"/>
+            <excludes name="${package.dir}/samples/Ignition/xboxone/*.cpp" unless="${config-system} == 'capilano'  and ${gdk.enabled??false} == false"/>
+            <excludes name="${package.dir}/samples/Ignition/xboxgdk/*.cpp" unless="(${config-system} == 'capilano' and ${gdk.enabled??false} == true) OR (${config-system} == 'xbsx')"/>
+            <excludes name="${package.dir}/samples/Ignition/xboxgdk/**/*.cpp" unless="(${config-system} == 'capilano' and ${gdk.enabled??false} == true) OR (${config-system} == 'xbsx')"/>
+            <excludes name="${package.dir}/samples/Ignition/stadia/*.cpp" unless="${config-system} == 'stadia'"/>
+            <excludes name="${package.dir}/samples/Ignition/voip/*.cpp" if="${config-system} == 'nx'"/>
+        </sourcefiles>
+
+        <headerfiles>
+          <includes name="${package.dir}/samples/Ignition/**/*.h"/>
+          <excludes name="${package.dir}/samples/Ignition/xboxone/*.h" unless="${config-system} == 'capilano'  and ${gdk.enabled??false} == false"/>
+          <excludes name="${package.dir}/samples/Ignition/xboxgdk/*.h" unless="(${config-system} == 'capilano' and ${gdk.enabled??false} == true) OR (${config-system} == 'xbsx')"/>
+          <excludes name="${package.dir}/samples/Ignition/xboxgdk/**/*.h" unless="(${config-system} == 'capilano' and ${gdk.enabled??false} == true) OR (${config-system} == 'xbsx')"/>
+        </headerfiles>
+        
+        <dependencies>
+            <auto>
+                <do if="${config-system} == 'capilano' or ${config-system} == 'kettle' or ${config-system} == 'nx' or ${config-system} == 'ps5' or ${config-system} == 'xbsx' or ${config-system} == 'stadia'">
+                    EAControllerUserPairing
+                    EAMessage
+                    EASystemEventMessageDispatcher
+                    NucleusSDK
+                    EATrace
+                    EadpFoundation
+                    EadpAuthentication
+                </do>
+                <do if="${config-system} == 'pc64' or ${config-system} == 'pc'">
+                    EAOrigin
+                    EadpFoundation
+                    EadpAuthentication
+                </do>
+            </auto>
+        </dependencies>
+
+        <sdkreferences if="${config-system} == 'capilano' and ${gdk.enabled??false} == false">
+            Xbox Services API, Version=8.0
+            Xbox.Game.Chat.2.Cpp.API, Version=8.0
+        </sdkreferences>
+        
+        <libraries>
+            <do if="${config-system} == 'kettle'">
+                <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceErrorDialog_stub_weak.a"    asis="true" />
+                <do if="${package.kettlesdk.crossgen.enabled??false} == true">
+                    <includes name="${package.kettlesdk.crossgen.libdir}/${lib-prefix}SceNpWebApi2_stub_weak.a" asis="true"/> <!--Needed for sceNpWebApi2XX calls-->
+                    <includes name="${package.kettlesdk.crossgen.libdir}/${lib-prefix}SceNpGameIntent_stub_weak.a" asis="true"/>
+                    <includes name="${package.kettlesdk.crossgen.libdir}/${lib-prefix}ScePlayerInvitationDialog_stub_weak.a" asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceHttp2_stub_weak.a" asis="true"/> <!--Needed for sceHttp2Init etc-->
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAppContent_stub_weak.a" asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}ScePad_stub_weak.a" asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceWebBrowserDialog_stub_weak.a" asis="true"/> <!--Needed for WebBrowser for linking new accounts during NucleusSDK logins-->
+                </do>
+            </do>
+            <do if="${config-system} == 'ps5'">
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}SceAmpr.a"/><!--Needed for PS5 ampr methods used by EAIO-->
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}SceNpGameIntent_stub_weak.a" asis="true"/><!-- Needed for PS5 GameIntents -->
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}ScePlayerInvitationDialog_stub_weak.a" asis="true"/>
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}SceAppContent_stub_weak.a" asis="true"/>
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}ScePad_stub_weak.a" asis="true"/>
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}SceKeyboard_stub_weak.a" asis="true"/>
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}SceWebBrowserDialog_stub_weak.a" asis="true"/> <!--Needed for WebBrowser for linking new accounts during NucleusSDK logins-->
+                <includes name="${package.ps5sdk.libdir}/${lib-prefix}SceErrorDialog_stub_weak.a" asis="true"/>
+            </do>
+        </libraries>
+
+        <shaderfiles>
+            <includes name="${package.dir}/samples/Ignition/ps5/shader/*.pssl"  optionset="ps5-shader-options" if="${config-system} == 'ps5'" />
+        </shaderfiles>
+
+        <bulkbuild enable="true"/>
+
+        <buildsteps>
+            <packaging deployassets="true">
+                <assetfiles basedir="${package.dir}/samples/Ignition/nx/data" if="${config-system} == 'nx'">
+                    <includes name="**"/>
+                </assetfiles>
+                <assetfiles basedir="${package.BlazeSDK.dir}/samples/xboxone" if="${config-system} == 'capilano' and !${gdk.enabled??false}">
+                    <includes name="*.hlsl"/>
+                </assetfiles>
+                <assetfiles basedir="${package.BlazeSDK.dir}/samples/Ignition/xboxgdk/shader" if="${gdk.enabled??false}">
+                    <includes name="*.cso"/>
+                </assetfiles>
+            </packaging>
+            <run workingdir="${package.builddir}/${config}/bin" args="-pyro:startui=${package.PyroSDK.dir}/prebuilt/PyroUi.exe -pyro:lport=${pyro.lport??0}"/>
+            <!-- copy sce_sys folder to working dir, for shell UX functionality -->
+            <do if="${config-system} == 'kettle'">
+              <postbuild-step targetname="copyPs4AppStartupConfigsToBin"/>
+            </do>
+            <do if="${config-system} == 'ps5'">
+              <postbuild-step targetname="copyPs5AppStartupConfigsToBin"/>
+            </do>
+        </buildsteps>
+
+      <visualstudio>
+        <msbuildoptions>
+          <option name="GgpApplication" value="Ignition" if="${config-system} == 'stadia'"/>
+        </msbuildoptions>
+      </visualstudio>
+
+        <config>
+            <warningsuppression>
+                <do if="${config-system} == 'capilano' and ${config-vs-version??} == '14.0'">
+                    -wd5029 <!--  nonstandard extension used: alignment attributes in C++ apply to variables, data members and tag types only -->
+                </do>
+                
+                <do if="${config-system} == 'capilano' or ${config-system} == 'xbsx'">
+                    -wd4265 <!-- class has virtual functions, but destructor is not virtual -->
+                </do>
+
+                <do if="${config-system} == 'stadia'">
+                    -Wno-nonportable-include-path  <!-- specified path differs in case from file name on disk -->
+                </do>
+            </warningsuppression>
+
+              <defines>
+                <do if="${config-system} == 'nx' or ${config-system} == 'ps5' or ${config-system} == 'xbsx' or ${config-system} == 'stadia' or ((${config-system} == 'kettle') and (${package.kettlesdk.crossgen.enabled??false} == true))">
+                  NUCLEUSSDK_NO_EAUSER
+                  NUCLEUSSDK_USE_SYSTEMBROWSER
+                </do>
+                
+                <do if="${gdk.enabled??false}">
+                    IGNITION_SCID="&quot;${package.Ignition.PrimaryServiceConfigId}&quot;"
+                </do>
+              </defines>
+          
+            <buildoptions>
+                <option name="exceptions" value="on" if="${gdk.enabled??false}"/>
+
+                <!-- sn-full-map which is added with our current framework is not supported on 2.000 sdk -->
+                <option name="generatemapfile" value="off" if="${config-system} == 'ps5'"/>
+            </buildoptions>
+
+        </config>
+    </Program>
+
+    <do if="${config-system} == 'capilano'">
+        <dependent name="DirtySDK"/>
+
+        <!--Set the appxmanifest options -->
+        <optionset name="runtime.Ignition.appxmanifestoptions" fromoptionset="config-options-appxmanifestoptions">
+            <option name="Xbox_Live_Config">
+                <![CDATA[
+                <mx:Extension Category="xbox.live">
+                    <mx:XboxLive TitleId="${package.Ignition.titleid}" PrimaryServiceConfigId="${package.Ignition.PrimaryServiceConfigId}"/>
+                </mx:Extension>
+                
+                <mx:Extension Category="xbox.multiplayer">
+                    <mx:XboxMultiplayer CanSuppressPartyChat="true" />
+                </mx:Extension>
+            ]]>
+            </option>
+            <option name="extension_options">
+                ${option.value}
+                Xbox_Live_Config
+            </option>
+            <option name="capabilities">
+                ${option.value}
+                kinectAudio
+                kinectGamechat
+            </option>
+        </optionset>
+        
+        <property name="runtime.Ignition.networking-manifest-files">
+            ${package.DirtySDK.networking-manifest-files}
+            ${package.dir}/scripts/sample/ignition-networkmanifest.xml
+        </property>
+    </do>
+
+    <do if="${gdk.enabled??false}">
+        <optionset name="config-options-gameconfigoptions">
+            <option name="title.id" value="${package.Ignition.titleid}"/>
+            <option name="title.dbgport">
+                6363
+            </option>
+        </optionset>
+    </do>
+            
+    <do if="${config-system} == 'nx'">
+        <!-- Set application .nmeta configuration -->
+        <optionset name="runtime.Ignition.nmetaoptions">
+            <option name="core.name" value="GSBlazeIgnition"/>
+            <option name="core.applicationId" value="0x010090800cf18000"/>
+            <option name="application.startupUserAccount" value="RequiredWithNetworkServiceAccountAvailable"/>
+            <option name="application.accessibleUrlsFilePath" value="${package.dir}/samples/Ignition/nx/data/accessible-urls.txt"/>
+        </optionset>
+    </do>
+
+  <!-- copy sce_sys folder to working dir, for shell UX functionality -->
+  <target name="copyPs4AppStartupConfigsToBin">
+    <do if="${config-system} == 'kettle'">
+      <property name="startupConfigsSourceFolderPs4" value="${package.dir}/samples/Ignition/ps4/sce_sys"/>
+      <property name="startupConfigsSourceFolderPs4" value="${package.dir}/samples/Ignition/ps4/sce_sys__crossgen" if="${package.kettlesdk.crossgen.enabled??false} == true"/> <!-- cross gen uses different title id -->
+      <property name="startupConfigsTargetFolderPs4" value="${package.builddir}/${config}/bin/sce_sys"/>
+      <echo message="copyPs4AppStartupConfigsToBin: copying ${startupConfigsSourceFolderPs4} to ${startupConfigsTargetFolderPs4}"/>
+      <copy todir="${startupConfigsTargetFolderPs4}" flatten="true">
+        <fileset>
+          <includes name="${startupConfigsSourceFolderPs4}/*"/>
+        </fileset>
+      </copy>
+    </do>
+  </target>
+  <target name="copyPs5AppStartupConfigsToBin">
+    <do if="${config-system} == 'ps5'">
+      <property name="startupConfigsSourceFolder" value="${package.dir}/samples/Ignition/ps5/sce_sys"/>
+      <property name="startupConfigsTargetFolder" value="${package.builddir}/${config}/bin/sce_sys"/>
+      <echo message="copyPs5AppStartupConfigsToBin: copying ${startupConfigsSourceFolder} to ${startupConfigsTargetFolder}"/>
+      <copy todir="${startupConfigsTargetFolder}" flatten="true">
+        <fileset>
+          <includes name="${startupConfigsSourceFolder}/*"/>
+        </fileset>
+      </copy>
+    </do>
+  </target>
+    
+</project>

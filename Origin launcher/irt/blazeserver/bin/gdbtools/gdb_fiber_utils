@@ -1,0 +1,305 @@
+define fiber_bt
+    set $fiber=('Blaze::Fiber'*)($arg0)
+    set print frame-arguments none
+    set $currFp=*($fiber->mFiberContext.stackPtr+5)
+    set $currIp=*(((void**)$currFp)+1)
+    while ($currIp != 0 && $currIp != 'abort@plt')
+        printf "Frame pointer: %p\n", $currFp
+        frame $currFp $currIp
+        set $currFp=*((void **)$currFp)
+        set $currIp=*(((void**)$currFp)+1)
+    end
+    set print frame-arguments all
+end
+
+document fiber_bt
+fiber_bt <Fiber ptr>: Print backtrace of all stack frames for the given Fiber*
+end
+
+define fibers
+    set $printfibertag = 0x0
+    set $printfiberfunc = 0x0
+
+    if ($argc >= 1)
+        set $printfibertag = $arg0
+    end
+
+    if (!$gSelector)
+        printf "$gSelector has not been set.  Use settls first.\n"
+    else
+        set $fiberMgr=$gSelector->mFiberManager
+        if ($fiberMgr == 0)
+            printf "No FiberManager available\n"
+        else
+            set $idx=0
+            while ($idx < Blaze::Fiber::MAX_STACK_SIZES)
+                printf "\n\nActive fibers of stack size "
+                p (Blaze::Fiber::StackSize) $idx
+                set $fiberbucket = $fiberMgr->mFiberPools.mpBegin[$idx].mUsedLists.mpBucketArray
+                while (*$fiberbucket != -1)
+                    set $curfiberpoolnode = *$fiberbucket
+                    while ($curfiberpoolnode != 0)
+                        if ($printfibertag == -1 || $curfiberpoolnode->mValue.first == $printfibertag)
+                            set $list = &$curfiberpoolnode->mValue.second
+                            set $list_size = 0
+                            set $curNode = $list->mAnchor.mpNext
+                            while ($curNode != &$list->mAnchor)
+                                set $curFiber = ('Blaze::Fiber'*) ('Blaze::FiberPoolListNode'*) $curNode
+                                if ($printfiberfunc != 0x0)
+                                    $printfiberfunc $curFiber $list_size
+                                else
+                                    printfiberdetails $curFiber 
+                                end
+                                set $curNode = ($curNode)->mpNext
+                                set $list_size++
+                            end    
+                        end
+                        set $curfiberpoolnode = $curfiberpoolnode->mpNext
+                    end
+                
+                    set $fiberbucket = $fiberbucket + 1
+                end
+                
+                set $idx++
+            end
+            
+            printf "\n\nMain fiber:\n"
+            printfiberdetails *$sThreadLocalInfo->mMainFiber
+        end
+    end
+end
+
+document fibers
+fibers [<tag> <printFunction>]: Print a list of all the active fibers.
+    This function assumes that settls has already been called to initialize
+    the $gSelector convenience variable.  
+    
+    The "tag" argument is used to select a set of fibers to print.  This defaults to '0', which
+    means only fibers that have NOT been tagged will be printed out.  If -1 is passed, ALL fibers
+    will be printed out.  To get a list of available tags, use the "fibertags" command.
+        
+    A print function may be optionally passed to the function and will be called 
+    for each fiber and should print the required contents of the fiber.  
+    This function is pass a Blaze::Fiber* and an index.
+end
+
+
+define fibertags
+      if (!$gSelector)
+        printf "$gSelector has not been set.  Use settls first.\n"
+    else
+        set $fiberMgr=$gSelector->mFiberManager
+        if ($fiberMgr == 0)
+            printf "No FiberManager available\n"
+        else
+            set $idx=0
+            while ($idx < Blaze::Fiber::MAX_STACK_SIZES)
+                set $fiberbucket = $fiberMgr->mFiberPools.mpBegin[$idx].mUsedLists.mpBucketArray
+                while (*$fiberbucket != -1)
+                    set $curfiberpoolnode = *$fiberbucket
+                    while ($curfiberpoolnode != 0)
+                        if ($curfiberpoolnode->mValue.first != 0x0)
+                            printf "Tag \"%s\" has value ", $curfiberpoolnode->mValue.first
+                            print $curfiberpoolnode->mValue.first
+                        end
+                        set $curfiberpoolnode = $curfiberpoolnode->mpNext
+                    end
+                
+                    set $fiberbucket = $fiberbucket + 1
+                end
+                
+                set $idx++
+            end
+        end
+    end
+end
+
+document fibertags
+fibertags : Print a list of all the available fibertags for the 'fibers' command.
+    This function prints out a list of all the fiber tags and their constant values.  A fiber tag
+    groups and categorizes sets of fibers, and is useful for weeding out large swaths of 
+    system fibers like the Connection read/write loops.
+end
+
+
+
+define printfiberdetails
+    set $printFiber = ('Blaze::Fiber'*)($arg0)
+    
+    if (!$sThreadLocalInfo)
+        printf "$sThreadLocalInfo has not been set.  Use settls first.\n"
+    else             
+        printf " id %llu", $printFiber->mHandle.fiberId
+        if ($printFiber->mNamedContext != 0)
+            printf " | context \"%s\"", $printFiber->mNamedContext
+        else
+            printf " | context UNNAMED"
+        end
+        if ($printFiber->mCurrentEventId == -1)
+            if (&$printFiber->mOwningFiberStackNode->mBlockingStack.mAnchor != $printFiber->Blaze::FiberBlockingStackNode::mpNext)
+                set $callingFiber = ('Blaze::Fiber'*) ('Blaze::FiberBlockingStackNode'*) $printFiber->Blaze::FiberBlockingStackNode::mpNext
+            else
+                if ($printFiber->mOwningFiberStackNode->mpNext != 0x0 && &(**$sThreadLocalInfo->mFiberStack).mAnchor != $printFiber->mOwningFiberStackNode->mpNext)
+                    set $callingFiber =  ('Blaze::Fiber'*) ('Blaze::FiberBlockingStackNode'*)  (('Blaze::Fiber::FiberStackNode'*) $printFiber->mOwningFiberStackNode->mpNext)->mBlockingStack.mAnchor.mpNext 
+                else
+                    set $callingFiber = 0x0
+                end
+            end
+            
+            if ($callingFiber != 0x0)
+                printf " | calling fiber %llu (\"%s\")", $callingFiber->mHandle.fiberId, $callingFiber->mNamedContext
+            else
+                if (*$sThreadLocalInfo->mCurrentFiber == $printFiber)
+                    printf " | RUNNING"
+                else
+                    printf " | UNKNOWN STATE"
+                end
+            end
+            
+        else
+            if ($printFiber->mCurrentEventContext != 0)
+                printf " | event \"%s\"", $printFiber->mCurrentEventContext
+            else
+                printf " | event \"UNNAMED\""
+            end
+        end
+        
+        printf " | "
+        print $printFiber
+    end
+end
+
+document printfiberdetails
+printfiberdetails <pointer to fiber>: Print details about a fiber
+    The default print method for the "fibers" command.  The "settls" call must be made first
+    to properly get the global thread-local fiber stack.
+end
+
+define printfiberstack 
+    if (!$sThreadLocalInfo)
+        printf "$sThreadLocalInfo has not been set.  Use settls first.\n"
+    else    
+        if ($argc == 1)
+            set $printFiber = ('Blaze::Fiber'*)($arg0)
+        else
+            set $printFiber = *$sThreadLocalInfo->mCurrentFiber        
+        end
+                
+        if ($printFiber->mOwningFiberStackNode->mpNext != 0x0)
+            set $curStackNode = (**$sThreadLocalInfo->mFiberStack).mAnchor.mpNext
+            while ($curStackNode != &(**$sThreadLocalInfo->mFiberStack).mAnchor)
+                set $curStack = (('Blaze::Fiber::FiberStackNode'*) $curStackNode)
+                set $curStackNode = $curStackNode->mpNext
+                
+                printfiberblockingstack $curStack            
+            end    
+        else
+            printfiberblockingstack $printFiber->mOwningFiberStackNode
+        end
+    end
+end
+
+document printfiberstack 
+printfiberstack [<fiber>]: prints the stack of fibers and how they relate to each other
+    Passing no argument will print the currently running fiber if settls has been run.  
+    This method prints out the "stack" of fibers, showing how fibers have called into other fibers, 
+    starting with "main" for a running fiber.  If a fiber is not running (i.e. waiting on an event), 
+    the stack will be the fiber and any other fibers that have a "blocking call" relationship with it.  
+    This method is NOT to be confused with "fiber_bt", which prints the actual stack trace of a fiber.
+end    
+    
+define printfiberblockingstack 
+    if (!$sThreadLocalInfo)
+        printf "$sThreadLocalInfo has not been set.  Use settls first.\n"
+    else        
+        set $printStack = $arg0
+         
+        set $curNode = $printStack->mBlockingStack.mAnchor->mpNext
+        while ($curNode != &$printStack->mBlockingStack.mAnchor)
+            set $curFiber = ('Blaze::Fiber'*) ('Blaze::FiberBlockingStackNode'*) $curNode
+            set $curNode = $curNode->mpNext
+            
+            print $curFiber
+            printf " id %llu", $curFiber->mHandle.fiberId
+            if ($curFiber->mNamedContext != 0)
+                printf " context \"%s\"", $curFiber->mNamedContext
+            else
+                printf " context UNNAMED"
+            end
+                
+            if ($curFiber->mCurrentEventId != -1)
+                if ($curFiber->mCurrentEventContext != 0)
+                    printf " event \"%s\"", $curFiber->mCurrentEventContext
+                else
+                    printf " event \"UNNAMED\""
+                end
+            else
+               if ($curNode != &$printStack->mBlockingStack.mAnchor)
+                  printf " calling (blocking)"           
+               else
+                  if (*$sThreadLocalInfo->mCurrentFiber == $curFiber)
+                      printf " RUNNING"
+                  else
+                      printf " calling (not blocking)"
+                  end
+               end
+            end
+            
+            printf "\n"       
+        end
+    end
+end
+
+document printfiberblockingstack 
+printfiberblockingstack <fiber stack node>: Helper method for printfiberstack    
+end     
+    
+define printfiberlocals
+    set $printFiber = 0x0
+    if ($argc == 1)
+        set $printFiber = ('Blaze::Fiber'*)($arg0)
+    else
+        if (!$sThreadLocalInfo)
+            printf "$sThreadLocalInfo has not been set.  Use settls first.\n"
+        else 
+            set $printFiber = *$sThreadLocalInfo->mCurrentFiber
+        end
+    end
+    
+    if ($printFiber != 0x0)
+        printf "Thread locals for fiber id %llu (%p), \"%s\":\n\n", $printFiber->mHandle.fiberId, $printFiber, $printFiber.mNamedContext
+        
+        printf "gCurrentUserSession:        "
+        print *(('Blaze::UserSessionExistence'**) ($printFiber->mFiberLocalStorage + Blaze::gCurrentUserSession.mOffset))
+        
+        printf "gCurrentLocalUserSession:   "
+        print *(('Blaze::UserSessionMaster'**) ($printFiber->mFiberLocalStorage + Blaze::gCurrentLocalUserSession.mOffset))
+
+        printf "msCurrentUserSessionId:     "
+        print *((uint32_t*) ($printFiber->mFiberLocalStorage + Blaze::UserSession::msCurrentUserSessionId.mOffset))
+
+        printf "msSuperUserPrivilegeCounter:"
+        print *((uint32_t*) ($printFiber->mFiberLocalStorage + Blaze::UserSession::msSuperUserPrivilegeCounter.mOffset))
+                
+        printf "gCurrentSlaveSession:       "
+        print *(('Blaze::SlaveSession'**) ($printFiber->mFiberLocalStorage + Blaze::InboundRpcConnection::smCurrentSlaveSession.mOffset))
+        
+        printf "gDbMetrics:                 "
+        print *(('Blaze::DbConnMetrics'**) ($printFiber->mFiberLocalStorage + Blaze::gDbMetrics.mOffset))
+        
+        printf "mCurrentLoggingMessage:     "
+        print *(('Blaze::StringBuilder'**) ($printFiber->mFiberLocalStorage + Blaze::Logger::mCurrentLoggingMessage.mOffset))
+        
+        printf "mThisFunctionLoggingMessage:"
+        print *(('Blaze::StringBuilder'**) ($printFiber->mFiberLocalStorage + Blaze::Logger::mThisFunctionLoggingMessage.mOffset))
+        
+        printf "gLogContext:                "
+        print *(('Blaze::LogContextWrapper'**) ($printFiber->mFiberLocalStorage + Blaze::gLogContext.mOffset))
+    end
+end
+
+document printfiberlocals 
+printfiberlocals  [<fiber to print>] Prints the fiber locals for a given fiber. 
+If no argument is given, the current running fiber on the thread set by the settls command.
+end
+

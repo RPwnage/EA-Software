@@ -1,0 +1,93 @@
+<project> 
+    <createtask name="package.EATDF.typecomp.task">
+        <parameters>
+            <option name="inputs" value="Required"/>
+            <option name="templates" value="Required" />
+            <option name="templatedirs" value=""/>
+            <option name="outdir" value="Required"/>
+            <option name="basedir" value="Required"/>
+            <option name="includedirs" value="Required" />
+            <option name="client" value="false"/>
+            <option name="headerPrefix" value=""/>
+            <option name="combine" value="false"/>
+            <option name="extraArgs" value=""/>
+            <option name="dep" value="" />
+            <option name="useAltStringTemplateLexer" value="false"/>
+            <option name="genCaseSensitiveFilenames" value="false"/>
+        </parameters>
+        <code>
+
+            <dependent name="antlr"/>
+ 
+            <!-- build our tools if its not already done -->
+            <task name="package.EATDF.buildtools.task" />
+            
+            <!-- Make sure paths are Unix-style -->
+            <property name="package.EATDF.typecomp.task.basedir" value="@{PathGetFullPath(${package.EATDF.typecomp.task.basedir})}"/>
+            <property name="package.EATDF.typecomp.task.basedir"     value="@{PathToUnix(${package.EATDF.typecomp.task.basedir})}"/>
+            <property name="package.EATDF.typecomp.task.outdir"      value="@{PathToUnix(${package.EATDF.typecomp.task.outdir})}"/>
+           
+            
+            <!-- Convert the RPC fileset to a list of relative paths to each RPC -->
+            <property name="package.EATDF.typecomp.task.inputs.relative" value="@{FileSetToString(${package.EATDF.typecomp.task.inputs}, ' ')}"/>
+            <do if="'${package.EATDF.typecomp.task.basedir}' != ''">
+                <property name="package.EATDF.typecomp.task.basedir" value="@{PathGetFullPath(${package.EATDF.typecomp.task.basedir})}"/>
+                <property name="package.EATDF.typecomp.task.inputs.relative" value="@{StrReplace(${package.EATDF.typecomp.task.inputs.relative}, '${package.EATDF.typecomp.task.basedir}/', '')}"/>
+                <property name="package.EATDF.typecomp.task.inputs.relative" value="@{StrReplace(${package.EATDF.typecomp.task.inputs.relative}, '${package.EATDF.typecomp.task.basedir}\\', '')}"/>
+                <property name="package.EATDF.typecomp.task.inputs.relative" value="@{StrReplace(${package.EATDF.typecomp.task.inputs.relative}, '\\', '/')}"/>
+            </do>
+
+            <property name="package.EATDF.typecomp.task.includedirargs" value="" />
+            <foreach item="String" in="${package.EATDF.typecomp.task.includedirs}" property="package.EATDF.typecomp.task.includedir" delim=" \n">
+                <property name="package.EATDF.typecomp.task.includedirargs" value="${property.value} --includeDir ${package.EATDF.typecomp.task.includedir}" />
+            </foreach>
+
+            <fileset name="inputchecks" fromfileset="${package.EATDF.typecomp.task.inputs}">
+                <includes name="${package.EATDF.builddir}/bin/typecomp.jar"/>
+            </fileset>
+
+            <property name="package.EATDF.typecomp.task.templatedirargs" value="" />
+            <foreach item="String" in="${package.EATDF.typecomp.task.templatedirs}" property="package.EATDF.typecomp.task.templatedir" delim=" \n">
+                <property name="package.EATDF.typecomp.task.templatedirargs" value="${property.value} --templateDir ${package.EATDF.typecomp.task.templatedir}" />
+                <fileset name="inputchecks" append="true">
+                    <includes name="${package.EATDF.typecomp.task.templatedir}/*.stg"/>
+                    <includes name="${package.EATDF.typecomp.task.templatedir}/**.stg"/>
+                </fileset>
+            </foreach>
+            
+            <property name="package.EATDF.typecomp.task.templateargs" value="" />
+            <foreach item="String" in="${package.EATDF.typecomp.task.templates}" property="package.EATDF.typecomp.task.template" delim=" \n">
+                <property name="package.EATDF.typecomp.task.templateargs" value="${property.value} --template ${package.EATDF.typecomp.task.template}" />
+            </foreach>
+
+            <property name="java-output-disabled" value="true" local="true"/>
+            <property name="java-output-disabled" value="false" local="true" if="${nant.verbose??false}"/>
+
+<exec program="${java.exe}" clearenv="true" workingdir="${package.EATDF.typecomp.task.basedir}" silent="${java-output-disabled}">
+                <args>
+                    <arg value="-Xmx512M"/>
+                    <arg value='-cp "${package.EATDF.builddir}/bin/antlr.jar${nant.env.path.separator}${package.EATDF.builddir}/bin/typecomp.jar"'/>
+                    <arg value="TdfComp"/>
+                    <arg value="--outputDir ${package.EATDF.typecomp.task.outdir}"/>
+                    <arg value="-D:HeaderPrefix=${package.EATDF.typecomp.task.headerPrefix}" if="'${package.EATDF.typecomp.task.headerPrefix}' != ''" />                    
+                    <arg value="--combine" if="${package.EATDF.typecomp.task.combine} == true"/>
+                    <arg value="--client" if="${package.EATDF.typecomp.task.client} == true"/>
+                    <arg value="--useAltStringTemplateLexer" if="${package.EATDF.typecomp.task.useAltStringTemplateLexer} == true"/>
+                    <arg value="--genCaseSensitiveFilenames" if="${package.EATDF.typecomp.task.genCaseSensitiveFilenames} == true"/>
+                    <arg value="--dependency ${package.EATDF.typecomp.task.dep}" if="'${package.EATDF.typecomp.task.dep}' != ''" />
+                    <arg value="${package.EATDF.typecomp.task.templatedirargs}"/>
+                    <arg value="${package.EATDF.typecomp.task.includedirargs}"/>          
+                    <arg value="${package.EATDF.typecomp.task.templateargs}" /> 
+                    <arg value="${package.EATDF.typecomp.task.extraArgs}"/>                    
+                    <arg value="${package.EATDF.typecomp.task.inputs.relative}"/>
+                </args>
+                <inputs fromfileset="inputchecks">
+                </inputs>
+                <outputs>
+                    <includes name="${package.EATDF.typecomp.task.dep}" asis="true" if="'${package.EATDF.typecomp.task.dep}' != ''" />
+                </outputs>
+            </exec>
+        </code>
+    </createtask>
+    
+</project>

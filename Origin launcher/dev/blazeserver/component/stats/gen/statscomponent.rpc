@@ -1,0 +1,579 @@
+// We assume that all request and response types are valid and just use them
+// directly in the code generation.
+//
+// The compiler should ensure that all commands within a component have a unique ID.
+// The compiler should ensure that all components within a file have a unique ID.
+// Zero is not a valid component or command ID
+// Enforce that method names must start with lowercase letter.
+// Enforce C++ rules for method names and TDF type names.
+// Allow C++ style comments.
+
+
+[ headername="stats/tdf/stats.h" ]
+#include "stats/gen/stats.tdf"
+
+[ 
+   client_include=false,
+   headername="stats/tdf/stats_server.h" 
+]
+#include "stats/gen/stats_server.tdf"
+
+namespace Blaze
+{
+namespace Stats
+{
+[
+  id = core/7,
+  description = "Not typically used. Retrieval of statistical data and leaderboards is instead provided by StatsAPI and LeaderboardAPI",
+  details = "The StatsAPI and LeaderboardAPI provide abstractions for retrieving statistical data and leaderboards. 
+               The StatsComponent should only be used if a game team wishes to build their own replacement for StatsAPI or LeaderboardAPI
+               because one or both of those APIs do not suit the needs of their title. Before using StatsComponent, please check 
+               with Blaze support to confirm that there is not a way to meet the needs of the title using StatsAPI or LeaderboardAPI. " ,
+  configurationType = StatsConfig
+]
+component Stats
+{
+   
+    
+    alloc_groups
+    {
+        cache = 1;
+        lb = 2; 
+    }
+    
+        
+    types
+    {
+        [
+          name = "custom",
+          has_identity = false 
+        ]
+        ENTITY_TYPE_CUSTOM = 1;
+    }
+    
+    permissions
+    {
+        PERMISSION_SET_STATS_VALUE = 1;
+        PERMISSION_UPDATE_STATS = 2;
+        PERMISSION_WIPE_STATS = 3;
+    }
+    
+    errors 
+    { 
+    [ description = "Config data is not loaded" ]
+    STATS_ERR_CONFIG_NOTAVAILABLE = 1;
+    [ description = "Invalid leaderboard ID" ]
+    STATS_ERR_INVALID_LEADERBOARD_ID = 2;
+    [ description = "Invalid leaderboard folder ID" ]
+    STATS_ERR_INVALID_FOLDER_ID = 3;
+    [ description = "Unknown category was requested" ]
+    STATS_ERR_UNKNOWN_CATEGORY = 4;
+    [ description = "Stat not found" ]
+    STATS_ERR_STAT_NOT_FOUND = 5;
+    [ description = "Bad period type" ]
+    STATS_ERR_BAD_PERIOD_TYPE = 6;
+    [ description = "Failed to obtain DB connection" ]
+    STATS_ERR_NO_DB_CONNECTION = 7;
+    [ description = "No data returned by DB" ]
+    STATS_ERR_DB_DATA_NOT_AVAILABLE = 8;
+    [ description = "Unknown stat group" ]
+    STATS_ERR_UNKNOWN_STAT_GROUP = 9;
+    [ description = "Unsuccessful DB transaction" ]
+    STATS_ERR_DB_TRANSACTION_ERROR = 10;
+    [ description = "Invalid update type" ]
+    STATS_ERR_INVALID_UPDATE_TYPE = 11;
+    [ description = "DB query select failed" ]
+    STATS_ERR_DB_QUERY_FAILED = 13;
+    [ description = "Rank out of range" ]
+    STATS_ERR_RANK_OUT_OF_RANGE = 14;
+    [ description = "Bad period offset" ]
+    STATS_ERR_BAD_PERIOD_OFFSET = 15;
+    [ description = "Scope defination is not right." ]
+    STATS_ERR_BAD_SCOPE_INFO = 16;
+    [ description = "Requested folder is not found." ]
+    STATS_ERR_INVALID_FOLDER_NAME = 17;
+    [ description = "Requested operation is already in progress." ]
+    STATS_ERR_OPERATION_IN_PROGRESS = 18;
+    [ description = "Requested operation is not defined" ]
+    STATS_ERR_INVALID_OPERATION = 20;
+    [ description = "Invalid object ID is supplied" ]
+    STATS_ERR_INVALID_OBJECT_ID = 21;
+    [ description = "Invalid period counter is supplied" ]
+    STATS_ERR_BAD_PERIOD_COUNTER = 22;
+    [ description = "Leaderboard is not in the memory" ]
+    STATS_ERR_LEADERBOARD_NOT_IN_MEMORY = 23;
+    }
+
+    slave
+    {
+        
+
+        methods
+        {
+               [
+                 id = 1,
+                 errors = {STATS_ERR_UNKNOWN_CATEGORY, STATS_ERR_STAT_NOT_FOUND},
+                 description = "Returns description of stats.",
+                 details = "Provides descriptions of named stats from the given category.",
+                 generate_command_class = false,
+                 requiresUserSession = false
+               ]
+               StatDescs getStatDescs(GetStatDescsRequest);
+            
+               [
+                 id = 2,
+                 errors = {STATS_ERR_BAD_PERIOD_TYPE, STATS_ERR_UNKNOWN_CATEGORY, 
+                              STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION,
+                              STATS_ERR_DB_DATA_NOT_AVAILABLE},
+                 description = "Returns a set of stat values.",
+                 details = "Provides a set of stats for requested stat names and entities.",
+                 requiresUserSession = false
+               ]
+               GetStatsResponse getStats(GetStatsRequest);
+            
+               [
+                 id = 3,
+                 description = "Returns a summary of stat groups.",
+                 details = "Provides a list of descriptions of available stat groups.",
+                 generate_command_class = false,
+                 requiresUserSession = false
+               ]
+               StatGroupList getStatGroupList();
+            
+               [
+                 id = 4,
+                 errors = {STATS_ERR_UNKNOWN_STAT_GROUP},
+                 description = "Returns a stat group.",
+                 details = "Provides a detailed description for every stat in the group.",
+                 generate_command_class = false ,
+                 requiresUserSession = false
+               ]
+               StatGroupResponse getStatGroup(GetStatGroupRequest);
+            
+               [
+                 id = 5,
+                 errors = {STATS_ERR_UNKNOWN_STAT_GROUP, STATS_ERR_BAD_PERIOD_TYPE, 
+                               STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION, 
+                               STATS_ERR_DB_DATA_NOT_AVAILABLE},
+                 description = "Returns a set of stats for the given group.",
+                 details = "Provides a set of stats for the given number of entities 
+                   and as described by the given group.",
+                 requiresUserSession = false
+               ]
+               GetStatsResponse getStatsByGroup(GetStatsByGroupRequest);
+            
+               [
+                 id = 6,
+                 errors = {STATS_ERR_UNKNOWN_CATEGORY},
+                 description = "Returns a date range for the given category and period type.",
+                 generate_command_class = false,
+                 requiresUserSession = false
+               ]
+               DateRange getDateRange(GetDateRangeRequest);
+
+               [
+                 id = 7,
+                 errors = {STATS_ERR_BAD_PERIOD_TYPE, STATS_ERR_UNKNOWN_CATEGORY, 
+                           STATS_ERR_DB_DATA_NOT_AVAILABLE, STATS_ERR_BAD_SCOPE_INFO,
+                           STATS_ERR_INVALID_OPERATION,STATS_ERR_BAD_PERIOD_OFFSET},
+                 description = "Returns an entity count for the given category and period type.",
+                 requiresUserSession = false
+               ]
+               EntityCount getEntityCount(GetEntityCountRequest);
+            
+               [
+                 id = 8,
+                 errors = {STATS_ERR_BAD_PERIOD_TYPE, STATS_ERR_UNKNOWN_CATEGORY, 
+                           STATS_ERR_STAT_NOT_FOUND, STATS_ERR_INVALID_UPDATE_TYPE, 
+                           STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION},
+                 description = "Updates stats.",
+                 client_export = false,
+                 requiresUserSession = false
+               ]
+               void updateStats(UpdateStatsRequest);
+            
+               [
+                 id = 9,
+                 errors = {STATS_ERR_UNKNOWN_CATEGORY, STATS_ERR_INVALID_OPERATION},
+                 description = "Wipe stats.",
+                 client_export = false,
+                 requiresUserSession = false
+               ]
+               void wipeStats(WipeStatsRequest);
+
+
+            // Leaderboards
+               [
+                 id = 10,
+                 errors = { STATS_ERR_CONFIG_NOTAVAILABLE, STATS_ERR_INVALID_LEADERBOARD_ID },
+                 description = "Returns description of leaderboard group.",
+                 details = "Input is a leaderboard ID, result is a description of a leaderboard.",
+                 requiresUserSession = false,
+                 generate_command_class = false 
+               ]
+               LeaderboardGroupResponse getLeaderboardGroup(LeaderboardGroupRequest);
+            
+               [
+                 id = 11,
+                 errors = { STATS_ERR_CONFIG_NOTAVAILABLE, STATS_ERR_INVALID_FOLDER_ID },
+                 description = "Returns a list of folders and/or leaderboards in the requested folder.",
+                 requiresUserSession = false,
+                 generate_command_class = false 
+               ]
+               LeaderboardFolderGroup getLeaderboardFolderGroup(LeaderboardFolderGroupRequest);
+            
+               [
+                 id = 12,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE, 
+                       STATS_ERR_RANK_OUT_OF_RANGE, STATS_ERR_BAD_SCOPE_INFO, 
+                       STATS_ERR_BAD_PERIOD_OFFSET, 
+                       STATS_ERR_NO_DB_CONNECTION}, 
+                 description = "Returns an ordered list of leaderboard rows,",
+                 details = "Each row contains string values for all stats including the ranked one.",
+                 requiresUserSession = false
+               ]
+               LeaderboardStatValues getLeaderboard(LeaderboardStatsRequest);
+            
+               [
+                 id = 13,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE,
+                   STATS_ERR_BAD_PERIOD_OFFSET, 
+                   STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION},
+                 description = "Returns an ordered list of centered leaderboard rows,",
+                 details = "Each row contains string values for all stats including the ranked one.",
+                 requiresUserSession = false
+               ]
+               LeaderboardStatValues getCenteredLeaderboard(CenteredLeaderboardStatsRequest);
+
+               [
+                 id = 14,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE,
+                   STATS_ERR_BAD_PERIOD_OFFSET,  
+                   STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION, 
+                   STATS_ERR_INVALID_OBJECT_ID},
+                 description = "Returns an ordered list of filtered leaderboard rows,",
+                 details = "Each row contains string values for all stats including the ranked one.",
+                 requiresUserSession = false
+               ]
+               LeaderboardStatValues getFilteredLeaderboard(FilteredLeaderboardStatsRequest);
+                        
+               [
+                 id = 15,
+                 description = "Returns a list of key scope name to value list which defined in stats config.",
+                 requiresUserSession = false,
+                 generate_command_class = false 
+               ]
+               KeyScopes getKeyScopesMap();
+
+               [
+                 id = 16,
+                 errors = {STATS_ERR_UNKNOWN_STAT_GROUP, STATS_ERR_BAD_PERIOD_TYPE, STATS_ERR_BAD_SCOPE_INFO, 
+                               STATS_ERR_NO_DB_CONNECTION},
+                 description = "Initiates asynchronous transfer of stats for the given group.",
+                 details = "Stats are sent to the client via notifications one row at time. To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                 generateProto = false 
+               ]
+               void getStatsByGroupAsync(GetStatsByGroupRequest);
+
+               [
+                 id = 162,
+                 errors = {STATS_ERR_UNKNOWN_STAT_GROUP, STATS_ERR_BAD_PERIOD_TYPE, STATS_ERR_BAD_SCOPE_INFO, 
+                               STATS_ERR_NO_DB_CONNECTION},
+                 description = "Same as getStatsByGroupAsync but used by grpc endpoint due to name collision. Initiates asynchronous transfer of stats for the given group.",
+                 details = "Stats are sent to the client via notifications one row at time. To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide."
+               ]
+               void getStatsByGroupAsync2(GetStatsByGroupRequest);
+
+               [
+                 id = 17,
+                 errors = {STATS_ERR_INVALID_FOLDER_NAME, STATS_ERR_CONFIG_NOTAVAILABLE, STATS_ERR_OPERATION_IN_PROGRESS},
+                 description = "Initiates asynchronous transfer of leaderboard tree starting from the given folder.",
+                 details = "The number of tree nodes sent per notification is (re)configured by setting mMaxNodesPerLeaderboardTreeNotification. To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                 generate_command_class = false,
+                 generateProto = false 
+               ]
+               void getLeaderboardTreeAsync(GetLeaderboardTreeRequest);
+
+               [
+                 id = 172,
+                 errors = {STATS_ERR_INVALID_FOLDER_NAME, STATS_ERR_CONFIG_NOTAVAILABLE, STATS_ERR_OPERATION_IN_PROGRESS},
+                 description = "Same as getLeaderboardTreeAsync but used by grpc endpoint due to name collision. Initiates asynchronous transfer of leaderboard tree starting from the given folder.",
+                 details = "The number of tree nodes sent per notification is (re)configured by setting mMaxNodesPerLeaderboardTreeNotification. To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                 generate_command_class = false
+               ]
+               void getLeaderboardTreeAsync2(GetLeaderboardTreeRequest);
+            
+
+               [
+                 id = 18,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_BAD_SCOPE_INFO, 
+                       STATS_ERR_BAD_PERIOD_OFFSET},
+                 description = "Returns number of entries in the leaderboard",
+                 details = "Based on category, data is retrieved from the memory or DB",
+                 generate_command_class = true,
+                 requiresUserSession = false
+               ]
+               EntityCount getLeaderboardEntityCount(LeaderboardEntityCountRequest);            
+
+               [
+                 id = 19,
+                 description = "Returns a summary of stat categories.",
+                 details = "Provides a list of descriptions of available stat categories.",
+                 generate_command_class = false,
+                 requiresUserSession = false
+               ]
+               StatCategoryList getStatCategoryList();
+
+               [
+                 id = 20,
+                 description = "Returns a summary of stat period configurations.",
+                 details = "Provides rollover information including time and retention.",
+                 generate_command_class = false,
+                 requiresUserSession = false
+               ]
+               PeriodIds getPeriodIds();
+               
+               [
+                 id = 21,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE, 
+                       STATS_ERR_RANK_OUT_OF_RANGE, STATS_ERR_BAD_SCOPE_INFO, 
+                       STATS_ERR_BAD_PERIOD_OFFSET, 
+                       STATS_ERR_NO_DB_CONNECTION},
+                 description = "Returns an ordered list of leaderboard rows,",
+                 details = "Each row contains raw stat values for all stats including the ranked one.",
+                 requiresUserSession = false,
+                 generateProto = false 
+               ]
+               LeaderboardStatValues getLeaderboardRaw(LeaderboardStatsRequest);
+
+               [
+                 id = 212,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE, 
+                       STATS_ERR_RANK_OUT_OF_RANGE, STATS_ERR_BAD_SCOPE_INFO, 
+                       STATS_ERR_BAD_PERIOD_OFFSET, 
+                       STATS_ERR_NO_DB_CONNECTION},
+                 description = "Same as getLeaderboardRaw but used by grpc endpoint due to name collision. Returns an ordered list of leaderboard rows,",
+                 details = "Each row contains raw stat values for all stats including the ranked one.",
+                 requiresUserSession = false
+               ]
+               LeaderboardStatValues getLeaderboardRaw2(LeaderboardStatsRequest);
+            
+               [
+                 id = 22,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE,
+                   STATS_ERR_BAD_PERIOD_OFFSET, 
+                   STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION},
+                 description = "Returns an ordered list of centered leaderboard rows,",
+                 details = "Each row contains raw stat values for all stats including the ranked one.",
+                 requiresUserSession = false,
+                 generateProto = false 
+               ]
+               LeaderboardStatValues getCenteredLeaderboardRaw(CenteredLeaderboardStatsRequest);
+
+               [
+                 id = 222,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE,
+                   STATS_ERR_BAD_PERIOD_OFFSET, 
+                   STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION},
+                 description = "Same as getCenteredLeaderboardRaw but used by grpc endpoint due to name collision. Returns an ordered list of centered leaderboard rows,",
+                 details = "Each row contains raw stat values for all stats including the ranked one.",
+                 requiresUserSession = false
+               ]
+               LeaderboardStatValues getCenteredLeaderboardRaw2(CenteredLeaderboardStatsRequest);
+               
+               [
+                 id = 23,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE,
+                   STATS_ERR_BAD_PERIOD_OFFSET,  
+                   STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION, 
+                   STATS_ERR_INVALID_OBJECT_ID},
+                 description = "Returns an ordered list of filtered leaderboard rows,",
+                 details = "Each row contains raw stat values for all stats including the ranked one.",
+                 requiresUserSession = false,
+                 generateProto = false
+               ]
+               LeaderboardStatValues getFilteredLeaderboardRaw(FilteredLeaderboardStatsRequest);
+               
+               [
+                 id = 232,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_DB_DATA_NOT_AVAILABLE,
+                   STATS_ERR_BAD_PERIOD_OFFSET,  
+                   STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION, 
+                   STATS_ERR_INVALID_OBJECT_ID},
+                 description = "Same as getFilteredLeaderboardRaw but used by grpc endpoint due to name collision. Returns an ordered list of filtered leaderboard rows,",
+                 details = "Each row contains raw stat values for all stats including the ranked one.",
+                 requiresUserSession = false
+               ]
+               LeaderboardStatValues getFilteredLeaderboardRaw2(FilteredLeaderboardStatsRequest);
+               
+               [
+                 id = 24,
+                 errors = { STATS_ERR_BAD_SCOPE_INFO, STATS_ERR_NO_DB_CONNECTION, 
+                   STATS_ERR_DB_DATA_NOT_AVAILABLE},
+                 description = "Change the key scope value",
+                 requiresUserSession = false
+               ]
+               void changeKeyscopeValue(KeyScopeChangeRequest);
+
+               [
+                 id = 25,
+                 errors = { STATS_ERR_INVALID_LEADERBOARD_ID, STATS_ERR_BAD_SCOPE_INFO,
+                   STATS_ERR_BAD_PERIOD_OFFSET, STATS_ERR_INVALID_OBJECT_ID, STATS_ERR_LEADERBOARD_NOT_IN_MEMORY},
+                 description = "Retrieves Entity ranks only.",
+                 details = "Return a entity ranks map, the map contains entity ranks keyed by entityId.",
+                 requiresUserSession = false
+               ]
+               GetEntityRankResponse getEntityRank(FilteredLeaderboardStatsRequest);
+
+               [                  
+                 id = 26,             
+                 errors = { STATS_ERR_BAD_SCOPE_INFO, 
+                          STATS_ERR_NO_DB_CONNECTION, 
+                          STATS_ERR_BAD_PERIOD_TYPE,
+                          STATS_ERR_UNKNOWN_CATEGORY,
+                          STATS_ERR_STAT_NOT_FOUND, 
+                          STATS_ERR_INVALID_UPDATE_TYPE},                     
+                 description = "This RPC will begin a DB transaction. It will validate the input data and initialize the transaction and return a transactionContextId for RPCs thereafter. The updates will not be submitted until commitStatsTransaction is called.",                  
+                 client_export = false,                  
+                 requiresUserSession = false, 
+                 generateProto = false
+               ] 
+               InitializeStatsTransactionResponse initializeStatsTransaction(InitializeStatsTransactionRequest); 
+
+               [                  
+                 id = 27,                                    
+                 description = "commit a transaction that was begun with an initializeStatsTransaction call.",                  
+                 client_export = false,                  
+                 requiresUserSession = false,
+                 generateProto = false
+               ] 
+               void commitStatsTransaction(CommitTransactionRequest); 
+
+               [                  
+                 id = 28,                                  
+                 description = "abort a transaction that was begun with an initializeStatsTransaction call.",                  
+                 client_export = false,                  
+                 requiresUserSession = false,
+                 generateProto = false
+               ] 
+               void abortStatsTransaction(AbortTransactionRequest); 
+
+               [                  
+                 id = 29,                                  
+                 description = "calculate derived stats for a transaction that is currently opened via initializeStatsTransaction. It is optional because it will be done automatically via commitStatsTransaction, and it only really needs to be used if the caller needs to compute derived stats AND needs to look at the results of these stats in order to apply more stat changes before committing the transaction.",                  
+                 client_export = false,                  
+                 requiresUserSession = false, 
+                 generateProto = false
+               ] 
+               void calcDerivedStats(CalcDerivedStatsRequest); 
+
+               [                  
+                 id = 30,                                  
+                 description = "get values from stats for cache. This is only used when a transaction is open via initializeStatsTransaction, and it can be optionally used to retrieve the up-to-date stat values to the caller so that the caller can inspect the values to perform further updates before committing the transaction.",                  
+                 client_export = false,                  
+                 requiresUserSession = false,
+                 generateProto = false
+               ] 
+               RetrieveValuesStatsResponse retrieveValuesStats(RetrieveValuesStatsRequest); 
+
+        }
+        
+        notifications
+        {
+            [
+              id = 1,
+              description = "Sends stat updates to the slave.",
+              details = "Passes updates and/or deletes for one or more stat rows in the cache.",
+              client_export = false,
+              generateProto = false
+            ]
+            UpdateCacheNotification(StatUpdateNotification);
+
+            [
+              id = 2,
+              description = "Sends global stat updates to the slave.",
+              details = "Passes updates for one or more stat rows in global stats.",
+              client_export = false
+            ]
+            UpdateGlobalStatsNotification(UpdateStatsRequest);
+
+            [
+              id = 50,
+              description = "Sends one stat row to client",
+              details = "Includes entity ID and keyScope string" 
+            ]
+            GetStatsAsyncNotification(KeyScopedStatValues);
+            
+            [
+              id = 51,
+              description = "Sends a list of folders and/or leaderboards to the client. Max list size is (re)configured by setting mMaxNodesPerLeaderboardTreeNotification.",
+              details = "A folder includes a list of folders and/or leaderboards" 
+            ]
+            GetLeaderboardTreeNotification(LeaderboardTreeNodes);
+        }
+    }
+
+    master
+    {
+        methods
+        {
+               [
+                 id = 3,
+                 description = "Provides period ids for slaves on startup.",
+                 errors = {
+                       STATS_ERR_CONFIG_NOTAVAILABLE
+                   },
+                 requires_authentication = false 
+               ]
+               PeriodIds getPeriodIdsMaster();
+
+               [
+                 id = 4,
+                 description = "Asks the master for a chunk of in-memory data for a leaderboard.",
+                 requires_authentication = false 
+               ]
+               PopulateLeaderboardIndexData populateLeaderboardIndex(PopulateLeaderboardIndexRequest);
+
+               [
+                 id = 6,
+                 description = "Report result of Global Cache Instruction execution to master.",
+                 requires_authentication = false 
+               ]
+               void reportGlobalCacheInstructionExecutionResult(GlobalCacheInstructionExecutionResult);
+
+               [
+                 id = 10,
+                 description = "Notification from a slave that it is starting up to use global cache/stats.",
+                 requires_authentication = false
+               ]
+               void initializeGlobalCache(InitializeGlobalCacheRequest);
+        }
+
+        notifications
+        {
+            [
+              id = 4,
+              description = "Triggers historical period trimming in the cache.",
+              details = "Passes period type to be varified and trimmed if necessary." 
+            ]
+            TrimPeriodNotification(StatPeriod);
+            
+            [
+              id = 5,
+              description = "Passes period IDs to slaves." 
+            ]
+            SetPeriodIdsNotification(PeriodIds);
+            
+            [
+              id = 6,
+              description = "Delivers instructions about Global Cache to slaves." 
+            ]
+            ExecuteGlobalCacheInstruction(StatsGlobalCacheInstruction);
+        }
+        
+    }
+}
+}
+}
+
+

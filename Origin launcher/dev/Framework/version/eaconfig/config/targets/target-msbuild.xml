@@ -1,0 +1,243 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <property name="eaconfig.msbuild.default.verbosity" value="minimal"/>  
+  <target name="msbuild-internal">
+    <call target="set-sln-file"/>   
+    
+    <choose>
+
+      <!-- sln file exists -->
+      <do if="@{FileExists('${sln-file}')}">
+        <property name="platform.name.${config-system}" value="@{GetVisualStudioPlatformName()}"/>
+        <GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+        <GetVSConfigName ConfigPropertyName="vsproj_config_name"/>
+
+        <call target="msbuild-setup-msbuild-path"/>
+        <call target="msbuild-setup-msbuild-verbosity"/>
+        <call target="msbuild-setup-msbuild-cpucount" />
+        
+        <property name="distributedBuildId" value="@{DateTimeNowAsFiletime()}" if="${sndbs.enabled??false}"/>
+
+        <!-- NOTICE - If you add or remove arguments for msbuild.exe, consider reflecting change that in target-sndbs.xml which also calls msbuild.exe -->
+        <exec program="${eaconfig.msbuild.path}">
+          <args>
+            <arg value='"${sln-file}"'/>
+            <arg value="/t:${eaconfig.msbuild.target??Build}"/>
+            <arg value="/nodeReuse:False"/>  <!-- This option stop msbuild.exe from lingering around after a build. -->
+            <arg value="/v:${eaconfig.msbuild.default.verbosity}"/>
+            <arg value="/r"/> <!-- nuget restore needed when building clean with the new csproj format -->
+            <arg value="/m" unless="@{PropertyExists('eaconfig.msbuild.cpucount')}"/>
+            <arg value="/m:${eaconfig.msbuild.cpucount}" if="@{PropertyExists('eaconfig.msbuild.cpucount')}"/>
+            <arg value="/l:${eaconfig.msbuild.loggers}" if ="@{PropertyExists('eaconfig.msbuild.loggers')}"/>
+            <arg value='"/p:Configuration=${vsproj_config_name};Platform=${platform.name.${config-system}}"'/>
+            <arg value="${eaconfig.msbuild.extra-args}" if="@{PropertyExists('eaconfig.msbuild.extra-args')}"/>
+            <arg value='/p:DistributedBuild=true /p:DistributedBuildId=DBS:${distributedBuildId} /p:DBSBUILD="dbsbuild.exe -id ${distributedBuildId} -gt" /p:DBS_IN=$$I: /p:DBS_OUT=$$O: /p:DBS_COMMENT=$$C:' if='${sndbs.enabled??false}'/>
+          </args>
+          <env>
+            <option name="VisualStudioVersion" value="${config-vs-version}"/>
+            <option name="MSBUILDDEBUGONSTART" value="1" if="${eaconfig.msbuild.debug??false}"/>
+          </env>
+        </exec>
+      </do>
+
+      <!-- no sln file -->
+      <do>
+        <choose>
+          <do if="@{StrIsEmpty('${${eaconfig.build.group}.buildmodules??}')}">
+            <echo message="There seems to be no modules in the '${eaconfig.build.group}' build group, nothing to build!"/>
+          </do>
+          <do>
+            <fail message="Need to generate SLN file for ${package.name} package.  Couldn't find ${sln-file}"/>
+          </do>
+        </choose>
+      </do>
+    </choose>
+  </target>
+
+  <target name="msbuild-setup-msbuild-cpucount">
+    <property name="eaconfig.msbuild.cpucount" value="${eaconfig.msbuild.cpucount??1}" if="${eaconfig.msbuild.debug??false}"/> <!-- use single node by default if debugging -->
+  </target>
+
+  <target name="msbuild-setup-msbuild-verbosity">
+    <property name="eaconfig.msbuild.default.verbosity" value="detailed" if="${nant.verbose}"/>
+    <property name="eaconfig.msbuild.default.verbosity" value="${eaconfig.msbuild.verbosity??${eaconfig.msbuild.default.verbosity}}"/>
+  </target>
+
+  <target name="msbuild-setup-msbuild-path">
+    <do unless="@{PropertyExists('eaconfig.msbuild.path')}">
+      <include file="${package.Framework.dir}/VisualStudio/scripts/init-common-tools.xml"/>
+      <property name="eaconfig.msbuild.path" value="${package.VisualStudio.msbuild.exe}"/>
+    </do>
+  </target>
+
+	<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+	<target name="msbuild-internal-all" hidden="true">
+		<property name="eaconfig.build.configs" value ="@{DistinctItems('${config} ${eaconfig.build.configs??${package.configs}}')}"/>
+		<property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>
+		<property name="eaconfig.cmdline_prop_optionset_name" value="nant.commandline.properties"/>
+		<do if="!@{OptionSetExists('nant.commandline.properties')} and @{OptionSetExists('nant.commadline.properties')}">
+			<!-- 
+                TODO: nant.commadline.properties cleanup 
+                We had a typo with nant.commandline.properties in older version of Framework and  
+                this optionset was named nant.commadline.properties.  So if the new optionset name  
+                doesn't exists, we must be using an old Framework.  Switch back to the old name. 
+            -->
+			<property name="eaconfig.cmdline_prop_optionset_name" value="nant.commadline.properties"/>
+		</do>
+		<parallel.foreach item="String" in="${eaconfig.build.configs}" property="build-config-name">
+			<!-- TODO: parallel.foreach? VS builds are very parllel anyway and kicking them all at once just add confusion-->
+			<choose>
+				<!-- if its our current config, just build sln -->
+				<do if="${build-config-name} == ${config}">
+					<call target="msbuild-internal"/>
+				</do>
+
+				<!-- if its not our current config, launch a sub project with right config call internal singe config target -->
+				<do>
+					<nant buildfile="${nant.project.buildfile}"
+					target="msbuild-internal"
+					optionset="${eaconfig.cmdline_prop_optionset_name}"
+					global-properties-action="initialize"
+					start-new-build="false">
+						<property name="config" value="${build-config-name}"/>
+						<property name="package.configs" value="${eaconfig.build.configs}"/>
+						<property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}"/>
+						<property name="eaconfig.build.group.names" value="${eaconfig.build.group.names}"/>
+					</nant>
+				</do>
+			</choose>
+		</parallel.foreach>
+	</target>
+
+  <!-- Build targets -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild')}' == 'exclude'">
+    <target name="msbuild" description="Build the library using msbuild" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig.msbuild.target" value="Build"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-all')}' == 'exclude'">
+    <target name="msbuild-all" description="Build the library using msbuild" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig.msbuild.target" value="Build"/>
+      <call target="msbuild-internal-all"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-example')}' == 'exclude'">
+    <target name="msbuild-example" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <property name="eaconfig.msbuild.target" value="Build"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-all-example')}' == 'exclude'">
+    <target name="msbuild-all-example" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <property name="eaconfig.msbuild.target" value="Build"/>
+      <call target="msbuild-internal-all"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-test')}' == 'exclude'">
+    <target name="msbuild-test" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <property name="eaconfig.msbuild.target" value="Build"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-all-test')}' == 'exclude'">
+    <target name="msbuild-all-test" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <property name="eaconfig.msbuild.target" value="Build"/>
+      <call target="msbuild-internal-all"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-tool')}' == 'exclude'">
+    <target name="msbuild-tool" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <property name="eaconfig.msbuild.target" value="Build"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-all-tool')}' == 'exclude'">
+    <target name="msbuild-all-tool" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <property name="eaconfig.msbuild.target" value="Build"/>
+      <call target="msbuild-internal-all"/>
+    </target>
+  </do>
+
+  <!-- Rebuild Targets -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild')}' == 'exclude'">
+    <target name="msbuild-rebuild" description="Build the library using msbuild" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig.msbuild.target" value="Rebuild"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-example')}' == 'exclude'">
+    <target name="msbuild-rebuild-example" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <property name="eaconfig.msbuild.target" value="Rebuild"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-test')}' == 'exclude'">
+    <target name="msbuild-rebuild-test" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <property name="eaconfig.msbuild.target" value="Rebuild"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-tool')}' == 'exclude'">
+    <target name="msbuild-rebuild-tool" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <property name="eaconfig.msbuild.target" value="Rebuild"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <!-- Clean Targets -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-clean')}' == 'exclude'">
+    <target name="msbuild-clean" description="Clean the library using msbuild" allowoverride="true">
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig.msbuild.target" value="Clean"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-clean-test')}' == 'exclude'">
+    <target name="msbuild-clean-test" description="Clean the library using msbuild" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <property name="eaconfig.msbuild.target" value="Clean"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-clean-tool')}' == 'exclude'">
+    <target name="msbuild-clean-tool" description="Clean the library using msbuild" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <property name="eaconfig.msbuild.target" value="Clean"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'msbuild-clean-example')}' == 'exclude'">
+    <target name="msbuild-clean-example" description="Clean the library using msbuild" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <property name="eaconfig.msbuild.target" value="Clean"/>
+      <call target="msbuild-internal"/>
+    </target>
+  </do>
+
+</project>

@@ -1,0 +1,81 @@
+<!-- (c) Electronic Arts. All Rights Reserved. -->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<do if="${config-system} == 'osx'">
+
+		<target name="copy-asset-files.osx" style="use" description="Deploy files to the package" hidden="true">
+
+			<!-- The properties 'buildStepGroup', 'buildStepModuleName', and 'buildStepModuleGroupName' are passed in from XcodeProjectizer. -->
+
+			<property name="build.module" value="${build.module??${buildStepModuleName??${package.name}}}"/>
+			<property name="eaconfig.build.group" value="${eaconfig.build.group??${buildStepGroup??runtime}}"/>
+
+			<property name="custom-module-output-dir" local="true" value="${${groupname??${buildStepModuleGroupName??runtime.${build.module}}}.outputdir??}"/>
+
+			<choose>
+				<do if="@{StrIsEmpty('${custom-module-output-dir}')}">
+					<property name="build-module-output-dir" local="true" value="@{GetModuleOutputDir('bin','${package.name}')}"/>
+				</do>
+				<do>
+					<property name="build-module-output-dir" local="true" value="${custom-module-output-dir}"/>
+				</do>
+			</choose>
+			<property name="appbundlename" local="true" value="${${groupname??${buildStepModuleGroupName??runtime.${build.module}}}.app-bundle-name??${build.module}}"/>
+			<property name="package.asset-configbuilddir" value="${build-module-output-dir}/${appbundlename}.app/Contents/Resources"/>
+
+			<property name="asset-deploy-basedir.osx" value="${package.asset-configbuilddir}"/>
+			<!-- 
+			On nant build, we don't create app-bundle.  So we want the deploy folder to be just the package's regular bin dir.  We detect
+			whether we're doing nant build vs XcodeProjectizer build by detecting the presense of property buildPostBuildTargets which only
+			get set by XcodeProjectizer.  We should find better means of detecting this in the future.
+			-->
+			<do unless="@{PropertyExists('buildPostBuildTargets')}">
+				<property name="asset-deploy-basedir.osx" value="${build-module-output-dir}"/>
+				<do if="!@{StrIsEmpty('${custom-module-output-dir}')} and @{PathIsPathRooted('${custom-module-output-dir}')}">
+					<property name="package.asset-configbuilddir" value="${build-module-output-dir}"/>
+				</do>
+
+				<!-- 
+				If we don't create app bundle, then assets and exe are in the same folder. 
+				We need to set up exe exclusion so that the syntargetdir task won't remove the exe. 
+				-->
+				<property name="build.exe-name" value="${${groupname??${buildStepModuleGroupName??runtime.${build.module}}}.outputname??${build.module}}" local="true"/>
+				<fileset name="eaconfig-copy-asset-files.additional-excludedfiles" basedir="${package.asset-configbuilddir}" append="false" failonmissing="false">
+					<includes name="${build.exe-name}"/>
+					<includes name="${build.exe-name}.map"/>
+				</fileset>
+			</do>
+
+			<call target="copy-asset-files"/>
+		</target>
+
+		<!-- Mainly used by Frostbite's buildlayout generation to get the actual app bundle (or ipa export output) full path -->
+		<target name="osx.get-packaging-output">
+            <dependent name="XcodeProjectizer"/>
+
+            <property name="osxModuleOutputName" value="${${groupname}.outputname??${build.module}}" local="true"/>
+
+            <property name="osxPackageDefaultExeBinDir" value="${package.configbindir}" local="true"/>
+			<do if="${eaconfig.build.group} != 'runtime'">
+				<property name="osxPackageDefaultExeBinDir" value="${property.value}/${eaconfig.build.group}" local="true"/>
+			</do>
+			<property name="osxPackageExeBinDir" value="@{PathGetFullPath(${${groupname}.outputdir??${osxPackageDefaultExeBinDir}})}" local="true"/>
+			<property name="bundle-name-override-prop" value="app-bundle-name" local="true"/>
+			<do if="${${groupname??runtime.${build.module}}.is-app-extension??false}">
+				<property name="bundle-name-override-prop" value="app-extension-name"/>
+			</do>
+            <choose>
+                <do if="'${package.XcodeProjectizer.version}' == 'dev' or @{StrCompareVersions('${package.XcodeProjectizer.version}','4.0.0')} lt 0">
+                    <property name="appbundlename" value="${${groupname??runtime.${build.module}}.${bundle-name-override-prop}??${build.module}}" local="true"/>
+                </do>
+                <do>
+                    <property name="appbundlename" value="${${groupname??runtime.${build.module}}.${bundle-name-override-prop}??${osxModuleOutputName??${build.module}}}" local="true"/>
+                </do>
+            </choose>
+			<property name="osx.get-packaging-output.resolved-path" value="@{PathCombine(${osxPackageExeBinDir},${appbundlename})}"/>
+			<property name="osx.get-packaging-output.resolved-path" value="${property.value}.${osx.get-packaging-output.output-type}"/>
+		</target>
+
+	</do>
+
+</project>

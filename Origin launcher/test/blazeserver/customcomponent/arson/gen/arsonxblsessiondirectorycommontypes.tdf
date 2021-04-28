@@ -1,0 +1,342 @@
+/*! ************************************************************************************************/
+/*!
+    \file arsonxblsessiondirectorycommontypes.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/externalsessiontypes.h"]
+#include "framework/gen/externalsessiontypes.tdf"
+
+[headername="gamemanager/tdf/gamemanager.h"] // for TournamentOrganizer, TournamentId
+#include "gamemanager/gen/gamemanager.tdf"
+
+[headername="arson/tournamentorganizer/tdf/arsontournamentorganizer.h"]    // for ExternalTournamentTeamStanding in ArsonServersTournamentsConstantsSystemTeam
+#include "arson/gen/tournamentorganizer/arsontournamentorganizer.tdf"
+
+namespace Blaze
+{
+
+namespace Arson
+{
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Wrappers for Blaze Server side only TDFs
+/////////////////////////////////////////////////////////////////////////////////////////
+
+typedef string(-1) ArsonExternalSessionInviteProtocol;
+
+class ArsonMultiplayerSessionRef
+{
+    [tag="scid", description="The title's service config identifier."]
+    Blaze::XblScid mScid;
+
+    [tag="stnm", description="The MultiPlayerSession's XDP configured session template."]
+    Blaze::XblSessionTemplateName mTemplateName;
+
+    [tag="snam", description="The MultiPlayerSession's session name."]
+    Blaze::XblSessionName mName;
+};
+
+class ArsonTournamentRef
+{
+    [tag="trid", description="Tournament id"]
+    Blaze::GameManager::TournamentIdentification mTournamentIdentification;
+};
+
+class ArsonServersTournamentsConstantsSystem
+{
+    [tag="tref", description="MPS 'servers.tournaments.constants.system.ArsonTournamentRef'. A reference to the tournament."]
+    ArsonTournamentRef mTournamentRef;
+};
+
+class ArsonServersTournamentsConstants
+{
+    [tag="syst", description="MPS 'servers.tournaments.constants.system'"]
+    ArsonServersTournamentsConstantsSystem mSystem;
+};
+
+// based on Blaze Server side only tdf ArenaResult
+[trackChanges = true]
+class ArsonArenaResult
+{
+    [tag="outc", description="arena match result. Possible values are win, loss, rank, draw, noshow"]
+    string(-1) mOutcome;
+    [tag="rank", description="arena match result ranking. Used if outcome was rank"]
+    uint64_t mRanking;
+};
+typedef map<string(-1), ArsonArenaResult> ArsonArenaResults;
+
+class ArsonServersTournaments
+{
+    [tag="cnst", description="MPS 'servers.tournaments.constants'"]
+    ArsonServersTournamentsConstants mConstants;
+};
+
+
+class ArsonServersArbitrationConstantsSystem
+{
+    [tag="strt", description="MPS 'servers.arbitration.constants.system.startTime'"]
+    UtcTimeString mStartTime;
+};
+
+class ArsonServersArbitrationConstants
+{
+    [tag="syst", description="MPS 'servers.arbitration.constants.system'"]
+    ArsonServersArbitrationConstantsSystem mSystem;
+};
+
+class ArsonServersArbitrationPropertiesSystem
+{
+    [tag="conf"] uint8_t mResultConfidenceLevel;
+    [tag="rsrc"] string(-1) mResultSource; //description="MPS 'servers.arbitration.properties.system.resultSource'. The arbitration result source."
+    [tag="stat"] string(-1) mResultState; //poss values: completed, canceled, noresults, partialresults. 15 chars for partialresults
+    [tag="arbi"] ArsonArenaResults mResults;
+};
+
+class ArsonServersArbitrationProperties
+{
+    [tag="syst"] ArsonServersArbitrationPropertiesSystem mSystem; //description="MPS 'servers.arbitration.properties.system'"
+};
+
+class ArsonServersArbitration
+{
+    [tag="cnst"] ArsonServersArbitrationConstants mConstants; //description="MPS 'servers.arbitration.constants'"
+    [tag="prop"] ArsonServersArbitrationProperties mProperties; //description="MPS 'servers.arbitration.properties'"
+};
+
+class ArsonMultiplayerSessionServers
+{
+    [tag="trna", description="MPS 'servers.tournaments' section"]
+    ArsonServersTournaments mTournaments;
+    
+    [tag="arbn", description="MPS 'servers.arbitration' section"]
+    ArsonServersArbitration mArbitration;
+};
+
+[description="Arena/tournament match session's arbitration status"]
+class ArsonArenaSessionArbitration
+{
+    [tag="stat", description="MultiplayerSession Arbitration status. Possible values are inprogress, waiting, complete"]
+    string(-1) mStatus;
+};
+
+class ArsonMultiplayerSessionSubscriptionsEntryEventHub
+{
+    [tag="nspc", description="MultiplayerSession Subscriptions Event Hub's namespace"]
+    string(-1) mNamespace;
+    [tag="name", description="MultiplayerSession Subscriptions Event Hub's name"]
+    string(-1) mName;
+    [tag="akey", description="MultiplayerSession Subscriptions Event Hub's access key"]
+    string(-1) mAccessKeyName;
+    [tag="pkey", description="MultiplayerSession Subscriptions Event Hub's partition key"]
+    string(-1) mPartitionKey;
+    [tag="ctxt", description="MultiplayerSession Subscriptions Event Hub's context"]
+    string(-1) mContext;
+};
+
+[description="Arena/tournament match session's subscription entry"]
+class ArsonMultiplayerSessionSubscriptionsEntry
+{
+    [tag="evhb", description="MultiplayerSession Subscriptions' event hub"]
+    ArsonMultiplayerSessionSubscriptionsEntryEventHub mEventHub;
+
+    [tag="ctyp", description="MultiplayerSession Subscriptions' change types"]
+    list<string(-1)> mChangeTypes;
+};
+
+typedef map<TournamentId, ArsonMultiplayerSessionSubscriptionsEntry> ArsonMultiplayerSessionSubscriptions;
+
+class ArsonMultiplayerSessionSystemProperties
+{
+    [tag="clos", default=false, description="whether external session will be Closed. Note: MPS may omit returning Closed if its false, so decoder must default to false."]
+    bool mClosed;
+
+    [tag="jres", description="external session's join restriction. Possible values are 'none', 'local', or 'followed'."]
+    string(-1) mJoinRestriction;
+    
+    [tag="keyw", description="The session's key words."]
+    list<string(-1)> mKeywords;
+};
+
+class ArsonMultiplayerSessionProperties
+{
+    [tag="syst", description="External session's system properties."]
+    ArsonMultiplayerSessionSystemProperties mSystem;
+};
+
+class ArsonMultiplayerSessionCapabilitiesSystemConstants
+{
+    [tag="gply", description="(needed for MPSD contract version 107) whether the external session represents an actual game play session (as opposed to a helper session like a match or lobby session). true enables XBL recent players and reputation reporting."]
+    bool mGameplay;
+
+    [tag="arbi", default=false, description="(needed for Arena play) whether the external session supports arbitration for Arena play."]
+    bool mArbitration;
+};
+
+class ArsonMultiplayerSessionSystemConstantsArbitration
+{
+    [tag="arto", description="milliseconds before an Arena match's arbitration time out."]
+    uint64_t mArbitrationTimeout;
+
+    [tag="ffto", description="milliseconds before an Arena match forfiet time out."]
+    uint64_t mForfeitTimeout;
+};
+
+class ArsonMultiplayerSessionSystemConstants
+{
+    [tag="rsto", description="milliseconds before a reserved ArsonMember removed."]
+    uint64_t mReservedRemovalTimeout;
+
+    [tag="into", description="milliseconds before an inactive ArsonMember removed."]
+    uint64_t mInactiveRemovalTimeout;
+
+    [tag="ryto", description="milliseconds before a ready ArsonMember removed."]
+    uint64_t mReadyRemovalTimeout;
+
+    [tag="seto", description="milliseconds before an empty session removed."]
+    uint64_t mSessionEmptyTimeout;
+
+    [tag="invp", description="external session's invite protocol. Possible values are  'game' or empty string."]
+    ArsonExternalSessionInviteProtocol mInviteProtocol;
+
+    [tag="visb", description="external session's visibility setting. Possible values are 'open', 'visible', or 'private'."]
+    string(-1) mVisibility;
+
+    [tag="capb", description="external session's capabilities block."]
+    ArsonMultiplayerSessionCapabilitiesSystemConstants mCapabilities;
+    
+    [tag="arbi", description="multiplayer session's arbitration block."]
+    ArsonMultiplayerSessionSystemConstantsArbitration mArbitration;
+};
+
+
+class ArsonMultiplayerSessionCustomConstants
+{
+    [tag="id", description="Numeric identifier for the external session, stored as a string."]
+    uint64_t mExternalSessionId;
+
+    [tag="type", description="The type of id specified for the external session."]
+    int64_t mExternalSessionType;
+
+    [tag="cust", description="Title specific custom data string."]
+    Blaze::ExternalSessionCustomDataString mExternalSessionCustomDataString;
+};
+
+//Note: external session ARSON, which is blocked from using 'Constants' name due to http://eadpjira.ea.com/browse/GOS-24615
+[description="same as the blazeserver side only Blaze::XBLServices::MultiplayerSessionConstants tdf class. This one though is exposed to client."]
+class ArsonMultiplayerSessionConstants
+{
+    [tag="cust", description=""]
+    ArsonMultiplayerSessionCustomConstants mCustom;
+
+    [tag="syst", description=""]
+    ArsonMultiplayerSessionSystemConstants mSystem;
+};
+
+class ArsonMemberSystem
+{
+    [tag="xuid", description=""]
+    Blaze::ExternalXblAccountId mXuid;
+
+    [tag="init", description="whether managed initialization enabled"]
+    bool mInitialize;
+    
+    [tag="team", description="member's tournament team name"]
+    string(-1) mTeam;
+};
+
+class ArsonMemberConstants
+{
+    [tag="syst", description=""]
+    ArsonMemberSystem mSystem;
+};
+
+class ArsonMemberPropertiesSystemArbitration
+{
+    [tag="arbi", description="match results"]
+    ArsonArenaResults mResults;
+};
+
+class ArsonMemberPropertiesSystem
+{
+    [tag="actv", description="whether player will be active"]
+    bool mActive;
+    [tag="arbi", description="player's arbitration block"]
+    ArsonMemberPropertiesSystemArbitration mArbitration;
+};
+
+
+class ArsonMemberProperties
+{
+    [tag="syst", description=""]
+    ArsonMemberPropertiesSystem mSystem;
+};
+
+
+class ArsonMember
+{
+    [tag="syst", description=""]
+    ArsonMemberConstants mConstants;
+
+    [tag="prop", description=""]
+    ArsonMemberProperties mProperties;
+    
+    [tag="arbi", description="The member's arbitration status. Possible values include 'joining', 'playing', 'complete'"]
+    string(-1) mArbitrationStatus;
+};
+
+
+class ArsonNonActiveMember
+{
+    [tag="syst", description=""]
+    ArsonMemberConstants mConstants;
+};
+
+
+typedef map<string(-1), ArsonMember> ArsonMembers;
+typedef map<string(-1), ArsonNonActiveMember> ArsonNonActiveMembers;
+
+
+class ArsonMultiplayerSessionResponse
+{
+    [tag="prop", description=""]
+    ArsonMultiplayerSessionProperties mProperties;
+
+    [tag="cons", description=""]
+    ArsonMultiplayerSessionConstants mConstants;
+
+    [tag="memb", description=""]
+    ArsonMembers mMembers;
+
+    [tag="coid"]
+    Blaze::XblCorrelationId mCorrelationId;
+    
+    [tag="srvr", description="MultiplayerSession servers"]
+    ArsonMultiplayerSessionServers mServers;
+
+    [tag="subn", description="MultiplayerSession Subscriptions"]
+    ArsonMultiplayerSessionSubscriptions mSubscriptions;
+
+    [tag="arbi", description="MultiplayerSession Arbitration"]
+    ArsonArenaSessionArbitration mArbitration;
+};
+
+
+class ArsonMultiplayerSessionErrorResponse
+{
+    [tag="retr", default=2, description="Recommended wait in seconds before MPSD call retry after an http 503 failure. MPSD may return this header value on http 503 failure, if not, then MS recommendeds waiting default 2s."]
+    uint32_t mRetryAfter;
+    
+    [tag="xlog", description="detailed debug info on failure."]
+    string(-1) mXblLog;
+
+    [tag="cons", description="only filled out if error returns this external session data (content type json), e.g. 403 join restriction errors."]
+    ArsonMultiplayerSessionConstants mConstants; //Used to check for Visibility private failures. side: decoder may log warning if this data missing in rsp, but this causes no functional problems.
+};
+
+
+
+}
+}

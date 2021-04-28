@@ -1,0 +1,988 @@
+
+/*! ************************************************************************************************/
+/*!
+    \file gamepacker_server.tdf
+
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+// Include for GameId
+[headername="gamemanager/tdf/gamemanager_types.h"]
+#include "gamemanager/gen/gamemanager_types.tdf"
+
+[headername="gamemanager/tdf/matchmaker_server.h"]      // PACKER_TODO - Remove this association.
+#include "gamemanager/gen/matchmaker_server.tdf"
+
+[headername="framework/tdf/userpineventtypes_server.h"]
+#include "framework/gen/userpineventtypes_server.tdf"
+
+[headername="framework/tdf/storagetypes_server.h"]
+#include "framework/gen/storagetypes_server.tdf"
+
+[headername="framework/tdf/riverposter.h"]
+#include "framework/gen/riverposter.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+
+typedef GameManager::MatchmakingScenarioId PackerScenarioId;
+typedef uint64_t PackerSessionId;
+typedef uint64_t PackerSiloId;
+typedef uint64_t PackerFinalizationJobId;
+
+typedef int64_t PackerPlayerId;
+typedef int64_t PackerPartyId;
+typedef int64_t PackerGameId;
+typedef list<float> FloatList;
+
+const PackerScenarioId INVALID_PACKER_SCENARIO_ID = 0;
+const PackerSessionId INVALID_PACKER_SESSION_ID = 0;
+const PackerSiloId INVALID_PACKER_SILO_ID = 0;
+
+enum GamePackerIdType
+{
+    GAMEPACKER_IDTYPE_SESSION, // reserved
+    GAMEPACKER_IDTYPE_SCENARIO, // reserved
+    GAMEPACKER_IDTYPE_PACKER_SILO,
+    GAMEPACKER_IDTYPE_TEMPLATE_SILO,
+    GAMEPACKER_IDTYPE_FINALIZATION_JOB
+};
+
+enum PackerFinalizationTrigger
+{
+    [description = "Viable game has exceeded its cooldown period."]
+    COOLDOWN,
+    [description = "At least one of the sessions in the game has expired."]
+    DEADLINE,
+    [description = "Game is ideal."]
+    OPTIMAL
+};
+
+[ description = "Internal master scenario specific state common to all sibling packer sessions", tdfid = "hash", generateProto = false ]
+class PackerScenarioData
+{
+    enum TerminationReason
+    {
+        SCENARIO_COMPLETED,
+        SCENARIO_TIMED_OUT,
+        SCENARIO_CANCELED,
+        SCENARIO_OWNER_LEFT,
+        SCENARIO_FAILED,
+        SCENARIO_SYSTEM_TERMINATED
+    };
+
+    [tag="pssn", description="Packer session id. (Used for Redis, but not slivers.)"]
+    PackerScenarioId packerScenarioId;
+
+    [tag="stim", description="Scenario started timestamp."]
+    TimeValue startedTimestamp;
+
+    [tag="etim", description="Scenario expires timestamp."]
+    TimeValue expiresTimestamp;
+
+    [tag="ltim", description="Scenario locked timestamp."]
+    TimeValue lockedTimestamp;
+
+    [tag="lext", description="Scenario lock expiration timestamp."]
+    TimeValue lockExpiresTimestamp;
+
+    [tag="lock", description="Packer session id that locked this scenario for finalization.", default=0]
+    PackerSessionId lockedForFinalizationByPackerSessionId;
+
+    [tag="xtrn", description="External session name"]
+    string(-1) externalSessionName;
+
+    [tag="trsn"]
+    TerminationReason terminationReason;
+};
+
+[ description = "Data Type holding information about active games, as used by the PackerSilos and PackerSlave.", tdfid = "hash", generateProto = false ]
+class PackerActiveGameData
+{
+    // Game Data:
+    [tag="gmid"] GameId gameId;
+    [tag="gver"] StorageRecordVersion gameVersion;
+    
+    // Player Data:
+    [tag="ugid"] UserGroupIdList userGroupIds;
+    [tag="tmid"] TeamIndexList teamIndexes;
+    [tag="prid"] PlayerIdList participantIds;
+    [tag="usid"] UserSessionIdList userSessionIds;
+
+    // Additional Properties (ex. "game.attr[mode]" - used internally by Packer) are only held as Properties and only converted when sent into Packer. 
+};
+
+
+[ description = "", generateProto = false ]
+class OverallScoringInfo
+{
+    [tag="gqfs", description="Latest factor sores representing the best factor scores of all games the session is currently part of."]
+    FloatList gameFactorScores;
+
+    [tag="gqus", description="Latest game quality score calculated out of 'gameFactorScores'."]
+    float gameQualityScore;
+
+    [tag="bqts", description="Highest game quality score achieved by this session."]
+    float bestGameQualityScore;
+
+    [tag="viqf", description="Viable factor scores from the silo containing the best game the session is part of."]
+    FloatList viableFactorScores;
+
+    [tag="viqs", description="Viable quality score calculated out of 'viableFactorScores'."]
+    float viableQualityScore;
+
+    [tag="bgid", description="The best game this session is part of. Used as debbuging aid."]
+    PackerSiloId bestGameId;
+
+    [tag="bsid", description="The silo containing the best game. Used as debbuging aid."]
+    PackerSiloId bestPackerSiloId;
+};
+
+
+[ description = "Internal master state of the packer session", tdfid = "hash", generateProto = false ]
+class PackerSessionData
+{
+    [ description = "Internal master enum used to explicitly track the lifecycle of the packer session" ]
+    enum SessionState
+    {
+        [description = "Ready to be assigned to a worker"]
+        SESSION_AWAITING_ASSIGNMENT,
+        [description = "Assigned to a worker"]
+        SESSION_ASSIGNED,
+        [description = "Suspended due to finalization lock collision. Resumed if suspending sibling session is unlocked or aborted."]
+        SESSION_SUSPENDED,
+        [description = "Waiting to be released by assigned worker. Used by master to flag the session as pending release."]
+        SESSION_AWAITING_RELEASE,
+        [description = "Delayed start."]
+        SESSION_DELAYED,
+        [description = "Session completed successfully."]
+        SESSION_COMPLETED,
+        [description = "Session was aborted due to error."]
+        SESSION_ABORTED
+    };
+
+    [ description = "Internal master enum used to generate session outcome metric tags" ]
+    enum SessionResult
+    {
+        [description = "Session completed successfully."]
+        SUCCESS,
+        [description = "Session failed game setup."]
+        FAILED,
+        [description = "Session timed out."]
+        TIMED_OUT,
+        [description = "Session was stopped due to client-initiated action (e.g. user explicitly canceled or logged out)."]
+        CANCELED,
+        [description = "Session was stopped due to server-initiated action (e.g. restart)."]
+        TERMINATED,
+        [description = "Session was stopped due to sibling session having completed."]
+        ENDED
+    };
+
+    [tag="pssn", description="Packer session id. (Used for Redis, but not slivers.)"]
+    PackerSessionId packerSessionId;
+
+    [tag="wrkr", description="Assigned worker id.  PACKER_TODO - This value may be meaningless after a migration."]
+    InstanceId assignedWorkerInstanceId;
+
+    [tag="layr", description="Assigned layer id in the layer hierarchy.  PACKER_TODO - This value is not used when Imported."]
+    int32_t assignedLayerId;
+
+    [tag="stim", description="Tracks the time the session was started. Write once."]
+    TimeValue startedTimestamp;
+
+    [tag="atim", description="Tracks the last time the session was assigned to a worker. If assigned, acquiredTimestamp > releasedTimestamp."]
+    TimeValue acquiredTimestamp;
+
+    [tag="rtim", description="Tracks the last time the session was released by a worker (unlocked,migrated,aborted)."]
+    TimeValue releasedTimestamp;
+
+    [tag="utim", description="Tracks the last time the session received a status update from a worker."]
+    TimeValue updatedStatusTimestamp;
+
+    [tag="itim", description="Tracks the last time the session received a status update from a worker that improved its score."]
+    TimeValue improvedScoreTimestamp;
+
+    [tag="ptim", description="Tracks the time the owner requested the session to be released by assigned worker. If awaiting release, pendingReleaseTimestamp < releasedTimestamp."]
+    TimeValue pendingReleaseTimestamp;
+    
+    [tag="udur", description="Total session time spent waiting to be acquired by a worker."]
+    TimeValue unassignedDuration;
+
+    [tag="rcou", description="Number of times session has been released by a worker (unlocked,migrated,aborted)."]
+    uint64_t releaseCount;
+
+    [tag="stat", description="This state is used to aid in robust handling of packer session transitions."]
+    SessionState state;
+
+    [tag="mgcn", description="Number of times the session was migrated to a new worker instance"]
+    uint64_t migrationCount;
+
+    [tag="slcn", description="Cumulative number of silos the session is a member of, measured across all packer workers the session is processed by."]
+    uint64_t totalSiloCount;
+
+    [tag="lsin", description="Highest number of players in the most populated silo the session is assigned to."]
+    uint64_t maxSiloPlayerCount;
+
+    [tag="plmc", description="Number of players matched/cycled through a game, counted from the moment the session was assigned to the game."]
+    uint64_t matchedPlayersInGameCount;
+
+    [tag="tevc", description="Cumulative number of times the packer session is evicted from a game, measured across all packer workers the session is processed by."]
+    uint64_t totalEvictionCount;
+            
+    [tag="scri", description="Overall scoring info for the session."]
+    OverallScoringInfo overallScoringInfo;
+
+    [tag="fdet", description="Detailed per factor scoring info of the best game the session is part of."]
+    RiverPoster::GqfDetailsList factorDetailsList;
+};
+
+// Base request that is used to build up the individual subsession requests:
+// Based on StartMatchmakingInternalRequest
+class PackerScenarioInternalRequest
+{
+// Source Data:  (From StartMatchmakingRequest)
+    [tag="pljd", description="Info on the players that may join the GB request. Includes Team choice, Roles, etc."]
+    PlayerJoinData playerJoinData;
+
+    [tag="cmgd", description="Common data provided directly from the SDK. Used in Matchmaking, Join Game, and GB Requests. Includes game protocol version string."]
+    CommonGameRequestData commonGameData;
+
+
+// Data Gathered By coreSlave:
+    [tag="usrs", description="The matchmaking session's joining users"]
+    GameManager::UserJoinInfoList usersInfo;
+    
+    [tag="ownr", description="Session information for the user that initiated the session.  May not be the host, or even in the matchmaking attempt."]
+    UserSessionInfo ownerUserSessionInfo;
+
+//    [tag="ses", description="The matchmaking session id to use for the created session on the master."]
+//    MatchmakingSessionId matchmakingSessionId;
+    
+    [tag="addr", description="Data about the external IPs of matchmaking session members for determining if users with strict NATs are behind the same firewall."]
+    UserSessionExternalIpInformation userSessionIpInformation;
+
+    [tag="blck", description="a list of external ids that will be blocked by the XblBlockPlayersRule"]
+    ExternalXblAccountIdList xblAccountIdBlockList;
+
+// PIN Data: 
+    [tag="ttag", description="The track tag stored from external data source and will be sent to PIN"]
+    string(32) trackingTag;
+
+    [tag="tusr", description="The total number of online (gameplay) users at start of matchmaking. (will be sent to PIN)"]
+    uint64_t totalUsersOnline;
+
+    [tag="tugm", description="The total number of users in an online game session at start of matchmaking. (will be sent to PIN)"]
+    uint64_t totalUsersInGame;
+
+    [tag="tumm", description="The total number of users in matchmaking sessions at start of matchmaking. (will be sent to PIN)"]
+    uint64_t totalUsersInMatchmaking;
+
+// (General) Scenarios Data:
+    [tag="snfo", description="Holds Scenario Data including ScenarioId, ScenarioAttributes  (Do not use for subsession name - use StartPackerSessionRequestData values)."]
+    ScenarioInfo scenarioInfo;
+
+    [tag="scto", description="The overall timeout for the scenario, if this session is part of one."]
+    TimeValue scenarioTimeoutDuration;
+
+    [tag="smef", description="The time window for adjusting ttm estimates."]
+    TimeValue scenarioMatchEstimateFalloffWindow;
+
+    [tag="gmef", description="The time window for adjusting ttm estimates for non-scenario-specific ttm."]
+    TimeValue globalMatchEstimateFalloffWindow;
+};
+
+
+class PackerSessionInternalRequest
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+// Subsession Info:  (From StartMatchmakingRequest)
+    [tag="mmsd", description="Data for delays, external session info, etc."]
+    MatchmakingSessionData matchmakingSessionData;
+
+    [tag="gmcd", description="The data used to create the game. Holds the common data between "]
+    GameCreationData gameCreationData;
+
+// Subsession Info:  (From StartMatchmakingRequestInternal)
+    [tag="exsd", description="external session data to potentially set on the matched game"]
+    ExternalSessionMasterRequestData gameExternalSessionData;
+
+    [tag="qosc", description="Matchmaking QoS criteria, contains per-topology avoid lists and failure counts."]
+    QosCriteriaMap qosCriteria;
+
+// Subsession info: (From ScenarioInfo)
+    [tag="subn", description="SubSession Name"]
+    SubSessionName subSessionName;
+
+
+// Packer specific subsession Information: 
+    [tag="tame", description="Create game template used by dedicated server search."]
+    TemplateName createGameTemplateName;
+
+    // (Technically, this still requires the older Matchmaking Rules to be used fully:)
+    [tag="find", description="Dedicated server attribute rules used for searching"]
+    FindDedicatedServerRulesMap findDedicatedServerRulesMap;
+
+    [tag="filt", description="The matchmaking session's property filters."]
+    MatchmakingFilterCriteria matchmakingFilters;
+
+    [tag="pmap", description="Property/value pairs included in the matchmaking request."]
+    PropertyNameMap matchmakingPropertyMap;
+
+
+    // This is the list of all Properties that are required for filters that reference the given CG Template. 
+    //  The idea is that because a single Template is not tied to any one set of Filters, we have to indicate the OTHER filters that are not be used for this specific Template name. 
+    //  As noted in the PACKER_TODO, this should just be managed on the PackerSilo, not something that Scenarios have to pass in.  
+    [tag="plst", description="Property names referenced by filters in this request required by the template."]
+    PropertyNameList matchmakingPropertyList; // PACKER_TODO: This list could be removed in Urraca.1 (options: Dynamic packer property referencing, or packer knows about MM scenarios cfg)
+};
+typedef list<PackerSessionInternalRequest> PackerSessionInternalRequestList;
+
+[ description = "", generateProto = false ]
+class StartPackerScenarioRequest
+{
+// Packer Data:
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;      // Technically, this is already in the internalRequest.ScenarioInfo.OriginatingScenarioId.  It's held here too for sharding purposes.
+
+    [tag="ireq", allowref=true]   // Using allowref=true so that copyInto can be avoided 
+    PackerScenarioInternalRequest packerScenarioRequest;
+
+    [tag="ssdt", allowref=true]   // Using allowref=true so that copyInto can be avoided 
+    PackerSessionInternalRequestList packerSessionRequestList;
+};
+
+
+[ description = "", generateProto = false ]
+class StartPackerSessionResponse
+{
+    [tag="irsp", allowref=true]   // Using allowref=true so that copyInto can be avoided 
+    StartMatchmakingInternalResponse internalResponse;    // PACKER_TODO - Replace these with PackerSpecific implementation. 
+};
+
+[ description = "", generateProto = false ]
+class StartPackerSessionError
+{
+    [tag="ierr", allowref=true]   // Using allowref=true so that copyInto can be avoided 
+    MatchmakingCriteriaError internalError;    // PACKER_TODO - Replace these with PackerSpecific implementation. 
+};
+
+[ description = "Cancels all sesssions associated with this Packer Scenario, assuming that the Scenario is not already finalizing.", generateProto = false ]
+class CancelPackerScenarioRequest
+{
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+};
+
+
+[ description = "", generateProto = false ]
+class WorkerObtainPackerSessionRequest
+{
+};
+
+[ description = "", generateProto = false ]
+class WorkerObtainPackerSessionResponse
+{
+    // [tag="psid"]
+    // PackerSessionId packerSessionId;  // Held in subsessionRequest
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;  //  Technically duplicated with baseRequest.ScenarioInfo.OriginatingScenarioId, but kept separate for future separation
+
+    [tag="ddln", description="Absolute session completion deadline. NOTE: Deliberately non-relative to compensate for message lag time under load causing slave to schedule expiry too late."]
+    TimeValue expiryDeadline;
+
+    [tag="vers", description="Version of the master session data to enable efficient resync in case of disconnect."]
+    uint64_t version;
+
+    [tag="ireq", allowref=true]   // Using allowref=true so that copyInto can be avoided 
+    PackerScenarioInternalRequest packerScenarioRequest;
+    [tag="sreq", allowref=true]   // Using allowref=true so that copyInto can be avoided 
+    PackerSessionInternalRequest packerSessionRequest;
+};
+
+[ description = "", generateProto = false ]
+class WorkerMigratePackerSessionRequest
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+};
+
+[ description = "", generateProto = false ]
+class WorkerRelinquishPackerSessionRequest
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+};
+
+[ description = "", generateProto = false ]
+class PackerPinData
+{
+    [tag="silc", description="Number of silos the session is a member of."]
+    uint64_t siloCount;
+
+    [tag="lscn", description="Highest number of players in the most populated silo the session is assigned to."]
+    uint64_t maxSiloPlayerCount;
+
+    [tag="nplm", description="Number of players matched/cycled through a game, counted from the moment the session was assigned to the game."]
+    uint64_t matchedPlayersInGameCount;
+
+    [tag="ecnt", description="Number of times the packer session is evicted from a game, summed across silos."]
+    uint64_t evictionCount;
+
+    [tag="ssci", description="Overall scoring info for the session."]
+    OverallScoringInfo overallScoringInfo;
+
+    [tag="qfdt", description="Detailed per factor scoring info of the best game the session is part of."]
+    RiverPoster::GqfDetailsList factorDetailsList;
+};
+
+[ description = "A helper type used for storing and manipulating with scoring and factor details of a game.", generateProto = false ]
+class ScoringAndFactorDetails
+{
+    [tag="osci", description="Overall scoring info of a game."]
+    OverallScoringInfo overallScoringInfo;
+
+    [tag="qfdt", description="Detailed per factor scoring info of a game."]
+    RiverPoster::GqfDetailsList factorDetailsList;
+};
+
+[ description = "Packer session has been successfully finalized into a game.", generateProto = false ]
+class WorkerCompletePackerSessionRequest
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+
+    [tag="gaid"]
+    GameId gameId;
+
+    [tag="isid", description="Identifies packer session that initiated the finalization process. May belong to different packer master instance than packer session being completed in this request."]
+    PackerSessionId initiatorPackerSessionId;
+
+    [tag="pins", description="PIN event to submit", allowref=true]
+    PINSubmission pinSubmission;
+    
+    [tag="pind", description="PIN data to be transfered to packer master"]
+    PackerPinData pinData;
+};
+
+[ description = "Packer session has been aborted due to error.", generateProto = false ]
+class WorkerAbortPackerSessionRequest
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+
+    [tag="isid", description = "Identifies packer session that initiated the finalization process. May belong to different packer master instance than packer session being completed in this request."]
+    PackerSessionId initiatorPackerSessionId;
+};
+
+[ description = "", generateProto = false ]
+class WorkerLockPackerSessionRequest
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+};
+
+[ description = "", generateProto = false ]
+class WorkerUnlockPackerSessionRequest
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+};
+
+[ description = "Request object", generateProto = false ]
+class WorkerUpdatePackerSessionStatusRequest
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+
+    [tag="pind", description="PIN data to be transfered to packer master"]
+    PackerPinData pinData;
+};
+
+[ description = "", generateProto = false ]
+class WorkerLayerAssignmentRequest
+{
+    [tag="name", description = "Worker instance name. Needed because when the worker registers with the master the latter has often not yet received the remote server registration for it yet."]
+    string(-1) instanceName;
+
+    [tag="type", description = "Worker instance type name to used for Scenario Partitioning.  Needed because when the worker registers with the master the latter has often not yet received the remote server registration for it yet."]
+    string(-1) instanceTypeName;
+
+    [tag="slot", description = "Sequential slot number used by the master to idempotently compute the layer id."]
+    uint32_t layerSlotId;
+
+    [tag="vers", description = "Slot assignment version incremented at each slot version assignment in redis. Used by the master to discard slot assignment requests that may arrive out of order."]
+    uint64_t layerSlotAssignmentVersion;
+};
+
+[ description = "", generateProto = false ]
+class WorkerLayerAssignmentResponse
+{
+    [tag="vers", description = "Slot assignment version held by the master. When this does not match what the version in the request, this means the update was discarded and the caller should refresh its version."]
+    uint64_t layerSlotAssignmentVersion;
+};
+
+[ description = "", generateProto = false ]
+class PackerInstanceStatusResponse
+{
+    [tag = "mpct", description = "Number of players matchmaking currently on the packer master instance.", default = 0]
+    uint64_t matchmakingUsersCount;
+
+    [tag = "msct", description = "Number of sessions matchmaking currently on the packer master instance.", default = 0]
+    uint64_t matchmakingSessionsCount;
+
+    [tag="gttm", description="Estimated time to match for matchmaking overall"]
+    InstanceTimeToMatchEstimateData globalTimeToMatchEstimateData;
+
+    [tag="sdta", description="Per-scenario Time to Match census data."]
+    TimeToMatchEstimateDataPerScenario scenarioTimeToMatchEstimateData;
+
+    [tag="pmrg", description="Player Matchmaking Rate, mapped to Scenario, Pingsite, and DelineationGroup."]
+    PlayerMatchmakingRateByScenarioPingsiteGroup playerMatchmakingRateByScenarioPingsiteGroup;
+        
+    [tag="mms", description="Per-Scenario matchmaking census data."]
+    MatchmakingSessionsByScenario scenarioMatchmakingData;
+};
+
+[ description = "Internal worker enum used to explicitly track the cleanup reason of the packer session" ]
+enum WorkerSessionCleanupReason
+{
+    [description = "Session successfully packed into game"]
+    WORKER_SESSION_COMPLETED,
+
+    [description = "Session exceeded non-viable time quantum"]
+    WORKER_SESSION_MIGRATED,
+
+    [description = "Session owner left before completion, session will be updated, reenter the worker hierarchy"]
+    WORKER_SESSION_RELINQUISHED,
+
+    [description = "Session scenario already finalizing, master will resume if finalization fails"]
+    WORKER_SESSION_SUSPENDED,
+
+    [description = "Session terminated by master (see PackerScenarioData::TerminationReason)"]
+    WORKER_SESSION_TERMINATED,
+
+    [description = "Session expired locally while attempting to finalize"]
+    WORKER_SESSION_EXPIRED,
+
+    [description = "Session placeholder swept during empty silo removal"]
+    WORKER_SESSION_EMPTY_SILO_REMOVED,
+
+    [description = "Session placeholder unpacked during active game removal"]
+    WORKER_SESSION_ACTIVE_GAME_REMOVED,
+
+    [description = "Session placeholder unpacked during active game update"]
+    WORKER_SESSION_ACTIVE_GAME_UPDATED,
+
+    [description = "Session creation failed due to internal error, see log"]
+    WORKER_SESSION_CREATE_FAILED,
+
+    [description = "Session finalization failed due to internal error, see log"]
+    WORKER_SESSION_FINALIZE_FAILED
+};
+
+// Notifications
+
+[ description = "", generateProto = false ]
+class NotifyWorkerPackerSessionAvailable
+{
+    [tag="inst", description = "Owner instance id."]
+    InstanceId instanceId;
+
+    [tag="acnt"]
+    uint32_t availableSessionsCount;
+};
+
+[ description = "Session change. Future: will be replaced by per/mmSession storage manager subscription", generateProto = false ]
+class NotifyWorkerPackerSessionRelinquish
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+
+    [tag="vers", description="Version of the master session data to enable efficient resync in case of disconnect."]
+    uint64_t version;
+};
+
+[ description = "Session termination. Future: will be replaced by per/mmSession storage manager subscription", generateProto = false ]
+class NotifyWorkerPackerSessionTerminated
+{
+    [tag="psid"]
+    PackerSessionId packerSessionId;
+
+    [tag="pscd"]
+    PackerScenarioId packerScenarioId;
+
+    [tag="trsn"]
+    PackerScenarioData::TerminationReason terminationReason;
+};
+
+[ description = "Request object", generateProto = false ]
+class GetPackerMetricsRequest
+{
+    [tag="ikey"]
+    string(-1) metricsInfoKey;
+};
+
+[ description = "Response object", generateProto = false ]
+class GetPackerMetricsResponse
+{
+    [ description = "", generateProto = false ]
+    class MetricsInfo
+    {
+        [tag="mmap"]
+        list<string(-1)> metrics;
+    };
+
+    [tag="imap"]
+    map<string(-1),MetricsInfo> metricsInfo;
+};
+
+[ description = "", generateProto = false ]
+class PackerSiloCreated
+{
+    [tag="psid", description="Packer silo id."]
+    PackerSiloId createdPackerSiloId;
+
+    [tag="pstm", description="Name of the game template which contains the packer config for this packer silo."]
+    string(-1) gameTemplateName;
+
+    [tag="pscs", description="List of condition = value pairs used to create the packer silo."]
+    string(-1) packerSiloConditions;
+
+    [tag="scor", description="List of GQFs used by the game template."]
+    string(-1) gameQualityFactors;
+};
+
+[ description = "", generateProto = false ]
+class PackerSiloDestroyed
+{
+    [tag="psid", description="Packer silo id."]
+    PackerSiloId destroyedPackerSiloId;
+
+    [tag="tpa", description="Total number of parties to have been added to the packer silo during it's lifetime."]
+    uint64_t totalParties;
+
+    [tag="tpl", description="Total number of players to have been added to the packer silo during it's lifetime."]
+    uint64_t totalPlayers;
+
+    [tag="tga", description="Total number of games created by the packer silo during it's lifetime."]
+    uint64_t totalGames;
+
+    [tag="tpae", description="Total number of parties evicted from games by the packer silo during it's lifetime."]
+    uint64_t totalPartiesEvicted;
+
+    [tag="tple", description="Total number of players evicted from games by the packer silo during it's lifetime."]
+    uint64_t totalPlayersEvicted;
+
+    [tag="tta", description="life time duration of packer silo"]
+    TimeValue totalTimeAlive;
+};
+
+[ description = "", generateProto = false ]
+class PackerSiloTotals
+{
+    [tag="tpro", description="Total new provisional parties. Tracks parties associated with packer sessions."]
+    uint64_t totalNewProvisionalParties;
+
+    [tag="tpla", description="Total new placeholder parties. Tracks immutable groups of members in active games."]
+    uint64_t totalNewPlaceholderParties;
+};
+
+
+[ description = "", generateProto = false ]
+class PackerSiloPartyAdded
+{
+    typedef map<string(-1), int64_t> PropertyValueMap;
+
+    class Player
+    {
+        [tag="plid", description="Id of player."]
+        PackerPlayerId playerId;
+
+        [tag="prop", description="Map of player property values used by the packer to evaluate game quality factors."]
+        PropertyValueMap properties;
+    };
+
+    [tag="paid", description="Id of party being added to the packer silo. This is the matchmaking session id."]
+    PackerPartyId addedPartyId;
+
+    [tag="pasi", description="Packer silo id."]
+    PackerSiloId packerSiloId;
+
+    [tag="pspl", description="Total packer silo players."]
+    uint64_t packerSiloPlayers;
+
+    [tag="pspa", description="Total packer silo parties."]
+    uint64_t packerSiloParties;
+
+    [tag="psga", description="Total packer silo games."]
+    uint64_t packerSiloGames;
+
+    [tag="pvgc", description="Total packer silo viable games."]
+    uint64_t packerSiloViableGames;
+
+    [tag="plrs", description="Player information used by the packer."]
+    list<Player> players;
+};
+
+[ description = "", generateProto = false ]
+class PackerSiloPartyRemoved
+{
+    [tag="paid", description="Id of party being removed from the packer silo. This is the matchmaking session id."]
+    PackerPartyId removedPartyId;
+
+    [tag="pasi", description="Packer silo id."]
+    PackerSiloId packerSiloId;
+
+    [tag="pavi", description="Number of times party was evicted from a provisional game."]
+    uint64_t partyEvictions;
+
+    [tag="prre", description="Removal reason for party from packer silo id. Reasons: completed, migrated, mutated, removed, expired, repack."]
+    string(-1) partyRemovalReason;
+
+    [tag="slim", description="Realative to creation time."]
+    TimeValue lastImprovedTime;
+
+    [tag="spla", description="Total packer silo players."]
+    uint64_t packerSiloPlayers;
+
+    [tag="spar", description="Total packer silo parties."]
+    uint64_t packerSiloParties;
+
+    [tag="sgam", description="Total packer silo games."]
+    uint64_t packerSiloGames;
+
+    [tag="svga", description="Total packer silo viable games."]
+    uint64_t packerSiloViableGames;
+};
+
+[ description = "", generateProto = false ]
+class PackerGamePartyAdded
+{
+    [tag="paid", description="Party id of party being added to game."]
+    PackerPartyId joinedPartyId;
+
+    [tag="pgid", description="Game id"]
+    PackerGameId packerGameId;
+
+    [tag="psid", description="Packer silo id."]
+    PackerSiloId packerSiloId;
+
+    [tag="gqfs", description="Factor scores for game."]
+    FloatList gameFactorScores;
+
+    [tag="gsco", description="Scalar game score."]
+    float gameScore;
+
+    [tag="psto", description="Silo snapshot."]
+    PackerSiloTotals siloTotals;
+};
+
+[ description = "", generateProto = false ]
+class PackerGamePartyEvicted
+{
+    [tag="paed", description="Party id of party evicted from game."]
+    PackerPartyId evictedPartyId;
+    
+    [tag="paer", description="Party id of party that caused the eviction."]
+    PackerPartyId evictorPartyId;
+
+    [tag="pgid", description="Game id"]
+    PackerGameId packerGameId;
+
+    [tag="psid", description="Packer silo id."]
+    PackerSiloId packerSiloId;
+};
+
+/*
+// Additional future tracing events
+
+[ description = "", generateProto = false ]
+class PackerGamePartyExpired
+{
+    [tag="paid", description="Party id of party expired from game."]
+    PackerPartyId expiredPartyId;
+
+    [tag="pgid", description="Game id"]
+    PackerGameId packerGameId;
+
+    [tag="psid", description="Packer silo id."]
+    PackerSiloId packerSiloId;
+
+    [tag="pstg", description="Expired in stage.(e.g: reap, finalize)"]
+    string(-1) expireStage;
+};
+
+[ description = "", generateProto = false ]
+class PackerGamePartyUnpacked
+{
+    [tag="paid", description="Party id of party unpacked from game."]
+    PackerPartyId unpackedPartyId;
+
+    [tag="pgid", description="Game id"]
+    PackerGameId packerGameId;
+
+    [tag="psid", description="Packer silo id."]
+    PackerSiloId packerSiloId;
+};
+*/
+
+[ description = "", generateProto = false ]
+class PackerGameCompleted
+{
+    [ description = "", generateProto = false ]
+    class Party
+    {
+        [tag="arid", description=""]
+        PackerPartyId partyId;
+        [tag="idx", description=""]
+        uint32_t teamIndex;
+        [tag="timw", description="Relative time since creation in microseconds"]
+        int64_t waitTime;
+        [tag="timi", description="Relative time since creation in microseconds"]
+        int64_t lastImprovedTime;
+    };
+
+    [tag="pgid", description="Game id."]
+    PackerGameId completedGameId;
+
+    [tag="pjid", description="Finalization job id."]
+    PackerFinalizationJobId finJobId;
+
+    [tag="psid", description="Packer silo id."]
+    PackerSiloId packerSiloId;
+
+    [tag="gqfs", description="Factor scores for game."]
+    FloatList gameFactorScores;
+
+    [tag="gsco", description="Scalar game score."]
+    float gameScore;
+    
+    [tag="part", description=""]
+    list<Party> parties;
+
+    [tag="play", description=""]
+    list<PackerPlayerId> playerIds;
+
+    [tag="evpa", description="Number of party evictions from game."]
+    uint64_t evictedParties;
+
+    [tag="evpl", description="Number of player evictions from game."]
+    uint64_t evictedPlayers;
+
+    [tag="tila", description="Relative to totalTime"]
+    uint64_t lastImprovedTime;
+
+    [tag="tovt", description="Relative to totalTime"]
+    uint64_t totalViableTime;
+
+    [tag="toti", description="Total time since creation"]
+    uint64_t totalTime;
+
+    [tag="psto", description="Silo snapshot."]
+    PackerSiloTotals siloTotals;
+};
+
+// PACKER_TODO: use this as a trace event
+[ description = "Issued for each party when game has been finalized", generateProto = false ]
+class PackerFinalizationJobStarted
+{
+    [tag="fjid", description="Finalization job id."]
+    PackerFinalizationJobId finJobId;
+
+    [tag="fjmd", description="Finalization job mode. (e.g: found_game, create_game, create_game_privileged, create_game_reset_ds, etc."]
+    string(-1) finJobMode;
+};
+
+// PACKER_TODO: use this as a trace event
+[ description = "Issued for each party when game has been finalized", generateProto = false ]
+class PackerFinalizationJobCompleted
+{
+    [tag="fjid", description="Finalization job id."]
+    PackerFinalizationJobId finJobId;
+
+    [tag="rslt", description="Finalization job result. success, fail_resume, fail_abort"]
+    string(-1) result;
+};
+
+
+// status and metrics types
+
+
+typedef map<uint64_t, uint64_t> FreqByPercentileMap;
+typedef map<string(64), FreqByPercentileMap> FactorScoresByPercentileMap;
+
+[ description = "", generateProto = false ]
+class HistogramPackerMetrics
+{
+    [tag="scor", description="Histogram representation of factor scores (in percent format) for successfully created games."]
+    FactorScoresByPercentileMap factorScoresByPercentileForSuccessfulGames;
+
+    [tag="ssor", description="Histogram representation of factor scores (in percent format) for all games."]
+    FactorScoresByPercentileMap factorScoresByPercentileForGames;
+
+    [tag="vtim", description="Histogram representation of time spent in viable games by parties."]
+    FreqByPercentileMap timeSpentInViableGamesByParties;
+
+    [tag="vstm", description="Histogram representation of time spent in viable games by parties who ended up in a game."]
+    FreqByPercentileMap timeSpentInViableGamesBySuccessfulParties;
+
+    [tag="timp", description="Histogram representation of time spent in the packer by parties."]
+    FreqByPercentileMap timeSpentInPackerByParties;
+
+    [tag="tisp", description="Histogram representation of time spent in packer games by parties who ended up in a game."]
+    FreqByPercentileMap timeSpentInPackerBySuccessfulParties;
+
+    [tag="evap", description="Histogram representation of number of times evicted by parties."]
+    FreqByPercentileMap evictionCountByParties;
+
+    [tag="evsp", description="Histogram representation of number of times evicted by parties who ended up in a game."]
+    FreqByPercentileMap evictionCountBySuccessfulParties;
+};
+
+typedef map<string(-1), HistogramPackerMetrics> GameTemplatePackerMetrics;
+
+[ description = "", generateProto = false ]
+class GetDetailedPackerMetricsResponse
+{
+    [tag="gpme", description="Map of histogram metrics per game template"]
+    GameTemplatePackerMetrics gameTemplatePackerMetrics;
+};
+
+
+} // GameManager
+} // Blaze
+
+
+

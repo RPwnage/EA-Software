@@ -1,0 +1,256 @@
+/*! ************************************************************************************************/
+/*!
+    \file search.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="gamemanager/tdf/gamemanager.h"]
+#include "gamemanager/gen/gamemanager.tdf"
+
+[headername="gamemanager/tdf/gamemanager_server.h"]
+#include "gamemanager/gen/gamemanager_server.tdf"
+
+[headername="gamemanager/tdf/matchmaker_types.h"]
+#include "gamemanager/gen/matchmaker_types.tdf"
+
+[headername="gamemanager/tdf/matchmaker_server.h"]
+#include "gamemanager/gen/matchmaker_server.tdf"
+
+[headername="gamemanager/tdf/matchmaker.h"]
+#include "gamemanager/gen/matchmaker.tdf"
+
+[headername="gamemanager/tdf/gamebrowser.h"]
+#include "gamemanager/gen/gamebrowser.tdf"
+
+[headername="gamemanager/tdf/matchmakingmetrics_server.h"]
+#include "gamemanager/gen/matchmakingmetrics_server.tdf"
+
+namespace Blaze
+{
+namespace Search
+{
+
+//
+// Requests / Responses
+//
+
+[ description = "Starts Find Game Matchmaking session on Search slave." ]
+class StartFindGameMatchmakingRequest
+{
+    [tag="msid", description="The matchmaking session id used for this search session."]
+    GameManager::MatchmakingSessionId mMatchmakingSessionId;
+
+    [tag="smmr", description="Original matchmaking request.", allowref=true]
+    GameManager::StartMatchmakingInternalRequest mStartMatchmakingInternalRequest;
+};
+
+[ description = "Response for the request to start Find Game Matchmaking session on Search slave.", trackChanges=true]
+class StartFindGameMatchmakingResponse
+{
+    [tag="tdia", description="Matchmaking diagnostic updates for the session"]
+    GameManager::MatchmakingSubsessionDiagnostics mDiagnostics;
+};
+
+[ description = "Terminates Find Game Matchmaking session on Search slave." ]
+class TerminateFindGameMatchmakingRequest
+{
+    [tag="msid", description="The matchmaking session id of the session to terminate."]
+    GameManager::MatchmakingSessionId mMatchmakingSessionId;
+    [tag="reas", description="The matchmaking result."]
+    GameManager::MatchmakingResult mMatchmakingResult;
+};
+
+[ description = "Create game list." ]
+class CreateGameListRequest
+{
+    [tag="usin", description="Owner user info."]
+    GameManager::UserSessionInfo mOwnerUserInfo;
+    
+    [tag="msid", description="The Game Browser List id."]
+    GameManager::GameBrowserListId mGameBrowserListId;
+    
+    [tag="glrq", description="The original request used to create game list.", allowref=true]
+    GameManager::GetGameListRequest mGetGameListRequest;
+
+    [tag="gfrq", description="The filter conditions used to create the game list (supercedes mGameListRequest)."]
+    GameManager::MatchmakingFilterCriteriaMap mFilterMap;
+
+    [tag="issn", description="If true indicates to Search slave to snapshot the current game list and destroy the session immediately."]
+    bool mIsSnapshot;
+
+    [tag="isul", description="If true indicates that this is an internal server list that should not have a user owner and that must be explicitly destroyed by a call to terminateList."]
+    bool mIsUserless;
+
+    [tag="evpv", description="If true indicates to Search slave to evaluate game protocol version string."]
+    bool mEvaluateGameVersionString;
+
+    [tag="mpca", default=0, description="Required max capacity for a dedicated server request. If set to 0, the capacity check will be ignored."]
+    uint16_t mMaxPlayerCapacity;
+
+    [tag="ntop", default=CLIENT_SERVER_PEER_HOSTED, description="Network topology to search for. (Only used for dedicated servers)."]
+    GameNetworkTopology mNetTopology;
+
+    [tag="pps", default="", description="Optional override of pingsite used while searching."]
+    PingSiteAlias mPreferredPingSite;
+};
+
+[ description = "Initial Search Result." ]
+class CreateGameListResponse
+{
+    [tag="maxf", description="The max possible fit score for the game browser criteria."]
+    GameManager::FitScore mMaxPossibleFitScore;
+        
+    [tag="ngd", default=0, description="The total number of games to be downloaded (summation of all chunks)."]
+    uint32_t mNumberOfGamesToBeDownloaded;
+};
+
+[ description = "Contains the Game Browser List id for the list to terminate." ]
+class TerminateGameListRequest
+{
+    [tag="glid", description="The Game Browser List id to terminate."]
+    GameManager::GameBrowserListId mListId;
+};
+
+//
+// TDF Data Containers
+//
+
+[ description = "Information about game's fit score" ]
+class GameFitScoreInfo
+{
+    [tag="gmmi", description="Id of the game."]
+    GameManager::GameId mGameId;
+
+    [tag="gmfs", description="Game fir score."]
+    GameManager::FitScore mFitScore;
+    
+};
+
+typedef list<GameFitScoreInfo> GameFitScoreInfoList;
+
+[ description = "Game list update." ]
+class GameListUpdate
+{
+    [tag="glid", description="The Game Browser list id that's being updated."]
+    GameManager::GameBrowserListId mListId;
+    
+    [tag="addg", description="A list of games that have been added in this list."]
+    GameFitScoreInfoList mAddedGameFitScoreList;
+    
+    [tag="remv", description="The list of games that have been removed from this list.  Either the game was destroyed, no longer matches, or was bumped off the list by a better match."]
+    GameManager::GameIdList mRemovedGameList;
+        
+    [tag="updt", description="A list of games that have been updated in this list."]
+    GameFitScoreInfoList mUpdatedGameFitScoreList;
+};
+
+typedef list<GameListUpdate> GameListUpdateList;
+
+//
+// Notifications
+//
+
+[ description = "Updates Find Game broker's list of finalization" ]
+class NotifyFindGameFinalizationUpdate
+{
+    [tag="mmfg", description="Tdf containing containing information necessary to attempt to join each game."]
+    GameManager::MatchmakingFoundGames mFoundGames;
+
+    [tag="inst", description="Instance id that sent the update."]
+    uint16_t mUpdateSourceInstanceId;
+};
+
+[ description = "Game list update." ]
+class NotifyGameListUpdate
+{
+    [tag="glul", description="Collection of all updates for all lists that reside on target Game Manager slave."]
+    GameListUpdateList mGameListUpdate;
+    
+    [tag="gmap", descripiont="Latest game notification data keyed by each config type referred to in the update"]
+    map<Blaze::GameManager::GameBrowserListConfigName, list<Blaze::GameManager::GameBrowserGameData> > mGameDataMap;
+};
+
+enum GetGamesResponseType
+{
+    GET_GAMES_RESPONSE_TYPE_FULL,
+    GET_GAMES_RESPONSE_TYPE_GAMEBROWSER,
+    GET_GAMES_RESPONSE_TYPE_ID
+};
+
+[description = "Request to get a set of games"]
+class GetGamesRequest
+{
+    [tag="glst", description="GameIds of games to retrieve. ", allowref=true] 
+    Blaze::GameManager::GameIdList mGameIds;
+        
+    [tag="pidl", description="PersistedGameIds of games to retrieve.", allowref=true] 
+    Blaze::GameManager::PersistedGameIdList mPersistedGameIdList;        
+        
+    [tag="uids", description="The Blaze id to do a game lookup on.", allowref=true]
+    BlazeIdList mBlazeIds;   
+    
+    [tag="prot", description="If set, this version is used to filter games when looking up by user", default="match_any_protocol"]
+    Blaze::GameManager::GameProtocolVersionString mGameProtocolVersionString;
+
+    [tag="eprt", description="If true, when looking up by user, if the user is in some game(s) but all were filtered out by this request's game protocol version string, return an error code indicating version mismatch.", default=false]
+    bool mErrorIfGameProtocolVersionStringsMismatch;
+
+    [tag="rtyp", default=GET_GAMES_RESPONSE_TYPE_FULL, description="Type of data to return"]
+    GetGamesResponseType mResponseType;
+
+    [tag="dnam", default="default", description="GameBrowserListConfig to use for completing any game browser data returned by request."]
+    Blaze::GameManager::GameBrowserListConfigName mListConfigName;
+
+    [tag="fone", default=false, description="If true, only the first matching item will be returned."]
+    bool mFetchOnlyOne;
+
+    [tag="gtwl", description="The game types to include as matches for the returned list."]
+    Blaze::GameManager::GameTypeList mGameTypeList;
+};
+
+[description="Response for a set of games"]
+class GetGamesResponse
+{
+    [tag="rtyp", default=GET_GAMES_RESPONSE_TYPE_FULL, description="Type of data contained in the response"]
+    GetGamesResponseType mResponseType;
+
+    [tag="gdat", description="List of games returned by request.", allowref=true] 
+    list<Blaze::GameManager::GameBrowserGameData> mGameBrowserData;
+
+    [tag="lgam", description="A list of the ListGameData for the requested games.", allowref=true]
+    list< Blaze::GameManager::ListGameData > mFullGameData;
+
+    [tag="gidl", description="A list of just the ids of the requested games.", allowref=true]
+    Blaze::GameManager::GameIdList mGameIdList;
+};
+
+class UserSetWatchListUpdate
+{
+    [tag="msid", description="The Game Browser List id."]
+    list<GameManager::GameBrowserListId> mGameBrowserLists;
+
+    [tag="uadd", description="List of users to add to the watch list."]
+    BlazeIdList mUsersAdded;
+
+    [tag="urem", description="List of users to remove from the watch list."]
+    BlazeIdList mUsersRemoved;
+};
+
+class CreateUserSetGameListRequest
+{
+    [tag="usid", description="Session id of user session that owns gamebrowser list"]
+    UserSessionId mUserSessionId;
+    
+    [tag="msid", description="The Game Browser List id."]
+    GameManager::GameBrowserListId mGameBrowserListId;
+ 
+    [tag="uadd", description="List of users to initially add to the watch list."]
+    BlazeIdList mInitialWatchList;
+};
+
+
+} // namespace Search
+} // namespace Blaze

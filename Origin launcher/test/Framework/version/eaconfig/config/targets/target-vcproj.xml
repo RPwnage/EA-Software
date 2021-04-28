@@ -1,0 +1,318 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <!-- - - - - - - - - -sln generation targets - - - - - - - - - - - - - -->
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slnruntime" style="use" allowoverride="true">
+    <property name="eaconfig.build.group" value="runtime" />
+    <call target="sln-genall-caller" force="true" />
+  </target>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slnexample" style="use" allowoverride="true">
+    <property name="eaconfig.build.group" value="example" />    
+    <call target="sln-genall-caller" force="true" />    
+  </target>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slntest" style="use">
+    <property name="eaconfig.build.group" value="test" />
+    <call target="sln-genall-caller" force="true" />
+  </target>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slntool" style="use">
+    <property name="eaconfig.build.group" value="tool" />
+    <call target="sln-genall-caller" force="true" />
+  </target>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slngroup" style="use">
+    <property name="__eaconfig.build.groups" value="${eaconfig.build.groups??runtime test example tool}" />
+    <property name="eaconfig.build.split-by-group-names" value="false"/>
+    <call target="sln-genall-caller" force="true" />
+    <!-- In case targets are chained reset the value -->
+    <eval code="@{PropertyUndefine('__eaconfig.build.groups')}" type="Function"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slngroupall" style="use">
+    <!-- IMTODO - propagate groups to dependents-->
+    <property name="__eaconfig.build.groups" value="${eaconfig.build.groups??${slngenerator.slngroupall.groups??runtime test example tool}}" />
+    <property name="eaconfig.build.split-by-group-names" value="false"/>
+    <call target="sln-genall-caller" force="true" />
+    <!-- In case targets are chained reset the value -->
+    <eval code="@{PropertyUndefine('__eaconfig.build.groups')}" type="Function"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slngroupallsndbs" style="use" depends="compile-sndbs_eacloverride">
+    <do unless="'${config-system}'=='kettle' or '${config-system}'=='pc64' or '${config-system}'=='ps5' or '${config-system}'=='pc' or '${config-system}'=='capilano' or '${config-system}'=='xbsx'">
+      <fail message="SN-DBS builds are not yet implemented for ${config-system}. Xbsx, XB1, PS4, PS5, PC64 and PC are currently supported. "/>
+    </do>
+    <dependent name="SNDBS_Customizations"/>
+    <dependent name="SNDBS" />
+    
+    <choose if="@{PropertyExists('vsversion')}">
+      <do if="${vsversion} == '2017'">
+        <property name="targetSupportUtilityPath" value="${package.SNDBS_customizations.targetSupportUtilityPath_2017}" />        
+        <property name="targetXslPath" value="${package.SNDBS_customizations.targetXsl_2017}" />
+      </do>
+      <do if="${vsversion} == '2019'">
+        <property name="targetSupportUtilityPath" value="${package.SNDBS_customizations.targetSupportUtilityPath_2019}" />
+        <property name="targetXslPath" value="${package.SNDBS_customizations.targetXsl_2019}" />
+      </do>
+      <do>
+        <fail message="Invalid vsversion value '${vsversion}'."/>
+      </do>
+    </choose>
+    
+    <exec program='"${targetSupportUtilityPath}"' >
+      <args>
+        <arg value='register' />
+        <arg value='${visualstudio.platform.name}'/>
+      </args>
+    </exec>
+    
+    <dependent name='MSBuildTools' />    
+    <exec program='"${targetSupportUtilityPath}"' if="'${config-system}'=='pc64' or '${config-system}'=='pc' or '${config-system}'=='capilano' or '${config-system}'=='xbsx'">
+      <args>
+        <arg value='generate' />
+        <arg value='-file' />
+        <arg value='"${targetXslPath}"'/>
+      </args>
+      <env>
+        <option name='MSBUILDTOOLS_BUILDTOOLS_DIR' value='${package.MSBuildTools.appdir}' />
+      </env>
+    </exec>
+    
+    <property name="eaconfig.enablesndbs" value="true" />    
+    <call target="slngroupall" />
+  </target>  
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slnruntime-generate-single-config" style="use">
+    <property name="eaconfig.build.group" value="runtime" />
+    <property name="generate-single-config" value="true" readonly="true"/>
+    <call target="sln-gen-caller" force="true" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slntest-generate-single-config" style="use">
+    <property name="eaconfig.build.group" value="test" />
+    <property name="generate-single-config" value="true" readonly="true"/>
+    <call target="sln-gen-caller" force="true" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slnexample-generate-single-config" style="use">
+    <property name="eaconfig.build.group" value="example" />
+    <property name="generate-single-config" value="true" readonly="true"/>
+    <call target="sln-gen-caller" force="true" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slntool-generate-single-config" style="use">
+    <property name="eaconfig.build.group" value="tool" />    
+    <property name="generate-single-config" value="true" readonly="true"/>
+    <call target="sln-gen-caller" force="true" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slngroup-generate-single-config" style="use">    
+    <property name="__eaconfig.build.groups" value="${eaconfig.build.groups??runtime test example tool}" />
+    <property name="generate-single-config" value="true" readonly="true"/>
+    <call target="sln-gen-caller" force="true" />
+    <!-- In case targets are chained reset the value -->
+    <eval code="@{PropertyUndefine('__eaconfig.build.groups')}" type="Function"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="slngroupall-generate-single-config" style="use">
+    <property name="__eaconfig.build.groups" value="${eaconfig.build.groups??runtime test example tool}" />
+    <property name="eaconfig.build.configs" value="${config}" />
+    <property name="generate-single-config" value="true" readonly="true"/>
+    <call target="sln-genall-caller" force="true" />
+    <!-- In case targets are chained reset the value -->
+    <eval code="@{PropertyUndefine('__eaconfig.build.groups')}" type="Function"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <!-- - - - - - - - - -helper targets - - - - - - - - - - - - - - - - - -->
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="sln-gen-caller" style="use">
+    <do unless="@{PlatformIsWindows()}">
+      <warn message="You are generating a visual studio solution on a non-windows OS, building with visual studio is only supported on windows."/>
+    </do>
+
+    <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+    <property name="eaconfig.build.process-generation-data" value="true"/>
+    <set-config-vs-version/>
+    <call target="eaconfig-build-graph" force="true" />
+
+    <GenerateBuildLayout/>
+
+    <property name="eaconfig.generate-make-style-vcxproj" value="${generate-make-style-vcxproj??true}" if="(${config-system}==unix64 or ${config-system}==unix) and ${config-compiler}==clang and ${nant.platform_host}==windows"/>
+
+    <do if="${eaconfig.generate-make-style-vcxproj??false}">
+      <property name="make-style-config-systems" local="true" value="${config-system}"/>
+      <property name="make-style-config-systems" local="true" value="pc pc64" if="${config-system}==pc64 or ${config-system}==pc"/>
+      <property name="make-style-config-systems" local="true" value="unix unix64" if="${config-system}==unix64 or ${config-system}==unix"/>
+
+      <!-- Note that some of the important property defines have been setup at beginning in unix-clang-common.xml file. -->
+      <generate-makefile startup-config="${config}" 
+          configurations="${config}"
+          generate-single-config="${generate-single-config??false}" 
+          split-by-group-names="${eaconfig.build.split-by-group-names??true}"
+          use-compiler-wrapper="false"
+          for-config-systems="${make-style-config-systems}"
+          warn-about-csharp-modules="false"/>
+    </do>
+
+    <backend-generator generator-name="VisualStudio"  
+        startup-config="${config}" 
+        configurations="${config}" 
+        generate-single-config="${generate-single-config??false}" 
+        split-by-group-names="${eaconfig.build.split-by-group-names??true}"/>
+  </target>
+
+  <target name="sln-genall-caller" style="use">
+    <do unless="@{PlatformIsWindows()}">
+      <warn message="You are generating a visual studio solution on a non-windows OS, building with visual studio is only supported on windows."/>
+    </do>
+
+    <property name="eaconfig.buildall.target" value="load-package-generate" />
+    <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+    <property name="eaconfig.build.configs" value="${package.configs}"/>
+    <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+    <property name="eaconfig.build.process-generation-data" value="true"/>
+    <set-config-vs-version/>
+    <call target="eaconfig-build-graph-all" force="true" />
+
+    <GenerateBuildLayout/>
+
+    <property name="eaconfig.generate-make-style-vcxproj.start-config"/>
+    <property name="eaconfig.generate-make-style-vcxproj.configs"/>
+    <property name="eaconfig.generate-make-style-vcxproj.config-systems"/>
+    <do if="${generate-make-style-vcxproj??true} and ${nant.platform_host}==windows">
+        <foreach item="String" in="${eaconfig.build.configs}" property="vcx-config">
+            <eval code="@{RetrieveConfigInfo(${vcx-config},'config-system')}" type="Function" property="vcx-config-system"/>
+            <eval code="@{RetrieveConfigInfo(${vcx-config},'config-compiler')}" type="Function" property="vcx-config-compiler"/>
+            <choose>
+                <do if="('${vcx-config-system}'=='unix' or '${vcx-config-system}'=='pc') and '${vcx-config-compiler}'=='clang'">
+                    <property name="eaconfig.generate-make-style-vcxproj.configs" value="${property.value}${vcx-config} "/>
+                    <do unless="@{StrContains('${eaconfig.generate-make-style-vcxproj.config-systems}','${vcx-config-system} ')}">
+                        <property name="eaconfig.generate-make-style-vcxproj.config-systems" value="${property.value}${vcx-config-system} "/>
+                    </do>
+                    <do if="@{StrIsEmpty('${eaconfig.generate-make-style-vcxproj.start-config}')}">
+                        <property name="eaconfig.generate-make-style-vcxproj.start-config" value="${vcx-config}"/>
+                    </do>
+                </do>
+                <do if="('${vcx-config-system}'=='unix64' or '${vcx-config-system}'=='pc64') and '${vcx-config-compiler}'=='clang'">
+                    <property name="eaconfig.generate-make-style-vcxproj.configs" value="${property.value}${vcx-config} "/>
+                    <do unless="@{StrContains('${eaconfig.generate-make-style-vcxproj.config-systems}','${vcx-config-system} ')}">
+                        <property name="eaconfig.generate-make-style-vcxproj.config-systems" value="${property.value}${vcx-config-system} "/>
+                    </do>
+                    <do if="@{StrIsEmpty('${eaconfig.generate-make-style-vcxproj.start-config}')}">
+                        <property name="eaconfig.generate-make-style-vcxproj.start-config" value="${vcx-config}"/>
+                    </do>
+                </do>
+                <!-- In case user explicitly set global property eaconfig.generate-make-style-vcxproj -->
+                <do if="${eaconfig.generate-make-style-vcxproj??false}">
+                    <property name="eaconfig.generate-make-style-vcxproj.configs" value="${property.value}${vcx-config} "/>
+                    <do unless="@{StrContains('${eaconfig.generate-make-style-vcxproj.config-systems}','${vcx-config-system} ')}">
+                        <property name="eaconfig.generate-make-style-vcxproj.config-systems" value="${property.value}${vcx-config-system} "/>
+                    </do>
+                    <do if="@{StrIsEmpty('${eaconfig.generate-make-style-vcxproj.start-config}')}">
+                        <property name="eaconfig.generate-make-style-vcxproj.start-config" value="${vcx-config}"/>
+                    </do>
+                </do>
+            </choose>
+        </foreach>
+        <property name="eaconfig.generate-make-style-vcxproj.configs" value="@{StrTrim(${property.value})}"/>
+        <property name="eaconfig.generate-make-style-vcxproj.config-systems" value="@{StrTrim(${property.value})}"/>
+    </do>
+    <eval code="!@{StrIsEmpty('${eaconfig.generate-make-style-vcxproj.configs}')}" type="Expression" property="eaconfig.generate-make-style-vcxproj"/>
+
+    <do if="${eaconfig.generate-make-style-vcxproj??false}">
+      <dependent name="vsimake"/>
+      <property name="eaconfig.vsimake.exe" value="@{PathToWindows('${package.vsimake.exe}')}"/>
+
+      <generate-makefile startup-config="${eaconfig.generate-make-style-vcxproj.start-config}" 
+          configurations="${eaconfig.generate-make-style-vcxproj.configs}"
+          generate-single-config="${generate-single-config??false}" 
+          split-by-group-names="${eaconfig.build.split-by-group-names??true}"
+          use-compiler-wrapper="false"
+          for-config-systems="${eaconfig.generate-make-style-vcxproj.config-systems}"
+          warn-about-csharp-modules="false"/>
+    </do>
+
+    <!-- If no solutions are provided from the outside we create one solution without top-modules and include-modules which makes it use default-->
+    <do unless="@{PropertyExists('eaconfig.vcproj.solutions')}">
+      <property name="eaconfig.vcproj.solutions" value="eaconfig.default.solution"/>
+      <property name="eaconfig.default.solution.name"/>
+      <property name="eaconfig.default.solution.top-modules"/>
+      <property name="eaconfig.default.solution.excluded-root-modules"/>
+      <property name="eaconfig.default.solution.preprocess"/>
+    </do>
+
+    <!-- Loop through and create all solutions -->
+    <parallel.foreach property="current-solution" in="${eaconfig.vcproj.solutions}" item="String">
+      <backend-generator generator-name="${${current-solution}.generator-name??}"
+          startup-config="${config}"
+          configurations="${eaconfig.build.configs}"
+          generate-single-config="${generate-single-config??false}"
+          split-by-group-names="${eaconfig.build.split-by-group-names??true}"
+          solution-name="${${current-solution}.name}"
+          top-modules="${${current-solution}.top-modules}"
+          excluded-root-modules="${${current-solution}.excluded-root-modules}"
+          enable-sndbs="${eaconfig.enablesndbs??false}"
+      />
+    </parallel.foreach>
+  </target>
+
+  <!--
+      slnruntime-prebuild
+      
+      Takes care of support for adding COM and web references to
+      C# projects. This will hopefully go away when the support is
+      added directly to eaconfig.
+     -->
+  <target name="slnruntime-prebuild" style="use">
+    <call target="slnruntime-generateslninteropassemblies" />
+    <call target="slnruntime-generatewebreferences" />
+  </target>
+
+  <!--
+    slnruntime-generateslninteropassemblies
+    
+    Iterates through ${runtime.buildmodules} looking for modules that
+    define a "comassemblies" fileset. If this exists then tlbimp.exe is
+    used to generate the corresponding managed wrappers, which are
+    added to the "assemblies" fileset for the module.
+  -->
+  <target name="slnruntime-generateslninteropassemblies">
+    <foreach property="module" in="${runtime.buildmodules}" item="String">
+      <do if="@{FileSetExists('runtime.${module}.comassemblies')}">
+        <task-generatemoduleinteropassemblies module="${module}" />
+      </do>
+    </foreach>
+  </target>
+
+  <!--
+    slnruntime-generatewebreferences
+    
+    Iterates through ${runtime.buildmodules} looking for modules that
+    define a "webreferences" fileset. If this exists then wsdl.exe is
+    used to generate the corresponding managed wrappers.
+  -->
+
+  <target name="slnruntime-generatewebreferences">
+    <foreach property="module" in="${runtime.buildmodules}" item="String">
+      <do if="@{OptionSetExists('runtime.${module}.webreferences')}">
+        <task-generatemodulewebreferences module="${module}" />
+      </do>
+    </foreach>
+  </target>
+
+</project>

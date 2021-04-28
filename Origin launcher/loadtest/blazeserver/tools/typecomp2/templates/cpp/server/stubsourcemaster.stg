@@ -1,0 +1,111 @@
+group stubsourcemaster : stubsourcecommon;
+
+slaveComponent(fileNode, component) ::= <<>>
+masterComponent(fileNode, component) ::= <<
+<standardFileHeader()>
+/*** Include Files ********************************************************************************/
+#include "framework/blaze.h"
+#include "<component.RelativeOutputPath;format="unixPath">/rpc/<component.Name;format="tl"><component.Type;format="tl">_stub.h"
+#include "framework/connection/inboundrpcconnection.h"
+#include "framework/component/command.h"
+#include "framework/connection/selector.h"
+#include "framework/controller/controller.h"
+#include "framework/connection/outboundconnectionmanager.h"
+#include "framework/system/fiber.h"
+#include "framework/usersessions/usersession.h"
+#include "framework/usersessions/usersessionmanager.h"
+#include "framework/connection/selector.h"
+<componentAutoConfigIncl()>
+<if(component.ReplMaps)>
+#include "framework/component/componentmanager.h"
+#include "framework/replication/replicator.h"
+#include "framework/replication/replicatedmap.h"
+<endif>
+
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+<component.Commands:{command | <if(!command.passthrough)>#include "<component.Name;format="toLower"><component.Type;format="tl">/<command.Name;format="toLower">_stub.h"<\n><endif>}>
+
+/*** Defines/Macros/Constants/Typedefs ************************************************************/
+
+<component.Scope.FullNameList: openNamespace(name=it); separator="\n">
+
+<component.StaticMaps:{map | const CollectionId <component.Name>MasterStub::<map.Name;format="toUpper">_MAP_ID(COMPONENT_ID, <map.id><if(map.collection_type)>, <map.collection_type><endif>);}; separator="\n">
+
+//These are here because not all command stubs have cpp files.
+<component.Commands:{command | <if(!command.passthrough)>const ::Blaze::MemoryGroupId& <command.Name;format="pascal">CommandStub::COMPONENT_MEMORY_GROUP = <component.Name><component.Type>::COMPONENT_MEMORY_GROUP;<\n><endif>}>
+
+/**************************************************************************************************/
+/*!
+    \class <component.Name><component.Type>
+
+    Generated code for stub methods.
+*/
+/**************************************************************************************************/
+
+
+<component.Name><component.Type>Stub::<component.Name><component.Type>Stub() : 
+    <component.Name><component.Type>(::Blaze::gController != nullptr ? ::Blaze::gController->getOutboundConnectionManager() : *(BLAZE_NEW ::Blaze::OutboundConnectionManager())),
+    ::Blaze::ComponentStub(COMPONENT_INFO)
+<if(component.ReplMaps)>,   mMapCollection(COMPONENT_ID, COMPONENT_MEMORY_GROUP)<endif>
+<if(component.StaticMaps)>,    <component.StaticMaps:{m<it.Name>Map(nullptr)}; separator=",\n"><endif>
+{   
+<if(component.configurationType)>    
+    mComponentConfig = nullptr;
+    mInitialComponentConfig = nullptr;
+<endif>
+
+<if(component.ReplMaps)>
+    setupReplication();
+<endif>  
+
+}
+
+<component.Name><component.Type>Stub::~<component.Name><component.Type>Stub()
+{
+<if(component.configurationType)>
+    delete mComponentConfig;
+    if (mInitialComponentConfig != mComponentConfig)
+        delete mInitialComponentConfig;
+<endif>
+}
+
+<componentAutoConfigImpl()>
+
+<if(component.ReplMaps)>
+void <component.Name><component.Type>Stub::addReplicationSubscription(SlaveSession& session, const ReplicationSubscribeRequest& req)
+{
+     mMapCollection.addSlaveSubscriber(session, req);
+}
+
+void <component.Name><component.Type>Stub::removeReplicationSubscription(SlaveSession& session)
+{
+     mMapCollection.removeSlaveSubscriber(session);
+}
+
+<endif>
+
+
+<if(component.ReplMaps)>
+void <component.Name>MasterStub::setupReplication()
+{
+    <component.StaticMaps:{m<it.Name>Map = BLAZE_NEW_MGID(COMPONENT_MEMORY_GROUP, "<component.Name>::<it.Name> staticmap") <it.Name>Map(<it.Name;format="toUpper">_MAP_ID, COMPONENT_MEMORY_GROUP, mMapCollection, false);
+    mMapCollection.addMap(*m<it.Name>Map);}; separator="\n">   
+    gReplicator->registerLocalCollection(mMapCollection);
+}
+
+::Blaze::BlazeRpcError <component.Name>MasterStub::replicationSubscribe(InstanceId selectedInstanceId)
+{
+    mMapCollection.addLocalSubscriber();
+    return ::Blaze::Component::replicationSubscribe(selectedInstanceId);
+}
+<component.Master.DynamicMaps:mapCreateDestroy(map=it);separator="\n\n">
+<endif>
+
+<if(component.generateProto)>
+<component.Commands:printGrpcCommandCreatorDefinition(component=component, command=it); separator="\n">
+<endif>
+
+<component.Scope.FullNameList: closeNamespace(name=it); separator="\n">
+<standardFileFooter()>
+>>
+

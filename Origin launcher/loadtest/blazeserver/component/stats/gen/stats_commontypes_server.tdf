@@ -1,0 +1,519 @@
+[headername="framework/tdf/entity.h"]
+#include "framework/gen/entity.tdf"
+[headername="stats/tdf/stats.h"]
+#include "stats.tdf"
+
+namespace Blaze
+{
+namespace Stats
+{
+
+const uint32_t STATS_MAX_AGGR_LENGTH = 256;
+
+enum StatUpdateType
+{
+    STAT_UPDATE_TYPE_ASSIGN = 0,
+    STAT_UPDATE_TYPE_CLEAR = 1,
+    [description="Add the (signed) input value to the stat. Side: equivalent to using STAT_UPDATE_TYPE_DECREMENT with the negative of the input value."]
+    STAT_UPDATE_TYPE_INCREMENT = 2,
+    [description="Subtract the (signed) input value from the stat. Side: equivalent to using STAT_UPDATE_TYPE_INCREMENT with the negative of the input value."]
+    STAT_UPDATE_TYPE_DECREMENT = 3,
+    STAT_UPDATE_TYPE_MAX = 4,
+    STAT_UPDATE_TYPE_MIN = 5,
+    STAT_UPDATE_TYPE_OR = 6,
+    STAT_UPDATE_TYPE_AND = 7,
+    STAT_NUM_UPDATE_TYPES = 8,
+    STAT_UPDATE_TYPE_FETCH = 255
+};
+
+typedef uint64_t SequenceId;
+typedef list<uint32_t> OffsetList;
+typedef map<int32_t, int32_t> PeriodIdMap;
+
+[
+    description = "Identifies stats to be deleted."
+]
+class StatDelete
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="eid", description="Entity ID."] EntityId mEntityId;
+    [tag="dall", description="Flags the server to delete all stats."] bool mDeleteAll;
+    [tag="ptyp", description="List of period types."] PeriodTypeList mPeriodTypes;
+    [tag="pero", description="List of offsets for periods to delete (empty list means all)."] OffsetList mPerOffsets;
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+
+[
+    description = "Identifies a set of stats to be deleted. Also used by delete broadcast."
+]
+class DeleteStatsRequest
+{
+    [tag="dele", description="List of stats to be deleted."] list<StatDelete> mStatDeletes;
+};
+
+[
+    description = "Identifies stats to be deleted."
+]
+class StatDeleteByUserSet
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="uset", description="ObjectId of user set to delete."] ObjectId mUserSetId;
+    [tag="ptyp", description="List of period types."] PeriodTypeList mPeriodTypes;
+    [tag="pero", description="List of offsets for periods to delete (empty list means all)."] OffsetList mPerOffsets;
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+
+[
+    description = "Identifies a set of stats to be deleted."
+]
+class DeleteStatsByUserSetRequest
+{
+    [tag="dele", description="List of stats to be deleted."] list<StatDeleteByUserSet> mStatDeletes;
+};
+
+[
+    description = "Identifies stats to be deleted."
+]
+class StatDeleteByCategory
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="ptyp", default=STAT_PERIOD_ALL_TIME, description="Period type."] StatPeriodType mPeriodType;
+};
+
+[
+    description = "Identifies a set of stats to be deleted."
+]
+class DeleteStatsByCategoryRequest
+{
+    [tag="dele", description="List of stats to be deleted."] list<StatDeleteByCategory> mStatDeletes;
+};
+
+[
+    description = "[DEPRECATED] Identifies stats to be deleted."
+]
+class StatDeleteByKeyScope
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="ptyp", default=STAT_PERIOD_ALL_TIME, description="Period type."] StatPeriodType mPeriodType;
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+
+[
+    description = "[DEPRECATED] Identifies a set of stats to be deleted."
+]
+class DeleteStatsByKeyScopeRequest
+{
+    [tag="dele", description="List of stats to be deleted."] list<StatDeleteByKeyScope> mStatDeletes;
+};
+
+[
+    description = "[DEPRECATED] Identifies a set of stats to be deleted."
+]
+class DeleteAllStatsByKeyScopeRequest
+{
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+
+[
+    description = "Identifies a set of stats to be deleted."
+]
+class DeleteAllStatsByEntityRequest
+{
+    [tag="etp", description="Entity Type."] ObjectType mEntityType;
+    [tag="eid", description="Entity ID."] EntityId mEntityId;
+};
+
+[
+    description = "Identifies a set of stats to be deleted."
+]
+class DeleteAllStatsByKeyScopeAndEntityRequest
+{
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="etp", description="Entity Type."] ObjectType mEntityType;
+    [tag="eid", description="Entity ID."] EntityId mEntityId;
+};
+
+[
+    description = "Identifies a set of stats to be deleted."
+]
+class DeleteAllStatsByKeyScopeAndUserSetRequest
+{
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="uset", description="ObjectId of user set to delete."] ObjectId mUserSetId;
+};
+
+class DeleteAllStatsByCategoryAndEntityRequest
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="ptyp", description="List of period types (empty list defaults to all)."] list<StatPeriodType> mPeriodTypes;
+    [tag="eid", description="Entity ID."] EntityId mEntityId;
+};
+
+typedef map<StatName, StatValue> StatNameValueMap;
+
+[
+    description = "Holds a single row of stats for cache update.  Note that for efficiency purposes, we store the category id, entity id, period type, period id, and hash code (in that order) in a single binary blob as it is much more efficient for these high volume server-server notifications."
+]
+class CacheRowUpdate
+{
+    [tag="bin",  description="Binary data."]    blob mBinaryData;
+    [tag="scop", description="mKeyScopeString"] string(-1) mKeyScopeString;
+    [tag="updt", description="List of stat names/valus."] StatNameValueMap mStatUpdates;
+};
+typedef list<CacheRowUpdate> CacheRowUpdateList;
+
+[
+    description = "Set of data representing cache update."
+]
+class StatUpdateBroadcast
+{
+    [tag="updt", description="List of rows, representing cache update."] CacheRowUpdateList mCacheUpdates;
+};
+
+class StatPeriod
+{
+    [tag="type", description="Period type."] int32_t mPeriod;
+    [tag="retn", description="Number of periods to keep."] int32_t mRetention;
+};
+
+class PopulateLeaderboardIndexRequest
+{
+    [tag="ctid", description="(Internal) Category ID for category used by the leaderboard."] uint32_t mCategoryId;
+    [tag="ptyp", description="Period type for the leaderboard."] int32_t mPeriodType;
+    /// @todo why change mKeyScopes to a map???  It isn't a key scope name?
+    [tag="kscs", description="String representation of key scope values."] string(-1) mKeyScopes;
+    [tag="pid",  description="Period id for the leaderboard."] int32_t mPeriodId;
+    [tag="lbid", description="Leaderboard id for the leaderboard."] int32_t mLeaderboardId;
+    [tag="frst", description="Flag set to 1 if this is the first request for this leaderboard."] uint8_t mFirst;
+};
+
+class PopulateLeaderboardIndexData
+{
+    [tag="data", description="List of cache entries.  Each entry is the entity ID of the stat owner and the value of the ranking stat(s)."] blob mData;
+    [tag="vers", description="At the time of this populate data, the current sequence version for master restart/rollover handling of stat update/delete broadcasts."] uint64_t mSequenceVersion;
+    [tag="seqn", description="At the time of this populate data, the current sequence ID for order handling of stat update/delete broadcasts."] SequenceId mSequenceId;
+};
+
+[
+    description = "Holds a single stat row key for cache delete."
+]
+class CacheRowDelete
+{
+    [tag="ctid", description="(Internal) Category ID."] uint32_t mCategoryId;
+    [tag="eid", description="Entity ID."] EntityId mEntityId;
+    [tag="ptyp", description="List of period types."] PeriodTypeList mPeriodTypes;
+    [tag="pero", description="List of offsets for periods to delete (empty list means all)."] OffsetList mPerOffsets;
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+};
+typedef list<CacheRowDelete> CacheRowDeleteList;
+
+[
+    description = "Set of data representing cache deletes and updates."
+]
+class StatDeleteAndUpdateBroadcast
+{
+    [tag="dele", description="List of row keys, representing cache delete."] CacheRowDeleteList mCacheDeletes;
+    [tag="updt", description="List of rows, representing cache update."] CacheRowUpdateList mCacheUpdates;
+    [tag="cpid", description="Overridable current period id for period type."] PeriodIdMap mCurrentPeriodIds;
+};
+
+[
+    description = "Set of data representing cache deletes."
+]
+class StatDeleteByCategoryBroadcast
+{
+    [tag="dele", description="List of row keys, representing cache delete."] CacheRowDeleteList mCacheDeletes;
+    [tag="cpid", description="Overridable current period id for period type."] PeriodIdMap mCurrentPeriodIds;
+};
+
+[
+    description = "Set of data representing cache deletes."
+]
+class StatDeleteByEntityBroadcast
+{
+    [tag="dele", description="List of row keys, representing cache delete."] CacheRowDeleteList mCacheDeletes;
+    [tag="cpid", description="Overridable current period id for period type."] PeriodIdMap mCurrentPeriodIds;
+};
+
+[
+    description = "Empty class that serves to notify slave to clear their LRU cache."
+]
+class StatClearCacheBroadcast
+{
+};
+
+union StatBroadcast
+{
+    [tag="stup"] StatUpdateBroadcast statUpdate;
+    [tag="sdau"] StatDeleteAndUpdateBroadcast statDeleteAndUpdate;
+    [tag="sdbc"] StatDeleteByCategoryBroadcast statDeleteByCategory;
+    [tag="sdbe"] StatDeleteByEntityBroadcast statDeleteByEntity;
+    [tag="clca"] StatClearCacheBroadcast statClearCache;
+};
+
+[
+    description = "Set of data representing cache deletes and updates (for slave-to-slave broadcasts)."
+]
+class StatUpdateNotification
+{
+    [tag="bdct", description="The stat update/delete broadcast data."] StatBroadcast mBroadcast;
+};
+
+class RolloverData
+{  
+    [tag="dlhr", default=0, description="Daily rollover: hour."]
+    int32_t mDailyHour;
+
+    [tag="dlrt", default=0, description="Daily rollover: retention."]
+    int32_t mDailyRetention;
+
+    [tag="dlbf", default=9, description="Daily rollover: future period buffer."]
+    int32_t mDailyBuffer;
+
+    [tag="wkhr", default=0, description="Weekly rollover: hour."]
+    int32_t mWeeklyHour;
+    
+    [tag="wkdy", default=0, description="Weekly rollover: day."]
+    int32_t mWeeklyDay;
+
+    [tag="wkrt", default=0, description="Weekly rollover: retention."]
+    int32_t mWeeklyRetention;
+
+    [tag="wkbf", default=2, description="Weekly rollover: future period buffer.."]
+    int32_t mWeeklyBuffer;
+
+    [tag="mshr", default=0, description="Monthly rollover: hour."]
+    int32_t mMonthlyHour;
+
+    [tag="msdy", default=1, description="Monthly rollover: day."]
+    int32_t mMonthlyDay;
+
+    [tag="msrt", default=0, description="Monthly rollover: retention."]
+    int32_t mMonthlyRetention;
+
+    [tag="msbf", default=1, description="Monthly rollover: future period buffer."]
+    int32_t mMonthlyBuffer;
+
+    [tag="dbtm", default=false, description="Debug Timer Flag, true if used, false otherwise."]
+    bool mDebugUseTimers;
+
+    [tag="dbdt", default=0, description="Debug Daily Timer specifying period duration in seconds (should be greater than 0). Overrides hour rollover setting."]
+    int32_t mDebugDailyTimer;
+
+    [tag="dbwt", default=0, description="Debug Weekly Timer specifying period duration in seconds (should be greater than 0). Overrides day & hour rollover settings."]
+    int32_t mDebugWeeklyTimer;
+
+    [tag="dbmt", default=0, description="Debug Monthly Timer specifying period duration in seconds (should be greater than 0). Overrides day & hour rollover settings."]
+    int32_t mDebugMonthlyTimer;
+
+    [tag="pbup", default="10s", description="On rollover, various DB tables are updated as part of period maintenance. This sets a pause/delay between each table update."]
+    TimeValue mPauseBetweenUpdates;
+};
+
+const uint32_t STATS_TYPE_LENGTH = 64;
+
+class StatData
+{
+    [tag="name", default="", description="The name of stats."]
+    string(STATS_STAT_NAME_LENGTH) mName;
+
+    [tag="srtd", default="", description="The short Desc value."]
+    string(STATS_SHORT_DESC_LENGTH) mShortDesc;
+
+    [tag="lond", default="", description="The long Desc value."]
+    string(STATS_LONG_DESC_LENGTH) mLongDesc;
+
+    [tag="type", default="", description="The type of stats."]
+    string(STATS_TYPE_LENGTH) mType;
+
+    [tag="meta", default="", description="The Metadata value."]
+    string(STATS_METADATA_LENGTH)  mMetadata;
+
+    [tag="defu", default="", description="The default value of stats."]
+    string(STATS_STATVALUE_LENGTH) mDefault;
+
+    [tag="fmat", default="", description="The input or output formatting of stats value."]
+    string(STATS_FORMAT_LENGTH) mFormat;
+
+    [tag="size", default=0, description="The size of byte(s) to cache the value data."]
+    uint32_t mSize;
+
+    [tag="deri", default="", description="The derived formatting of stats"]
+    string(-1) mDerived;
+
+    [tag="kind", default="", description="The kind of stats"]
+    string(STATS_KIND_LENGTH)  mKind;
+};
+
+typedef list<ScopeName> ScopeList;
+
+typedef map<ScopeName, ScopeString, ignorecase> ScopeMap;
+class UserSessionStatsData
+{
+    [tag="stid", default=-1, description="The stat ID of user stats."]
+    int32_t mStatid ; 
+    
+    [tag="name", default="", description="The user stats name."]
+    string(STATS_STAT_NAME_LENGTH) mName;
+    
+    [tag="stna", default="", description="The stat name for user stats."]
+    string(STATS_STAT_NAME_LENGTH) mStatName; 
+    
+    [tag="cate", default="", description="The category of user stats."]
+    string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    
+    [tag="ptye", default=-1, description="Period type of user stats."]
+    int32_t mPeriodType ;
+
+    [tag="scpe", description="The scope values of user stats."]
+    ScopeMap mScope; 
+};
+
+typedef list<UserSessionStatsData> UserSessionStatsList;  
+
+class StatDescData
+{
+    [tag="name", default="", description="The name of stat desc."]
+    string(STATS_STAT_NAME_LENGTH) mName;
+    
+    [tag="cate", default="", description="The name of category for stat (overrides group's category)."]
+    string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    
+    [tag="petp", default=-1, description="Period type for stat (overrides group category's)."]
+    int32_t mPeriodType;
+
+    [tag="scpe", description="Paired scope name/value (overrides group's)."]
+    ScopeMap mScope;
+
+    [tag="srtd", default="", description="The short Desc value."]
+    string(STATS_SHORT_DESC_LENGTH) mShortDesc;
+
+    [tag="lond", default="", description="The long Desc value."]
+    string(STATS_LONG_DESC_LENGTH) mLongDesc;
+
+    [tag="fmat", default="", description="The input or output formatting of stats value."]
+    string(STATS_FORMAT_LENGTH) mFormat;
+    
+    [tag="meta", default="", description="The metadata value."]
+    string(STATS_METADATA_LENGTH) mMetadata;
+    
+    [tag="kind", default="", description="The kind of stat"]
+    string(STATS_KIND_LENGTH) mKind;
+};
+
+typedef list<string(STATS_STATVALUE_LENGTH)> ScopeValueList;
+typedef map<ScopeName, ScopeValueList, ignorecase> ScopesMap;
+
+
+const uint32_t STATS_HIERARCHY_EXTRA_DATA_LENGTH = 128;
+const uint32_t STATS_HIERARCHY_NAME_LENGTH = 32;
+
+[description="This is the base tdf of LeaderboardData."]
+class StatLeaderboardBaseData
+{
+};
+
+class UserSessionRanksData
+{
+    [tag="rkid", default=-1, description="The rank ID."]
+    int32_t mRankid;
+
+    [tag="name", default="", description="User ranks name."]
+    string(STATS_STAT_NAME_LENGTH) mName;
+
+    [tag="ldbd", default="", description="The name of leaderboard."]
+    string(STATS_LEADERBOARD_NAME_LENGTH) mLeaderboard;
+
+    [tag="scpe", description="paired scope name/value."]
+    ScopeMap mScope;
+};
+typedef list<UserSessionRanksData> UserSessionRanksList;
+
+enum StatsGlobalCacheInstructionEnum
+{
+    // write global cache to database; sent to specific slave
+    STATS_GLOBAL_CACHE_WRITE = 0,
+    // ignore changes and write the whole cache to database
+    STATS_GLOBAL_CACHE_FORCE_WRITE = 1,
+    // rebuild cache, sent to all slaves to synchronize caches when new slave is added
+    STATS_GLOBAL_CACHE_REBUILD = 2,
+    // clear dirty rows in cache, sent to all slaves once cache is written to database
+    STATS_GLOBAL_CACHE_CLEAR = 3
+};
+
+class StatsGlobalCacheInstruction
+{
+    [tag="inst", description="Instruction to slave"]
+    StatsGlobalCacheInstructionEnum mInstruction;
+};
+
+class GlobalCacheInstructionExecutionResult
+{
+    [tag="rwwr", default=-1, description="Count of rows written to database or -1 if operation failed."]
+    int32_t mRowsWritten;
+};
+
+class FetchedStatNameValue
+{
+    [tag="name", description="Stat name."] string(STATS_STAT_NAME_LENGTH)  mName;
+    [tag="vali", description="Stat value int.", default=0] int64_t mValueInt;
+    [tag="valf", description="Stat value float.", default=0.0] float mValueFloat;
+    [tag="vals", description="Stat value string."] string(STATS_STATVALUE_LENGTH) mValueString;
+    [tag="valt", description="Stat value type.", default=0] uint32_t mType;
+    [tag="valc", description="Stat value changed or not.", default=false] bool mChanged;
+};
+typedef list<FetchedStatNameValue> FetchedNameValueList;
+
+class FetchedRowUpdate
+{
+    [tag="cat", description="Category name."] string(STATS_CATEGORY_NAME_LENGTH) mCategory;
+    [tag="eid", description="Row entity ID." ] EntityId mEntityId;
+    [tag="ptyp", description="Row period type."] int32_t mPeriodType;   
+    [tag="ksum", description="Key scope name/value pairs for the group defined in the stats config."] ScopeNameValueMap mKeyScopeNameValueMap;
+    [tag="updt", description="List of stat names/valus."] FetchedNameValueList mStatUpdates;
+};
+typedef list<FetchedRowUpdate> FetchedRowUpdateList;
+
+class InitializeStatsTransactionRequest 
+{     
+    [tag="rtns", default=0] uint64_t mTimeout; // if 0, use default value of stats component.     
+    [tag="updt"] list<StatRowUpdate> mStatUpdates; 
+    [tag="strc", default=true] bool mStrict;
+    [tag="glbs", default=false] bool mGlobalStats;
+}; 
+
+class InitializeStatsTransactionResponse 
+{     
+    [tag="trid"] uint64_t mTransactionContextId; 
+}; 
+
+class CommitTransactionRequest 
+{     
+    [tag="trid"] uint64_t mTransactionContextId;     
+    [tag="drst"] FetchedRowUpdateList mCacheRowList; 
+}; 
+
+class AbortTransactionRequest 
+{     
+    [tag= "trid"] uint64_t mTransactionContextId; 
+}; 
+
+class CalcDerivedStatsRequest 
+{     
+    [tag= "trid"] uint64_t mTransactionContextId;     
+    [tag= "drst"] FetchedRowUpdateList mCacheRowList; 
+}; 
+
+class RetrieveValuesStatsRequest 
+{     
+    [tag= "trid"] uint64_t mTransactionContextId; 
+}; 
+
+class RetrieveValuesStatsResponse 
+{     
+    [tag= "drst"] FetchedRowUpdateList mCacheRowList; 
+    [tag= "urst"] FetchedRowUpdateList mUpdatedCacheRowList; 
+}; 
+
+}
+}

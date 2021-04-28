@@ -1,0 +1,123 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+  
+  <property name="${config-system}.support-shared-pch" value="true"/>
+  <property name="${config-system}.shared-pch-generate-lib" value="false"/>
+
+  <!-- UnixClang needs to know config-system first -->
+  <dependent name="UnixClang" />
+
+  <!-- 
+  Older version of UnixClang inserted tasks to some visual studio related properties.  We're now moving them to eaconfig!
+  -->
+  <do if="${nant.platform_host}==windows">
+    <!--
+    We no longer insert the makefile generation into 'backend.VisualStudio.pregenerate' task.  We do that directly in
+    the gensln task.
+    -->
+    <do if="@{StrContains('${backend.VisualStudio.pregenerate??}','generate-unix-build-makefiles-for-vsproj')}">
+      <property name="backend.VisualStudio.pregenerate" value="@{StrReplace('${property.value}','generate-unix-build-makefiles-for-vsproj','')}"/>
+    </do>
+
+    <!-- 
+    We need to setup the following properties so that each package's project will contain these property definitions during solution generation. 
+    -->
+
+    <property name="visualstudio.platform.name" value="x64" if="${config-processor} == 'x64'"/>
+    <property name="visualstudio.platform.name" value="Win32" unless="${config-processor} == 'x64'"/>
+
+    <dependent name="vsimake"/>
+    <property name="eaconfig.vsimake.exe" value="@{PathToWindows('${package.vsimake.exe}')}"/>
+    <fail unless="@{FileExists('${eaconfig.vsimake.exe}')}"
+          message="Doing Unix build on PC host requires vsimake.exe. Unable to locate that exe in path '${eaconfig.vsimake.exe}'."/>
+    <eval code="@{MathMul(${sys.env.NUMBER_OF_PROCESSORS??16},2)}" type="Function" property="eaconfig.default_vsimake_numjobs" />
+    <do if="@{MathGT('${eaconfig.default_vsimake_numjobs}','64')}">
+        <property name="eaconfig.default_vsimake_numjobs" value="64"/>
+    </do>
+    <property name="eaconfig.build.sln.unix.make.exe" value="${eaconfig.vsimake.exe}"/>
+    <property name="eaconfig.build.sln.unix.make.buildcmd" value="--no-print-directory --stop --no-builtin-rules --jobs=${eaconfig.make-numjobs??${eaconfig.default_vsimake_numjobs}} -C&quot;%makefile_dir%&quot; -f%makefile_name% build"/>
+    <property name="eaconfig.build.sln.unix.make.rebuildcmd" value="--no-print-directory --stop --no-builtin-rules --jobs=${eaconfig.make-numjobs??${eaconfig.default_vsimake_numjobs}} -C&quot;%makefile_dir%&quot; -f%makefile_name% rebuild"/>
+    <property name="eaconfig.build.sln.unix.make.cleancmd" value="--no-print-directory --stop --no-builtin-rules --jobs=${eaconfig.make-numjobs??${eaconfig.default_vsimake_numjobs}} -C&quot;%makefile_dir%&quot; -f%makefile_name% clean"/>
+    <property name="eaconfig.build.sln.unix.make.output" value="%output%"/>
+    <property name="eaconfig.build.sln.unix64.make.exe" value="${eaconfig.build.sln.unix.make.exe}"/>
+    <property name="eaconfig.build.sln.unix64.make.buildcmd" value="${eaconfig.build.sln.unix.make.buildcmd}"/>
+    <property name="eaconfig.build.sln.unix64.make.rebuildcmd" value="${eaconfig.build.sln.unix.make.rebuildcmd}"/>
+    <property name="eaconfig.build.sln.unix64.make.cleancmd" value="${eaconfig.build.sln.unix.make.cleancmd}"/>
+    <property name="eaconfig.build.sln.unix64.make.output" value="${eaconfig.build.sln.unix.make.output}"/>
+
+    <!-- These flags will tell Framework to create a vcproj that is a make style project for these "config-system"s and use the above settings to do builds. -->
+    <property name="eaconfig.build.sln.unix.force-makestyle" value="true"/>
+    <property name="eaconfig.build.sln.unix64.force-makestyle" value="true"/>
+  </do>
+
+  <property name="incredibuild.supports.sln" value="true"/>
+
+  <include file="unix-clang-buildtools.xml"/>
+  
+  <include file="unix-common.xml"/>
+
+  <property name="cc.std.${config-system}.default" value="${cc.std.${config-system}.default??c++17}"/>
+
+  <optionset name="config-options-common">
+    <option name="cc" value="${cc}"/>
+    <option name="as" value="${as}"/>
+    <option name="link" value="${link}"/>
+    <option name="lib" value="${lib}"/>
+    <option name="exportdynamic" value="on"/>
+    <option name="preprocess"/>
+    <option name="postprocess">
+      unix-common-postprocess
+    </option>
+    <option name="buildset.cc.options">
+      ${option.value}
+      ${cc.common-options}
+    </option>
+      <option name="buildset.cc.system-includedirs">
+      ${option.value}
+      ${cc.system-includedirs}
+    </option>
+    <option name="buildset.cc.defines">
+      ${option.value}
+      ${valgrind-define}
+      ${cc.common-defines}
+    </option>
+    <option name="buildset.cc.clangdefines">
+      ${option.value}
+      ${cc.clangdefines??}
+    </option>
+    <option name="buildset.as.options">
+      ${option.value}
+      ${as.common-options}
+    </option>
+    <option name="buildset.lib.options">
+      ${option.value}
+      ${lib.common-options}
+    </option>
+    <option name="buildset.link.options">
+      ${option.value}
+      ${link.common-options}
+    </option>
+    <option name="buildset.link.librarydirs">
+      ${option.value}
+      ${link.system-librarydirs}
+    </option>
+  </optionset>
+
+  <!-- 
+    Set version specific libraries
+  If you need to use the dpm libs of TypeB/TypeC, do these if you're using FW2/eaconfig:
+  1. Derive your build type (optionset) from appropriate optionset, says config-options-library.
+  2. Set standardsdklibs to custom in your optionset
+  3. In its standardsdklibs.custom.link option, include those dpm libs
+  -->
+  <fail unless="@{PropertyExists('package.UnixClang.regularlib')}"
+    message="Property package.UnixClang.regularlib is required by this release of eaconfig. Please use a release of UnixClang that defines this property."/>
+  <property name="platform.sdklibs.regular">
+    ${package.UnixClang.regularlib}
+  </property>
+  <property name="platform.sdklibs.debug">
+    ${package.UnixClang.debuglib}
+  </property>
+</project>

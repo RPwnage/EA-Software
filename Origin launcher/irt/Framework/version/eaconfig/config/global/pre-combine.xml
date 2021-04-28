@@ -1,0 +1,45 @@
+<!-- (c) Electronic Arts. All Rights Reserved. -->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <optionset name="config-options-common">
+    <option name="postprocess" if="${config-compiler} == gcc or ${config-compiler} == clang">
+      ${option.value}
+      gcc-lib-postprocess
+    </option>
+  </optionset>
+  
+    <optionset name="config-build-layout-tags-common">
+        <option name="Configuration" value="${config-name}"/>
+    </optionset>
+    
+    <do if="@{PropertyExists('eaconfig.additional-buildlayout-tags')}">
+        <foreach item="String" in="${eaconfig.additional-buildlayout-tags}" delim=";" property="tag">
+            <property name="colonIdx" value="@{StrIndexOf(${tag}, ':')}" local="true"/>
+            <optionset name="config-build-layout-tags-common" append="true">
+                <option name="@{StrSubstring(${tag}, '0', ${colonIdx})}" value="@{StrSubstring(${tag}, @{MathAdd(${colonIdx}, '1')})}"/>
+            </optionset>
+        </foreach>
+    </do>
+
+  <createtask name="AddNetworkLibsToModule" unless="@{PropertyExists('Task.AddNetworkLibsToModule')}">
+    <!-- this task can be overwritten in the configuration specific file -->
+    <parameters>
+      <option name="module" value="Required"/>
+    </parameters>
+    <code>
+      <do if="@{FileSetExists('platform.sdklibs.network')}">
+        <fileset name="${AddNetworkLibsToModule.module}.libs" append="true">
+          <includes fromfileset="platform.sdklibs.network"/>
+        </fileset>
+      </do>
+    </code>
+  </createtask>
+
+  <do unless="@{FileSetExists('platform.sdklibs.network')}">
+    <fileset name="platform.sdklibs.network">
+    </fileset>
+  </do>
+
+  <property name="config-available-processors" value="${config-available-processors??${config-processor}}"/>
+
+</project>

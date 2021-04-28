@@ -1,0 +1,215 @@
+// Defines the TDF classes used in the FIFA game reporting component
+//  TDF classes are compiled with TypeComp, generating C++ classes that can be serialized in RPCs and Notifications.
+//
+// Note: see http://gos.online.ea.com/confluence/display/tech/Typecomp for info on the .tdf spec, as well as the compiler, TypeComp
+
+[headername="gamereporting/tdf/gamereporting.h"]
+#include "gamereporting/gen/gamereporting.tdf"
+
+namespace Blaze
+{
+[usePtrOption=true]
+namespace GameReporting
+{
+namespace FUT
+{
+ 
+const uint32_t MAX_VAR_NAME_LENGTH = 32;
+const uint32_t MAX_VAL_LENGTH = 16;
+
+// Reference to eac-p4fos
+// ut/common/dtos/ml/src/main/java/com/ea/ut/common/dto/utcore/MatchEndReason.java
+/*
+public enum MatchEndReason
+{
+    IN_PROGRESS(0),
+    WIN(1),
+    LOSS(2),
+    DRAW(3),
+    DNF(4),
+    QUIT(5),
+    NO_CONTEST(6),
+    DNF_WIN(7),
+    DNF_DRAW(8),
+    DNF_LOSS(9),
+    DNF_AFK(10),
+    DNF_OG(11),
+    DNF_CONSTRAINED(12),
+    DNF_TEAMMATE_LEFT(13)
+}
+*/
+
+// Please make sure that the enums defined here are the same as the ones defined on the UTAS server.
+// Changes to the following enum MUST be consistent with the numbers from FIFA 19, since the enum is shared between years on UTAS.
+//
+// NOTE: The reason why strings where not used as a protocol is because the server was only able to parse integers from XML, and a significant risk would be introduced with parsing strings.
+
+enum MatchResult
+{
+    IN_PROGRESS = 0,
+    WIN = 1,
+    LOSS = 2,
+    DRAW = 3,
+    DNF = 4,
+    QUIT = 5,
+    NO_CONTEST = 6,
+    DNF_WIN = 7,
+    DNF_DRAW = 8,
+    DNF_LOSS = 9,
+    DNF_OG = 10,
+    DNF_AFK = 11,
+    DNF_CONSTRAINED = 12,
+    DNF_TEAMMATE_LEFT = 13
+};
+ 
+[
+    tdfid = "hash",
+    description = "FUT Custom Report Collision Report."   
+]
+class CollisionInstance
+{
+	[tag="root", description="Root class."]
+    string(MAX_VAR_NAME_LENGTH) root;
+
+	[tag="prnt", description="Parent class."]
+    string(MAX_VAR_NAME_LENGTH) parent;
+
+    [tag="name", description="The variable name of the collision."]
+    string(MAX_VAR_NAME_LENGTH) member;
+ 
+    [tag="val0", description="Value from the first report."]
+    string(MAX_VAL_LENGTH) value0;
+ 
+    [tag="val1", description="Value from the second report."]
+    string(MAX_VAL_LENGTH) value1;
+
+	[tag="type", description="The value type in TdfType."]
+	uint32_t type;
+};
+
+typedef int32_t UserRating;
+typedef list<CollisionInstance> CollisionList;
+
+class IndividualPlayerReport
+{
+    [tag="blid", description="The Blaze ID of the player.", default=0]
+    GameManager::PlayerId id;
+  
+    [tag="rrcv", description="Did the first player send a report?", default=false]
+    bool reportReceived;
+
+    [tag="base", description="Is this user report used for the basis for comparison.", default=false]
+    bool isBaseReport;
+
+    [tag="dnfr", description="Did the user report as a dnf.", default=false]
+    bool isDNFReport;
+
+    [tag="rcrp", description="Did we have to recover the report in the game report slave.", default=false]
+    bool isRecovered;
+
+    [tag="marl", description="The result determined by the report slave.", default=NO_CONTEST]
+    MatchResult matchResult;
+
+    [tag="surt", description="The rating of the user in a standard game mode.", default=0]
+    UserRating standardRating;
+
+    [tag="curt", description="The rating of the user in a competitive game mode.", default=0]
+    UserRating competitiveRating;
+};
+ 
+const uint32_t MAX_OUTCOME_LENGTH = 16;
+typedef map<GameManager::PlayerId, IndividualPlayerReport> PlayerReportMap;
+ 
+class CollatorReport
+{
+    [tag="prmp", description="Report on each player status from the collation."]
+    PlayerReportMap playerReportMap;
+ 
+    [tag="cllt", description="The list of collisions."]
+    CollisionList collisionList;
+
+    [tag="rcnt", description="Total game report used in collation.", default=0]
+    uint32_t reportCount;
+
+    [tag="coll", description="Flag when a collision happens during collation.", default=false]
+    bool collision;
+
+    [tag="miss", description="Flag missing finished or mid game report.", default=false]
+    bool validReport;
+    
+    [tag="invp", description="Invalid player showed up in the report.", default=false]
+    bool invalidPlayerMap;
+
+    [tag="ctms", description="The game reports differ in the most critical variables.", default=false]
+    bool critMissMatch;
+};
+
+typedef map<string(64), string(16), ignorecase> ComparisonConfigMap;
+typedef list<string(32)> ColumnList;
+typedef list<ColumnList> StatResetList;
+typedef map<string(64), int32_t, ignorecase> EventAdjustmentMap;
+typedef map<string(32), int64_t, ignorecase> ColDefaultMap;
+typedef list<int32_t> ModeList;
+
+class Range
+{
+    [tag="uppe", description="upper part of the range"]
+    int32_t upper;
+
+    [tag="lowe", description="lower part of the range"]
+    int32_t lower;
+};
+
+class MatchStatusConfig
+{
+	[tag="list", description="List of mode the value should apply to."]
+	ModeList modeList;
+
+	[tag="flag", description="The flag identified by the data team.", default=0]
+	int64_t flag;
+
+	[tag="mask", description="The bits to consider when looking at the flag.  This is to prevent patches from breaking existing values.", default=0]
+	int64_t mask;
+};
+
+typedef list<MatchStatusConfig> MatchStatusConfigList;
+
+class CollatorConfig
+{
+    [tag="size", description="The number of elements to record per collision.", default=20]
+    uint64_t maxCollisionListSize;
+
+    [tag="epsi", description="Buffer to allow values to not be exactly equal.  The string value will be automatically converted to the matching type."]
+    ComparisonConfigMap comparisonConfig;
+
+    [tag="rese", description="Reset the stat listed at the index."]
+    StatResetList statResetList;
+
+    [tag="rtrs", description="Reset the ratings listed at the index."]
+    StatResetList ratingResetList;
+
+    [tag="stdf", description="Default value for columns. Zero is used when not found"]
+    ColDefaultMap statDefault;
+
+    [tag="cpmd", description="List of modes considered to be competitive"]
+    list<int32_t> competitiveModes;
+
+    [tag="stdr", description="Standard Rating Range"]
+    Range standardRatingRange;
+
+    [tag="cmpr", description="Competitive Rating Range"]
+    Range competitiveRatingRange;
+
+    [tag="sadj", description="Adjustment to the match report scoring based on the value."]
+    EventAdjustmentMap standardEventAdjustment;
+
+    [tag="cadj", description="Adjustment to the match report scoring based on the value."]
+    EventAdjustmentMap competitiveEventAdjustment;
+
+    [tag="mscf", description="List of status flags identified."]
+    MatchStatusConfigList matchStatusConfigList;
+};
+ 
+} // namespace FUT
+} // namespace GameReporting
+} // namespace Blaze

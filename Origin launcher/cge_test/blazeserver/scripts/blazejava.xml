@@ -1,0 +1,86 @@
+<project default="buildjava" xmlns="schemas/ea/framework3.xsd">
+    <target name="cleanjava">
+      <!-- Add dependency on EATDF_Java, to enable executing 'package.EATDF_Java.clean' -->
+      <dependent name="EATDF_Java"/>
+      <task name="package.EATDF_Java.clean" />
+    </target>
+
+    <target name="buildjava">
+      <!-- Add dependency on EATDF_Java, to enable executing 'package.EATDF_Java.generate' -->
+      <dependent name="EATDF_Java"/>
+
+      <fileset name="package.blazeserver.all.tdfs"/>
+
+      <foreach item="String" in="${components}" delim=" " property="component">
+        <fileset name="package.blazeserver.all.tdfs" append="true">
+          <includes name="${package.dir}/component/${component}/**.tdf"/>
+          <includes name="${package.dir}/customcomponent/${component}/**.tdf"/>
+          <includes name="${package.dir}/proxycomponent/${component}/**.tdf"/>
+        </fileset>
+      </foreach>
+
+      <!-- protobuftest_server.tdf contains many complex test scenarios and we have not been updating blazejava stg files regularly (and looks like never tested it with alltypes.tdf) 
+      so let's just exclude that file from java build. -->
+      <fileset name="package.blazeserver.all.tdfs" append="true">
+        <includes name="${package.dir}/framework/**.tdf"/>
+        <excludes name="${package.dir}/framework/gen/protobuftest_server.tdf"/>
+      </fileset>
+
+      <fileset name="package.blazeserver.all.tdfs" append="true">
+        <includes name="${package.dir}/customcode/**.tdf"/>
+      </fileset>
+
+      <property name="package.blazeserver.codegen.outdir" value="${package.builddir}/gen_java" local="true"/>
+
+      <property name="package.blazeserver.tdfincludedirs" local="true">
+        ${package.blazeserver.dir}/component
+        ${package.blazeserver.dir}/customcomponent
+        ${package.blazeserver.dir}/proxycomponent
+      </property>
+
+      <task name="package.EATDF_Java.generate"
+          basedir="${package.dir}"
+          outdir="${package.blazeserver.codegen.outdir}"
+          includedirs="${package.blazeserver.tdfincludedirs}"
+          inputs="package.blazeserver.all.tdfs"
+          dep="${package.blazeserver.codegen.outdir}/alltdfs.d"
+          pkgsource="${blazejava.pkgsource??false}"
+          genjavadoc="${blazejava.pkgjavadoc??false}"
+          />
+
+      <call target="copytoeclipseproj" if="${blazejava.copytoeclipse??false} == true"/>
+  </target>
+
+  <target name="copytoeclipseproj">
+    <property name="blazejava.eclipseprojdir" value="${blazejava.eclipseprojdir??${package.dir}/../EATDF_Java}" local="true"/>
+    <echo message="Copying generated Java files into Eclipse project at ${blazejava.eclipseprojdir}"/>
+
+    <property name="blazejava.eclipsegensrc" value="${blazejava.eclipseprojdir}/java/gen_src" local="true"/>
+
+    <!-- clear out any previously generated java -->
+    <delete dir="${blazejava.eclipsegensrc}" failonmissing="false"/>
+    <delete dir="${blazejava.eclipseprojdir}/lib" failonmissing="false"/>
+
+    <!-- Copy generated source code to eclipse project -->
+    <foreach item="Directory" in="${package.builddir}/gen_java" local="true" property="gendir">
+      <do if="@{StrEndsWith('${gendir}', 'javagentdfs')} == true">
+        <!-- Copy any java files generated -->
+        <copy todir="${blazejava.eclipsegensrc}/" flatten="false" clobber="false" overwrite="true">
+          <fileset basedir="${gendir}/">
+            <includes name="./**"/>
+          </fileset>
+        </copy>
+      </do>
+    </foreach>
+
+    <!-- Copy generated constants files -->
+    <copy todir="${blazejava.eclipsegensrc}/" flatten="false" clobber="false" overwrite="true">
+      <fileset basedir="${package.builddir}/gen_java/constants/">
+        <includes name="./**"/>
+      </fileset>
+    </copy>
+
+    <!-- Copy services file over -->
+    <copy todir="${blazejava.eclipsegensrc}/META-INF/services/" file="${package.builddir}/bin_java/archive/META-INF/services/ea.tdf.AutoTdfRegistrar" flatten="true"/>
+  </target>
+</project>

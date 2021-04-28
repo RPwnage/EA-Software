@@ -1,0 +1,91 @@
+group rpcarsonservercommandshelpersource : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+rootComponent(fileNode, node) ::= <<
+<standardFileHeader()>
+#include "commands/serverrpcmanager.h"
+#include "commands/blaze/generatedcommands.h"
+#include "commands/blaze/client/Commands.h"
+#include "shared/framework/protocol/shared/heat2decoder.h"
+#include "shared/framework/protocol/shared/heat2encoder.h"
+#include "framework/util/shared/rawbuffer.h"
+#include "commands/blaze/client/MemoryMetrics.h"
+
+const int16_t FRAMEWORK_COMPONENT_ID = 28673;
+const int32_t SHUTDOWN_COMMAND_ID = 4;
+
+int32_t ExecBlazeClientCommand( uint8_t* pubRequestData, uint32_t uiRequestDataLen, uint8_t*& ppubResponseData, uint32_t& puiResBatchBufLen  )
+{
+    int iResult = -1;
+    Blaze::Heat2Decoder*    pHeatDecoder = nullptr;
+    Blaze::RawBuffer* pRawRequest = new Blaze::RawBuffer( pubRequestData, uiRequestDataLen );
+    pRawRequest->put( uiRequestDataLen );
+    pHeatDecoder = new Blaze::Heat2Decoder;
+    int16_t componentId;
+    int32_t commandId;
+    {
+        Arson::ClientStructures::ArsonMetaData md;
+        pHeatDecoder->decode(*pRawRequest, md);
+        componentId = md.getComponentId();
+        commandId = md.getCommandId();
+    }
+    delete pRawRequest;
+    delete pHeatDecoder;
+    switch(componentId)
+    {
+        <node.Subcomponents:componentCase(component=it); separator="\n">
+        default:
+        {
+            LOG_ERROR("Component not found ");
+            break;
+        }
+    }
+
+    if ((componentId == FRAMEWORK_COMPONENT_ID) && (commandId == SHUTDOWN_COMMAND_ID)) // FrameworkSlave_ShutdownCommandHelper
+    {
+        LoadMemoryLeakInfo();
+    }
+
+    return( iResult );
+}
+
+<node.Subcomponents:helperDefinitions(component=it); separator="\n\n">
+<standardFileFooter()>
+>>
+
+componentCase(component) ::= <<
+<if(!component.IsMaster)>
+case <component.SubComponentId>:
+{
+    //LogManager::LogInfo( "calling BCC: <component.Name><component.Type;format="pascal">...\n");
+    switch(commandId)
+    {
+        <component.Commands:commandCase(command=it); separator="\n">
+        default:
+        {
+            LOG_ERROR("Command not found in component <component.Name><component.Type;format="pascal"> ");
+            break;
+        }
+    }
+    break;
+}
+<endif>
+>>
+
+commandCase(command) ::= <<
+<if(command.client_export)>
+case <command.id>:
+{
+    //LogManager::LogInfo( "calling BCC: <command.Name>...\n");
+    iResult = <component.Name;format="pascal"><component.Type;format="pascal">_<command.Name;format="pascal">CommandHelper( pubRequestData, uiRequestDataLen, ppubResponseData, puiResBatchBufLen );
+    break;
+}
+<endif>
+>>
+
+helperDefinitions(component) ::= <<>>
+
+helperDefinition(command) ::= <<>>
+

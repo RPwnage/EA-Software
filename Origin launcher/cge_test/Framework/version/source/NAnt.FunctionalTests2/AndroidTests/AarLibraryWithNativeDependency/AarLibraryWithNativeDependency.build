@@ -1,0 +1,28 @@
+<project default="regress">
+	<package name="AarLibraryWithNativeDependency"/>
+
+	<DynamicLibrary name="NativeLibrary">
+	    <sourcefiles>
+			<includes name="NativeLibrary/**.cpp"/>
+		</sourcefiles>
+	</DynamicLibrary>
+
+	<AndroidAar name="AarLibrary" gradle-directory="AarLibrary">
+		<dependencies>
+			AarLibraryWithNativeDependency/NativeLibrary
+		</dependencies>
+	</AndroidAar>
+
+	<target name="regress">
+		<property name="output-aar" value="@{PathCombine('@{GetModuleOutputDirEx('lib', 'AarLibraryWithNativeDependency', 'AarLibrary', 'runtime')}', 'AarLibrary.aar')}"/>
+		<delete file="${output-aar}"/>
+
+		<call target="gensln"/>
+		<call target="buildsln"/>
+
+		<fail unless="@{FileExists(${output-aar})}"/>
+
+		<dependent name="FrameworkAndroidTestUtils"/>
+		<fail unless="@{ApkContains('${output-aar}', 'jni/arm64-v8a/libNativeLibrary.so')}"/>
+	</target>
+</project>

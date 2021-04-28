@@ -1,0 +1,240 @@
+<?xml version="1.0"?>
+<project xmlns="schemas/ea/framework3.xsd">
+	<!-- IMPORTANT NOTE: this file is not ever included directly from the android_ocnfig package - it is directly included from AndroidNDK's initialize xml.
+	This is done because we want to separate the NDK configuration from the content and it's easier to modify the configuration in the config package. -->
+
+	<property name="package.NDK.gradle-overhaul-compatible" value="true"/> <!-- disable an error in android-common.xml that checks we are using new-style NDK package -->
+
+	<!-- ndk path, api, and version / revision setup -->
+	<do unless="${ndk-is-top-level-package??false}"> <!-- don't resolve install stuff if NDK is top level - allow us to do install targets, etc without errors -->
+
+		<!-- set ndk version -->		
+		<property name="ndk-full-match" local="true" value="unused"/>
+		<property name="ndk-version-match" local="true" value="unset"/>
+		<property name="ndk-source-properties-info" local="true" fromfile="${package.AndroidNDK.appdir}/source.properties"/>
+		<RegexMatch
+			Input="${ndk-source-properties-info}"
+			Pattern="Pkg\.Revision = (\d+(?:\.\d+)*)"
+			Properties="ndk-full-match;ndk-version-match"/>
+		<do unless="${package.AndroidNDK.is-proxy}">
+			<fail unless="'${ndk-version-match}' == '${package.AndroidNDK.expected-version}'" 
+				message="Non-proxy NDK source.properties version '${ndk-version-match}' doesn't match expect version '${package.AndroidNDK.expected-version}}'!"/> 
+		</do>
+
+		<!-- deduce revision -->
+		<optionset name="ndk-version-to-revision">
+			<option name="15.2.4203891" value="r15c" />
+			<option name="19.1.5304403" value="r19b" />
+			<option name="20.0.5594570" value="r20"  />
+			<option name="21.0.6113669" value="r21"  />
+			<option name="21.3.6528147" value="r21d"  />
+		</optionset>
+		<fail unless="@{OptionSetOptionExists('ndk-version-to-revision', '${ndk-version-match}')}" message="Cannot determine AndroidNDK revision. Please add revision mapping for '${ndk-version-match}'."/>
+		<property name="package.AndroidNDK.ndk-revision" value="@{OptionSetGetValue('ndk-version-to-revision', '${ndk-version-match}')}"/>
+
+		<!-- ndk api version -->
+		<choose>
+			<do if="@{PropertyExists('package.AndroidNDK.apiVersion')}">
+				<do.once if="@{PropertyExists('android_ndk_api')}" key="android-ndk-legacy-ndk-api-property">
+					<warn message="Property 'android_ndk_api' is deprecated and is instead superceded by package.AndroidNDK.apiVersion. Please don't set 'android_ndk_api'."/>
+				</do.once>
+			</do>
+			<do if="@{PropertyExists('android_ndk_api')}">
+				<do.once key="package.AndroidNDK.apiVersion">
+					<warn message="Property 'android_ndk_api' is deprecated and is instead superceded by 'package.AndroidNDK.apiVersion'. Setting package.AndroidNDK.apiVersion to the value of 'android_ndk_api' (${android_ndk_api})."/>
+				</do.once>
+				<property name="package.AndroidNDK.apiVersion" value="${android_ndk_api}"/>
+			</do>
+			<do>
+				<!-- if neither new or old property are set use minimumSDKVersion as api version, the most common wisdom is the you should target the ndk of the oldest phone you support to guarantee
+				runtime linkage etc works -->
+				<property name="package.AndroidNDK.apiVersion" value="${package.AndroidSDK.minimumSDKVersion}"/>
+			</do>
+		</choose>
+	</do>
+
+	<do if="'${config-system}' == 'android'"> <!-- only calculate toolchain / std lib / etc info if we are in an android configuration -->
+
+		<!-- ARCH SETUP -->
+		<do>
+			<!-- this is used in determining what standard libraries to link, but is also exposed for packaging later on -->
+			<choose>
+				<do if="'${config-processor}'=='arm'">
+					<property name="package.AndroidNDK.architecture" value="armv7-a"/>
+					<property name="package.AndroidNDK.target" value="armv7-linux-androideabi"/>
+				</do>
+				<do if="'${config-processor}'=='arm64'">
+					<property name="package.AndroidNDK.architecture" value="armv8-a"/>
+					<property name="package.AndroidNDK.target" value="aarch64-linux-android"/>
+				</do>
+				<do if="'${config-processor}'=='x86'">
+					<property name="package.AndroidNDK.architecture" value="i686"/>
+					<property name="package.AndroidNDK.target" value="i686-linux-android"/>
+				</do>
+				<do if="'${config-processor}'=='x64'">
+					<property name="package.AndroidNDK.architecture" value="x86_64"/>
+					<property name="package.AndroidNDK.target" value="x86_64-linux-android"/>
+				</do>
+				<do>
+					<fail message="Cannot determine target and architecture for config-processor: ${config-processor}!"/>
+				</do>
+			</choose>
+		</do>
+
+		<!-- TOOLCHAIN SETUP - figured out paths to linker, archiver, compiler and assembler -->
+		<do> 
+			<!-- platform we're building on - we always assume 64bit windows for now -->
+			<property name="package.AndroidNDK.toolchain-version" value="4.9"/> <!-- GRADLE-TODO: how can we detect this? -->
+			<property name="toolchain-platform" local="true" value="windows-x86_64"/>
+
+			<!-- figure out path to archiver / librarian - note target-triple is reused for standard include dirs as well -->
+			<choose>
+				<do if="'${config-processor}'=='arm'">
+					<property name="toolchain-name" local="true" value="arm-linux-androideabi"/>
+					<property name="target-triple"    local="true" value="${toolchain-name}" />
+					<property name="package.AndroidNDK.compiler-target" value="armv7-none-linux-androideabi"/>
+				</do>
+				<do if="'${config-processor}'=='arm64'">
+					<property name="toolchain-name" local="true" value="aarch64-linux-android"/>
+					<property name="target-triple"    local="true" value="${toolchain-name}"/>
+					<property name="package.AndroidNDK.compiler-target" value="aarch64-none-linux-androideabi"/>
+				</do>
+				<do if="'${config-processor}'=='x86'">
+					<property name="toolchain-name" local="true" value="x86"/>
+					<property name="target-triple"    local="true" value="i686-linux-android" />
+					<property name="package.AndroidNDK.compiler-target" value="x86_64-none-linux-android"/>
+				</do>
+				<do if="'${config-processor}'=='x64'">
+					<property name="toolchain-name" local="true" value="x86_64"/>
+					<property name="target-triple"    local="true" value="x86_64-linux-android" />
+					<property name="package.AndroidNDK.compiler-target" value="i686-none-linux-androideabi"/>
+				</do>
+				<do>
+					<fail message="Cannot determine toolchain for config-processor: ${config-processor}!"/>
+				</do>
+			</choose>
+
+			<!-- Android NDK 21 no longer support 32-bit windows toolchains, so hardcode x64 -->
+			<property
+				name="toolchain-dir" 
+				value="${package.AndroidNDK.appdir}/toolchains/${toolchain-name}-${package.AndroidNDK.toolchain-version}/prebuilt/windows-x86_64"
+				local="true" />
+
+			<property name="package.AndroidNDK.archiver"    value="${toolchain-dir}/bin/${target-triple}-ar.exe"/>
+			<property name="package.AndroidNDK.android-gdb" value="${toolchain-dir}/bin/${target-triple}-gdb.exe"/>
+
+			<!-- figure out path to clang, we use bounce through clang to the linker -->
+			<property name="llvm-dir" local="true" value="${package.AndroidNDK.appdir}/toolchains/llvm/prebuilt/windows-x86_64"/>
+			<property name="llvm-version-file-info" local="true" fromfile="${llvm-dir}/AndroidVersion.txt"/>
+			<RegexMatch
+				Input="${llvm-version-file-info}"
+				Pattern="\d+\.\d+(\.\d+)?"
+				Properties="package.AndroidNDK.android_llvm_version"/>
+			<fail if="@{StrIsEmpty('${package.AndroidNDK.android_llvm_version}')}" message="ERROR: Unable to extract clang version info from ${llvm-dir}/AndroidVersion.txt"/>
+
+			<property name="package.AndroidNDK.assembler"  value="${llvm-dir}/bin/clang.exe"/>
+			<property name="package.AndroidNDK.c-compiler" value="${llvm-dir}/bin/clang.exe"/>
+			<property name="package.AndroidNDK.compiler"   value="${llvm-dir}/bin/clang++.exe"/>
+			<property name="package.AndroidNDK.linker"     value="${llvm-dir}/bin/clang++.exe"/>
+		</do>
+
+		<!-- STANDARD PATHS SETUP - figure out system library paths, standard include paths, standard system libraries, etc -->
+		<do> 
+			<warn if="@{PropertyExists('android.use-gnu-stdc')}" message="Property 'android.use-gnu-stdc' is deprecated and has no effect. Only LLVM stdc is now used." />	
+
+			<!-- ndk arch dirs -->
+			<property name="platformdir"   local="true"  value="${package.AndroidNDK.appdir}/platforms/android-${package.AndroidNDK.apiVersion}"/>
+			<property name="arch-dir"      local="true"  value="${platformdir}/arch-${config-processor}"/>
+			<property name="arch-dir"      local="true"  value="${platformdir}/arch-x86_64" if="'${config-processor}'=='x64'"/>
+			<property name="arch-lib-dir"  local="true"  value="${arch-dir}/usr/lib"/>
+			
+			<!-- tool chain lib dirs -->
+			<property name="toolchain-lib-dir"  local="true"  value="${toolchain-dir}/lib"/>	
+			
+			<!-- std c lib dirs -->
+			<property name="std-c-dir" local="true" value="${package.AndroidNDK.appdir}/sources/cxx-stl/llvm-libc++"/>
+			<choose>
+				<do if="'${package.AndroidNDK.architecture}' == 'armv7-a'">
+					<property name="stdlibs_foldername" local="true" value="armeabi-v7a"/>
+				</do>
+				<do if="'${package.AndroidNDK.architecture}' == 'armv8-a'">
+					<property name="stdlibs_foldername" local="true" value="arm64-v8a"/>
+				</do>
+				<do if="'${package.AndroidNDK.architecture}' == 'i686'">
+					<property name="stdlibs_foldername" local="true" value="x86"/>
+				</do>
+				<do if="'${package.AndroidNDK.architecture}' == 'x86_64'">
+					<property name="stdlibs_foldername" local="true" value="x86_64"/>
+				</do>
+				<do>
+					<fail message="Cannot determine std libraries folders from architecture: ${package.AndroidNDK.architecture}!"/>
+				</do>
+			</choose>
+			<property name="std-c-lib-dir"      local="true"  value="${std-c-dir}/libs/${stdlibs_foldername}" />
+
+			<!-- export system and std libs -->
+			<property name="package.AndroidNDK.system-libdirs">
+				${arch-lib-dir}
+				${toolchain-lib-dir}
+			</property>
+			<property name="package.AndroidNDK.std-libdirs">
+				${std-c-lib-dir}
+			</property>
+			<property name="package.AndroidNDK.platform-arch-libdir" value="${arch-lib-dir}" />
+
+			<!-- SYSROOT
+			  in current NDKs (~r20), the compile-time sysroot differs from the link-time one -->
+			<property name="package.AndroidNDK.compiler-sysroot" value="${package.AndroidNDK.appdir}/sysroot" />
+			<property name="package.AndroidNDK.linker-sysroot" value="${arch-dir}" />
+
+			<!-- isystem -->
+			<property name="package.AndroidNDK.isystem" value="${package.AndroidNDK.appdir}/sysroot/usr/include/${target-triple}" />
+
+			<!-- export system and std include dirs -->
+			<property name="package.AndroidNDK.system-includedirs">
+				${package.AndroidNDK.appdir}/sysroot/usr/include/${target-triple}
+				${package.AndroidNDK.appdir}/sysroot/usr/include
+			</property>
+
+			<property name="package.AndroidNDK.std-includedirs">
+				${package.AndroidNDK.appdir}/sources/cxx-stl/llvm-libc++/include
+				${package.AndroidNDK.appdir}/sources/android/support/include
+				${package.AndroidNDK.appdir}/sources/cxx-stl/llvm-libc++abi/include
+				${llvm-dir}/lib64/clang/${package.AndroidNDK.android_llvm_version}/include
+			</property>
+
+			<!-- export system and std lib -->
+			<property name="package.AndroidNDK.system-libs">
+				-lm
+				-latomic
+				-lc
+				-lgcc
+				-landroid
+				-llog
+				-ldl
+				-lc++abi
+			</property>
+			<property name="package.AndroidNDK.system-libs" if="'${package.AndroidNDK.architecture}' == 'armv7-a'">
+				${property.value}
+				-lunwind
+			</property>
+			<property name="package.AndroidNDK.std-libs"> <!-- SEE: https://developer.android.com/ndk/guides/cpp-support -->
+				-lc++_shared <!-- important note: we treat this as a system library but it isn't provided by OS - it has to be included in the .apk, see below -->
+			</property>
+
+			<!-- export additional .so we should package in .apk - according to the above doc Gradle should do this automatically though this may only apply if you do the native build through Gradle.
+			It certainly doesn't get packaged by default with Gradle / Tegra setup we have currently so expose this is we can tell Gradle to explicitly package it - ms vsi handles this automatically, 
+			can probably remove if we drop Tegra support -->
+			<property name="package.AndroidNDK.additional-package-libraries">
+				${std-c-lib-dir}/libc++_shared.so
+			</property>
+			
+			<!-- legacy property, now always neon -->
+			<property name="mfpu" value="neon"/>
+		</do>
+
+		<!-- GRADLE-TODO: doesn't belong here? in fact is this ever worth being false? -->
+		<property name="link.useresponsefile" value="true"/>
+		<property name="link.usealtsepinresponsefile" value="true"/>
+	</do>
+</project>

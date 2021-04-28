@@ -1,0 +1,212 @@
+// Defines the TDF classes used in the FIFA game reporting component
+//  TDF classes are compiled with TypeComp, generating C++ classes that can be serialized in RPCs and Notifications.
+//
+// Note: see http://gos.online.ea.com/confluence/display/tech/Typecomp for info on the .tdf spec, as well as the compiler, TypeComp
+
+[headername="gamereporting/tdf/gamereporting.h"]
+#include "gamereporting/gen/gamereporting.tdf"
+
+[headername="gamereporting/fifa/tdf/fifaseasonalplayreport.h"]
+#include "gamereporting/fifa/gen/fifaseasonalplayreport.tdf"
+
+[headername="gamereporting/fifa/tdf/fifacommonplayerreport.h"]
+#include "gamereporting/fifa/gen/fifacommonplayerreport.tdf"
+
+[headername="gamereporting/fifa/tdf/fifacommongamereport.h"]
+#include "gamereporting/fifa/gen/fifacommongamereport.tdf"
+
+
+namespace Blaze
+{
+[usePtrOption=true]
+namespace GameReporting
+{
+
+namespace Fifa
+{
+
+// Should be the same as //fifa/dev/ml/TnT/Code/fifa/gamemodes/impl/fifaonline/dev/include/fifaonline/onlinetypes.h
+// Description found in the client source
+enum GameEndedReason
+{
+	LOBBY_DISCONNECTED = -4,
+	LOGIN_CHANGED = -3,
+	GAMEENDED_FE = -2,
+	PROFILE_SIGNOUT = -1,
+	GAMEENDED_COMPLETE = 0,
+	GAMEENDED_REMOTEQUIT = 1,
+	GAMEENDED_LOCALQUIT = 2,
+	GAMEENDED_MUTUALQUIT = 3,
+	GAMEENDED_REMOTEDISCONNECT = 4,
+	GAMEENDED_LOCALDISCONNECT = 5,
+	GAMEENDED_LOCALIDLE = 6,
+	GAMEENDED_DESYNC = 7,
+	GAMEENDED_OPPONENT_NOTENOUGHPLAYERS = 8,
+	GAMEENDED_NOTENOUGHPLAYERS = 9,
+	GAMEENDED_SQUADMISMATCH = 10,
+	GAMEENDED_MISMATCHCHANGELIST = 11,
+	GAMEENDED_ALTTAB = 12,
+	GAMEENDED_OVRATTR_MISMATCH = 13,
+	GAMEENDED_LOCALIDLE_H2H = 14,
+	GAMEENDED_OWNGOALS = 15,
+	GAMEENDED_OWNGOALS_H2H = 16,
+	GAMEENDED_CONSTRAINED = 17
+};
+
+const uint32_t TEAM_MAX_NAME_LENGTH = 64;
+
+[
+    tdfid = "hash",
+    description = "H2H custom player data report"    
+]
+class H2HCustomPlayerData
+{
+    [tag="tmrt", description="teamrating"]
+    uint16_t teamrating;
+	
+    [tag="team", description="team"]
+    uint32_t team;
+
+    [tag="toti", description="tournamentTeamIndex"]
+    uint16_t tournamentTeamIndex;
+	
+    [tag="kit", description="kit"]
+    uint32_t kit;
+
+    [tag="opid", description="opponent id"]
+    int64_t opponentId;
+	
+    [tag="tnam", description="Player team name"]
+    string(TEAM_MAX_NAME_LENGTH) teamName;
+	
+    [tag="shag", description="Player shot against count"]
+    uint16_t shotsAgainst;
+
+    [tag="shgl", description="Player shot against on goal count"]
+    uint16_t shotsAgainstOnGoal;
+	
+    [tag="glag", description="Player goal against count"]
+    uint16_t goalAgainst;	
+	
+    [tag="ctrl", description="Player controls"]
+    uint16_t controls;
+
+    [tag="wnpk", description="game went to penalty"]
+    uint16_t wentToPk;  
+
+    [tag="gsts", description="number of guest"]
+    uint16_t nbGuests;
+};
+
+class H2HCollationPlayerData
+{
+    [tag="goal", description="Player goals count"]
+    uint16_t goals;
+	
+    [tag="owgl", description="Player own goals count"]
+    uint16_t ownGoals;
+	
+    [tag="pkgl", description="Player penalty goals count"]
+    uint16_t pkGoals;
+	
+    [tag="cglc", description="Player goals conceded count"]
+    uint16_t goalsConceded;
+	
+    [tag="foul", description="Player fouls count"]
+    uint16_t fouls;
+
+    [tag="ywcd", description="Player yellow cards count"]
+    uint16_t yellowCard;
+	
+    [tag="rdcd", description="Player red cards count"]
+    uint16_t redCard;
+	
+    [tag="offs", description="Player offsides count"]
+    uint16_t offsides;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+//  Fifa H2H Player Report
+//
+//  Submitted report TDFs. 
+[
+    tdfid = "hash",
+    description = "Generic PlayerReport TDF that takes a variable TDF representing player data.",
+    details = "Online H2H game player report TDF"
+]
+class H2HPlayerReport
+{    
+    [tag="spdt", description="Seasonal Play Data"]
+    Blaze::GameReporting::Fifa::SeasonalPlayData mSeasonalPlayData;
+    
+    [tag="cmpr", description="Common player report"]
+    Blaze::GameReporting::Fifa::CommonPlayerReport mCommonPlayerReport;
+    
+    [tag="hcpr", description="H2H custom player data"]
+    Blaze::GameReporting::Fifa::H2HCustomPlayerData mH2HCustomPlayerData;
+	
+    [tag="cpdr", description="H2H Collation player data"]
+    Blaze::GameReporting::Fifa::H2HCollationPlayerData mH2HCollationPlayerData;
+    
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+//  Fifa H2H Player Notification Report
+//
+//  Notification report TDFs. 
+class H2HNotificationPlayerCustomData
+{
+    [tag="gspt", description="Player H2H Skill Points"]
+    uint32_t skillPoints;
+};
+
+[
+    tdfid = "hash",
+    description = "H2H custom data report notification TDF",
+    details = "Online H2H custom data report notification TDF"
+]
+class H2HNotificationCustomGameData
+{
+    typedef map<GameManager::PlayerId, H2HNotificationPlayerCustomData> PlayerCustomDataMap;
+
+    [tag="pcdr", description="Player Custom Data Reports"]
+    PlayerCustomDataMap playerCustomDataReports;
+
+    [tag="grid", description="The unique value assigned at the beginning of the game."]
+    GameManager::GameReportingId gameReportingId;   
+	
+    [tag="ghhs", description="The Hash computed for home side of the match (currently only for FUT match)."]
+    string(HASH_MAX_LENGTH) homeMatchHash;
+
+    [tag="gahs", description="The Hash computed for away side of the match (currently only for FUT match)."]
+    string(HASH_MAX_LENGTH) awayMatchHash;
+
+    [tag="spec", description="Used for debugging."]
+    string(1024) special;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+//  Fifa H2H Game Report
+//
+//  Submitted report TDFs. 
+[
+    tdfid = "hash",
+    description = "Generic GameReport TDF that takes a variable TDF representing game data.",
+    details = "Online H2H game report TDF"
+]
+class H2HGameReport
+{
+    [tag="cmgr", description="Common Game report"]
+	Blaze::GameReporting::Fifa::CommonGameReport mCommonGameReport;	
+
+	[tag="nmmp", description="Number of Match Seconds Played capped within 0-5400s"]
+	uint16_t matchInSeconds;
+	
+    [tag="seid", description="Sponsored Event ID", details="This id is used by the Sponsored Events feature."]
+    uint32_t sponsoredEventId;
+};
+
+} // namespace Fifa
+} // namespace GameReporting
+} // namespace Blaze

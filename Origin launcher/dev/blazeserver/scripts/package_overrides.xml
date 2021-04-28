@@ -1,0 +1,224 @@
+<project xmlns="schemas/ea/framework3.xsd">
+  <!-- Copyright 2007 Electronic Arts Inc.  All rights reserved. -->
+
+  <property name="blazeserver.publishdocs.rootdir">\\sc-fs1\gos_docs\blaze-latest</property>
+
+  <target name="generate-docs">
+    <!-- Call html generation targets defined in code_gen.xml -->
+    <echo message="Generate config docs"/>
+    <call target="cfgdoc"/>
+    <echo message="Generate WAL docs"/>
+    <call target="wadl"/>
+  </target>
+
+  <target name="publish-docs">
+    <fail if="${blazeserver.publishdocs.dir} == DEV" message="Tried to publish docs from a dev build!"/>
+    
+    <call target="publish-configdocs"/>
+    <call target="publish-waldoc"/>
+  </target>
+
+  <!-- Publish config docs, to be called in release candidate builds -->
+  <target name="publish-configdocs">
+    <fail if="${blazeserver.publishdocs.dir} == DEV" message="Tried to publish config docs from a dev build!"/>
+    
+    <echo message="Delete old config docs"/>
+    <delete>
+          <fileset basedir="${blazeserver.publishdocs.rootdir}\${blazeserver.publishdocs.dir}\tdf">
+            <includes name="**"/> 
+          </fileset>
+    </delete>
+
+    <echo message="Publish new config docs"/>
+    <copy todir="${blazeserver.publishdocs.rootdir}\${blazeserver.publishdocs.dir}\tdf">
+      <fileset basedir="${package.builddir}/gen_html/tdf">
+          <includes name="framework/frameworkconfig.html"/>
+          <includes name="framework/bootconfig.html"/>
+          <includes name="component/*.html"/>
+          <includes name="*"/>
+      </fileset>
+    </copy>
+
+  </target>
+ 
+  <!-- Publish WAL docs, to be called in release candidate builds -->
+  <target name="publish-waldoc">    
+    <fail if="${blazeserver.publishdocs.dir} == DEV" message="Tried to publish WAL docs from a dev build!"/>
+    
+    <echo message="Delete old WAL docs"/>
+    <delete>
+        <fileset basedir="${blazeserver.publishdocs.rootdir}\${blazeserver.publishdocs.dir}\wal">
+          <includes name="**"/> 
+        </fileset>
+    </delete>
+    
+    <echo message="Publish new WAL docs"/>
+    <copy todir="${blazeserver.publishdocs.rootdir}\${blazeserver.publishdocs.dir}\wal">
+      <fileset basedir="${package.builddir}/gen_html/wadl">
+        <includes name="**"/>
+      </fileset>
+    </copy>
+
+  </target>
+ 
+  <!-- Stage nant output to .\out directory -->
+  <target name="staging" description="Stage output of FW2 build in the ./out directory">
+
+    <echo message="Staging output of FW2 build..."/>
+
+    <foreach item="String" in="${package.configs}" property="cfg">
+      <choose>
+        <do if="@{DirectoryExists('${package.builddir}/${cfg}')}">
+
+          <echo message="Adding binaries for config ${cfg}..."/>
+
+          <property name="cfg-style" value="debug"/>
+          <property name="cfg-style" value="final" if="@{StrIndexOf('${cfg}','-opt')} > 0 or @{StrIndexOf('${cfg}','-final')} > 0"/>
+          <property name="cfg-style" value="release" if="@{StrIndexOf('${cfg}','-debug-opt')} > 0 or @{StrIndexOf('${cfg}','-release')} > 0"/>
+
+          <echo message="CFG STYLE: ${cfg-style}"/>
+          <property name="cfg-platform" value="linux"/>
+          <property name="cfg-platform" value="win32" if="@{StrIndexOf('${cfg}','unix')} == -1 and @{StrIndexOf('${cfg}','linux')} == -1"/>
+
+          <property name="target-dir" value="${package.dir}/out/${cfg-platform}/${cfg-style}"/>
+          <echo message="TARGET DIR: ${target-dir}"/>
+
+          <choose>
+
+            <do if="${cfg-platform} == linux">
+              <property name="staging" value="true"/>
+              <call target="prepforcontainer"/>
+              <exec program="ln" workingdir="${target-dir}/bin" commandline="-s -f blazeserver cfgtest"/>
+              <exec program="ln" workingdir="${target-dir}/bin" commandline="-s -f blazeserver monitor"/>
+            </do>
+
+            <do>
+              <do if="@{DirectoryExists('${package.builddir}/${cfg}/bin')}">
+                <copy todir="${target-dir}/bin" flatten="true">
+                  <fileset>
+                    <includes name="${package.builddir}/${cfg}/bin/*"/>
+                    <excludes name="${package.builddir}/${cfg}/bin/*.d"/>
+                    <excludes name="${package.builddir}/${cfg}/bin/*.obj"/>
+                    <excludes name="${package.builddir}/${cfg}/bin/*.dep"/>
+                  </fileset>
+                </copy>
+              </do>
+            </do>
+
+          </choose>
+
+        </do>
+        <do>
+          <echo message="Skipping binaries for config ${cfg}..."/>
+        </do>
+      </choose>
+    </foreach>
+    
+  </target>
+
+  <!-- Package output of Nant -->
+  <target name="package" description="Package windows blaze server for arson test running on windows.">
+    <fileset name="blazeserver" basedir="${package.dir}">
+      <includes name='changelist.txt'/>
+      <includes name='bin/**'/>
+      <includes name='etc/**'/>
+      <includes name='etc.arson/**'/>
+      <includes name='framework/**/*.sql'/>
+      <includes name='framework/**/*.lua'/>
+      <includes name='component/**/*.sql'/>
+      <includes name='component/**/*.lua'/>
+      <includes name='customcomponent/**/*.sql'/>
+      <includes name='customcomponent/**/*.lua'/>
+      <includes name='${package.builddir}/**/bin/*.exe'/>
+      <includes name='${package.builddir}/**/bin/*.manifest'/>
+      <includes name='${package.builddir}/**/bin/*.dll'/>
+      <includes name='${package.builddir}/**/bin/*.pdb'/>
+    </fileset>
+    <zip zipfile='${package.dir}/blazeserver.zip' zipentrydir='${package.name}'>
+      <fileset fromfileset="blazeserver" />
+    </zip>
+  </target>
+
+  <!-- Call bin\mkvers -->
+   <target name="mkvers">
+    <mkdir dir="${package.builddir}/gen/blazeserver" unless="@{DirectoryExists('${package.builddir}/gen/blazeserver')}"/>
+    <mkdir dir="${package.builddir}/${package.config}" unless="@{DirectoryExists('${package.builddir}/${package.config}')}"/>
+    <echo message="Must run bin/mkvers.sh to create this file!" file="${package.builddir}/gen/blazeserver/vers.cpp"/>
+    <!-- Call mkvers.sh -->
+    <exec program="${package.dir}/bin/mkvers.sh" workingdir="${package.dir}">
+      <args>
+       <arg value="${package.builddir}/gen/blazeserver/vers.cpp"/>
+       <arg value="${package.config}"/>
+       <arg value="${package.builddir}"/>
+       <arg value="${package.builddir}/${package.config}/blazeversion.cfg"/>
+       <!-- the package roots need to be the last arguments to the script -->
+       <arg value="@{StrReplace('${nant.project.packageroots}', '\n', ' ')}" />
+      </args>
+    </exec>
+   </target>
+
+  <!-- Set the default debug working directory and command args -->
+  <target name="mkvcproj">
+  
+    <!-- Add ActivePython to project PATH env variable -->
+    <dependent name="ActivePython"/>
+
+    <property name="vcproj.user.template" fromfile="${package.dir}/scripts/template.user"/>
+    <choose>
+      <do if="${blazeserver.lite??false}">
+        <property name="vcproj.user.template" value="@{StrReplace('${vcproj.user.template}','%CMDARGS%','env\\lite.boot --dbdestructive')}"/>
+      </do>
+      <do if="${blazeserver.localstress??false}">
+        <property name="vcproj.user.template" value="@{StrReplace('${vcproj.user.template}','%CMDARGS%','env\\localstress.boot --bootFileOverride  ..\\etc.ilt.sports\\sports.boot --dbdestructive --logdir logs --logname stress -DLOCAL_STRESS=1 -DPLATFORM=pc')}"/>
+      </do>
+      <do>
+        <property name="vcproj.user.template" value="@{StrReplace('${vcproj.user.template}','%CMDARGS%','env\\local.boot --dbdestructive')}"/>
+      </do>
+    </choose>
+    <property name="vcproj.user.template" value="@{StrReplace('${vcproj.user.template}','%CUSTOMDIR%','${package.ActivePython.dir}\installed')}"/>
+
+    <!-- Check dependencies -->
+    <property name="rewrite_user_template" local="true"/>
+    <depends property="rewrite_user_template">
+      <inputs>
+        <includes name="${package.dir}/scripts/template.user"/>
+      </inputs>
+      <outputs>
+        <includes name="${package.builddir}/blazeserver.vcxproj.user"/>
+        <includes name="${package.builddir}/stress.vcxproj.user"/>
+      </outputs>
+    </depends>
+
+    <echo message="${vcproj.user.template}" file="${package.builddir}/blazeserver.vcxproj.user" if="${rewrite_user_template} == true"/>
+
+    <do if="${blazeserver.localstress??false}">
+      <property name="vcproj.user.template" fromfile="${package.dir}/scripts/template.user"/>
+      <property name="vcproj.user.template" value="@{StrReplace('${vcproj.user.template}','%CMDARGS%','-c ..\etc.ilt.sports\stress\stress-integrated.cfg --logdir logs --logname stressclient -DLOCAL_STRESS=1 -DSTRESS_SECURE=false -DUSE_STRESS_LOGIN=false -DLOGIN_BY_JWT=false -num_conns 20 -start_index 1001 -DPLATFORM=pc')}"/>
+      <echo message="${vcproj.user.template}" file="${package.builddir}/stress.vcxproj.user" if="${rewrite_user_template} == true"/>
+    </do>
+  </target>
+
+  <target name="mkvcprojredis">
+  
+    <!-- Add redis to project PATH env variable -->
+
+    <property name="vcproj.user.template" fromfile="${package.dir}/scripts/template.user"/>
+    <property name="vcproj.user.template" value="@{StrReplace('${vcproj.user.template}','%CUSTOMDIR%','${package.dir}\\bin\\redis\\win64')}"/>
+    <property name="vcproj.user.template" value="@{StrReplace('${vcproj.user.template}','%CMDARGS%','')}"/>
+
+    <!-- Check dependencies -->
+    <property name="rewrite_user_template" local="true"/>
+    <depends property="rewrite_user_template">
+        <inputs>
+            <includes name="${package.dir}/scripts/template.user"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.builddir}/blazeredis.vcxproj.user"/>
+        </outputs>
+    </depends>
+
+    <echo message="${vcproj.user.template}" file="${package.builddir}/blazeredis.vcxproj.user" if="${rewrite_user_template} == true"/>
+
+  </target>
+
+</project>

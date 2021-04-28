@@ -1,0 +1,114 @@
+#!/bin/env python
+"""
+Verify the most recent deploy package made with build-dist passes cfgtest. Also print out some build details.
+This is intended to assist deploy preparation and provide additional assurances of the quality of the deploy.
+
+This script should be run from the bin directory of a blaze build location.
+Invoke with -h to see the help.
+"""
+
+from optparse import OptionParser
+import commands
+
+def findPackage(path):
+    """
+    Search the path directory for .tar.gz files. Find the most recent one. This is the package that would be deployed
+    if you were to invoke the command now. So we will examine the most recent deploy package. 
+    """
+    archives = commands.getoutput('ls ' + path).split()
+    deployarchive = ''
+    current = 0
+
+    for index in range(1, len(archives) + 1):
+        if archives[-index].find('blaze-') != -1 and archives[-index].find('.tar.gz') != -1:
+            deployarchive = archives[-index]
+            break
+
+    print 'CFGTEST ' + deployarchive + ' ...\n'
+
+    if deployarchive == '':
+        print 'CFGTEST' + ' ERROR:'
+        print 'No deployable archives found'
+        sys.exit(-1)
+
+    return deployarchive
+
+
+def extractPackage(package):
+    """
+    Extract the relative file path package, which is a compressed blaze deploy package. The compressed file will still exist. 
+    The extracted contents are used to run cfgtest and then are deleted later. 
+    """
+    outputPath = package.replace('.tar.gz','')
+    """
+    Delete any already extracted packages for this deploy package (as determined by folder name). 
+    They might be there from manual efforts or from this script dying without completing
+    """
+    commands.getoutput('rm -rf %s/' % outputPath) 
+    commands.getoutput('mkdir ' + outputPath)
+    commands.getoutput('tar xzf ' + package + ' -C ' + outputPath)
+    return outputPath
+
+def cleanUp(path):
+    """
+    Recursively remove the contents of a path. This path should be the relative path to the extracted blaze deploy.
+    Using rm -rf concerns me but i see this in a number of our deploy related tools already so i'll stick with it.
+    """
+    commands.getoutput('rm -rf %s/' % path)
+
+def printPackageDetails(path):
+    """
+    Call the blazeserver binary that was extracted in order to print out the version information.
+    The path is the relative path to the extracted blaze deploy
+    """
+    print '==Blaze Details=='
+    print commands.getoutput('%s/bin/blazeserver -vv' % path)
+    print
+
+def runCfgTest(path, environment, platform):
+    """
+    Run cfgtest using the passed in arguments against the extracted deploy package. Print out the last 5 lines and search for any obvious errors. 
+    Always display the last 5 lines so a human can review. 
+
+    The BASE_PORT is also defined in cfgtest because many boot files will barf if it is not explicitly defined. The value doesn't matter. 
+    """
+    cmd = 'cd %s/etc; ../bin/cfgtest env/%s.boot -DPLATFORM=%s -DBASE_PORT="" | tail -n 5' % (path, options.environment, options.platform)
+    cfgTestResult = commands.getoutput(cmd)
+    print '==cfgtest Results=='
+    print 'Last 5 Lines of output from cfgtest:'
+    print cfgTestResult
+    print
+    if ' ERR ' in cfgTestResult:
+        print 'CFGTEST Error Found'
+    else:
+        print 'Script did not detect config errors. Review the last lines of output from cfgtest above to ensure there are no errors'
+        print 'Errors are the last things logged by cfgtest in failures'
+
+    print
+    
+
+"""
+Parse the arguments necessary for this script
+"""
+parser = OptionParser()
+parser.add_option('-e', '--environment', dest='environment')
+parser.add_option('-p', '--platform', dest='platform')
+(options, args) = parser.parse_args()
+
+"""
+Optionally follow the existing Blaze deploy syntax where = signs are used between keys and values in params.
+"""
+options.environment = options.environment.replace('=','')
+options.platform = options.platform.replace('=','')
+
+"""
+The archive path is a relative path from the blaze build locations bin directory. Compressed Blaze deploys from build-dist go here.
+The most recent Blaze deploy package is found inside the archivePath. The deploy is extracted inside the archivePath/<archiveName>.
+Some tests like cfgtest are run against the extracted package to look for issues and confirm deploy information.
+"""
+archivePath = 'archive'
+deployPackageCompressed = archivePath + '/' + findPackage(archivePath)
+deployPackageExtracted = extractPackage(deployPackageCompressed)
+printPackageDetails(deployPackageExtracted)
+runCfgTest(deployPackageExtracted, options.environment, options.platform)
+cleanUp(deployPackageExtracted)

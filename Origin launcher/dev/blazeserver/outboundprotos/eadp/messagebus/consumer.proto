@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package eadp.messagebus;
+
+import "eadp/messagebus/service_message.proto";
+import "eadp/messagebus/topic_partition_message.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+import "eadp/annotations.proto";
+
+option java_package = "com.ea.gs.messagebus.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "ConsumerProto";
+
+service Consumer {
+    option (eadp.grpc.service_mapping) = {
+        ports: [ S2S ]
+        scopes: {
+            key: "S2S"
+            value: "gs_messagebus_consumer"
+        }
+    };
+
+    // Message Bus Kafka Consumer bidirectional streaming API.
+    rpc ConsumeRecords(stream ConsumerRequest) returns (stream ConsumerResponse);
+
+}
+
+
+// A record to be received from Kafka.
+message ConsumerRecord {
+    // The topic's name.
+    string topic_name = 1;
+    // The partition from which this record is received.
+    uint32 partition = 2;
+    // The position of this record in the corresponding Kafka partition.
+    uint64 offset = 3;
+    // The record contents (service message).
+    ServiceMessage value = 4;
+    // The size of the serialized, uncompressed value in bytes.
+    uint32 serialized_value_size = 5;
+    // The timestamp of the record.
+    google.protobuf.Timestamp timestamp = 6;
+}
+
+// Container for the service request data.
+message ConsumerRequest {
+    // The action to perform.
+    oneof request {
+        PollRequest poll_request = 1;
+        SeekToPositionRequest seek_to_position_request = 3;
+        CommitOffsetRequest commit_offset_request = 4;
+        GetConsumerCommittedOffsetsRequest get_committed_offsets_request = 5;
+        PausePollRequest pause_poll_request = 8;
+        ResumePollRequest resume_poll_request = 9;
+    }
+
+    // Request to to create new Kafka Consumer, subscribe it to a list of topic patterns, and trigger a single poll request to fetch data from Kafka topics.
+    message PollRequest {
+        repeated string topic_pattern = 1;
+    }
+
+    // Request to override fetch offsets that the consumer will use on the next poll.
+    message SeekToPositionRequest {
+        TopicPartitionOffset topic_partition_offset = 1;
+    }
+
+    // Request to commit offsets for the given topics and partitions.
+    message CommitOffsetRequest {
+        repeated TopicPartitionOffset topic_partition_offsets = 1;
+        bool should_unblock_partition_revoke_operation = 2;
+    }
+
+    // Request to find all committed offsets per consumer.
+    message GetConsumerCommittedOffsetsRequest {
+
+    }
+
+    // Request to suspend polling from all Consumer subscribed or assigned currently partitions.
+    message PausePollRequest {
+
+    }
+
+    // Request to resume polling from all Consumer subscribed or assigned currently partitions.
+    message ResumePollRequest {
+
+    }
+
+    // Consumer group ID which uniquely identifies the group of consumer processes.
+    string group_id = 6;
+    // Unique message (Consumer request) ID.
+    string message_id = 7;
+}
+
+// Consumer response data.
+message ConsumerResponse {
+    // The response status message.
+    google.rpc.Status status = 1;
+
+    oneof response {
+        // The record fetched from Kafka.
+        ConsumerRecord record = 2;
+        TopicPartitionOffset seek_topic_partition_offset = 3;
+        TopicPartitionOffset commit_topic_partition_offset = 4;
+        PartitionsRevoked partitions_revoked = 5;
+        PartitionsAssigned partitions_assigned = 6;
+        CommittedOffsets commited_offsets = 7;
+        EndOfPoll end_of_poll = 10;
+        PartitionsPaused partitions_paused = 11;
+        PartitionsResumed partitions_resumed = 12;
+    }
+
+    message PartitionsRevoked {
+        repeated TopicAndPartition topic_partitions = 1;
+    }
+
+    message PartitionsAssigned {
+        repeated TopicAndPartition topic_partitions = 1;
+        repeated TopicPartitionOffset committed_topic_partition_offsets = 2;
+    }
+
+    message CommittedOffsets {
+        repeated TopicPartitionOffset offsets = 1;
+    }
+
+    message EndOfPoll {
+
+    }
+
+    message PartitionsPaused {
+        repeated TopicAndPartition topic_partitions = 1;
+    }
+
+    message PartitionsResumed {
+        repeated TopicAndPartition topic_partitions = 1;
+    }
+
+    // Unique message (Consumer request) ID.
+    string message_id = 8;
+
+    // Number of records returned in a single call to poll.
+    uint32 number_returned_records_per_poll = 9;
+}
+
+// Information about a topic and partition.
+message TopicAndPartition {
+    // The topic's name.
+    string topic_name = 1;
+    // The partition number.
+    uint32 partition = 2;
+}

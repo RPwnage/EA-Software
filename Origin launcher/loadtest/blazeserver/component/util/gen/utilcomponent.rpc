@@ -1,0 +1,360 @@
+// Util Component interface
+
+
+[ headername="framework/tdf/qosdatatypes.h" ]
+#include "framework/gen/qosdatatypes.tdf"
+
+[headername="framework/tdf/metricsdatatypes.h"]
+#include "framework/gen/metricsdatatypes.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[ headername="util/tdf/utiltypes.h" ]
+#include "util/gen/utiltypes.tdf"
+
+[
+  client_include = false,
+  headername="util/tdf/util_server.h" 
+]
+#include "util/gen/util_server.tdf"
+
+namespace Blaze
+{
+namespace Util
+{
+[
+  id = core/9,
+  description = "Fetch client config from the server.",
+  details = "This component allows the client to fetch configuration file from the server. 
+               Request data consists of user ID and name of the section in the main configuration file.",
+  configurationType = UtilConfig
+]
+component Util
+{
+
+    permissions
+    {
+        PERMISSION_TELEMETRY_TOGGLE = 1;
+        PERMISSION_TELEMETRY_VIEW = 2;
+        PERMISSION_OTHER_USER_SETTINGS = 3;
+        PERMISSION_OTHER_USER_SETTINGS_VIEW = 4;
+    }
+    
+    errors
+    {
+        [ description = "config section not found" ]
+        UTIL_CONFIG_NOT_FOUND = 100;
+        [ description = "PSU limit reached" ]
+        UTIL_PSU_LIMIT_EXCEEDED = 101;
+        [ description = "Caller did not specify a service name. Required for shared platforms cluster." ]
+        UTIL_SERVICENAME_NOT_SPECIFIED = 102;
+        [ description = "Caller specified service name is not hosted on this instance." ]
+        UTIL_SERVICENAME_NOT_HOSTED = 103;
+        
+        [ description = "caller's platform is not available." ]
+        UTIL_CALLER_PLATFORM_NOT_FOUND = 104;
+        
+        [ description = "caller is attempting to access a resource for a different platform. Explicit error mostly to assist debugging." ]
+        UTIL_CALLER_PLATFORM_MISMATCH = 105;
+
+        [ description = "caller is attempting to access a service it should not. Explicit error mostly to assist debugging." ]
+        UTIL_CALLER_PLATFORM_NOT_ALLOWED = 106;
+
+        [ description = "There are no telemetry servers available" ]
+        UTIL_TELEMETRY_NO_SERVERS_AVAILABLE = 150;
+        [ description = "Server is out of memory." ]
+        UTIL_TELEMETRY_OUT_OF_MEMORY        = 151;
+        [ description = "Telemetry key is longer then it should be." ]
+        UTIL_TELEMETRY_KEY_TOO_LONG         = 152;
+
+        [ description = "There are no ticker servers available." ]
+        UTIL_TICKER_NO_SERVERS_AVAILABLE    = 155;
+        [ description = "Ticker key is too long to create." ]
+        UTIL_TICKER_KEY_TOO_LONG            = 156;
+        
+        [ description = "Record not found in user small storage." ]
+        UTIL_USS_RECORD_NOT_FOUND           = 200;
+        [ description = "Exceeded number of keys allowed for user." ]
+        UTIL_USS_TOO_MANY_KEYS              = 201;
+        [ description = "Database error while reading/writing." ]
+        UTIL_USS_DB_ERROR                   = 202;
+        
+        [ description = "There is no extended data for the given session." ]
+        UTIL_USS_USER_NO_EXTENDED_DATA      = 250;
+        
+        [ description = "Requested Ping Suspension time exceeds maximum configured time." ]
+        UTIL_SUSPEND_PING_TIME_TOO_LARGE            = 300;
+        
+        [ description = "Requested Ping Suspension time is less than the minimum time allowed for a connection (has to be greater than inactivityTimeout on the BlazeServer)." ]
+        UTIL_SUSPEND_PING_TIME_TOO_SMALL            = 301;
+        
+    } // errors
+
+
+    slave
+    {
+
+        methods
+        {
+            [
+              id = 1,
+              description = "Provides configuration data for the client.",
+              details = "Receives request from the client, retreives the section requested and sends it to the client.",
+              errors = {
+                   UTIL_CONFIG_NOT_FOUND
+                },
+              generate_command_class = false,
+              allowGuestCall = true,
+              requires_authentication = false 
+            ]
+            FetchConfigResponse fetchClientConfig(FetchClientConfigRequest);
+
+            [
+              id = 2,
+              description = "Ping the server to keep the connection alive.",
+              generate_command_class = false,
+              allowGuestCall = true,
+              requires_authentication = false
+            ]
+            PingResponse ping();
+
+            [
+              id = 3,
+              generate_command_class = false,
+              allowGuestCall = true,
+              requires_authentication = false 
+            ]
+            void setClientData(ClientData);
+
+            [
+              id = 4,
+              description = "Get map of id-to-localized strings for supplied list of ids.",
+              generate_command_class = false,
+              allowGuestCall = true,
+              requires_authentication = false 
+            ]
+            LocalizeStringsResponse localizeStrings(LocalizeStringsRequest);
+
+            [
+              id = 5,
+              description = "Get telemetry server connection data.",
+              generate_command_class = false,
+              requires_authentication = true,
+              allowGuestCall = true,
+              errors = {
+                    UTIL_TELEMETRY_NO_SERVERS_AVAILABLE,
+                    UTIL_TELEMETRY_OUT_OF_MEMORY,
+                    UTIL_TELEMETRY_KEY_TOO_LONG,
+                    UTIL_CALLER_PLATFORM_NOT_FOUND
+                }
+            ]
+            GetTelemetryServerResponse getTelemetryServer(GetTelemetryServerRequest);
+
+            [
+              id = 6,
+              description = "Get ticker server connection data.",
+              generate_command_class = false,
+              requires_authentication = true,
+              allowGuestCall = true,
+              errors = {
+                    UTIL_TICKER_NO_SERVERS_AVAILABLE,
+                    UTIL_TICKER_KEY_TOO_LONG
+                }
+            ]
+            GetTickerServerResponse getTickerServer();
+
+            [
+              id = 7,
+              description = "Perform setClientData, fetchClientConfig, fetchQosConfig before authentication",
+              generate_command_class = false,
+              requires_authentication = false,
+              allowGuestCall = true,
+              errors = {
+                    UTIL_CONFIG_NOT_FOUND,
+                    UTIL_PSU_LIMIT_EXCEEDED,
+                    UTIL_SERVICENAME_NOT_SPECIFIED,
+                    UTIL_SERVICENAME_NOT_HOSTED,
+                    UTIL_CALLER_PLATFORM_MISMATCH,
+                    UTIL_CALLER_PLATFORM_NOT_ALLOWED
+                }
+            ]
+            PreAuthResponse preAuth(PreAuthRequest);
+
+            [
+              id = 8,
+              description = "Perform getTickerServer and getTelemetryServer after authentication",
+              requires_authentication = true,
+              allowGuestCall = true,
+              errors = {
+                    UTIL_TICKER_NO_SERVERS_AVAILABLE,
+                    UTIL_TICKER_KEY_TOO_LONG,
+                    UTIL_TELEMETRY_NO_SERVERS_AVAILABLE,
+                    UTIL_TELEMETRY_OUT_OF_MEMORY,
+                    UTIL_TELEMETRY_KEY_TOO_LONG
+                }
+            ]
+            PostAuthResponse postAuth(PostAuthRequest);
+
+            [
+              id = 10,
+              description = "Loads user's (persona's) game specific settings from db.",
+              details = "Loads user settings using a key.",
+              requiresUserSession = false,
+              errors = {
+                    UTIL_USS_RECORD_NOT_FOUND,
+                    UTIL_USS_DB_ERROR
+                }
+            ]
+            UserSettingsResponse userSettingsLoad(UserSettingsLoadRequest);
+
+            [
+              id = 11,
+              description = "Saves user's (persona's) game specific settings to the db.",
+              details = "Saves settings using a key. There is a maximum number of keys that can be configured in util.cfg.  The default is 8.
+                         i.e. user.small.storage = { maxkeys = 8 }",
+              requiresUserSession = false,
+              errors = {
+                    UTIL_USS_TOO_MANY_KEYS,
+                    UTIL_USS_DB_ERROR
+                }
+            ]
+            void userSettingsSave(UserSettingsSaveRequest);
+
+            [
+              id = 12,
+              description = "Loads all settings of the current logged-in persona from db.",
+              details = "Loads all settings into key-value map.",
+              requires_authentication = true,
+              errors = {
+                    UTIL_USS_RECORD_NOT_FOUND,
+                    UTIL_USS_DB_ERROR
+                }
+            ]
+            UserSettingsLoadAllResponse userSettingsLoadAll();
+
+            [
+              id = 13,
+              description = "Loads all settings of the current logged-in persona from db.",
+              details = "Loads all settings into key-value map.",
+              requires_authentication = true,
+              errors = {
+                   UTIL_USS_RECORD_NOT_FOUND,
+                   UTIL_USS_DB_ERROR
+                },
+              client_export = false 
+            ]
+            UserSettingsLoadAllResponse userSettingsLoadAllForUserId(UserSettingsLoadAllRequest);
+
+            [
+              id = 14,
+              description = "delete user's (persona's) game specific settings from db.",
+              details = "delete user settings using a key.",
+              requiresUserSession = false,
+              errors = {
+                    UTIL_USS_DB_ERROR
+                }
+            ]
+            void deleteUserSettings(DeleteUserSettingsRequest);
+
+            [
+              id = 15,
+              description = "Loads specified settings of the provided user/persona (or current logged-in user/persona) from db.",
+              details = "Loads specified settings into key-value map.  Invalid specified settings (keys) are ignored.",
+              requiresUserSession = false,
+              errors = {
+                   UTIL_USS_RECORD_NOT_FOUND,
+                   UTIL_USS_DB_ERROR
+                }
+            ]
+            UserSettingsLoadMultipleResponse userSettingsLoadMultiple(UserSettingsLoadMultipleRequest);
+
+            [
+              id = 20,
+              description = "Filter a list of user supplied text for profanity.",
+              allowGuestCall = true,
+              generate_command_class = false,
+              blocking = true
+            ]
+            FilterUserTextResponse filterForProfanity(FilterUserTextResponse);
+
+            [
+              id = 21,
+              description = "Provides configuration data for the QOsSettings.",
+              generate_command_class = false,
+              allowGuestCall = true,
+              requires_authentication = false 
+            ]
+            Blaze::QosConfigInfo fetchQosConfig();
+
+            [
+              id = 22,
+              description = "Set metrics collected from client side for current user.",
+              allowGuestCall = true,
+              generate_command_class = false 
+            ]
+            void setClientMetrics(Blaze::ClientMetrics);
+
+            [
+              id = 23,
+              description = "Set connection active to false indicate the client is not using online feature and may be disconnected by the blaze server",
+              allowGuestCall = true,
+              generate_command_class = false 
+            ]
+            void setConnectionState(SetConnectionStateRequest);
+
+            [
+              id = 25,
+              description = "Get user's options."
+            ]
+            UserOptions getUserOptions(GetUserOptionsRequest);  
+            
+            [
+              id = 26,
+              description = "Set user's options."
+            ]
+            void setUserOptions(UserOptions);     
+
+            [
+                id = 27,
+                description = "Allows client to suspend pings for upto a maximum configured duration.",
+                generate_command_class = false,
+                requires_authentication = false,
+                allowGuestCall = true,
+                generateProto = false,
+                errors = {
+                    UTIL_SUSPEND_PING_TIME_TOO_LARGE,
+                    UTIL_SUSPEND_PING_TIME_TOO_SMALL
+                }
+            ]
+            void suspendUserPing(SuspendUserPingRequest);
+
+            [
+                id = 28,
+                description = "Allows current user to set information about its client state.",
+                generate_command_class = false
+            ]
+            void setClientState(ClientState);
+            
+            [
+              id = 29,
+              description = "Set metrics collected about the client, updated periodically.",
+              allowGuestCall = true,
+              generate_command_class = false 
+            ]
+            void setClientUserMetrics(ClientUserMetrics);
+
+        } // methods
+
+        events
+        {
+            [ id = 1000 ]
+            UserSettingsSavedEvent(UserSettingsSaved);
+        }
+    } // slave
+
+}
+}
+}
+
+ // component

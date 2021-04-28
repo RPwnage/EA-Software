@@ -1,0 +1,71 @@
+<project>
+
+  <createtask name="message.gen.cpp">
+    <parameters>
+      <option name="compiler"       value="Required"/><!-- Either protoc-blaze.exe or protoc.exe -->
+      <option name="protofile"      value="Required"/><!-- The proto file being processed. -->
+      <option name="depfile"        value="Required"/><!-- The dependency file. -->
+      <option name="workingdir"     value="Required"/><!-- Working/Root directory of the proto files in which the compiler runs. -->
+      <option name="outputdir"      value="Required"/><!-- The output directory where the code will be generated. Should exist before calling this task. -->
+      <option name="protopaths"     value="Required"/><!-- Additional proto paths for the proto files being included from other sources. -->
+      <option name="verbose"        value="Required"/><!-- If true, spew log from the code generator. -->
+    </parameters>
+
+    <code>
+      <foreach item="String" in="${message.gen.cpp.protopaths}" local="true" property="protopath" delim=" \n">
+        <property name="protopath_arg" value="${property.value} --proto_path=${protopath}" local="true"/>
+      </foreach>
+
+      <exec program="${message.gen.cpp.compiler}" workingdir="${message.gen.cpp.workingdir}" silent="!${nant.verbose??false}" silent-err="!(${nant.verbose??false} or ${message.gen.cpp.verbose})">
+        <args>
+          <arg value="${protopath_arg}"/>
+          <arg value="--cpp_out=${message.gen.cpp.outputdir}"/>
+          <arg value="${message.gen.cpp.protofile}"/>
+        </args>
+        <inputs>
+          <includes name="${message.gen.cpp.workingdir}/${message.gen.cpp.protofile}"/>
+          <includes name="${message.gen.cpp.compiler}"/>
+        </inputs>
+        <outputs>
+          <includes name="${message.gen.cpp.depfile}" />
+        </outputs>
+      </exec>
+      <touch file="${message.gen.cpp.depfile}"/>
+    </code>
+  </createtask>
+
+  <createtask name="service.gen.cpp">
+    <parameters>
+      <option name="protofile"      value="Required"/>
+      <option name="depfile"        value="Required"/>
+      <option name="workingdir"     value="Required"/>
+      <option name="outputdir"      value="Required"/>
+      <option name="protopaths"     value="Required"/>
+      <option name="verbose"        value="Required"/><!-- If true, spew log from the code generator. -->
+    </parameters>
+
+    <code>
+      <foreach item="String" in="${service.gen.cpp.protopaths}" local="true" property="protopath" delim=" \n">
+        <property name="protopath_arg" value="${property.value} --proto_path=${protopath}" local="true"/>
+      </foreach>
+
+      <exec program="${protoc.exe}" workingdir="${service.gen.cpp.workingdir}" silent="!${nant.verbose??false}" silent-err="!(${nant.verbose??false} or ${service.gen.cpp.verbose})">
+        <args>
+          <arg value="${protopath_arg}"/>
+          <arg value="--grpc_out=${service.gen.cpp.outputdir}"/>
+          <arg value="--plugin=protoc-gen-grpc=${grpc_cpp_plugin.exe}"/>
+          <arg value="${service.gen.cpp.protofile}"/>
+        </args>
+        <inputs>
+          <includes name="${service.gen.cpp.workingdir}/${service.gen.cpp.protofile}"/>
+          <includes name="${protoc.exe}"/>
+          <includes name="${grpc_cpp_plugin.exe}"/>
+        </inputs>
+        <outputs>
+          <includes name="${service.gen.cpp.depfile}" />
+        </outputs>
+      </exec>
+      <touch file="${service.gen.cpp.depfile}"/>
+    </code>
+  </createtask>
+</project>

@@ -1,0 +1,69 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<do.once key="eaconfig.pc-clang-unsupported-warning">
+		<warn message="!!! PC Clang configurations are not officially supported. Use at your own risk. !!!"/>
+	</do.once>
+	<do.once key="eaconfig.pc-clang-as-vc-really-really-bad" if="${eaconfig.treat-pc-clang-as-vc??false}">
+		<warn message="!!! Property 'eaconfig.treat-pc-clang-as-vc' evaluates to true. This is an incredibly hacky short cut to make packages unaware of pc-clang work by pretending to be vc. This feature may be removed without warning. !!!"/>
+	</do.once>
+
+	<property name="config-compiler" value="vc" if="${eaconfig.treat-pc-clang-as-vc??false}"/>
+	<choose>
+		<do if="${eaconfig.treat-pc-clang-as-vc??false}">
+			<include file="pc64-clang-as-vc.xml"/>
+		</do>
+		<do>
+			<include file="pc-common.xml"/>
+					
+			<dependent name="VisualStudio"/> <!-- pull in lib and link definitions from VisualStudio package -->
+			<dependent name="PCClang"/>
+			<set-config-vs-version/>
+
+			<!-- These "vc" properties are duplicate from pc-vc-common.xml.  Need to set those up before calling pc64-clang-buildtools.xml! -->
+			<property name="eaconfig.msvc.version" value="${package.MSBuildTools.msvc-version}" if="@{PropertyExists('package.MSBuildTools.msvc-version')}"/>
+			<property name="eaconfig.msvc.version" value="${package.VisualStudio.InstalledUpdateVersion??${package.VisualStudio.InstalledVersion??}}" unless="@{PropertyExists('eaconfig.msvc.version')}"/>
+			<choose>
+				<do if="@{PropertyExists('package.VisualStudio.nativetoolsroot')}">
+					<property name="package.eaconfig.vcdir" value="${package.VisualStudio.nativetoolsroot}"/>  
+				</do>
+				<do>
+					<property name="package.eaconfig.vcdir" value="${package.VisualStudio.vcdir??${package.VisualStudio.appdir}\VC}"/>  
+				</do>
+			</choose>
+			<choose>
+				<do if="@{StrCompareVersions('${config-vs-version}', '14.0')} lte 0 or @{StrIsEmpty('${cc.includedirs??}')}">
+					<property name="package.eaconfig.vc.includedirs">
+						${package.eaconfig.vcdir}\ATLMFC\INCLUDE
+						${package.eaconfig.vcdir}\INCLUDE
+					</property>
+					<property name="cc.includedirs"/>
+				</do>
+				<do>
+					<eval code="${cc.includedirs}" property="package.eaconfig.vc.includedirs" type="Property"/>
+					<property name="cc.includedirs"/>
+				</do>
+			</choose>
+
+			<include file="pc64-clang-buildtools.xml"/>
+
+			<optionset name="config-options-common">
+				<option name="buildset.cc.options">
+					${option.value}
+					${cc.common-options??}
+				</option>
+				<option name="buildset.link.options">
+				  ${option.value}
+				  ${link.common-options??}
+				</option>
+			</optionset>
+		</do>
+	</choose>
+	
+	  <!-- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <!-- +-+-  Visual Studio solution generation related data       -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <!-- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <property name="visualstudio.platform.name" value="x64"/>
+</project>

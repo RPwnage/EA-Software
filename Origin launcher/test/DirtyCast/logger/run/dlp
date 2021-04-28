@@ -1,0 +1,132 @@
+#!/bin/bash
+USERNAME=jbrookes
+UPDATE=0
+PARSE=0
+
+#
+# Usage
+#
+if [ $# \< 2 ]; then
+  echo "usage: $0 <region> [update] [parse]"
+  exit
+fi
+
+# utility function emulating strstr
+function strstr()
+{
+   echo $1 | grep --quiet $2
+}
+
+#
+# Get source VS log directory from title
+#
+if $(strstr $1 'nhl13-ps3'); then
+   VSDIR="/opt/home/nhl/dirtyCast.nhl-2013.ps3.prod.8.18.2.706799/VS_Linux.11.8.2012_19.6.29.920"
+elif $(strstr $1 'nhl14-ps3'); then
+   VSDIR="/opt/home/nhl/dirtyCast.nhl-2014.ps3.prod.8.18.2.926972/VS_Linux.10.17.2013_18.11.31.270"
+elif $(strstr $1 'fifa14-ps3'); then
+   VSDIR="/opt/home/fifa/dirtyCast.fifa-2014.ps3.prod.13.3.0.5.0.907427/VS_Linux.9.25.2013_20.2.32.3"
+elif $(strstr $1 'fifa14-xbl2'); then
+   VSDIR="/opt/home/fifa/dirtyCast.fifa-2014.xbl2.prod.13.3.0.5.0.907427/VS_Linux.9.25.2013_20.2.32.3"
+elif $(strstr $1 'nfsrivals-ps4'); then
+   VSDIR="/opt/home/nfs/dirtyCast.nfs-rivals.ps4.prod.13.3.1.3.0.930681/VS_Linux.10.30.2013_19.12.33.743"
+fi
+
+#
+# Get source vs hostnames from title/region
+#
+
+#  nhl-2013-ps3
+if [ "$1" == "nhl13-ps3-ams" ]; then
+   HOSTS="159.153.20.200 159.153.20.201 159.153.20.202 159.153.20.203"
+elif [ "$1" == "nhl13-ps3-m3d" ]; then
+   HOSTS="209.25.177.102 209.25.177.103 209.25.177.117 209.25.177.119"
+elif [ "$1" == "nhl13-ps3-iad" ]; then
+   HOSTS="173.203.183.244 173.203.183.245 173.203.183.246 173.203.183.247 173.203.183.248 173.203.183.249"
+# nhl-2014-ps3
+elif [ "$1" == "nhl14-ps3-dub" ]; then
+   HOSTS="10.74.168.12 10.74.168.13 10.74.168.14"
+   #HOSTS="159.153.76.12 159.153.76.13 159.153.76.14"
+elif [ "$1" == "nhl14-ps3-sjc" ]; then
+   HOSTS="10.73.168.11 10.73.168.12 10.73.168.13 10.73.168.14"
+   #HOSTS="159.153.126.32 159.153.126.33 159.153.126.34 159.153.126.35"
+elif [ "$1" == "nhl14-ps3-iad" ]; then
+   HOSTS="10.72.168.15 10.72.168.18 10.72.168.19 10.72.168.20 10.72.168.21 10.72.168.22 10.72.168.23"  
+# fifa-2014-ps3
+elif [ "$1" == "fifa14-ps3-iad" ]; then
+   HOSTS="173.203.183.198 173.203.183.211 173.203.183.212"
+elif [ "$1" == "fifa14-ps3-lhr" ]; then
+   HOSTS="162.13.69.245 162.13.69.246 162.13.69.247 162.13.69.248 162.13.69.249 162.13.69.250 162.13.69.251 162.13.69.252"
+elif [ "$1" == "fifa14-ps3-m3d" ]; then
+   HOSTS="216.65.112.75 216.65.112.76"
+elif [ "$1" == "fifa14-ps3-hkg" ]; then
+   HOSTS="180.150.147.52"
+# fifa-2014-xbl2
+elif [ "$1" == "fifa14-xbl2-iad" ]; then
+   HOSTS="173.203.183.196 173.203.183.197 173.203.183.231 173.203.183.232 173.203.183.234"
+elif [ "$1" == "fifa14-xbl2-lhr" ]; then
+   HOSTS="162.13.69.233 162.13.69.234 162.13.69.235 162.13.69.236 162.13.69.237 162.13.69.238 162.13.69.239 162.13.69.240 162.13.69.241 162.13.69.242 162.13.69.243 162.13.69.244"
+elif [ "$1" == "fifa14-xbl2-m3d" ]; then
+   HOSTS="216.65.112.69 216.65.112.70 216.65.112.72 216.65.112.73 216.65.112.77"
+elif [ "$1" == "fifa14-xbl2-hkg" ]; then
+   HOSTS="180.150.147.50"
+# nfs-2014-ps4
+elif [ "$1" == "nfsrivals-ps4-ams" ]; then
+   HOSTS="10.128.76.19 10.128.76.20 10.128.76.21 10.128.76.22 10.128.76.23 10.128.76.24 10.128.76.33 10.128.76.57 10.128.76.58"
+elif [ "$1" == "nfsrivals-ps4-iad" ]; then
+   HOSTS="10.72.166.5 10.72.166.6 10.72.166.7 10.72.166.8 10.72.166.9 10.72.166.10"
+elif [ "$1" == "nfsrivals-ps4-sjc" ]; then
+   HOSTS="10.73.166.5 10.73.166.6 10.73.166.7 10.73.166.12 10.73.166.13"
+elif [ "$1" == "nfsrivals-ps4-syd" ]; then
+   HOSTS="10.70.166.11 10.70.166.12 10.70.166.13 10.70.166.15 10.70.166.16"
+# unknown
+else
+   echo "Unknown game-region $1"
+   exit
+fi
+
+# make sure we have a VSDIR set
+if [ "$VSDIR" == "" ]; then
+   echo "VSDIR not set"
+   exit
+fi
+
+# see if we are updating logparser
+if [ "$2" == "update" ]; then
+   UPDATE=1
+elif [ "$3" == "update" ]; then
+   UPDATE=1
+fi
+
+# see if we are executing logparser
+if [ "$2" == "parse" ]; then
+   PARSE=1
+elif [ "$3" == "parse" ]; then
+   PARSE=1
+fi
+
+#
+# main process; update and/or execute logparser against all hostnames specified
+#
+for HOSTNAME in ${HOSTS} ; do
+    if [ $UPDATE == 1 ]; then
+        echo "Updating..."
+        scp dologparse logparsef ${USERNAME}@${HOSTNAME}:~
+        ssh -l ${USERNAME} ${HOSTNAME} "chmod +x dologparse"
+    fi
+    if [ $PARSE == 1 ]; then
+        echo "Parsing..."
+        echo "Connecting to host ${HOSTNAME}"
+        ssh -l ${USERNAME} ${HOSTNAME} "./dologparse ${VSDIR}"
+        mkdir -p ./vsmerge/"$1"
+        scp ${USERNAME}@${HOSTNAME}:~/vsmerge.log.gz ./vsmerge/"$1"/vsmerge-${HOSTNAME}.log.gz
+        gunzip -f ./vsmerge/"$1"/*.gz
+    fi
+done
+
+#
+# final step; execute logparser against merge of logparsers from all regional hosts, using GeoIP databases if available
+echo "Final merge of parse files from all hosts"
+if [ $PARSE == 1 ]; then
+    ./logparsef -o ./vsmerge/"$1"/vsmerge-log.txt -g GeoIPCity.dat -G GeoIPOrg.dat ./vsmerge/"$1"/*.log > ./vsmerge/"$1"/vsmerge-out.txt
+fi

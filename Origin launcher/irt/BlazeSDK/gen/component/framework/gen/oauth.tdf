@@ -1,0 +1,128 @@
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+// Following OAuth request/response objects are used by Arson so not in oauth_server.tdf
+namespace Blaze
+{
+namespace OAuth
+{
+
+class GetUserAccessTokenRequest
+{
+    [tag="usid", description="The user session id of the user whose access token is requested. Super user permission required if accessing access token of a user session that is not current." ]
+    UserSessionId mUserSessionId;
+};
+
+class GetUserAccessTokenResponse
+{
+    [tag="atok"]
+    string(-1) mAccessToken;
+
+    [tag="clid", description="The clientId associated with the access token."]
+    string(MAX_NUCLEUS_CLIENT_ID_LENGTH) mClientId;
+
+    [tag="vali", description="The time when the token should still be valid."]
+    TimeValue mValidUntil;
+};
+
+[description="Provide either the PersonaId or the ExternalId of a users account to retrieve a XBL token. Setting neither will result in an error."]
+union XblTokenOwnerId
+{
+    PersonaId mPersonaId;
+    ExternalId mExternalId;
+};
+
+class GetUserXblTokenRequest
+{
+    [tag="ownr", description="Provide either the PersonaId or the ExternalId of a users account to retrieve a XBL token. Setting neither will result in an error."]
+    XblTokenOwnerId mRetrieveUsing;
+
+    [tag="ref", description="Flag to indicate if Blaze should tell Nucleus to update its cached XBL token.", default=false]
+    bool mForceRefresh;
+
+    [tag="rlyp", description="The relying party for the XBL token. Possible values: http://licensing.xboxlive.com, http://mp.microsoft.com, http://xboxlive.com (default if unspecified)", default="http://xboxlive.com"]
+    string(512) mRelyingParty;
+};
+
+class GetUserXblTokenResponse
+{
+    [tag="dtok", description="The user's XBL token. This is the full XBL3.0 token and can be used with XBL services as is."]
+    string(-1) mXblToken;
+
+    [tag="prof", description="The token's proof key"]
+    string(-1) mProofKey;
+};
+
+[description="Provide either the PersonaId or ExternalPsnAccountId of a users account to retrieve a PSN token. Setting neither will result in an error."]
+union PsnTokenOwnerId
+{
+    PersonaId mPersonaId;
+
+    ExternalPsnAccountId mExternalId;
+};
+
+class GetUserPsnTokenRequest
+{
+    [tag="ownr", description="Provide either the PersonaId or the ExternalPsnAccountId of a users account to retrieve a PSN token. Setting neither will result in an error."]
+    PsnTokenOwnerId mRetrieveUsing;
+
+    [tag="ref", description="Flag to indicate if Blaze should explicitly update its cached PSN token.", default=false]
+    bool mForceRefresh;
+
+    [tag="plat", description="ps4 or now ps5.", default=INVALID]
+    ClientPlatformType mPlatform;
+
+    [tag="xgen", description="Whether to fetch cross gen compatible token for the platform as appropriate.", default=false]
+    bool mCrossgen;
+};
+
+class GetUserPsnTokenResponse
+{
+    [tag="dtok", description="The user's PSN token. This is the full token and can be used with PSN services as is."]
+    string(-1) mPsnToken;
+
+    [tag="expi", description="The time when the token will expire."]
+    TimeValue mExpiresAt;
+};
+
+class GetServerAccessTokenRequest
+{
+    [tag="scop", description="The scopes that this token should have."]
+    string(-1) mAllowedScopes;
+};
+
+class GetServerAccessTokenResponse
+{
+    [tag="atok"]
+    string(-1) mAccessToken;
+
+    [tag="clid", description="The clientId associated with the access token."]
+    string(MAX_NUCLEUS_CLIENT_ID_LENGTH) mClientId;
+
+    [tag="vali", description="The time when the token should still be valid."]
+    TimeValue mValidUntil;
+};
+
+// Access token to a service is passed as
+//      authorization: <type> <token string>
+// The type tells the server how to verify the token string.
+enum TokenType
+{
+    TOKEN_TYPE_NONE = 0,   // No prefix type. Sentinel value.
+    TOKEN_TYPE_BEARER,     // Use "Bearer" as prefix string. The target service needs no credentials other than the token.
+    TOKEN_TYPE_NEXUS_S2S,  // Use "NEXUS_S2S" prefix type. Usually, required by EADP services to verify the nucleus access token being passed. The service may requires additional credentials such as SSL client certification authentication.
+
+    // Sentinel value - do not use. Add more prefix types above this line.
+    TOKEN_TYPE_COUNT
+};
+
+enum TokenFormat
+{
+    TOKEN_FORMAT_NONE = 0,
+    TOKEN_FORMAT_OPAQUE,
+    TOKEN_FORMAT_JWT
+};
+
+
+}//OAuth
+}//Blaze

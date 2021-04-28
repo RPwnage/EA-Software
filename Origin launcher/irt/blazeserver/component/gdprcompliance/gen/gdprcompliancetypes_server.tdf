@@ -1,0 +1,112 @@
+// Defines the TDF classes used in the gdprcompliance component.
+//  TDF classes are compiled with TypeComp, generating C++ classes that can be serialized in RPCs and Notifications.
+
+[headername="framework/tdf/frameworkconfigtypes_server.h"]
+#include "framework/gen/frameworkconfigtypes_server.tdf"
+
+namespace Blaze
+{
+namespace GdprCompliance
+{
+
+[
+    description = "The map key is column name, value is column description"
+]
+typedef map<string(64), string(128)> ColumnDescriptionByNameMap;
+typedef list<string(64)> ColumnNameList;
+
+class DataPullDbTable
+{
+    [tag="dbnp", description="names of the databases (per platform)."]
+    DbNameByPlatformTypeMap mDbNamesByPlatform;
+
+    [tag="apna", description="the DB table name"]
+    string(128) mTableName;
+
+    [tag="srnm", description="The table description"]
+    string(256) mDesc;
+
+    [tag="idco", description="The blaze id column"]
+    string(128) mBlazeIdColumnAlias;
+
+    [tag="acco", description="The account id column.  Should ONLY be used when no BlazeId is available in DB entry."]
+    string(128) mAccountIdColumnAlias;
+
+    [tag="colm", description="The columns to fetch"]
+    ColumnDescriptionByNameMap mColumnDescriptionByNameMap;
+};
+
+typedef list<DataPullDbTable> DataPullDbTableList;
+
+class DataEraseDbTable
+{
+    [tag="dbnp", description="names of the databases (per platform)."]
+    DbNameByPlatformTypeMap mDbNamesByPlatform;
+
+    [tag="apna", description="the DB table name"]
+    string(128) mTableName;
+
+    [tag="idco", description="The blaze id column"]
+    string(128) mBlazeIdColumnAlias;
+
+    [tag="acco", description="The account id column (used if set, with no BlazeIdColumnAlias)"]
+    string(128) mAccountIdColumnAlias;
+
+    [tag="delr", default=false, description="If set, the row that matches the id value will be DELETEd"]
+    bool mDeleteRow;
+
+    [tag="coln", description="The columns to set to NULL.  Used when deleteRow = false."]
+    ColumnNameList mColumnsToSetToNULL;
+    [tag="colz", description="The columns to set to 0.  Used when deleteRow = false."]
+    ColumnNameList mColumnsToSetToZero;
+    [tag="cole", description="The columns to set to ''.  Used when deleteRow = false."]
+    ColumnNameList mColumnsToSetToEmptyString;
+};
+
+typedef list<DataEraseDbTable> DataEraseDbTableList;
+
+[
+    description = "The configuration object for the gdprcompliance component",
+    details = "This class represents the schema for all the configuration parameters for the gdprcompliance component.."
+]
+class GdprComplianceConfig
+{
+    [tag="dbnp", description="names of the databases (per platform) that contain tables that store gdpr table."]
+    DbNameByPlatformTypeMap mDbNamesByPlatform;
+
+    [tag="tabl", description="The list of DB tables for data pull"]
+    DataPullDbTableList mDataPullDbTables;
+
+    [tag="tabe", description="The list of DB tables for data erase"]
+    DataEraseDbTableList mDataEraseDbTables;
+
+    [tag="ccwg", description="The list of custom components that integrate the GDPR functions. (getUserData and deactivateUserData)"]
+    ComponentNameList mCustomComponentsWithGDPR;
+
+    [tag="ccwt", default="180s", description="How long to wait for each custom components to process the request."]
+    TimeValue mCustomComponentWaitTime;
+
+    [tag="delp", default="1d", description="how frequently the GDPR delete processor is run."]
+    TimeValue mDeleteProcessorPeriod;
+
+    [tag="prod", default="7d", description="The amount of time we wait before process a specific delete job."]
+    TimeValue mMinimumProcessingDelay;
+
+    [tag="retr", default=20, description="The max retry attempts to wait for all DB tables to be created before startup fails."]
+    uint64_t mWaitAllDBTablesCreatedMaxRetry;
+
+    [tag="wait", default="5s", description="How long to wait between each retry."]
+    TimeValue mWaitAllDBTablesCreatedInterval;
+
+    [tag="dexp", default="180d", description="How long GDPR-related data can persist before it is removed/obfuscated."]
+    TimeValue mDataExpiryDuration;
+
+    [tag="exdb", default=1000, description="Generically (or generally), how much GDPR-related expired data should be deleted per batch (where deletes can involve multiple batches)."]
+    uint32_t mExpiredDataBatchSize;
+};
+
+} // GdprCompliance
+} // Blaze
+
+
+

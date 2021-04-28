@@ -1,0 +1,464 @@
+<project>
+  <!-- Copyright 2007-2008 Electronic Arts Inc.  All rights reserved. -->
+
+  <!-- =========== DOXYGEN TARGET ============  -->
+  <target name="doxygen" description="Generates Doxygen documentation for Blaze SDK">
+    <dependent name="Doxygen"/>
+    <dependent name="GraphViz"/>
+
+    <!-- Create list of input directories -->
+    <echo message="INPUT                  =  ../include \" file="${package.dir}\scripts\doxygen\inputs.dxc" append="false"/>
+    <echo message="                          ../doc/doc-source \" file="${package.dir}\scripts\doxygen\inputs.dxc" append="true"/>
+    <echo message="                          ../build/BlazeSDK/${package.version}/gen/include" file="${package.dir}\scripts\doxygen\inputs.dxc" append="true"/>
+
+    <echo>Running Doxygen (may take a while)</echo>'
+    <doxygen doxyfile="${package.dir}\scripts\doxygen\Module65_blazesdk.dxc" />
+  </target>
+
+  <target name="chm" description="Generates a CHM file for Blaze SDK">
+    <dependent name="Doxygen" />
+    <dependent name="GraphViz" />
+    <dependent name="userdoc"/>
+
+    <!-- Create list of input directories -->
+    <echo message="INPUT                  =  ../include \" file="${package.dir}\scripts\doxygen\inputs.dxc" append="false"/>
+    <echo message="                          ../doc/doc-source \" file="${package.dir}\scripts\doxygen\inputs.dxc" append="true"/>
+    <echo message="                          ../build/BlazeSDK/${package.version}/gen/include" file="${package.dir}\scripts\doxygen\inputs.dxc" append="true"/>
+
+    <echo>Running Doxygen (may take a while)</echo>
+    <doxygen doxyfile="${package.dir}\scripts\doxygen\Module65_blazesdk_chm.dxc"/>
+
+    <echo>Generating .chm file (may take a while)</echo>
+    <!-- run help compiler to create the CHM file (does not fail on error because of hhc compiler return code) -->
+    <fail unless="@{FileExists('${package.dir}\doc\chm\html\index.hhp')}" message="HHP file not present - perhaps doxygen wasn't already run"/>
+
+    <exec program="${package.userdoc.dir}\bin\hhc.exe" workingdir="${package.dir}\doc" failonerror="false" stdout="false" output="${package.dir}\doc\hhc.log">
+      <arg value="${package.dir}\doc\chm\html\index.hhp" />
+    </exec>
+    <fail unless="@{FileExists('${package.dir}\doc\chm\html\index.chm')}" message="CHM file not created - see '${package.dir}\doc\hhc.log' for details"/>
+
+    <move file="${package.dir}\doc\chm\html\index.chm" tofile="${package.dir}\doc\${package.name}.chm" clobber="true" failonerror="true" />
+  </target>
+
+  <!-- updates the doxygen output to display the current BlazeSDK version string (from the "package.targetversion" property).
+       TODO: Ideally, we'd also set the version in the documentation footer, but that's a little tricky to do.  We'd probably
+          have to copy off the doxygen config file (Module64_blazesdk.dxc) and replace/set the projectnumber before running doxygen.
+          That would allow doxygen's $projectnumber token to be replaced in the footer.
+  -->
+  <createtask name="SetBlazeVersionInDocs">
+    <code>
+      <script language="C#" >
+        <code>
+          <![CDATA[
+      public static void ScriptMain(Project project)
+      {
+        string blazeSDKVersion = project.GetPropertyValue("package.targetversion");
+
+        // replace the special token in main.html with the sdk version
+        ReplaceStringInFile(@"doc\html\main.html", "$BLAZE_SDK_PACKAGE_VERSION$", blazeSDKVersion);
+
+        // append the version to the top node of the tree view (Blaze SDK <version>)
+        ReplaceStringInFile(@"doc\html\tree.html", "<h3>Blaze SDK</h3>", String.Format("<h3>Blaze SDK {0}</h3>", blazeSDKVersion) );
+
+        // append the version to the title of index.html
+        ReplaceStringInFile(@"doc\html\index.html", "<title>Blaze SDK</title>", String.Format("<title>Blaze SDK {0}</title>", blazeSDKVersion) );
+
+        // append the version to the title of the chm file project
+        //  Note: found the 'right' value to edit via trial and error, so if you know the format of a .hhp, and there's a better place to do this, please update
+        ReplaceStringInFile(@"doc\html\index.hhp", "main=\"Blaze SDK\"", String.Format("main=\"Blaze SDK {0}\"", blazeSDKVersion) );
+      }
+
+      // open the supplied file (as text/utf-8), and replace all instances of key with replacement.
+      // Note: the entire file is read into memory, so keep file size in mind.
+      public static void ReplaceStringInFile(string filePath, string key, string replacement)
+      {
+        // read entire file into memory (it's small)
+        FileInfo fileInfo = new FileInfo(filePath);
+        StreamReader reader = fileInfo.OpenText();
+        string fileText = reader.ReadToEnd();
+        reader.Close();
+
+        // write the file back out after replacing all instances of key with replacement
+        StreamWriter writer = fileInfo.CreateText();
+        writer.Write( fileText.Replace(key, replacement) );
+        writer.Close();
+      }
+          ]]>
+        </code>
+      </script>
+    </code>
+  </createtask>
+
+  <!-- This task should be run after doxygen completes.
+    It modifies doxygen's generated html navigation page (tree.html) to strip out some
+      nav categories that the BlazeSDK doesn't find useful.
+
+    We strip out the following nav categories:
+        Class Hierarchy
+        Graphical Class Hierarchy
+        Class Members
+        Namespace Members
+        Namespace List
+        Namespace Members
+        File Members
+
+        See the "unwantedTreeNodes" string below if you need to modify the stripped elements.
+  -->
+  <createtask name="StripUnwantedHtmlTreeNavElements">
+    <code>
+      <script language="C#" >
+        <code>
+          <![CDATA[
+    public static void ScriptMain(Project project)
+    {
+      string navPagePath = @"doc\html\tree.html";
+
+      // Note: the unwantedTreeNodes are pasted directly into a regex, so watch your case & spaces if editing
+      string unwantedTreeNodes = "Class Hierarchy|Graphical Class Hierarchy|Class Members|Namespace Members|File Members";
+
+      //NOTE: doxygen doesn't quite output xhtml (see the header's link tag for example; it's not closed properly)
+      // there are other problems too, so we're forced to do ugly things with regexp instead of using the .net xml classes.
+
+      //open file
+      FileInfo theSourceFile = new FileInfo(navPagePath);
+      StreamReader reader = theSourceFile.OpenText();
+
+      // match the unwanted tree nodes from the top level items (tree or folder)
+      string pattern = String.Format("^\\s*<p>.*>(?:{0})<.*</p>", unwantedTreeNodes);
+      Regex regexUnwantedNode = new Regex(pattern, RegexOptions.Multiline);
+
+      // match div start and end lines
+      Regex regexDivStart = new Regex(@"^\s*<div.*>\s*", RegexOptions.IgnoreCase);
+      Regex regexDivEnd = new Regex(@"^\s*</div>\s*", RegexOptions.IgnoreCase);
+
+      // read the file line by line, pruning off the tree nodes we don't want, and adding the rest to the outBuffer
+      StringBuilder outBuffer = new StringBuilder((int)theSourceFile.Length);
+      string line = null;
+      while(true)
+      {
+          if (line == null)
+          {
+            // Note: this is ugly, but framework 2.11.01 doesn't support .net 2.0, so reader.EndOfStream isn't defined.
+            // so, we check for null and break out of the loop if we get it.
+              line = reader.ReadLine();
+              if (line == null)
+                break;
+          }
+          if (regexUnwantedNode.IsMatch(line))
+          {
+              // Note: we don't write the matching line, we drop it.
+              // If the next line is a div, we eat the entire div block too
+              string nextLine = reader.ReadLine();
+              if (regexDivStart.IsMatch(nextLine))
+              {
+                  // found sub-menu, eat the entire div
+                  int depth = 1;
+                  while(depth > 0)
+                  {
+                      string divContentLine = reader.ReadLine();
+                      if (regexDivStart.IsMatch(divContentLine))
+                          depth++;
+                      else if (regexDivEnd.IsMatch(divContentLine))
+                          depth--;
+                  }
+
+                  line = null; // indicate that we need to read & process the next line
+              }
+              else
+              {
+                  // the line after the deleted node is not a div, so we need to process it normally
+                  // since it might be something we want to delete
+                  line = nextLine; //we only need to process this line (don't advance file)
+              }
+          }
+          else
+          {
+              // keep this line
+              outBuffer.Append(line + "\n");
+              line = null; // indicate that we need to read & process the next line
+          }
+      }
+      reader.Close();
+
+
+      // Next, we need to cleanup the new end of the tree ("Directories" node)
+      // by swapping out some img sources to removing the trailing vertical lines.
+      // And write the changes back into the tree.html file
+
+     // break the outBuffer into 3 parts
+      //   the header: everything before the last top-level node
+      //   the last top level node: Directories folder
+      //   the tail: everything after the last top-level node
+      Regex regexSeparateBuffer = new Regex(@"(?<header>(?:.*\n)+)(?<lastNode>.*>Directories<.*)(?<tail>(?:\n.*)+)", RegexOptions.Multiline);
+      Match match = regexSeparateBuffer.Match(outBuffer.ToString());
+      string header = match.Groups["header"].Value;
+      string lastNode = match.Groups["lastNode"].Value;
+      string tail = match.Groups["tail"].Value;
+
+      // write the header out to disk (it's fine as-is)
+      StreamWriter writer = new StreamWriter(navPagePath, false);
+      writer.Write(header);
+
+      // the lastNode simply needs to change its img tag
+      lastNode = lastNode.Replace("ftv2pnode.png", "ftv2plastnode.png");
+      writer.Write(lastNode);
+
+      // cleaning up the tail is a little harder, we need to cleanup only the leftmost img tag
+      //   (not all instances of vertline)
+      Regex regexCleanupTail = new Regex("(^\\s*<p><img src=\")(ftv2vertline.png)(.*)", RegexOptions.Multiline);
+      tail = regexCleanupTail.Replace(tail, "$1ftv2blank.png$3");
+      writer.Write(tail);
+
+
+      writer.Close();
+    }
+          ]]>
+        </code>
+      </script>
+    </code>
+  </createtask>
+
+  <!-- basically a cut 'n paste version of the StripUnwantedHtmlNavElements task.
+    We strip the same unwanted nav elements out of the index.hhc file (used for the chm's table of contents) -->
+  <createtask name="StripUnwantedChmTreeNavElements">
+    <code>
+      <script language="C#" >
+        <code>
+          <![CDATA[
+    public static void ScriptMain(Project project)
+    {
+      string navPagePath = @"doc\html\index.hhc";
+
+      // Note: the unwantedTreeNodes are pasted directly into a regex, so watch your case & spaces if editing
+      string unwantedTreeNodes = "Class Hierarchy|Graphical Class Hierarchy|Class Members|Namespace Members|File Members";
+
+      //NOTE: doxygen doesn't quite output xhtml (see the header's link tag for example; it's not closed properly)
+      // there are other problems too, so we're forced to do ugly things with regexp instead of using the .net xml classes.
+
+      //open file
+      FileInfo theSourceFile = new FileInfo(navPagePath);
+      StreamReader reader = theSourceFile.OpenText();
+
+      // match the unwanted tree nodes from the top level items (tree or folder)
+      string pattern = String.Format("^\\s*<LI>.*<param name=\"Name\" value=\"(?:{0})\">.*", unwantedTreeNodes);
+      Regex regexUnwantedNode = new Regex(pattern, RegexOptions.Multiline);
+
+      // match div start and end lines
+      Regex regexULStart = new Regex(@"^\s*<UL>\s*", RegexOptions.IgnoreCase);
+      Regex regexULEnd = new Regex(@"^\s*</UL>\s*", RegexOptions.IgnoreCase);
+
+      // read the file line by line, pruning off the tree nodes we don't want, and adding the rest to the outBuffer
+      StringBuilder outBuffer = new StringBuilder((int)theSourceFile.Length);
+      string line = null;
+      while(true)
+      {
+          if (line == null)
+          {
+            // Note: this is ugly, but framework 2.11.01 doesn't support .net 2.0, so reader.EndOfStream isn't defined.
+            // so, we check for null and break out of the loop if we get it.
+              line = reader.ReadLine();
+              if (line == null)
+                break;
+          }
+          if (regexUnwantedNode.IsMatch(line))
+          {
+              // Note; we don't write the matching line, we drop it.
+              // If the next line is a UL, we eat the entire UL block too
+              string nextLine = reader.ReadLine();
+              if (regexULStart.IsMatch(nextLine))
+              {
+                  // found sub-menu, eat the entire div
+                  int depth = 1;
+                  while(depth > 0)
+                  {
+                      string ulContentLine = reader.ReadLine();
+                      if (regexULStart.IsMatch(ulContentLine))
+                          depth++;
+                      else if (regexULEnd.IsMatch(ulContentLine))
+                          depth--;
+                  }
+
+                  line = null; // indicate that we need to read & process the next line
+              }
+              else
+              {
+                  // the line after the deleted node is not a div, so we need to process it normally
+                  // since it might be something we want to delete
+                  line = nextLine; //we only need to process this line (don't advance file)
+              }
+          }
+          else
+          {
+              // keep this line
+              outBuffer.Append(line + "\n");
+              line = null; // indicate that we need to read & process the next line
+          }
+      }
+      reader.Close();
+
+      // write the updated info out to disk
+      StreamWriter writer = new StreamWriter(navPagePath, false);
+      writer.Write(outBuffer.ToString());
+      writer.Close();
+    }
+          ]]>
+        </code>
+      </script>
+    </code>
+  </createtask>
+
+  <!-- Fully remove some of the html files we snipped from the html nav tree (inherits.html, globals*.html, etc)
+       Fix for Doxygen 1.5.2 bug (huge hidden nav table added to each struct/enum/const defined in the Blaze namespace-->
+  <createtask name="StripUnwantedHtml">
+    <code>
+      <script language="C#" >
+        <code>
+          <![CDATA[
+    public static void ScriptMain(Project project)
+    {
+        string doxyRootPath = @"doc\html\";
+
+          // File sizes as of 7 Aug 2007 (all in MB)
+        // Raw html ( 152 ) raw chm (25.9)
+        // after step 1 [Deleted root files] html (150)   chm (25.2)
+        // after step 2 [Deleted tagnav junk] html (28.8) chm (4.39)
+        // after stripping html comments: html (28.2) chm (4.33)
+
+
+        // Note: I tested stripping all html comments from the source, but the operation took a long time
+        // (~4.5 min) and only removed about .06 mb ( just over 1%)
+        // it's not worth the time it takes.
+
+        // Note: doxygen is still generating a big summary page for the Blaze namespace (which "Blaze" links to in the code).
+        // the page is "namespace_blaze.html", and contains the brief desc of everything in the Blaze namespace...
+        //  currently, this is the largest html file at 388k, and it'll probably grow...
+
+
+        DirectoryInfo doxyRootDir = new DirectoryInfo(doxyRootPath);
+
+        // step 1: nuke some files that we don't care about at all
+        string[] filesToNuke = {"functions*.html", "globals*.html", "inherits.html", 
+            "namespacemembers*.html" };
+        foreach(string searchPattern in filesToNuke)
+        {
+            foreach(FileInfo file in doxyRootDir.GetFiles(searchPattern))
+            {
+                file.Delete();
+            }
+        }
+
+        // step 2: remove the huge hidden nav table from the namespace_blaze_* files
+        string pattern = "<td valign=\"top\">\\s*<div class=\"navtab\">.*</div>\\s*</td>";
+        Regex regex_removeNavTable = new Regex(pattern, RegexOptions.Singleline | RegexOptions.Compiled);
+
+        // poor man's .net 1.1 version of a recursive dir search.  replace this code block with the following
+        //  when EATech upgrades framework to use 2.0 or later.
+        //FileInfo[] htmlFiles = doxyRootDir.GetFiles("namespace_blaze_*.html", SearchOption.AllDirectories);
+        ArrayList htmlFiles = new ArrayList(3500);
+        Queue dirsToCheck = new Queue();
+        dirsToCheck.Enqueue(doxyRootDir);
+        while(dirsToCheck.Count > 0)
+        {
+            DirectoryInfo dir = (DirectoryInfo)dirsToCheck.Dequeue();
+            foreach (DirectoryInfo subDir in dir.GetDirectories())
+                dirsToCheck.Enqueue(subDir);
+            htmlFiles.AddRange(dir.GetFiles("namespace_blaze_*.html"));
+        }
+
+        // remove the hidden nav table from each file
+        foreach (FileInfo file in htmlFiles)
+        {
+            // read file
+            StreamReader reader = file.OpenText();
+            string fileText = reader.ReadToEnd();
+            reader.Close();
+            // strip div
+            fileText = regex_removeNavTable.Replace(fileText, "");
+            // write the text back out
+            StreamWriter writer = new StreamWriter(file.FullName, false);
+            writer.Write(fileText);
+            writer.Close();
+        }
+    }
+          ]]>
+        </code>
+      </script>
+    </code>
+  </createtask>
+
+  <!-- Builds a webHelp TOC file from the index.hhc file doxygen generates -->
+  <createtask name="BuildWebHelpTableOfContents">
+    <code>
+      <mkdir dir="${package.dir}\doc\html\whxdata" />
+      <script language="C#" >
+      <code>
+        <![CDATA[
+    public static void ScriptMain(Project project)
+    {
+        string hhcFilePath = @"doc\html\index.hhc";
+        string webHelpOutputPath = @"doc\html\whxdata\whtdata0.xml";
+        string blazeSDKVersion = project.GetPropertyValue("package.version");
+
+        string pattern1 = @"<LI>.*?value=""(.*?)"".*?value=""(.*?)"".*?value=""1""></OBJECT>";
+        string pattern2 = @"<LI>.*?value=""(.*?)"".*?value=""(.*?)"".*?value=""11""></OBJECT>";
+        string pattern3 = @"(\s+)</UL>";
+        Regex Rgx1 = new Regex(pattern1);
+        Regex Rgx2 = new Regex(pattern2);
+        Regex Rgx3 = new Regex(pattern3);
+
+        //open file
+        FileInfo theSourceFile = new FileInfo(hhcFilePath);
+
+        //create a text reader for that file
+        StreamReader reader = theSourceFile.OpenText();
+
+        //create a text writer to the new file
+        StreamWriter writer = new StreamWriter(webHelpOutputPath, false);
+
+        //Write xml file header and opening xml tag
+        writer.WriteLine("<?xml version='1.0' encoding='windows-1252' ?>");
+        writer.WriteLine("<tocdata>");
+
+
+        //create a text variable to hold each line
+        string text;
+
+        //walk the file line by line and test against regexs
+        //replace text when a match is found
+
+        while (true)
+        {
+            text = reader.ReadLine();
+            if (text == null)
+                break;
+
+            if (Rgx1.IsMatch(text))
+            {
+                string modtext = Rgx1.Replace(text, "<book name=\"$1\" url=\"$2\">");
+                writer.WriteLine(modtext);
+            }
+            if (Rgx2.IsMatch(text))
+            {
+                string modtext = Rgx2.Replace(text, "<item name=\"$1\" url=\"$2\" />");
+                writer.WriteLine(modtext);
+            }
+            if (Rgx3.IsMatch(text))
+            {
+                string modtext = Rgx3.Replace(text, "$1</book>");
+                writer.WriteLine(modtext);
+            }
+        }
+
+        //write closing tag to end of file
+        writer.WriteLine("</tocdata>");
+
+        //tidy up
+        reader.Close();
+        writer.Close();
+    }
+          ]]>
+        </code>
+      </script>
+    </code>
+  </createtask>
+</project>

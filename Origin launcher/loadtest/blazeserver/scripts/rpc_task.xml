@@ -1,0 +1,78 @@
+<project>
+
+  <createtask name="package.blazeserver.rpc.task">
+    <parameters>
+      <option name="inputs" value="Required"/>
+      <option name="templatedir" value="Required"/>
+      <option name="basetemplatedir" value="Required"/>
+      <option name="outdir" value="Required"/>
+      <option name="basedir" value="Required"/>
+      <option name="components" value="Required"/>
+      <option name="language" value="Required"/>
+      <option name="wadl" value="false"/>
+      <option name="cfgdoc" value="false"/>
+      <option name="luagen" value="true"/>
+      <option name="proxy" value="false"/>
+      <option name="nocentral" value="false"/>
+    </parameters>
+    <code>
+
+      <dependent name="antlr"/>
+      
+      <property name="package.blazeserver.rpc.task.basedir" value="@{PathGetFullPath(${package.blazeserver.rpc.task.basedir})}"/>
+
+      <!-- Convert the RPC fileset to a list of relative paths to each RPC -->
+      <property name="package.blazeserver.rpc.task.inputs.relative" value="@{FileSetToString(${package.blazeserver.rpc.task.inputs}, ' ')}"/>
+      <property name="package.blazeserver.rpc.task.inputs.relative" value="@{StrReplace(${package.blazeserver.rpc.task.inputs.relative}, '${package.blazeserver.rpc.task.basedir}/', '')}"/>
+      <property name="package.blazeserver.rpc.task.inputs.relative" value="@{StrReplace(${package.blazeserver.rpc.task.inputs.relative}, '${package.blazeserver.rpc.task.basedir}\\', '')}"/>
+
+      <!-- Make sure paths are Unix-style -->
+      <property name="package.blazeserver.rpc.task.inputs.relative" value="@{StrReplace(${package.blazeserver.rpc.task.inputs.relative}, '\\', '/')}"/>
+      <property name="package.blazeserver.rpc.task.outdir"          value="@{StrReplace(${package.blazeserver.rpc.task.outdir}, '\\', '/')}"/>
+      <property name="package.blazeserver.rpc.task.templatedir"     value="@{StrReplace(${package.blazeserver.rpc.task.templatedir}, '\\', '/')}"/>
+      <property name="package.blazeserver.rpc.task.includedir"      value="@{StrReplace(${package.dir}, '\\', '/')}/component"/>
+
+      <mkdir dir="${package.blazeserver.rpc.task.outdir}"/>
+
+      <property name="dep" value="${package.blazeserver.rpc.task.outdir}/blazerpc.d"/>
+      <property name="dep" value="${package.blazeserver.rpc.task.outdir}/blazeproxyrpc.d" if="${package.blazeserver.rpc.task.proxy} == true"/>
+      <property name="dep" value="${package.blazeserver.rpc.task.outdir}/wadl.d" if="${package.blazeserver.rpc.task.wadl} == true"/>
+      <property name="dep" value="${package.blazeserver.rpc.task.outdir}/cfgdoc.d" if="${package.blazeserver.rpc.task.cfgdoc} == true"/>
+
+      <property name="os.delim" value=";"/>
+      <property name="os.delim" value=":" if="${config-system} == unix64"/>
+
+      <exec program="${java.exe}" clearenv="true" workingdir="${package.blazeserver.rpc.task.basedir}">
+        <args>
+          <arg value="-Xmx512M"/>
+          <arg value='-cp "${package.builddir}/bin/antlr.jar${os.delim}${package.builddir}/bin/typecomp.jar"'/>
+          <arg value="TdfComp rpc"/>
+          <arg value="-wadl" if="${package.blazeserver.rpc.task.wadl} == true"/>
+          <arg value="-cfgdoc" if="${package.blazeserver.rpc.task.cfgdoc} == true"/>
+          <arg value="-t ${package.blazeserver.rpc.task.templatedir}"/>
+          <arg value="-d ${dep}"/>
+          <arg value="-s ${package.blazeserver.rpc.task.outdir}"/>
+          <arg value="-h ${package.blazeserver.rpc.task.outdir}"/>
+          <arg value="-I ${package.blazeserver.rpc.task.includedir}"/>
+          <arg value="-I ${package.blazeserver.dir}/component"/>
+          <arg value="-I ${package.blazeserver.dir}/customcomponent"/>
+          <arg value="-I ${package.blazeserver.dir}/proxycomponent"/>
+          <arg value='-c "${package.blazeserver.rpc.task.components}"'/>
+          <arg value='-lang "${package.blazeserver.rpc.task.language}"'/>
+          <arg value="-luagen" if="${package.blazeserver.rpc.task.luagen} == true"/>
+          <arg value="-proxy" if="${package.blazeserver.rpc.task.proxy} == true"/>
+          <arg value="-nocentral" if="${package.blazeserver.rpc.task.nocentral} == true"/>
+          <arg value="${package.blazeserver.rpc.task.inputs.relative}"/>
+        </args>
+        <inputs fromfileset="${package.blazeserver.rpc.task.inputs}">
+          <includes name="${package.dir}/${package.blazeserver.rpc.task.basetemplatedir}/*.stg"/>
+          <includes name="${package.dir}/${package.blazeserver.rpc.task.basetemplatedir}/**.stg"/>
+          <includes name="${package.builddir}/bin/typecomp.jar"/>
+        </inputs>
+        <outputs>
+          <includes name="${dep}" asis="true"/>
+        </outputs>
+      </exec>
+    </code>
+  </createtask>
+</project>

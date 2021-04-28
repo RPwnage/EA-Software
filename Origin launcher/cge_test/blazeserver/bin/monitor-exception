@@ -1,0 +1,504 @@
+#!/opt/local/bin/python
+
+# monitor-exception
+#
+# 2011/07/12 (igarcia) First version
+#
+# This script is to be used in combination with the monitor application
+# It is responsible for handling exception core files
+
+# IMPORTS #
+import commands, os, signal, sys, time, re
+import traceback
+import logging
+from bugsentry import CrashReport
+import hashlib
+import smtplib
+from email.mime.text import MIMEText
+import StringIO
+
+from time import mktime
+from datetime import timedelta, datetime
+
+import ConfigParser
+import socket
+
+# GLOBALS #
+variables = {}
+backtraces = ''
+
+sentmail = False
+
+# Allows a title to customize the server SKU to align with their client SKU names in BugSentry.
+customBugSentrySkuInfo = {}
+# Example 1:
+# customBugSentrySkuInfo['studioName'] = "eav"
+# customBugSentrySkuInfo['titleName'] = "ufc4"
+# customBugSentrySkuInfo['titleVersion'] = "21"
+# Example 2:
+# customBugSentrySkuInfo['studioName'] = "fb"
+# customBugSentrySkuInfo['titleName'] = "FIFA21"
+# customBugSentrySkuInfo['titleVersion'] = ""
+
+
+# FUNCTIONS #
+
+# Determine the BugSentry SKU string for the given Blaze service name
+def getBugSentrySku( blazeServiceName, blazeVersion ):
+    if 'studioName' in customBugSentrySkuInfo:
+        studioName = customBugSentrySkuInfo['studioName']
+    else:
+        studioName = "gos"
+
+    if 'titleName' in customBugSentrySkuInfo:
+        titleName = customBugSentrySkuInfo['titleName']
+    else:
+        titleName = None
+
+    if 'titleVersion' in customBugSentrySkuInfo:
+        titleVersion = customBugSentrySkuInfo['titleVersion']
+    else:
+        titleVersion = None
+
+    titlePlatform = None
+    titleSuffixList = None
+
+    if blazeServiceName and blazeServiceName!= 'unknown':
+        try:
+            # <title>-<version>-<platform>-<suffix_1>...-<suffix_n>
+            serviceNameParts = blazeServiceName.split('-')
+
+            if titleName is None:
+                titleName = serviceNameParts[0]
+
+            if titleVersion is None:
+                titleVersion = serviceNameParts[1]
+
+            titlePlatform = serviceNameParts[2]
+
+            if len(serviceNameParts) > 3:
+                titleSuffixList = serviceNameParts[3:]
+        except IndexError:
+            logger.debug("Failed to determine BugSentry SKU name parts for service name " + blazeServiceName)
+
+    if not titleName:
+        # Without a title name, we don't have much to go on; return legacy SKU format
+        return 'ea.gos.blazeserver.unknown.%s' % (blazeVersion)
+
+    if titleVersion is None:
+        titleVersion = blazeVersion
+
+    if titlePlatform is None:
+        titlePlatform = "unknown"
+
+    # <company>.<studio>.<title>.<version>.<suffix_1>...<suffix_n>.<platform>.Blaze
+    skuParts = []
+    skuParts.append("ea")
+    skuParts.append(studioName)
+    skuParts.append(titleName)
+    if titleVersion:
+        skuParts.append(titleVersion)
+
+    if titleSuffixList is not None:
+        skuParts.extend(titleSuffixList)
+
+    skuParts.append(titlePlatform)
+    skuParts.append("Blaze")
+
+    return '.'.join(skuParts)
+
+# Find the thread number in the core info for the given thread id
+# If we don't find the thread, then we'll intentionally hit a monitor script exception for further investigation
+def findThreadNumber( coreInfo, threadId):
+    marker1 = "info threads"
+    temp1 = coreInfo.find(marker1)
+    threadInfo = coreInfo[temp1:]
+
+    temp1 = re.search(r'(.*) (Thread|LWP) %s (.*)' % threadId, threadInfo)
+    result = temp1.group(1)
+    result = result.strip()
+    return result
+
+# Get the thread number of the exception;
+# only use if findThreadNumber is not an option (i.e. opt builds)
+# If we don't find the thread, then we'll intentionally hit a monitor script exception for further investigation
+def getExceptionThreadNumber( path, core):
+    logger.debug('getExceptionThreadNumber')
+    allThreadsBtCommand = 'gdb --batch %s/blazeserver %s --eval-command="thread apply all bt full"' % (path, core)
+    logger.debug('allThreadsBtCommand: ' + allThreadsBtCommand)
+
+    allThreadsBt = commands.getoutput(allThreadsBtCommand)
+
+    # Truncate anything after the exception handler thread
+    t1 = allThreadsBt.find('<signal handler called>')
+    allThreadsBt = allThreadsBt[:t1]
+
+    # Get the last thread number (i.e. the exception handler thread)
+    threadNumbers = re.findall(r'Thread ([0-9]+) \(LWP [0-9]+\)', allThreadsBt)
+    result = threadNumbers[-1]
+    return result
+
+# Get the backtrace in the core file for the given thread id
+# If we don't find the thread, then we'll intentionally hit a monitor script exception for further investigation
+def getExceptionBacktrace( threadNumber, path, core ):
+    logger.debug('getExceptionBacktrace')
+    btCommand = 'gdb --batch %s/blazeserver %s --eval-command="thread %s" --eval-command="bt"' % (path, core, threadNumber)
+    logger.debug('btCommand: %s' % (btCommand) )
+
+    fullbt = commands.getoutput(btCommand)
+
+    marker1 = "[Switching to thread "
+    temp1 = fullbt.find(marker1)
+    result = fullbt[temp1:]
+    return result
+
+# move the core file if there is one
+def handlecore():
+    logger.debug('handling exception')
+    command = 'ls ../etc | grep ^core-.*\.' + variables['pid'] + '\..*gz$'
+    core = commands.getoutput(command)
+
+    if 'core' not in core:
+        logger.debug('no core file found')
+        return False
+
+    cores = core.split('\n')
+
+    currentTime = time.strftime('%Y%m%d_%H%M%S', time.gmtime())
+    variables['corecount'] = 0
+
+    baseCorePath = variables['coredir']
+    for newcore in cores:
+        if 'core' not in newcore:
+            continue
+
+        # move the core file
+        logger.debug('moving core %s' % newcore)
+
+        variables['coredir'] = os.path.join( baseCorePath , currentTime )
+
+        os.makedirs( variables['coredir'] )
+
+        # only proceed when blaze server finished writing the core file
+        # we assume that's the case when the file had not been changed for 15 seconds
+        coreFileTime = datetime.fromtimestamp(mktime(time.gmtime(os.stat(newcore).st_ctime)))
+        while ((datetime.utcnow() - coreFileTime ) < timedelta(0,15,0) ):
+            time.sleep(5)
+            logger.debug('waiting for core file(%s) to finish writing to disk... (%s)' % (newcore, datetime.utcnow() - coreFileTime))
+            coreFileTime = datetime.fromtimestamp(mktime(time.gmtime(os.stat(newcore).st_ctime)))
+
+        os.system('mv ' + os.getcwd() + '/' + newcore + ' ' + variables['coredir'])
+
+        tempCoreName = variables['coredir'] + '/' + newcore + '.tmp'
+        extractCoreCommand = 'gunzip -c ' + variables['coredir'] + '/' + newcore + ' > ' + tempCoreName
+        logger.debug('extractCoreCommand: %s' % (extractCoreCommand) )
+        os.system(extractCoreCommand)
+
+        variables['corecount'] = variables['corecount'] + 1
+
+    #process .so files
+    os.system('cp ../lib/*.so* ' + variables['coredir'])
+
+    #process blaze binary
+    blazebinary = commands.getoutput('ls ' + variables['dir'] + '/' + 'blazeserver' )
+    file = blazebinary.split('/')[-1]
+    cmd = 'cp ' + blazebinary + ' ' +  variables['coredir'] + '/' + file
+    os.system(cmd)
+    linkinfocore = 'cp ' + variables['info-core-script'] + ' ' +  variables['coredir'] + '/'
+    os.system(linkinfocore)
+    linkinfocoreopt = 'cp ' + variables['info-core-opt-script'] + ' ' +  variables['coredir'] + '/'
+    os.system(linkinfocoreopt)
+
+    for newcore in cores:
+        if 'core' not in newcore:
+            continue
+        logger.debug('getting back trace: ' + newcore )
+
+        tempCoreName = variables['coredir'] + '/' + newcore + '.tmp'
+
+        coreInfo = 'unknown'
+        exceptionBacktrace = None
+        try:
+            # determine if core dump is from an opt build
+            logger.debug('determining build type: ' + newcore )
+            buildTypeCommand='gdb --batch %s/blazeserver %s --eval-command="info address Blaze::gProcessController"' %(variables['coredir'], tempCoreName)
+            logger.debug('buildTypeCommand: ' + buildTypeCommand)
+
+            buildType = commands.getoutput(buildTypeCommand)
+
+            isOptBuild = False
+            y = re.search(r'in a file compiled without debugging', buildType)
+            if y:
+                logger.debug('core is from a build compiled without debugging')
+                isOptBuild = True
+
+            # get the exception back trace
+            if isOptBuild:
+                backtraceCommand='gdb --batch -x %s %s/blazeserver %s' %(variables['info-core-opt-script'],variables['coredir'],tempCoreName)
+            else:
+                backtraceCommand='gdb --batch -x %s %s/blazeserver %s' %(variables['info-core-script'],variables['coredir'],tempCoreName)
+
+            logger.debug('backtraceCommand: %s' % backtraceCommand)
+
+            coreInfo = commands.getoutput(backtraceCommand)
+
+            # Note: this section will intentionally hit a monitor script exception if thread is not found
+            if isOptBuild:
+                threadNumber = getExceptionThreadNumber( variables['coredir'], tempCoreName)
+            else:
+                # opt builds will not contain the ExceptionThreadId in the coreInfo
+                y = re.search(r'ExceptionThreadId(.*)= (?P<threadid>[0-9]*)', coreInfo)
+                threadId = y.group('threadid')
+                threadNumber = findThreadNumber( coreInfo, threadId)
+
+            exceptionBacktrace = getExceptionBacktrace( threadNumber, variables['coredir'], tempCoreName)
+
+            # Remove everything after "backtrace", keeping "basic info" and "controller info"
+            # and replace it with the exceptionBacktrace retrieved above
+            coreInfo = coreInfo.split('backtrace')[0]
+            coreInfo = coreInfo + "backtrace (exception)\n" + "---------------------\n" + "{noformat}\n" + exceptionBacktrace + '\n{noformat}\n'
+        except:
+            logger.exception('exception:')
+        finally:
+            if os.path.exists(tempCoreName):
+                logger.debug("Removing temporary core file " + tempCoreName)
+                os.system('rm ' + tempCoreName)
+
+        backtrace = '\n\n*Core info:*\n' + 'Core located at ' + variables['coredir'] + '/' + newcore + '\n'
+        backtrace = backtrace + coreInfo
+
+        global backtraces
+        backtraces = backtraces + backtrace
+
+        # Send the BugSentry crash report
+        try:
+            crashReport = CrashReport()
+
+            if exceptionBacktrace != None:
+                # Pass False for stripbt because exceptionBacktrace does not contain the "info threads" marker
+                crashReport.stack = crashReport.findstack(exceptionBacktrace, False)
+            else:
+                crashReport.stack = "unknown"
+
+            tm=re.search(r'mBuildTarget: (?P<target>[\w-]+)',backtrace)
+            if tm!=None:
+                target=tm.group('target')
+            else:
+                target="unknown"
+
+            blazeVersion = "unknown"
+            clm=re.search(r'mVersion: Blaze (?P<blazeVersion>[0-9.]+).*\(CL# (?P<changelist>[\d]+)\)',backtrace)
+            if clm!=None:
+                changelist=clm.group('changelist')
+                blazeVersion=clm.group('blazeVersion')
+            else:
+                changelist="unknown"
+
+            serviceName = variables['servicename']
+            clm=re.search(r'service name: (?P<serviceName>[a-zA-Z0-9\-]+)',backtrace)
+            if clm!=None:
+                coreInfoServiceName = clm.group('serviceName')
+                if coreInfoServiceName != 'unknown':
+                    serviceName = coreInfoServiceName
+
+            crashReport.buildsig = 'blazeserver-%s-%s' % (target,changelist)
+            crashReport.systemConfig = commands.getoutput('uname -a')
+
+            crashReport.sku = getBugSentrySku(serviceName, blazeVersion)
+
+            crashReport.createtime = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
+            crashReport.catId = hashlib.md5(' '.join(crashReport.stack.split()[0:3])).hexdigest()
+
+            # limit the size of the contextData to avoid http error 400
+            if (len(backtrace) > 20000):
+                crashReport.contextdata = backtrace[0:20000] + "\n\nreport truncated..."
+            else:
+                crashReport.contextdata = backtrace
+
+            message = crashReport.send(variables.get('environment', 'test'))
+            crashReport.saveToFile(variables['coredir'])
+
+            logger.debug(message)
+        except:
+            logger.exception('exception:')
+
+    #process log files
+    os.system('mkdir -p ' + os.path.join( variables['coredir'] , 'log' ))
+    blazeprocessname = os.path.basename( os.path.splitext( variables['pidfile'] )[0] )
+    cmd = 'ls ' + os.path.join( variables['logfilesdir'] , '*' + blazeprocessname + '*' )
+    files = commands.getoutput(cmd).split('\n')
+    for log in files:
+        logname = os.path.basename( log )
+        cmd = 'cp ' + log + ' ' + os.path.join( variables['coredir'] , 'log', logname )
+        os.system(cmd)
+
+    mail()
+
+# read configuration file monitor.cfg
+def readconfig():
+    MONITOR_CONFIG  = os.path.join( os.path.dirname(__file__), "monitor.cfg")
+
+    config = ConfigParser.SafeConfigParser()
+    config.read([MONITOR_CONFIG])
+
+    variables['MAIL_RECIPIENTS'] = config.get("MONITOR", "recipients")
+    variables['MAIL_NOT_RESTARTED_RECIPIENTS'] = config.get("MONITOR", "recipients")
+
+    sender = config.get("MONITOR", "sender")
+    if '@' in sender:
+        variables['MAIL_SENDER'] = sender
+    else:
+        variables['MAIL_SENDER'] = '{0}@{1}'.format(sender, socket.gethostname())
+
+    variables['SENDMAIL_PATH'] = config.get("MONITOR", "sendmail")
+
+    variables['logfilesdir'] = config.get("MONITOR", "logDir")
+    variables['coredir'] = config.get("MONITOR", "coreDir")
+
+    coreDirBasename = os.path.basename(os.path.normpath(variables['coredir']))
+    if coreDirBasename != '.':
+        variables['servicename'] = coreDirBasename
+    else:
+        variables['servicename'] = 'unknown'
+
+    variables['environment'] = config.get("MONITOR", "env")
+
+# sent the email notification about the core file
+def mail():
+    global sentmail
+
+    logger.debug('mail')
+    hostname = commands.getoutput('hostname')
+    sender = variables['MAIL_SENDER']
+    recipients = variables['MAIL_RECIPIENTS']
+
+    subject = '[Blaze Server][Monitor] Blaze caught an exception on ' + hostname
+    content = 'Blaze server has caught an exception on ' + hostname
+    content = content + '\n\n*Server:*\n' + hostname + '\n\n*Instance:*\n' + variables['MAIL_SENDER'] + '\n\n*Time:*\n' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '\n\n'
+    content = content + '*Cause:*\n'
+    content = content + 'The process ' + (variables['pidfile'].replace('.pid', '')).replace('../bin/', '') + ' has had ' + str(variables['corecount']) + ' exception(s) which created core(s).\n\n'
+    content = content + 'The core file(s) can be found at ' + hostname + ':' + variables['coredir'] + '\n'
+
+    content = content + backtraces
+
+    #process logs
+    logcontent = ''
+    logdir = variables['coredir'] + '/log/'
+    logfiles = commands.getoutput('ls ' + logdir).split('\n')
+
+    for log in logfiles:
+        logcontent = logcontent +  log + '\n'
+        logcontent = logcontent + commands.getoutput('tail -n 20 ' + logdir + log)
+        logcontent = logcontent + '\n\n'
+
+    content = content + '\n\n*Relevant Logs:*\n' + logcontent
+
+    email_msg = MIMEText(content)
+    email_msg['Subject'] = subject
+    email_msg['From'] = sender
+    email_msg['To'] = recipients
+
+    recipients_list = [r.strip() for r in recipients.split(',')]
+
+    mailer = smtplib.SMTP('localhost')
+    mailer.sendmail(sender, recipients_list, email_msg.as_string())
+    mailer.quit()
+
+    logger.debug('mail sender: ' + sender)
+    logger.debug('mail recipients: ' + ', '.join(recipients_list))
+    logger.debug('mail sent: '+ variables['coredir'])
+
+    sentmail = True
+
+    # write backtrace to a file
+    try:
+        infoCoreLogName=variables['coredir'] + '/info-exception.log'
+        f = open(infoCoreLogName, 'w')
+        f.write(content)
+        f.close()
+    except:
+        logger.exception('Cannot write info-exception report to a file:')
+
+
+# sent the email notification about the core file
+def safetyMail():
+    global sentmail
+
+    logger.info('sending safety mail')
+    hostname = commands.getoutput('hostname')
+    sender = variables['MAIL_SENDER']
+    recipients = variables['MAIL_RECIPIENTS']
+
+    subject = '[Blaze Server][Monitor][safetyMail] Blaze caught an exception on ' + hostname
+    content = 'Blaze server has caught an exception on ' + hostname
+    content = content + '\n\n*Server:*\n' + hostname + '\n\n*Instance:*\n' + variables['MAIL_SENDER'] + '\n\n*Time:*\n' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '\n\n'
+    content = content + 'This email means an exception occurred. There will be a follow up email with additional details. If you do not see the follow up email, it means this monitor crashed and you should look for the Blaze core and monitor exception.\n'
+    content = content + '*Cause:*\n'
+    content = content + 'The process ' + (variables['pidfile'].replace('.pid', '')).replace('../bin/', '') + ' has had ' + str(variables['corecount']) + ' exception(s) which created core(s).\n\n'
+    content = content + 'The core file(s) can be found at ' + hostname + ':' + variables['coredir'] + '\n\n'
+    content = content + '*Command:*\n\t'
+    content = content + ' '.join(sys.argv)
+    content = content + '\n\n'
+
+    content_file = StringIO.StringIO(content)
+
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=content_file)
+
+    email_msg = MIMEText(content_file.getvalue())
+    email_msg['Subject'] = subject
+    email_msg['From'] = sender
+    email_msg['To'] = recipients
+
+    recipients_list = [r.strip() for r in recipients.split(',')]
+
+    mailer = smtplib.SMTP('localhost')
+    mailer.sendmail(sender, recipients_list, email_msg.as_string())
+    mailer.quit()
+
+    logger.info('done safety mail')
+    sentmail = True
+
+# MAIN #
+variables['dir'] = os.getcwd().replace('/etc', '/bin')
+variables['pidfile'] = sys.argv[1].replace('monitor_', 'blaze_')
+variables['coredir'] = ''
+variables['corecount'] = '0'
+
+variables['rundir'] = os.path.abspath(os.path.dirname(__file__))
+
+# find the info-core and info-core-opt scripts which can be in the <blaze>/bin directory or in the
+# run (ie. tools) directory of the deployment
+for script_path in ['dir', 'rundir']:
+    info_script = os.path.join(variables[script_path], 'info-core')
+    if os.path.exists(info_script):
+        variables['info-core-script'] = info_script
+        break
+for script_path in ['dir', 'rundir']:
+    info_opt_script = os.path.join(variables[script_path], 'info-core-opt')
+    if os.path.exists(info_opt_script):
+        variables['info-core-opt-script'] = info_opt_script
+        break
+
+readconfig()
+
+logger = logging.getLogger('monitor')
+hdlr = logging.FileHandler(os.path.join( variables['logfilesdir'], 'monitor-exception.log'))
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+logger.setLevel(logging.DEBUG)
+
+logger.debug('monitor-exception')
+
+try:
+    PIDFILE = open(variables['pidfile'], 'r')
+    variables['pid'] = PIDFILE.readline().split()[0]
+    PIDFILE.closed
+    handlecore()
+except:
+    safetyMail()
+    logger.exception('Error while attempting to handle blaze-exception:')
+
+if not sentmail:
+    safetyMail()

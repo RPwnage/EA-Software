@@ -1,0 +1,59 @@
+<project default="regress">
+
+	<package name="ProgramPrebuiltTransitiveNative"/>
+	
+	<do if="${do_bot_prebuild??false}">
+		<DynamicLibrary name="Bot">
+			<sourcefiles>
+				<includes name="Bot/*.cpp"/>
+			</sourcefiles>
+		</DynamicLibrary>
+	</do>
+	<do unless="${do_bot_prebuild??false}">
+		<Program name="Top">
+			<sourcefiles>
+				<includes name="*.cpp"/>
+			</sourcefiles>
+			<dependencies>
+				<auto>
+					ProgramPrebuiltTransitiveNative/Mid
+				</auto>
+			</dependencies>
+		</Program>
+		
+		<DynamicLibrary name="Mid">
+			<sourcefiles>
+				<includes name="Mid/*.cpp"/>
+			</sourcefiles>
+			<dependencies>
+				<auto>
+					ProgramPrebuiltTransitiveNative/Bot
+				</auto>
+			</dependencies>
+		</DynamicLibrary>
+		
+		<Utility name="Bot"/>
+	</do>
+
+	<target name="regress">
+		<!-- prebuild bottom .so -->
+        <nant buildfile="${nant.project.buildfile}" target="slnruntime msbuild">
+			<property name="config" value="${config}"/>
+			<property name="package.configs" value="${config}"/>
+			<property name="do_bot_prebuild" value="true"/>
+		</nant>
+		<!-- built full chain with bottom .so being prebuilt from before -->
+		<nant buildfile="${nant.project.buildfile}" target="slnruntime msbuild">
+			<property name="config" value="${config}"/>
+			<property name="package.configs" value="${config}"/>
+			<property name="do_bot_prebuild" value="false"/>
+		</nant> 
+
+		<property name="final_apk" local="true" value="${package.configbindir}/Top.apk"/>
+
+		<dependent name="FrameworkAndroidTestUtils"/>
+
+		<!-- make sure Top.apk contains prebuilt transtive dependency lubBot.so -->
+		<fail unless="@{ApkContains('${final_apk}', 'lib/armeabi-v7a/libBot.so')}"/>
+	</target>
+</project>

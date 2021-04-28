@@ -1,0 +1,69 @@
+version: "3.8"
+services:
+
+  test-blaze-service-mesh:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/testblazeservicemesh:0.4
+    restart: "no"
+    depends_on:
+      - envoy-test-egress
+    command:
+      - -insecure=true
+      - -target_host=envoy-test-egress
+      - -target_port=10000
+      # Blaze DEV/CERT servers should have dev- / cert- prepended to the service name.
+      - -server_space=dev-${BLAZE_SERVICE_NAME}
+      - -product_name=${BLAZE_AUTH_PRODUCT_NAME}
+      - -nucleus_email=${NUCLEUS_EMAIL}
+      - -nucleus_persona_name=${NUCLEUS_PERSONA_NAME}
+      - -nucleus_password=${NUCLEUS_PASSWORD}
+      - -trusted_client_id=${TRUSTED_CLIENT_ID}
+      - -trusted_client_secret=${TRUSTED_CLIENT_SECRET}
+      - -test_ping=${TEST_PING}
+      - -test_user_auth=${TEST_USER_AUTH}
+      - -test_s2s_auth=${TEST_S2S_AUTH}
+      - -test_notify=${TEST_LEGACY_NOTIFICATIONS}
+      - -test_gbs=${TEST_GAME_BROWSER_SERVICE}
+      - -test_greeter=${TEST_GREETER}
+      - -greeting_count=${GREETING_COUNT}
+
+  # Used by the test-blaze-service-mesh client to send messages on the S2S service edge Mesh Data Plane.
+  envoy-test-egress:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/envoy-mesh-node:3.0.0
+    restart: "no"
+    volumes:
+      #
+      # Using sample cert/key for testing only; replace with your mesh client's Nucleus client id public cert / private key
+      - ./certs/test.key:/tmp/client.key
+      - ./certs/test.crt:/tmp/client.crt
+    ports:
+      # Optional: only used for diagnostics and stats
+      - 8001:8001
+    environment:
+      # Client certificate must be signed by Tech Ops / PIE, and
+      # client certificate must pass verification by the ENVOY_SERVER_CERT_CA
+      # configured for the Blaze server's envoy-blaze-ingress nodes.
+      ENVOY_CLIENT_CERT_PRIVATE_KEY: /tmp/client.key
+      ENVOY_CLIENT_CERT_PUBLIC_KEY: /tmp/client.crt
+      ENVOY_CLIENT_TLS_ENABLED: 1
+      #
+      # Admin page: http://localhost:8001/
+      # Metrics page: http://localhost:8001/stats/prometheus
+      ENVOY_ADMIN_LISTENER_PORT: 8001
+      #
+      # Logger levels: https://github.com/envoyproxy/envoy/blob/v1.15.3/source/common/common/base_logger.h#L21
+      ENVOY_LOG_LEVEL: info
+      JAEGER_ENABLED: 0
+      MESH_NAMESPACE: eadp.edge
+      MESH_SERVICE: blaze.sandbox
+      #
+      # INT / LT / PROD
+      # servicemesh.int.gameservices.ea.com / servicemesh.lt.gameservices.ea.com / servicemesh.gameservices.ea.com
+      EGRESS_MESH_ID: INT
+      ENVOY_XDS_HOST: servicemesh.int.gameservices.ea.com
+      ENVOY_XDS_PORT: 443
+      #
+      # Arbitrary identification of the client accessing the services (for tracking purposes)
+      EGRESS_CLIENTSPACE: blaze-envoy-test-app
+      #
+      # Overridden via x-eadp-serverspace header in the client app (via optional server_space command line argument)
+      EGRESS_SERVERSPACE: common

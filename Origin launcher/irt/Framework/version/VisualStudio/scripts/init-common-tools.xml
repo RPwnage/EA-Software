@@ -1,0 +1,182 @@
+<!--
+================================================================================
+init-common-tools.xml
+
+Special script for the VisualStudio package, which exports properties for where the Common tools for Visual Studio can be found
+
+(c) Electronic Arts. All Rights Reserved
+================================================================================
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<!-- manual setting of package.VisualStudio.dir due to the fact that this script is called directly from eaconfig without first making a dependency on the VisualStudio package -->
+	<do unless="@{PropertyExists('package.VisualStudio.dir')}">
+		<property name="vs-package-dir" value="@{PackageGetMasterDirOrEmpty('VisualStudio')}" local="true"/>
+		<do unless="@{StrIsEmpty(${vs-package-dir})}">
+			<property name="package.VisualStudio.dir" value="${vs-package-dir}"/>
+		</do>
+	</do>
+
+	<set-config-vs-version/>
+	
+	<do if="${package.VisualStudio.useCustomMSVC??false} and '${config-compiler??}' == 'vc'">
+		<dependent name="MSBuildTools"/>
+		<property name="package.VisualStudio.nativetoolsroot" value="${package.MSBuildTools.vc-tools-root}"/>
+		<property name="package.VisualStudio.MSC_VER" value="${package.MSBuildTools.MSC_VER}"/>
+	</do>
+	<do unless="${package.VisualStudio.use-non-proxy-build-tools??false}">
+
+		<!-- We expect users to use this minimum version property in the masterconfig to enforce a minimum version for their team -->
+		<!-- What is set here is just a default value that is much lower than what users will be on and we may use this to indicate the bare minimum we support -->
+		<property name="package.VisualStudio.MinimumVersion" value="15.7.27703.2042"/>
+
+		<!-- Optionally users may want to set a maximum version in their masterconfig. -->
+		<!-- By default we have set this to an arbitrarily choose very large value. -->
+		<property name="package.VisualStudio.MaximumVersion" value="100"/>
+
+		<!-- If during solution generation you want the vs2017detect mechanism used in the get-vs2017-install-info task to also consider Preview editions of VS2017.-->
+		<property name="package.VisualStudio.AllowPreview" value="false" unless="@{PropertyExists('package.VisualStudio.AllowPreview')}"/>
+
+		<get-visual-studio-install-info
+			out-installed-version-property="package.VisualStudio.InstalledVersion"
+			out-appdir-property="package.VisualStudio.appdir"
+			out-tool-version-property="package.VisualStudio.MsvcToolsVersion"
+			out-redist-version-property="package.VisualStudio.MsvcRedistVersion"/>
+
+		<fail message="Unable to detect Visual Studio version or install path. Product does not appear to be installed."
+			if="@{StrIsEmpty('${package.VisualStudio.InstalledVersion??}')} or @{StrIsEmpty('${package.VisualStudio.appdir??}')}"/>
+
+		<!-- Minimum Version Check -->
+		<fail message="Visual Studio installed version less than the minimum. Minimum version ${package.VisualStudio.MinimumVersion}; found version ${package.VisualStudio.InstalledVersion}. You likely need to update Visual Studio to the latest version. This can be done via the 'Visual Studio Installer' Application."
+			  unless="${package.VisualStudio.InstalledVersion} gte ${package.VisualStudio.MinimumVersion}"/>
+
+		<!-- Maximum Version Check -->
+		<fail message="Visual Studio installed version greater than the maximum. Maximum version ${package.VisualStudio.MaximumVersion}; found version ${package.VisualStudio.InstalledVersion}. You likely need to uninstall Visual Studio and re-install from an archived installer."
+			  unless="${package.VisualStudio.InstalledVersion} lte ${package.VisualStudio.MaximumVersion} or ${package.VisualStudio.AllowPreview}"/>
+
+		<fail message="Unable to detect MSVC tools version info for Visual Studio. Please make sure that 'Desktop development with C++' workload is selected in your Visual Studio installation!"
+			  if="@{StrIsEmpty('${package.VisualStudio.MsvcToolsVersion??}')}"/>
+
+		<fail message="Unable to detect MSVC Redist version info for Visual Studio. Please make sure that 'Desktop development with C++' workload is selected in your Visual Studio installation!"
+			  if="@{StrIsEmpty('${package.VisualStudio.MsvcRedistVersion??}')}"/>
+
+		<!-- EXPORT: Visual Studio install dir -->
+		<property name="package.VisualStudio.nativetoolsroot" value="${package.VisualStudio.appdir}VC\Tools\MSVC\${package.VisualStudio.MsvcToolsVersion}"
+			  unless="@{PropertyExists('package.VisualStudio.nativetoolsroot')}"/>
+
+		<fail message="Visual Studio 2017 desktop C++ tools are not installed; the directory ${package.VisualStudio.nativetoolsroot}/lib/x64 is missing. Please ensure that component is installed.  If it was installed then please try repairing your install and re-add that component."
+			  unless="@{DirectoryExists('${package.VisualStudio.nativetoolsroot}\lib\x64')}"/>
+
+		<property name="package.VisualStudio.devenvdir" value="${package.VisualStudio.appdir}Common7\IDE"/>
+		<property name="package.VisualStudio.MSC_VER" value="1913"
+			  unless="@{PropertyExists('package.VisualStudio.nativetoolsroot')}"/>/>
+	</do>
+	<do if="${package.VisualStudio.use-non-proxy-build-tools??false}">
+		<dependent name="MSBuildTools"/>
+		<property name="package.VisualStudio.InstalledVersion" value="${package.MSBuildTools.vs-version??'15.0.0.0'}"/>
+		<property name="package.VisualStudio.MsvcToolsVersion" value="${package.MSBuildTools.msvc-version}"/>
+		<property name="package.VisualStudio.MSC_VER" value="${package.MSBuildTools.MSC_VER}"/>
+		<property name="package.VisualStudio.MsvcRedistVersion" value="${package.MSBuildTools.msvc-redist-version}"/>
+		<property name="package.VisualStudio.appdir" value="${package.MSBuildTools.appdir}"/>
+		<property name="package.VisualStudio.nativetoolsroot" value="${package.MSBuildTools.vc-tools-root}"/>
+		<choose>
+			<do if="(@{StrCompareVersions('${package.MSBuildTools.vs-version??'15.0.0.0'}','16.0.0.0')} gte 0) or @{FileExists('${package.MSBuildTools.appdir}\Common7\IDE\CommonExtensions\Microsoft\TestWindow\VSTest.console.exe')}">
+				<property name="package.VisualStudio.vstestconsole.exe" value="${package.MSBuildTools.appdir}\Common7\IDE\CommonExtensions\Microsoft\TestWindow\VSTest.console.exe"/>
+			</do>
+			<do>
+				<property name="package.VisualStudio.vstestconsole.exe" value="${package.VisualStudio.dir}\installed\TestWindow\vstest.console.exe"/>
+			</do>
+		</choose>
+	</do>
+
+	<property name="package.VisualStudio.vcdir" value="${package.VisualStudio.nativetoolsroot}"/>
+	<!-- for compatibility, VC dir in VS2017 has nothing in it unlike in VS2015 and prior, what you actually want is the VC Tools Dir AKA nativetoolsroot -->
+	<property name="package.VisualStudio.bindir" value="${package.VisualStudio.nativetoolsroot}\bin\"/>
+
+	<target name="init-devenv-location">
+		<do if="${package.VisualStudio.use-non-proxy-build-tools??false}">
+			<!-- this won't have been run for non proxy case, but we need to find ide location -->
+			<property name="vs-install-dir" value="" local="true"/>
+			<get-visual-studio-install-info
+					  out-installed-version-property="package.VisualStudio.InstalledVersion"
+					  out-appdir-property="vs-install-dir"/>
+			<property name="package.VisualStudio.devenvdir" value="${vs-install-dir}\Common7\IDE"/>
+		</do>
+		<property name="package.VisualStudio.devenv"     value="${package.VisualStudio.devenvdir}\devenv.com"/>
+		<property name="package.VisualStudio.devenv.com" value="${package.VisualStudio.devenvdir}\devenv.com"/>
+		<property name="package.VisualStudio.devenv.exe" value="${package.VisualStudio.devenvdir}\devenv.exe"/>
+	</target>
+
+	<call target="init-devenv-location" unless="${package.VisualStudio.use-non-proxy-build-tools??false}"/>
+
+	<choose>
+		<do if="${package.VisualStudio.InstalledVersion??'15.0.0.0'} gte '16.0.0.0'">
+			<!-- Just for now with VS2019 Preview, there doesn't seem to be a 16.0 etc. folder for msbuild yet its just called 'Current' -->
+			<property name="package.VisualStudio.msbuild.exe" value="@{PathCombine('${package.VisualStudio.appdir}', 'MSBuild\Current\bin\amd64\msbuild.exe')}"/>
+			<property name="package.VisualStudio.msbuild.exe" value="@{PathCombine('${package.VisualStudio.appdir}', 'MSBuild\Current\bin\msbuild.exe')}" if="${eaconfig.msbuild.use32bit??false}"/>
+			<property name="package.VisualStudio.csc.exe" value="@{PathCombine('${package.VisualStudio.appdir}', 'MSBuild\Current\bin\Roslyn\csc.exe')}"/>
+			<property name="package.VisualStudio.msbuild.platforms-dir" value="@{PathCombine('${package.VisualStudio.appdir}', 'MSBuild\Microsoft\VC\v160\Platforms')}"/>
+		</do>
+		<do>
+			<property name="package.VisualStudio.msbuild.exe" value="@{PathCombine('${package.VisualStudio.appdir}', 'MSBuild\15.0\bin\amd64\msbuild.exe')}"/>
+			<property name="package.VisualStudio.msbuild.exe" value="@{PathCombine('${package.VisualStudio.appdir}', 'MSBuild\15.0\bin\msbuild.exe')}" if="${eaconfig.msbuild.use32bit??false}"/>
+			<property name="package.VisualStudio.csc.exe" value="@{PathCombine('${package.VisualStudio.appdir}', 'MSBuild\15.0\bin\Roslyn\csc.exe')}"/>
+			<property name="package.VisualStudio.msbuild.platforms-dir" value="@{PathCombine('${package.VisualStudio.appdir}', 'Common7\IDE\VC\VCTargets\Platforms')}"/>
+		</do>
+	</choose>
+	
+
+	<property name="package.VisualStudio.vcnumber" value="@{StrSubstring('${config-vs-toolsetversion}', '1')}"/>
+
+	<!-- get host tools dirs -->
+	<do if="${sys.env.PROCESSOR_ARCHITECTURE} == AMD64">
+		<property name="hosttoolsdir" value="HostX64"/>
+		<property name="hostdependenciesdir" value="x64"/>
+	</do>
+
+	<do if="${sys.env.PROCESSOR_ARCHITECTURE} == x86">
+		<property name="hosttoolsdir" value="HostX86"/>
+		<property name="hostdependenciesdir" value="x86"/>
+	</do>
+
+	<!-- get target tool dirs, provided we are loading this in context which has a target processor -->
+	<do if="@{PropertyExists('config-processor')}">
+		<!-- If compiling arm code on an x86 processor -->
+		<do if="${config-processor} == arm">
+			<property name="__tmp_ml_exe" value="armasm.exe"/>
+			<property name="targettoolsdir" value="arm"/>
+		</do>
+
+		<!-- If compiling arm64 code on an x86 processor -->
+		<do if="${config-processor} == arm64">
+			<property name="__tmp_ml_exe" value="armasm64.exe"/>
+			<property name="targettoolsdir" value="arm64"/>
+		</do>
+
+		<!-- If compiling x64 code on an x86 processor -->
+		<do if="${config-processor} == 'x64'">
+			<property name="__tmp_ml_exe" value="ml64.exe"/>
+			<property name="targettoolsdir" value="x64"/>
+		</do>
+
+		<do if="${config-processor} == 'x86'">
+			<property name="targettoolsdir" value="x86"/>
+		</do>
+
+		<property name="package.VisualStudio.hosttoolspath" value="${package.VisualStudio.nativetoolsroot}\bin\${hosttoolsdir}\${targettoolsdir}"/>
+		<property name="package.VisualStudio.hostdependenciesdir" value="${package.VisualStudio.nativetoolsroot}\bin\${hosttoolsdir}\${hostdependenciesdir}"/>
+		<!-- folder for dependent dlls of compiler, when cross-compiling x86 -> x64 or reverse compiler still needs dlls from folder of host platform and host target -->
+
+		<property name="package.VisualStudio.vc-redist-root" value="@{PathCombine(${package.VisualStudio.appdir}, 'VC\Redist\MSVC\${package.VisualStudio.MsvcRedistVersion}')}"/>
+		<property name="package.VisualStudio.crtredistpath" value="@{PathCombine(${package.VisualStudio.vc-redist-root}, '${targettoolsdir}\Microsoft.VC${package.VisualStudio.vcnumber}.CRT')}"/>
+		<property name="package.VisualStudio.debug_crtredistpath" value="@{PathCombine(${package.VisualStudio.vc-redist-root}, 'Debug_NonRedist\${targettoolsdir}\Microsoft.VC${package.VisualStudio.vcnumber}.DebugCRT')}"/>
+
+		<property name="package.VisualStudio.nmake.exe" value="${package.VisualStudio.nativetoolsroot}\bin\HostX86\x86\nmake.exe"/>
+
+		<!-- If on an x64 processor -->
+		<do if="${sys.env.PROCESSOR_ARCHITECTURE} != x86 and ${config-processor} == 'x64'">
+			<property name="package.VisualStudio.nmake.exe" value="${package.VisualStudio.nativetoolsroot}\bin\HostX64\x64\nmake.exe"/>
+		</do>
+	</do>
+
+</project>

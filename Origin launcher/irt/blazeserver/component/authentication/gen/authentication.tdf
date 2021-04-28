@@ -1,0 +1,638 @@
+[headername="authentication/tdf/accountdefines.h"]
+#include "authentication/gen/accountdefines.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/nucleuscodes/tdf/personastatus.h"]
+#include "framework/gen/nucleuscodes/personastatus.tdf"
+
+[headername="framework/nucleuscodes/tdf/nucleusfield.h"]
+#include "framework/gen/nucleuscodes/nucleusfield.tdf"
+
+[headername="framework/nucleuscodes/tdf/nucleuscause.h"]
+#include "framework/gen/nucleuscodes/nucleuscause.tdf"
+
+[headername="framework/nucleuscodes/tdf/entitlementstatus.h"]
+#include "framework/gen/nucleuscodes/entitlementstatus.tdf"
+
+[headername="framework/nucleuscodes/tdf/productcatalog.h"]
+#include "framework/gen/nucleuscodes/productcatalog.tdf"
+
+[headername="framework/nucleuscodes/tdf/statusreason.h"]
+#include "framework/gen/nucleuscodes/statusreason.tdf"
+
+[headername="framework/nucleuscodes/tdf/entitlementtype.h"]
+#include "framework/gen/nucleuscodes/entitlementtype.tdf"
+
+namespace Blaze
+{
+namespace Authentication
+{
+
+const uint32_t INVALID_USECOUNT = UINT32_MAX;
+const uint16_t MAX_PARAMETER_PERSONA_EXT_AUTH_LEN = 256;
+
+enum CrossPlatformOptSetting
+{
+    DEFAULT,
+    OPTIN,
+    OPTOUT
+};
+
+class LoginRequest
+{
+    [tag="auth", description="Nucleus 2.0 Auth Code"]
+    string(-1) mAuthCode;
+
+    [tag="exti", description="DEPRECATED (Use PlatformInfo) - First party identifier"]
+    ExternalId mExternalId;
+
+    [tag="aids", description="Contains platform ids and current client platform."] 
+    PlatformInfo mPlatformInfo;
+
+    [tag="prdt", description="The product name as configured in products.cfg that this user authenticates against."]
+    ProductName mProductName;
+
+    [tag="ctyp", default=CLIENT_TYPE_INVALID, description="(Optional) Specifies the ClientType for the created UserSession. If left as default(CLIENT_TYPE_INVALID), then the ClientType defined on the Connection will be used."]
+    ClientType mClientType;
+
+    [tag="copt", default=DEFAULT, description="(Optional) Sets the crossplay option for the user. If left as default(DEFAULT), then the user will be opted in to crossplay if this is his first login, or keep his existing setting if he has logged in before."]
+    CrossPlatformOptSetting mCrossPlatformOpt;
+};
+
+class TrustedLoginRequest
+{
+    [tag="tokn", description="Nucleus 2.0 Access Token"]
+    string(-1) mAccessToken;
+
+    [tag="id", description="Optional ID that can be provided for logging purposes"]
+    string(256) mId;
+
+    [tag="ityp", description="Optional ID type that can be provided for logging purposes"]
+    string(256) mIdType;
+
+    [tag="ctyp", default=CLIENT_TYPE_INVALID, description="(Optional) Specifies the ClientType for the created UserSession. If left as default(CLIENT_TYPE_INVALID), then the ClientType defined on the Connection will be used."]
+    ClientType mClientType;
+
+    [tag="scln", default=false, description="If set to true the ClientInfo below will be applied prior to login."]
+    bool mSetClientInfo;
+
+    [tag="cnfo", description="(Optional) Specifies the ClientInfo for the Connection.  Used when preAuth could not be called (HTTP users)."]
+    ClientInfo mClientInfo;
+};
+
+class PersonaDetails
+{
+    [tag="pid", description="Nucleus personaId"]
+    PersonaId mPersonaId;
+
+    [tag="dsnm", description="Persona name"]
+    string(MAX_PERSONA_LENGTH) mDisplayName;
+
+    [tag="xref", default=0, description="DEPRECATED (Use PlatformInfo) (Never actually set or used) - External reference value such as XUID"]
+    ExternalId mExtId;
+
+    [tag="last", description="Last authentication timestamp for persona"]
+    uint32_t mLastAuthenticated;
+
+    [tag="stas", default=Blaze::Nucleus::PersonaStatus::UNKNOWN, description="The status of persona."] 
+    Blaze::Nucleus::PersonaStatus::Code mStatus;
+};
+typedef list<PersonaDetails> PersonaDetailsList;
+
+class UserLoginInfo
+{
+    [tag="key", description="The SessionKey created by the Blaze server for this session" ]
+    string(MAX_SESSION_KEY_LENGTH) mSessionKey;
+
+    [tag="buid", description="The unique Nucleus persona id assigned to the persona associated with this session"]
+    BlazeId mBlazeId;
+
+    [tag="uid", description="DEPRECATED (Use PlatformInfo) - The Nucleus account id for the user associated with this session" ]
+    AccountId mAccountId;
+
+    [tag="aids", description="Contains linked internal and external acccount ids."] 
+    PlatformInfo mPlatformInfo;
+
+    [tag="frst", description="True if this is the first time the user has logged on to this Blaze server"]
+    bool mIsFirstLogin;
+
+    [tag="1con", description="True if this is the first time the user has logged on to this Blaze server on the Console (not a Web login) & has external data set"]
+    bool mIsFirstConsoleLogin;
+
+    [tag="llog", description="provides the data/time this user was last authenticated by this Blaze server"]
+    int64_t mLastLoginDateTime;
+
+    [tag="pdtl", description="The persona details for the persona associated with this session"]
+    PersonaDetails mPersonaDetails;
+
+    [tag="geo", description="Flag indicating if Geo IP resolution failed for this user.", default=true]
+    bool mGeoIpSucceeded;
+};
+
+class FieldValidationError
+{
+    [tag="fld", description="Nucleus field enum", description="The field that has an error"]
+    Blaze::Nucleus::NucleusField::Code mField;
+    [tag="err", description="Nucleus cause enum", description="The error code"]
+    Blaze::Nucleus::NucleusCause::Code mError;
+};
+
+class FieldValidateErrorList
+{
+    [tag="list", description="A collection of validation errors"]
+    list<FieldValidationError> mList;
+};
+
+typedef string(64) GroupName;
+
+class GetEmailOptInSettingsRequest
+{
+    [tag="ctry", description="The ISO country code for which to lookup the most recent legal doc information"]
+    string(MAX_COUNTRY_ISO_CODE_LENGTH) mIsoCountryCode;
+    [tag="ptfm", default=NATIVE, description="The platform for which to lookup the most recent legal doc information"]
+    ClientPlatformType mPlatform;
+};
+
+class GetEmailOptInSettingsResponse
+{
+    [tag="eamc", description="Non-zero if the specified country allows EA to email registered user"]
+    uint32_t mEaMayContact;
+    [tag="pmc", description="Non-zero if the specified country allows third party email to be sent to registered users"]
+    uint32_t mPartnersMayContact;
+};
+
+class GetLegalDocContentRequest
+{
+    enum ContentType
+    {
+        [description="The content type(plain or html) for which to lookup the most recent LegalDoc information"]
+        PLAIN,
+        HTML
+    };
+
+    [tag="ctry", description="The ISO country code for which to lookup the most recent LegalDoc information"]
+    string(MAX_COUNTRY_ISO_CODE_LENGTH) mIsoCountryCode;
+    [tag="cpft", default=NATIVE, description="The client platform type for which to lookup the most recent LegalDoc information"]
+    ClientPlatformType mPlatform;
+    [tag="lang", description="The ISO language for which to lookup the most recent LegalDoc information"]
+    string(MAX_LANG_ISO_CODE_LENGTH) mIsoLanguage;  
+    [tag="text", description="The content type(plain or html) for which to lookup the most recent LegalDoc information,default 'plain'"]
+    ContentType mContentType;
+    [tag="ftch", description="Specifies whether to fetch the document content", default=true]
+    bool mFetchContent;
+};
+
+class GetLegalDocContentResponse
+{
+    [tag="tcol", description="The Length for the most recent Online Terms of Service or Online Privacy Policy document for the specified country and platform"]
+    uint32_t mLegalDocContentLength;
+    [tag="tcot", description="The Content for the most recent Online Terms of Service or Online Privacy Policy document for the specified country and platform"]
+    string(-1) mLegalDocContent;
+    [tag="ldvc", description="The Version for the most recent Online Terms of Service or Online Privacy Policy for the specified country and platform"]
+    string(256) mLegalDocVersion;
+};
+
+class ExpressLoginRequest
+{
+    [tag="mail", description="The email address of the account to login", printFormat="hash"]
+    string(MAX_EMAIL_LENGTH) mEmail;
+    
+    [tag="pass", description="The password of the account to login", printFormat="censor"]
+    string(MAX_PASSWORD_LENGTH) mPassword;
+    
+    [tag="pnam", description="The persona name to login"]
+    string(MAX_PERSONA_LENGTH) mPersonaName;
+
+    [tag="prdt", description="The product name as configured in products.cfg that this user authenticates against."]
+    ProductName mProductName;
+
+    [tag="ctyp", default=CLIENT_TYPE_INVALID, description="(Optional) Specifies the ClientType for the created UserSession. If left as default(CLIENT_TYPE_INVALID), then the ClientType defined on the Connection will be used."]
+    ClientType mClientType;
+
+    [tag="copt", default=DEFAULT, description="(Optional) Sets the crossplay option for the user. If left as default(DEFAULT), then the user will be opted in to crossplay if this is his first login, or keep his existing setting if he has logged in before."]
+    CrossPlatformOptSetting mCrossPlatformOpt;
+};
+
+class StressLoginRequest
+{
+    [tag="mail", description="The email address of the account to login"]
+    string(MAX_EMAIL_LENGTH) mEmail;
+
+    [tag="pnam", description="The persona name to login"]
+    string(MAX_PERSONA_LENGTH) mPersonaName;
+
+    [tag="nuid"] AccountId mAccountId;
+
+    [tag="prdt", description="The product name as configured in products.cfg that this user authenticates against."]
+    ProductName mProductName;
+
+    [tag="ctyp", default=CLIENT_TYPE_INVALID, description="(Optional) Specifies the ClientType for the created UserSession. If left as default(CLIENT_TYPE_INVALID), then the ClientType defined on the Connection will be used."]
+    ClientType mClientType;
+};
+
+class LoginResponse
+{
+    [tag="spam", default=false, description="True if the user old enough to opt in to receive third party email"]
+    bool mIsOfLegalContactAge;
+    
+    [tag="undr", default=false, description="true if this user is flagged as an underage account in Nucleus"] 
+    bool mIsUnderage;
+    
+    [tag="anon", default=false, description="true if this user is flagged as an anonymous account in Nucleus"] 
+    bool mIsAnonymous;
+    
+    [tag="sess", description="Information about this login"]
+    UserLoginInfo mUserLoginInfo;
+};
+
+class GetPersonaResponse
+{
+    [tag="uid", description="The Nucleus account id of the user"]
+    AccountId mAccountId;
+
+    [tag="pinf", description="Information about the created persona"]
+    PersonaInfo mPersonaInfo;
+};
+
+class ListPersonasResponse
+{
+    [tag="pinf", description="A list of available personas"]
+    PersonaDetailsList mList;
+}; 
+
+class PostEntitlementRequest
+{
+    [tag="prid", description="The product id"]
+    string(64) mProductId;
+
+    [tag="pjid", description="The project id"]
+    string(64) mProjectId;
+
+    [tag="gnam", description="The group name"]
+    GroupName mGroupName;
+
+    [tag="tag", description="The entitlement tag"]
+    string(64) mEntitlementTag;
+
+    [tag="stat", description="The status code for the entitlement"]
+    Blaze::Nucleus::EntitlementStatus::Code mStatus;
+
+    [tag="deid", description="unique id for the console hardware."]
+    uint32_t mDeviceId;
+
+    [tag="pers", description="when false, the entitlement is granted only to the account but not linked to the persona", default=true]
+    bool mWithPersona;
+};
+
+class GrantEntitlement2Request
+{
+    [tag="buid", description="Blaze id for whom the entitlement is granted. If the blaze id is not provided, the blazeid is the logged in user."]
+    BlazeId mBlazeId;
+
+    [tag="prid", description="The product id"]
+    string(64) mProductId;  
+
+    [tag="pjid", description="The project id"]
+    string(64) mProjectId;
+
+    [tag="gnam", description="The group name"]
+    GroupName mGroupName;
+
+    [tag="tag", description="The entitlement tag"]
+    string(64) mEntitlementTag;
+
+    [tag="stat", default=Blaze::Nucleus::EntitlementStatus::ACTIVE, description="The status code for the entitlement"]
+    Blaze::Nucleus::EntitlementStatus::Code mStatus;
+
+    [tag="pers", description="when false, the entitlement is granted only to the account but not linked to the persona", default=true]
+    bool mWithPersona;
+
+    [tag="expi", description="the entitlement termination time/date"] 
+    string(32) mTermination;
+
+    [tag="coun", description="use count"] 
+    string(32) mUseCount;
+
+    [tag="isse", description="When true, the Blaze server will firstly search the entitlement. If inexistence, the Blaze server will create it."] 
+    bool mIsSearch;
+
+    [tag="prca", default=Blaze::Nucleus::ProductCatalog::UNKNOWN, description="The product catalog the product is from"] 
+    Blaze::Nucleus::ProductCatalog::Code mProductCatalog;
+
+    [tag="stre", description="The reason for the current status"] 
+    Blaze::Nucleus::StatusReason::Code mStatusReasonCode;
+
+    [tag="mali", description="Determines whether or not the entitlement's lifecycle is automatically updated based on it's grant date and termination date."] 
+    bool mManagedLifecycle;
+
+    [tag="type", default=Blaze::Nucleus::EntitlementType::DEFAULT, description="The type of the entitlement"]
+    Blaze::Nucleus::EntitlementType::Code mEntitlementType;
+
+    [tag="deid", description="The device Id of the device to which this entitlement is to be applied"]
+    string(32) mDeviceId;
+
+    [tag="gday", description="The date the entitlement was granted, default if not specified is current server time"]
+    string(32) mGrantDate;
+};
+
+class ModifyEntitlement2Request
+{
+    [tag="buid", description="Blaze id (PersonaId) for whom the entitlement is modified. If the blaze id is not provided, the blazeid is the logged in user."]
+    BlazeId mBlazeId;
+    
+    [tag="eid", description="The entitlement id that need to udpate."]
+    int64_t mEntitlementId;
+
+    [tag="stat", default=Blaze::Nucleus::EntitlementStatus::UNKNOWN, description="The new status code"]
+    Blaze::Nucleus::EntitlementStatus::Code mStatus;
+
+    [tag="expi", description="The new termination time/date"] 
+    string(32) mTermination;
+
+    [tag="coun", description="The new use count"] 
+    string(32) mUseCount;
+
+    [tag="strc", default=Blaze::Nucleus::StatusReason::NONE, description="The new nucleus status reason"] 
+    Blaze::Nucleus::StatusReason::Code mStatusReasonCode;
+
+    [tag="vers", default=0, description="The version of the entitlement that is being updated"]
+    uint32_t mVersion;
+};
+
+class Entitlement
+{
+    [tag="id", description="The id of the entitlement"]
+    uint64_t mId;
+    
+    [tag="tag", description="The entitlement tag"]
+    string(128) mEntitlementTag;
+    
+    [tag="gnam", description="The group name"]
+    GroupName mGroupName;
+    
+    [tag="pjid", description="The project id"]
+    string(64) mProjectId;
+    
+    [tag="ver", description="The entitlement version"]
+    uint32_t mVersion;
+    
+    [tag="ucnt", description="The number of times the entitlement has been used"]
+    uint32_t mUseCount;
+    
+    [tag="prid", description="The product id"]
+    string(64) mProductId;
+    
+    [tag="gday", description="The date the entitlement was granted"]
+    string(32) mGrantDate;
+    
+    [tag="tday", description="The date the entitlement terminates"]
+    string(32) mTerminationDate;
+    
+    [tag="stat", description="The status of the entitlement"]
+    Blaze::Nucleus::EntitlementStatus::Code mStatus;
+    
+    [tag="type", description="The type of the entitlement"]
+    Blaze::Nucleus::EntitlementType::Code mEntitlementType;
+    
+    [tag="pid", description="The persona id associated with the entitlement"]
+    PersonaId mPersonaId;
+
+    [tag="isco", default=false, description="Indicates that this entitlement is consumable and has a use count"]
+    bool mIsConsumable;
+
+    [tag="strc", description="The reason for the current status"] 
+    Blaze::Nucleus::StatusReason::Code mStatusReasonCode;
+
+    [tag="prca", description="The product catalog for the entitlement"] 
+    Blaze::Nucleus::ProductCatalog::Code mProductCatalog;
+
+    [tag="devi", description="The device Uri of the device to which this entitlement is applied."] 
+    string(64) mDeviceUri;
+};
+
+class Entitlements
+{
+    [tag="nlst", description="A list of entitlements"] list<Entitlement> mEntitlements; 
+};
+
+bitfield EntitlementSearchFlag
+{
+    [description="If set, include entitlement(s) linked to a persona"]
+    includePersonaLink : 1;
+    [description="If set, include entitlement(s) not linked to any persona but in persona's account"]
+    includeUnlinked : 1;
+};
+
+typedef list<GroupName> GroupNameList;
+
+class ListEntitlementsRequest
+{
+    [tag="buid", description="Blaze id for whom the entitlement is checked."]
+    BlazeId mBlazeId;
+
+    [tag="gnls", description="The list of group names"]
+    GroupNameList mGroupNameList;
+
+    [tag="flag"]
+    EntitlementSearchFlag mEntitlementSearchFlag;
+
+    [tag="epsz", description="Number of entitlements to be shown in a page"]
+    uint16_t mPageSize;
+
+    [tag="epsn", description = "Order of entitlement page to start with"]
+    uint16_t mPageNo;
+};
+
+class ListUserEntitlements2Request
+{
+    [tag="buid", description="Blaze id for whom the entitlements are checked."]
+    BlazeId mBlazeId;
+
+    [tag="gnls", description="The list of group names"]
+    GroupNameList mGroupNameList;
+
+    [tag="epsz", description = "Number of entitlements to be shown in a page."]
+    uint16_t mPageSize;
+
+    [tag="epsn", description = "Order of entitlement page to start with."]
+    uint16_t mPageNo;
+
+    [tag="stat", default=Blaze::Nucleus::EntitlementStatus::UNKNOWN, description = "The optional status that restricts listing."]
+    Blaze::Nucleus::EntitlementStatus::Code mStatus;
+
+    [tag="type", default=Blaze::Nucleus::EntitlementType::UNKNOWN, description="The optional type that restricts listing."]
+    Blaze::Nucleus::EntitlementType::Code mEntitlementType;
+
+    [tag="etag", description="The optional tag that restricts listing."]
+    string(64) mEntitlementTag;
+
+    [tag="prid", description="The optional product id that restricts listing."]
+    string(64) mProductId;
+
+    [tag="pjid", description="The optional project id that restricts listing."]
+    string(64) mProjectId;
+
+    [tag="stda", description="The optional start termination date that restricts listing."]
+    string(32) mStartTerminationDate;
+
+    [tag="etda", description="The optional end termination date that restricts listing."]
+    string(32) mEndTerminationDate;
+
+    [tag="recu", default=false, description="when true, entitlement group search is recursive using group pdatenc."]
+    bool mRecursiveSearch;
+
+    [tag="sgda", description="The optional start grant date that restricts listing."]
+    string(32) mStartGrantDate;
+
+    [tag="egda", description="The optional end grant date that restricts listing."]
+    string(32) mEndGrantDate;
+
+    [tag="haup", default=false, description="Whether or not the entitlements listed have a linked authorized persona. Only used when searching entitlements by user."]
+    bool mHasAuthorizedPersona;
+};
+
+class ListPersonaEntitlements2Request
+{
+    [tag="gnls", description="The list of group names"]
+    GroupNameList mGroupNameList;
+    
+    [tag="epsz", description = "Number of entitlements to be shown in a page."]
+    uint16_t mPageSize;
+    
+    [tag="epsn", description = "Order of entitlement page to start with."]
+    uint16_t mPageNo;
+    
+    [tag="stat", default=Blaze::Nucleus::EntitlementStatus::UNKNOWN, description = "The optional status that restricts listing."]
+    Blaze::Nucleus::EntitlementStatus::Code mStatus;
+    
+    [tag="type", default=Blaze::Nucleus::EntitlementType::UNKNOWN, description="The optional type that restricts listing."]
+    Blaze::Nucleus::EntitlementType::Code mEntitlementType;
+    
+    [tag="etag", description="The optional tag that restricts listing."]
+    string(64) mEntitlementTag;
+    
+    [tag="prid", description="The optional product id that restricts listing."]
+    string(64) mProductId;
+    
+    [tag="pjid", description="The optional project id that restricts listing."]
+    string(64) mProjectId;
+    
+    [tag="stda", description="The optional start termination date that restricts listing."]
+    string(32) mStartTerminationDate;
+    
+    [tag="etda", description="The optional end termination date that restricts listing."]
+    string(32) mEndTerminationDate;
+    
+    [tag="pid", default=0, description="Nucleus personaId for whom the entitlements are checked."]
+    PersonaId mPersonaId;
+    
+    [tag="recu", default=false, description="when true, entitlement group search is recursive using group pdatenc."]
+    bool mRecursiveSearch;
+    
+    [tag="sgda", description="The optional start grant date that restricts listing."]
+    string(32) mStartGrantDate;
+    
+    [tag="egda", description="The optional end grant date that restricts listing."]
+    string(32) mEndGrantDate;
+};
+
+class GetUseCountRequest
+{
+    [tag="buid", description="Blaze id (PersonaId) for whom the user count is retrieved."]
+    BlazeId mBlazeId;
+    [tag="prid", description="The product id"] string(64) mProductId;
+    [tag="pjid", description="The project id"] string(64) mProjectId;
+    [tag="gnam", description="The group name"] GroupName mGroupName;
+    [tag="etag", description="The entitlement tag"] string(64) mEntitlementTag;
+};
+
+class UseCount
+{
+    [tag="ucnt", description="The number of times the entitlement has been used"] uint32_t mUseCount;
+};
+
+class DecrementUseCount
+{
+    [tag="uctr"] uint32_t mUseCountRemain;
+    [tag="uctc"] uint32_t mUseCountConsumed;
+};
+
+class DecrementUseCountRequest
+{
+    [tag="prid", description="The product id"] string(64) mProductId;
+    [tag="pjid", description="The project id"] string(64) mProjectId;
+    [tag="gnam", description="The group name"] GroupName  mGroupName;
+    [tag="etag", description="The entitlement tag"] string(64) mEntitlementTag;
+    [tag="deuc", description="The number to descrement the use-count by"] uint32_t mDecrementCount;
+};
+
+class OptInRequest
+{
+    [tag="name", default="", description="The name of opt-in."]
+    string(64) mOptInName;
+};
+
+class OptInValue
+{
+    [tag="valu", description="the value of opt-in, either true or false."]
+    bool mOptInValue;
+};
+
+class GrantEntitlement2Response
+{
+    [tag="enti", description="The entitlement information"]
+    Entitlement mEntitlementInfo;
+
+    [tag="isgr", description="Determines whether or not the entitlement was found or the entitlement was granted."]
+    bool mIsGranted;
+};
+
+class CheckLegalDocRequest
+{
+    [tag="turi", description="The URI of a Legal doc to check"]
+    string(MAX_LEGAL_DOC_VERSION_LENGTH) mLegalDocUri;
+};
+
+class CheckLegalDocResponse
+{
+    [tag="acpt", description="true if the user has accepted this version of legal doc"]
+    bool mAccepted;
+};
+
+union OriginPersonaIdentifier 
+{
+    [tag="buid", default=INVALID_BLAZE_ID, description="Set this to the BlazeId of the user that you want to get origin persona for.  If set, mPersonaName is ignored.  If neither mBlazeId and mPersonaName are set, we default mBlazeId to the logged in user's BlazeId and return the origin persona for the logged in user"]     
+    BlazeId mBlazeId;     
+    
+    [tag="pnam", description="Set this to the origin persona name you want to lookup.  If set, mBlazeId will be ignored"]     
+    string(MAX_PERSONA_LENGTH) mPersonaName; 
+};
+
+class GetOriginPersonaRequest 
+{     
+    [tag="uiop", description="The BlazeId of the user that you want to get origin persona for, or the persona name of the origin persona you want to fetch.  Defaults to the invoking user's BlazeId if they are logged in"]     
+    OriginPersonaIdentifier mBlazeIdOrPersonaName; 
+};
+
+class GetDecryptedBlazeIdsRequest
+{
+    [tag="eids", description="encrypted ids to decrypt"]
+    list<EncryptedBlazeId> mEncryptedBlazeIds;
+};
+
+class GetDecryptedBlazeIdsResponse
+{
+    [tag="dids", description="decrypted id results"]
+    map<EncryptedBlazeId, BlazeId> mDecryptedIds;
+};
+
+class GetDecryptedBlazeIdsResponseError
+{
+    [tag="fenc", description="List of the request's encryptedBlazeIds that failed to be decrypted."]
+    EncryptedBlazeIdList mFailedEncryptedBlazeIds;
+};
+
+}
+}

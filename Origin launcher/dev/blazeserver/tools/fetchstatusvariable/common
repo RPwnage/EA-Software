@@ -1,0 +1,128 @@
+let errorcount=0
+declare -a errors
+curlOpts=(--compressed --silent --max-time 60)
+
+function getredirector {
+  local param_env param_protocol port
+  param_env=$1
+
+  local redirector
+  if [ $param_env = "prod" ]; then
+    redirector="tools.internal.gosredirector.ea.com:42125"
+  elif [ $param_env = "test" ]; then
+    redirector="web.internal.gosredirector.stest.ea.com:42125"
+  elif [ $param_env = "dev" ]; then
+    redirector="internal.gosredirector.online.ea.com:42125"
+  else
+    echo "Error: Unknown environment: '$param_env'. Environment must be one of: prod test dev" >&2
+    exit 1
+  fi
+  echo $redirector
+}
+
+function getredirector_client {
+  local param_env
+  param_env=$1
+
+  local redirector
+  if [ $param_env = "prod" ]; then
+    redirector="gosredirector.ea.com:42124"
+  elif [ $param_env = "test" ]; then
+    redirector="stress.gosredirector.stest.ea.com:42124"
+  elif [ $param_env = "dev" ]; then
+    redirector="gosredirector.online.ea.com:42124"
+  else
+    echo "Error: Unknown environment: '$param_env'. Environment must be one of: prod test dev" >&2
+    exit 1
+  fi
+  echo $redirector
+}
+
+function adderror {
+  errors[errorcount]=$1
+  let errorcount=errorcount+1
+}
+
+
+function printerrors {
+  local i
+  for (( i=0;i<$errorcount;i++ )) do
+    printf "Error: %s\n" "${errors[$i]}" >&2
+  done
+}
+
+echoerr() { echo "$@" 1>&2; }
+
+function getservers {
+  local servers server name ipnum port param_redirector param_servicen_name param_env param_plat oldIFS
+  local param_protocol param_bindtype
+
+  param_redirector=$1
+  param_service_name=$2
+  param_env=$3
+  param_plat=$4
+  param_instance=$5
+  param_protocol=$6
+  param_bindtype=$7
+  param_addrtype=$8
+  param_channel=$9
+
+  if [ -z "$param_addrtype" ];
+  then
+    param_addrtype=0
+  fi
+
+  if [ -z "$param_channel" ];
+  then
+    param_channel="tcp"
+  fi
+
+  local xsltDir=$(dirname ${BASH_SOURCE[0]})
+
+  local timeStamp=$$  #(date +"%Y%m%d_%H%M%S")
+  local serverListXml="/tmp/serverlist_$timeStamp.xml"
+  local serverListResult="/tmp/serverlist_result_$timeStamp.txt"
+  local rc=0
+  curl ${curlOpts[*]} "http://$param_redirector/redirector/getServerList?name=$param_service_name&env=$param_env&plat=$param_plat" > $serverListXml
+
+  rc=$?
+
+  if [ $rc -ne 0 ];
+  then
+      rm $serverListXml
+      echoerr "Failed to get serverlist name=$param_service_name&env=$param_env&plat=$param_plat from $param_redirector, curl err=$rc."
+      return
+  fi
+
+  xsltproc --stringparam bindtype "$param_bindtype" --stringparam addrtype "$param_addrtype" --stringparam channel "$param_channel" --stringparam instance "$param_instance" --stringparam servicename "$param_service_name" --stringparam protocol "$param_protocol" $xsltDir/getendpoints.xslt $serverListXml > $serverListResult
+
+  rc=$?
+
+  if [ $rc -ne 0 ];
+  then
+      rm $serverListResult
+      echoerr "Failed to parse serverlist result, parse err=$rc."
+      return
+  fi
+
+  oldIFS=$IFS
+  IFS=$'\n'
+
+  servers=$(cat $serverListResult | grep -v xml)
+
+  rm $serverListXml $serverListResult
+
+  for server in $servers
+  do
+    local name=$(echo $server | awk '{ printf $1 }')
+    local ipnum=$(echo $server | awk '{ printf $2 }')
+    local ip=$(printf "%08x\n" $ipnum | awk '{ print strtonum("0x" substr($1, 1, 2))"."strtonum("0x" substr($1, 3, 2))"."strtonum("0x" substr($1, 5, 2))"."strtonum("0x" substr($1, 7, 2)) }')
+    local port=$(echo $server | awk '{ printf $3 }')
+    local inService=$(echo $server | awk '{ printf $4 }')
+    echo "$name $ip:$port $inService"
+  done
+  IFS=$oldIFS
+}
+
+
+

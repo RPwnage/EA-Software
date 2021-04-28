@@ -1,0 +1,442 @@
+// Defines the TDF classes used in the osdkseasonalplay component
+//  TDF classes are compiled with TypeComp, generating C++ classes that can be serialized in RPCs and Notifications.
+//
+// Note: see http://gos.online.ea.com/confluence/display/tech/Typecomp for info on the .tdf spec, as well as the compiler, TypeComp
+
+[headername="framework/tdf/entity.h"]
+#include "framework/gen/entity.tdf"
+
+[headername="stats/tdf/stats.h"]
+#include "stats/gen/stats.tdf"
+
+[headername="osdktournaments/tdf/osdktournamentstypes.h"]
+#include "osdktournaments/gen/osdktournamentstypes.tdf"
+
+
+namespace Blaze
+{
+namespace OSDKSeasonalPlay
+{
+    const uint32_t  AWARD_NAME_LENGTH           = 192;
+    const uint32_t  AWARD_DESCRIPTION_LENGTH    = 384;
+    const uint32_t  AWARD_ASSET_LENGTH          = 256;
+    const uint32_t  AWARD_METADATA_LENGTH       = 256;
+    const int32_t   AWARD_ANY_SEASON_NUMBER     = -1;
+
+    const uint32_t  SEASON_ID_INVALID           = 0;
+    const uint32_t  MEMBER_ID_INVALID           = 0;
+
+    typedef uint32_t AwardId;
+    typedef EntityId MemberId;
+    typedef uint32_t SeasonId;
+    typedef uint32_t LeagueId;
+    typedef Blaze::OSDKTournaments::TournamentId TournamentId;
+    typedef int64_t TimeStamp;
+        
+    enum MemberType
+    {
+        SEASONALPLAY_MEMBERTYPE_USER = 1,
+        SEASONALPLAY_MEMBERTYPE_CLUB
+    };
+    
+    enum SeasonState
+    {
+        SEASONALPLAY_SEASON_STATE_NONE = 0,
+        SEASONALPLAY_SEASON_STATE_REGULARSEASON,
+        SEASONALPLAY_SEASON_STATE_PLAYOFF,
+        SEASONALPLAY_SEASON_STATE_BLACKOUT
+    };
+    
+    enum TournamentStatus
+    {
+        SEASONALPLAY_TOURNAMENT_STATUS_NONE = 0,
+        SEASONALPLAY_TOURNAMENT_STATUS_ELIMINATED,
+        SEASONALPLAY_TOURNAMENT_STATUS_WON,
+        SEASONALPLAY_TOURNAMENT_STATUS_PROHIBITED
+    };
+
+    enum TournamentRule
+    {
+        [description="Unlimited access to the tournament"]
+        SEASONALPLAY_TOURNAMENTRULE_UNLIMITED = 1,
+        [description="Win once, unlimited retries if eliminated"]
+        SEASONALPLAY_TOURNAMENTRULE_RETRY_ON_LOSS   = 2,
+        [description="One attempt at the tournament"]
+        SEASONALPLAY_TOURNAMENTRULE_ONE_ATTEMPT   = 3
+    };
+    
+    enum AwardHistoricalFilter
+    {
+        [description="Do not filter awards by their historical status"]
+        SEASONALPLAY_AWARD_HISTORICAL_ANY = 0,
+        [description="Filter awards that have historical status set to true"]
+        SEASONALPLAY_AWARD_HISTORICAL_TRUE,
+        [description="Filter awards that have historical status set to false"]
+        SEASONALPLAY_AWARD_HISTORICAL_FALSE
+    };
+    
+    [description="An assigned award"]
+    class Award
+    {
+        [tag="id", description="award assignment id"]
+        uint32_t mId;
+        
+        [tag="aid", description="Id of the award assigned"]
+        AwardId mAwardId;
+        
+        [tag="mid", default=MEMBER_ID_INVALID, description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+
+	    [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+
+	    [tag="lgid", description="The id of the league that the entity is in"]
+        LeagueId mLeagueId;
+
+        [tag="snum", description="The season number"]
+        uint32_t mSeasonNumber;
+        
+        [tag="awdt", description="The time the award was assigned"]
+        TimeStamp mTimeStamp;
+        
+        [tag="hist", description="Historical status flag"]
+        bool mHistorical;
+        
+        [tag="meta", description="Metadata associated with the award"]
+        string(AWARD_METADATA_LENGTH) mMetadata;
+    };
+    
+    typedef list<Award> AwardList;
+    
+    [tdfid="hash", description="Seasonal play award configuration", trackChanges = true]
+    class AwardConfiguration
+    {
+        [tag="aid", description="Award Id"]
+        AwardId mAwardId;
+        
+        [tag="name", description="Award Name"]
+        string(AWARD_NAME_LENGTH) mName;
+        
+        [tag="desc", description="Award Description"]
+        string(AWARD_DESCRIPTION_LENGTH) mDescription;
+        
+        [tag="asst", description="Award Asset Path"]
+        string(AWARD_ASSET_LENGTH) mAssetPath;
+    };
+    
+    [description="Summary of a member's award history over all season numbers for a season"]
+    class AwardSummary
+    {
+        [tag="aid", description="Award Id"]
+        AwardId mAwardId;
+        
+        [tag="twon", description="Times won"]
+        uint32_t mTimesWon;
+        
+        [tag="lsea", description="Last season number award was awarded"]
+        uint32_t mSeasonNumberLastAwarded;
+        
+        [tag="lsat", description="The last time the award was awarded"]
+        TimeStamp mTimeStampLastAwarded;
+
+    };
+    
+    typedef list<AwardSummary> AwardSummaryList;
+    
+    [tdfid="hash", description="The configuration of a season's division"]
+    class Division
+    {
+        [tag="num", description="The division number"]
+        uint8_t mNumber;
+        
+        [tag="size", description="The division size (as a percentage)"]
+        uint8_t mSize;
+        
+        [tag="trul", description="The tournament rule for this division"]
+        TournamentRule  mTournamentRule;
+    };
+    
+    [description="The starting rank info for a division"]
+    class DivisionStartingRank
+    {
+        [tag="num", description="The division number"]
+        uint32_t mNumber;
+        
+        [tag="srnk", description="The division's starting rank"]
+        uint32_t mStartingRank;
+    };
+   
+    
+	[description="The configuration of a season"]
+	class SeasonConfiguration
+	{
+	    [tag="sid", description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+        
+        [tag="mtyp", description="The type of Entity that can be a member of this season"]
+        MemberType mMemberType;
+        
+        [tag="lgid", description="The league id associated with this season"]
+        LeagueId mLeagueId;
+        
+        [tag="lnam", description="The name of the leaderboard associated with this seasonal"]
+        string(Blaze::Stats::STATS_LEADERBOARD_NAME_LENGTH) mLeaderboardName;
+        
+        [tag="tid", description="The tournament id associated with this seasonal play instance"]
+        TournamentId mTournamentId;
+        
+        [tag="sprt", descripion="Stats category period type"]
+        Blaze::Stats::StatPeriodType mStatPeriodtype;
+        
+        [tag="divl", description="List of divisions"]
+        list<Division> mDivisions;
+		
+		[tag="scnm", description="Stats category name"]
+        string(Blaze::Stats::STATS_CATEGORY_NAME_LENGTH) mStatCategoryName;
+	};
+
+
+    [description="The details of a season that is not specific to registered members"]
+    class SeasonDetails
+    {
+	    [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+
+        [tag="stat", description="The current state of the season"]
+        SeasonState mSeasonState;
+        
+        [tag="snum", description="The current season number"]
+        uint32_t mSeasonNumber;
+        
+        [tag="rst", description="Current regular season start time"]
+        TimeStamp mRegularSeasonStart;
+        
+        [tag="ret", description="Current regular season end time"]
+        TimeStamp mRegularSeasonEnd;
+        
+        [tag="pst", description="Playoff period start time"]
+        TimeStamp mPlayOffStart;
+        
+        [tag="pet", description="Playoff period end time"]
+        TimeStamp mPlayOffEnd;
+        
+        [tag="nrst", description="Next regular season start time"]
+        TimeStamp mNextRegularSeasonStart;
+    };
+
+
+    [description="Leaderboard ranking information for a season"]
+    class SeasonRankingInfo
+    {
+        [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+    
+        [tag="lbec", description="The count of entities currently ranked on the Season's regular season leaderboard"]
+        uint32_t mLeaderboardEntityCount;
+        
+        [tag="dstr", description="List of the starting ranks for each of the season's divisions"]
+        list<DivisionStartingRank> mDivisionStartingRanks;
+    };
+    
+    typedef list<SeasonRankingInfo> SeasonRankingInfoList;
+
+    [description="The details of a season that is specific to registered members"]
+    class MySeasonDetails
+    {
+	    [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+        
+        [tag="tsta", description="Member's tournament status"]
+        TournamentStatus mTournamentStatus;
+
+        [tag="telg", description="Member is eligible for tournament play"]
+        bool mTournamentEligible;
+        
+        [tag="div", description="The division within the leaderboard that the member is in"]
+        uint8_t mDivision;
+
+        [tag="dsr", description="The overall rank that the division starts at"]
+        uint32_t mDivisionStartingRank;
+        
+        [tag="drnk", description="The member's rank within the division"] 
+        uint32_t mDivisionRanking;
+        
+        [tag="ornk", description="The member's overall rank in the leaderboard"]
+        uint32_t mOverallRank;
+    };
+
+
+    [description="Response to the get award configuration request"]
+    class GetAwardConfigurationResponse
+    {
+        [tag="awdl", descripion="The list of award details"]
+        list<AwardConfiguration> mAwards;
+    };
+    
+    
+    [description="Request to retrieve the awards for a seasonal play member"]
+    class GetAwardsForMemberRequest
+    {
+        [tag="mid", default=MEMBER_ID_INVALID, description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+
+	    [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+
+        [tag="snum", description="The season number. Set to AWARD_ANY_SEASON_NUMBER to retrieve awards for all season numbers"]
+        uint32_t mSeasonNumber;
+    };
+
+
+    [description="Request to retrieve the awards for a seasonal play season"]
+    class GetAwardsForSeasonRequest
+    {
+	    [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+
+        [tag="snum", description="The season number. Set to AWARD_ANY_SEASON_NUMBER to retrieve awards for all season numbers"]
+        uint32_t mSeasonNumber;
+        
+        [tag="hist", description="Filter awards by their historical status"]
+        AwardHistoricalFilter mHistoricalFilter;
+    };
+
+    
+    [description="Reponse to the Get Awards request"]
+    class GetAwardsResponse
+    {
+        [tag="awdl", description="The list of awards"]
+        AwardList mAwardList;
+        
+        [tag="suml", description="The award summary list"]
+        AwardSummaryList mAwardSummaryList;
+    };
+    
+
+    [description="Response to the get season configuration request"]
+    class GetSeasonConfigurationResponse
+    {
+        [tag="cfgl", description="The list of seasonal play instance configurations"]
+        list<SeasonConfiguration> mInstanceConfigList; 
+    };
+    
+    
+    [description="Request to get the season id that the entity is registered in"]
+    class GetSeasonIdRequest
+    {
+        [tag="mid", default=MEMBER_ID_INVALID, description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+    };
+    
+    
+    [description="Response to the get season id request"]
+    class GetSeasonIdResponse
+    {
+        [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+    };
+    
+    
+    [description="Request to register an entity in a season"]
+    class RegisterForSeasonRequest
+    {
+        [tag="mid", default=MEMBER_ID_INVALID, description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+
+	    [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+
+	    [tag="lgid", description="The id of the league that the entity is in"]
+        LeagueId mLeagueId;
+    };
+    
+    
+    [description="Request to retrieve the details of a season"]
+    class GetSeasonDetailsRequest
+    {
+	    [tag="sid", default=SEASON_ID_INVALID, description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+    };
+    
+    
+    [description="Request to retrieve the details of the season the entity is registered in that is specific to the entity"]
+    class GetMySeasonDetailsRequest
+    {
+        [tag="mid", default=MEMBER_ID_INVALID, description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+
+	    [tag="sid", description="The seasonal play instance id"]
+        SeasonId mSeasonId;
+    };
+    
+    [description="Response to the get season ranking info request"]
+    class GetSeasonsRankingInfoResponse
+    {
+        [tag="sril", description="The list of SeasonRankingInfo"]
+        SeasonRankingInfoList   mSeasonRankingInfoList;
+    };
+	
+	[description="Request to set the tournament status of the member"]
+	class SetMemberTournamentStatusRequest
+	{
+		[tag="mid", default=MEMBER_ID_INVALID, description="The entity id"]
+        MemberId    mMemberId;
+        
+        [tag="mtyp", description="The type of Entity"]
+        MemberType  mMemberType;
+
+		[tag="tsta", description="The tournament status to be set for the member"]
+        TournamentStatus mTournamentStatus;
+	};
+    
+    [description="Request to register a club in the season that matches the given league id"]
+    class RegisterClubRequest
+    {
+        [tag="clid", default=MEMBER_ID_INVALID, description="The club id"]
+        MemberId    mClubId;
+        
+        [tag="lgid", description="The id of the league that matches the resgistering club"]
+        LeagueId    mLeagueId;
+    };
+    
+    [description="Request to update a club's registration to put the club in the season that matches the new league id"]
+    class UpdateClubRegistrationRequest
+    {
+        [tag="clid", default=MEMBER_ID_INVALID, description="The club id"]
+        MemberId    mClubId;
+        
+        [tag="lgid", description="The id of the league that matches the updating club"]
+        LeagueId    mLeagueId;
+    };
+
+    [description="Request to delete a user's or club's registration"]
+    class DeleteRegistrationRequest
+    {
+        [tag="drid", default=MEMBER_ID_INVALID, description="The user's or club's id"]
+        MemberId    mMemberId;
+        
+        [tag="drty", description="The type of the id"]
+        MemberType  mMemberType;
+    };
+    
+} // OSDKSeasonalPlay
+} // Blaze
+
+
+
+

@@ -1,0 +1,210 @@
+// We assume that all request and response types are valid and just use them
+// directly in the code generation.
+//
+// The compiler should ensure that all commands within a component have a unique ID.
+// The compiler should ensure that all components within a file have a unique ID.
+// Zero is not a valid component or command ID
+// Enforce that method names must start with lowercase letter.
+// Enforce C++ rules for method names and TDF type names.
+// Allow C++ style comments.
+
+
+[ headername="messaging/tdf/messagingtypes.h" ]
+#include "messaging/gen/messagingtypes.tdf"
+
+
+[ 
+    client_include = false,
+    headername="messaging/tdf/messagingevents_server.h" 
+]
+#include "messaging/gen/messagingevents_server.tdf"
+
+[ 
+    client_include = false,
+    headername="messaging/tdf/messaging_server.h" 
+]
+#include "messaging/gen/messaging_server.tdf"
+
+namespace Blaze
+{
+namespace Messaging
+{
+[
+    id = core/15,
+    description = "Sends persistent and non-persistent messages to one or more user(s) using a general matching criteria.",
+    details = "Persistent messages must be explicitly deleted by the recepient in order to free up space in the inbox.",
+    configurationType = MessagingConfig
+]
+component Messaging
+{
+    
+           
+    permissions
+    {
+        PERMISSION_GET_PERSISTENT_MESSAGES_BY_TARGET = 1;
+        PERMISSION_MESSAGING_ALL_ONLINE_USERS = 2;
+    }
+    
+    errors
+    {
+        [ description = "Unknown error occurred." ]
+        MESSAGING_ERR_UNKNOWN                   = 1;
+        [ description = "Exceeded maximum number of message attributes." ]
+        MESSAGING_ERR_MAX_ATTR_EXCEEDED         = 2;
+        [ description = "Messaging database error." ]
+        MESSAGING_ERR_DATABASE                  = 3;
+        [ description = "Message target not found." ]
+        MESSAGING_ERR_TARGET_NOT_FOUND          = 4;
+        [ description = "Message target type is invalid." ]
+        MESSAGING_ERR_TARGET_TYPE_INVALID       = 5;
+        [ description = "Target message inbox is full." ]
+        MESSAGING_ERR_TARGET_INBOX_FULL         = 6;
+        [ description = "Match not found." ]
+        MESSAGING_ERR_MATCH_NOT_FOUND           = 7;
+        [ description = "Feature is disabled on the messaging server." ]
+        MESSAGING_ERR_FEATURE_DISABLED          = 8;
+        [ description = "Invalid parameter(s)." ]
+        MESSAGING_ERR_INVALID_PARAM             = 9;
+        [ description = "Message was tagged for profanity filtering but the profanity service returned an error. Message will not be delivered." ]
+        MESSAGING_ERR_PROFANITY_SYSTEM          = 10;
+    }
+
+    slave
+    {
+        
+        
+
+        methods
+        {
+            // Core methods
+            
+               [
+                 id = 1,
+                 errors = {MESSAGING_ERR_UNKNOWN,
+                           MESSAGING_ERR_FEATURE_DISABLED,
+                           MESSAGING_ERR_MAX_ATTR_EXCEEDED,
+                           MESSAGING_ERR_DATABASE,
+                           MESSAGING_ERR_TARGET_NOT_FOUND,
+                           MESSAGING_ERR_TARGET_TYPE_INVALID,
+                           MESSAGING_ERR_TARGET_INBOX_FULL,
+                           MESSAGING_ERR_PROFANITY_SYSTEM},
+                 description = "This command will send the provided message to recepients defined by MessageTarget.",
+                 details = "N/A",
+                 allowGuestCall = true,
+                 requiresUserSession = false,
+                 requires_authentication = true 
+               ]
+               SendMessageResponse sendMessage(ClientMessage);
+            
+               [
+                 id = 2,
+                 errors = {MESSAGING_ERR_UNKNOWN,
+                           MESSAGING_ERR_FEATURE_DISABLED,
+                           MESSAGING_ERR_DATABASE,
+                           MESSAGING_ERR_MATCH_NOT_FOUND,
+                           MESSAGING_ERR_INVALID_PARAM},
+                 description = "This command generates one or more notifications that deliver messages stored for this user.",
+                 details = "To retrieve resulting notifications via the WAL call notificationcache/fetchBySeqNo with a sequence number(X-BLAZE-SEQNO) supplied in the request. For details on notificationcache/fetchBySeqNo refer to the WAL Proxy Users Guide.",
+                 allowGuestCall = true,
+                 requires_authentication = true 
+               ]
+               FetchMessageResponse fetchMessages(FetchMessageRequest);
+            
+            // TODO: Another way to purge multiple messages, is to require the client to "touch"
+            // the messages first, that way we can guarantee that the message has been delivered to the client
+            // before it can be purged...
+               [
+                 id = 3,
+                 errors = {MESSAGING_ERR_UNKNOWN,
+                           MESSAGING_ERR_FEATURE_DISABLED,
+                           MESSAGING_ERR_DATABASE,
+                           MESSAGING_ERR_MATCH_NOT_FOUND,
+                           MESSAGING_ERR_INVALID_PARAM},
+                 description = "This command will delete one or more persistent messages stored for this user.",
+                 details = "N/A.",
+                 allowGuestCall = true,
+                 requires_authentication = true 
+               ]
+               PurgeMessageResponse purgeMessages(PurgeMessageRequest);
+            
+               [
+                 id = 4,
+                 errors = {MESSAGING_ERR_UNKNOWN,
+                           MESSAGING_ERR_FEATURE_DISABLED,
+                           MESSAGING_ERR_DATABASE,
+                           MESSAGING_ERR_MATCH_NOT_FOUND,
+                           MESSAGING_ERR_INVALID_PARAM},
+                 description = "This command will touch one or more persistent messages that match the supplied parameters.",
+                 details = "N/A.",
+                 allowGuestCall = true,
+                 requires_authentication = true 
+               ]
+               TouchMessageResponse touchMessages(TouchMessageRequest);
+
+               [
+                 id = 5,
+                 errors = {MESSAGING_ERR_UNKNOWN,
+                           MESSAGING_ERR_FEATURE_DISABLED,
+                           MESSAGING_ERR_DATABASE,
+                           MESSAGING_ERR_MATCH_NOT_FOUND,
+                           MESSAGING_ERR_INVALID_PARAM},
+                 description = "This command will return one or more persistent messages stored for this user.",
+                 details = "N/A.",
+                 allowGuestCall = true,
+                 requires_authentication = true 
+               ]
+               GetMessagesResponse getMessages(FetchMessageRequest);
+
+               [
+                 id = 6,
+                 errors = {MESSAGING_ERR_UNKNOWN,
+                           MESSAGING_ERR_FEATURE_DISABLED,
+                           MESSAGING_ERR_MAX_ATTR_EXCEEDED,
+                           MESSAGING_ERR_DATABASE,
+                           MESSAGING_ERR_TARGET_NOT_FOUND,
+                           MESSAGING_ERR_TARGET_TYPE_INVALID,
+                           MESSAGING_ERR_TARGET_INBOX_FULL},
+                 description = "This command will send the provided message to recepients defined by MessageTarget.",
+                 details = "While similar to the sendMessage RPC, it also allows the caller to specify the sender.",
+                 client_export = false,
+                 allowGuestCall = true,
+                 requiresUserSession = false
+               ]
+               SendMessageResponse sendSourceMessage(SendSourceMessageRequest);
+               
+               [
+                 id = 7,
+                 errors = {MESSAGING_ERR_MAX_ATTR_EXCEEDED,
+                           MESSAGING_ERR_PROFANITY_SYSTEM},
+                 description = "This command will send the provided message to all online users.",
+                 details = "N/A",
+                 allowGuestCall = true,
+                 requiresUserSession = false,
+                 requires_authentication = true
+               ]
+               SendGlobalMessageResponse sendGlobalMessage(SendGlobalMessageRequest);
+               
+        } // methods
+        
+        events
+        {
+            [ id = 1000 ]
+            MessageSentEvent(MessageSent);
+        }
+           
+        notifications
+        {
+            [
+              id = 1,
+              description = "Message received.",
+              details = "This notification is sent by the slave to the affected client session." 
+            ]
+            NotifyMessage(ServerMessage);
+        }// notifications
+        
+    } // slave
+}
+}
+}
+
+

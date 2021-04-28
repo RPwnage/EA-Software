@@ -1,0 +1,125 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuild')}' == 'exclude'">
+    <target name="incredibuild" description="Build the library using IncrediBuild" allowoverride="true">
+      <property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}" />
+
+      <set-config-vs-version/>
+
+      <property name="sln-file" value="@{GetSolutionFileName('${eaconfig.build.group}', '${generate-single-config??false}', '${eaconfig.build.split-by-group-names??true}')}"/>
+      <property name ="all-sln-files" local="true">
+        ${sln-file}
+      </property>
+
+      <!-- eaconfig doesn't save the sln file in this location, but it was requested by a game team to also check here for the sln file. -->
+      <do unless="@{FileExists('${sln-file}')}">
+        <property name="sln-file" value="${package.builddir}/${config}/${package.name}.sln"/>
+        <property name="all-sln-files" local="true">
+          ${property.value}
+          ${sln-file}
+        </property>
+      </do>
+      <fail unless="@{FileExists('${sln-file}')}" message="Need to generate SLN file for ${package.name} package.  Couldn't find solution file(s): ${all-sln-files}"/>
+
+      <property name="platform.name.${config-system}" value="@{GetVisualStudioPlatformName()}"/>
+
+      <GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+      <GetVSConfigName ConfigPropertyName="vsproj_config_name"/>
+
+      <!-- Define TMP environment variable to pass to incredibuild -->
+      <property name="IncrediTempPath" value="@{PathGetDirectoryName('${sln-file}')}\IncrediTemp"/>
+      <mkdir dir="${IncrediTempPath}" unless="@{DirectoryExists('${IncrediTempPath}')}"/>
+      <choose>
+        <do if="${incredibuild.supports.sln??true}">
+          <!-- Incredibuild, uses the visual studio solution for distributing the build, may not work on platforms that don't support visual studio builds -->
+          <dependent name="IncrediBuild"/>
+
+          <property name="incredibuild.xgConsole.repeatpattern" local="true" unless="@{PropertyExists('incredibuild.xgConsole.repeatpattern')}">
+            Timed out waiting for Build System process to initialize.
+            Timed out waiting for reply from local connection (after 60 seconds
+          </property>
+
+          <repeatexecif program="${package.IncrediBuild.BuildConsole.exe}"
+                  repeatpattern="${incredibuild.xgConsole.repeatpattern}" maxlinestoscan="50" workingdir="${IncrediTempPath}">
+            <args>
+              <arg value='"${sln-file}"'/>
+              <arg value='/CFG="${vsproj_config_name}|${platform.name.${config-system}}"'/>
+              <arg value='/All' if="${incredibuild.keep_going??false}"/>
+              <arg value='/ShowAgent' if="${incredibuild.show_agent??false}"/>
+              <arg value='/ShowTime' if="${incredibuild.show_time??false}"/>
+              <arg value='/NoLogo' unless="${incredibuild.show_logo??true}"/>
+              <arg value='${incredibuild.custom_options}' unless="@{StrIsEmpty('${incredibuild.custom_options??}')}"/>
+              <arg value='"/Prj=${eaconfig.build-one-module}"' if="@{PropertyExists('eaconfig.build-one-module')}"/>
+            </args>
+            <env>
+              <option name="TMP" value="${IncrediTempPath}"/>
+              <option name="TEMP" value="${IncrediTempPath}"/>
+            </env>
+          </repeatexecif>
+        </do>
+        <do>
+          <warn message="This config '${config}' does not appear to support Incredibuild SLN builds. Performing basic visualstudio build instead."/>
+          <call target="visualstudio"/>
+        </do>
+      </choose>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuildall')}' == 'exclude'">
+    <target name="incredibuildall" description="Build all the configurations using incredibuild" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="incredibuild" />
+      <call target="eaconfig-buildall-caller" force="true" />
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuild-example-all')}' == 'exclude'">
+    <target name="incredibuild-example-all" description="Build all the configurations using incredibuild-example" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="incredibuild-example" />
+      <property name="eaconfig.build.group" value="example" />
+      <call target="eaconfig-buildall-caller" force="true" />
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuild-tool-all')}' == 'exclude'">
+    <target name="incredibuild-tool-all" description="Build all the configurations using incredibuild-tool" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="incredibuild-tool" />
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="eaconfig-buildall-caller" force="true" />
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuild-test-all')}' == 'exclude'">
+    <target name="incredibuild-test-all" description="Build all the configurations using incredibuild-test" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="incredibuild-test" />
+      <property name="eaconfig.build.group" value="test" />
+      <call target="eaconfig-buildall-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuild-example')}' == 'exclude'">
+    <target name="incredibuild-example" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+      <call target="incredibuild"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuild-test')}' == 'exclude'">
+    <target name="incredibuild-test" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <call target="incredibuild"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'incredibuild-tool')}' == 'exclude'">
+    <target name="incredibuild-tool" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="incredibuild"/>
+    </target>
+  </do>
+
+</project>

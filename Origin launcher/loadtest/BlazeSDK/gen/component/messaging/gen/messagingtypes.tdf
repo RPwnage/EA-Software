@@ -1,0 +1,403 @@
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+namespace Blaze
+{
+namespace Messaging
+{
+
+/////////////////////////////////////////////////////////////////
+// Typedefs
+/////////////////////////////////////////////////////////////////
+[ description="Unique message identifier assigned to every message by the Blaze server. 0 for invalid messages." ]
+typedef uint64_t MessageId;
+
+[ description="Optional message type that may be set by the sender of the message." ]
+typedef uint32_t MessageType;
+
+[ description="Optional message tag that may be set by the sender of the message." ]
+typedef uint32_t MessageTag;
+
+[ description="Persistent message status that may be set via the touchMessages method." ]
+typedef uint32_t MessageStatus;
+
+[ description="Persistent message status bitmask used to specify the status bits to set via the touchMessages method." ]
+typedef uint32_t MessageStatusMask;
+
+[ description="Message timestamp assigned to every message by the Blaze server. Seconds since the epoch." ]
+typedef uint32_t Timestamp;
+
+[ description="Message attribute key type. Customer defined _processed_: [0..0xFEFF] or _unprocessed_[0xB0000..0xBFFFF]" ]
+typedef uint32_t AttrKey;
+
+[ description="Message attribute value type. Arbitrary string data of size [0..MSG_ATTR_STR_MAX]" ]
+typedef string(MSG_ATTR_STR_MAX) AttrValue;
+
+[ description="Message attribute map type." ]
+typedef map<AttrKey, AttrValue> MessageAttrMap;
+
+[ description="Message type list." ]
+typedef list<MessageType> MessageTypeList;
+
+[ description="Unique message identifiers in a list assigned to every message by the Blaze server. 0 for invalid messages." ]
+typedef list<MessageId> MessageIdList;
+
+[ description="Slave session identifiers." ]
+typedef list<SlaveSessionId> SlaveSessionIdList;
+
+[ description="Target Entity identifiers." ]
+typedef list<EntityId> TargetIdList;
+
+/////////////////////////////////////////////////////////////////
+// Constants
+/////////////////////////////////////////////////////////////////
+[ description="Maximum size of a single message attribute string. Includes null terminator." ]
+const uint32_t MSG_ATTR_STR_MAX = 1024;
+[ description="Invalid message ID." ]
+const MessageId MESSAGE_ID_INVALID = 0;
+[ description="Maximal number of substitution parameters that can be associated with a _processed_ attribute." ]
+const uint32_t PARAM_COUNT_LIMIT = 10;
+
+[ description="Attribute key reserved for _processed_ TITLE attribute." ]
+const uint32_t MSG_ATTR_TITLE = 0xFF00;
+[ description="Attribute key reserved for _processed_ SUBJECT attribute." ]
+const uint32_t MSG_ATTR_SUBJECT = 0xFF01;
+[ description="Attribute key reserved for _processed_ BODY attribute." ]
+const uint32_t MSG_ATTR_BODY = 0xFF02;
+
+[ description="Minimal valid attribute key for _processed_ custom attributes." ]
+const uint32_t CUSTM_ATTR_MIN = 0x0000;
+[ description="Maximal valid attribute key for _processed_ custom attributes. Keys 0xFF00-0xFFFF are reserved for Blaze." ]
+const uint32_t CUSTM_ATTR_MAX = 0xFEFF;
+
+[ description="Minimal valid attribute key for substitution parameters associated with _processed_ attributes." ]
+const uint32_t PARAM_ATTR_MIN = 0x10000;
+[ description="Maximal valid attribute key for substitution parameters associated with _processed_ attributes." ]
+const uint32_t PARAM_ATTR_MAX = 0xAFFFF;
+
+[ description="Minimal valid attribute key for _unprocessed_ custom attributes." ]
+const uint32_t CLEAN_ATTR_MIN = 0xB0000;
+[ description="Maximal valid attribute key for _unprocessed_ custom attributes." ]
+const uint32_t CLEAN_ATTR_MAX = 0xBFFFF;
+
+/////////////////////////////////////////////////////////////////
+// Enumerations
+/////////////////////////////////////////////////////////////////
+[ description="Specifies the sort order of messages. Used by FetchMessage RPC." ]
+enum MessageOrder
+{
+    ORDER_DEFAULT, // the default order returned by the server (typically ascending MESSAGE_ID order)
+    ORDER_TIME_ASC,
+    ORDER_TIME_DESC
+};
+
+/////////////////////////////////////////////////////////////////
+// Bitsets
+/////////////////////////////////////////////////////////////////
+[ description="Flags used to modify the behavior of the message (set by the sender)." ]
+bitfield MessageFlags
+{
+    [description="Message will be persisted to the target's inbox"]
+    Persistent : 1;
+    [description="Message will be echoed to sender (regardless of IncludeSelf setting)"]
+    Echo : 1;
+    [description="Message attributes defined as _processed_ will be filtered for profanity"]
+    FilterProfanity : 1;
+    [description="Message attributes defined as _processed_ will be localized"]
+    Localize : 1;
+    [description="Message will be delivered to the sender if sender matches target"]
+    IncludeSelf : 1;
+    [description="Exclude the list of persistent message IDs in the response (applicable only if persistent message flag is set)."]
+    OmitMessageIds : 1;
+};
+
+[ description="Flags used to modify the behavior of the global message (set by the sender)." ]
+bitfield GlobalMessageFlags
+{
+    [description="Message attributes defined as _processed_ will be localized"]
+    Localize : 1;
+};
+
+[ description="Flags used to signal special message state (set by the server)." ]
+bitfield ServerFlags
+{
+    [description="Message was explicitly fetched by the recipient"]
+    Fetched : 1;
+};
+
+[ description="Flags used specify the fields to use when matching message(s) to fetch/purge." ]
+bitfield MatchFlags
+{
+    [description="Match message ID (precludes other flags)"]
+    MatchId : 1;
+    [description="Match message source object id (allows other flags)"]
+    MatchSource : 1;
+    [description="Match message type (allows other flags)"]
+    MatchType : 1;
+    [description="Match message target object id (allows other flags)"]
+    MatchTarget : 1;
+    [description="Match message status (allows other flags)"]
+    MatchStatus : 1;
+    [description="Match message types (allows other flags)"]
+    MatchTypes : 1;
+    [description="Exclude message types (allows other flags)"]
+    NotMatchTypes : 1;
+};
+
+/////////////////////////////////////////////////////////////////
+// Core TDFs
+/////////////////////////////////////////////////////////////////
+[
+ description = "Object that is sent by the message sender to the Blaze server for delivery.",
+ details = "This object has both blaze-defined and customer-defined fields."
+]
+class ClientMessage
+{
+    [tag="ttyp", description="Used to specify the entity type of target entity ids."]
+    ObjectType mTargetType;
+        
+    [tag="tids", description="Used to specify message target entity ids.", allowref=true]
+    TargetIdList mTargetIds;    
+    
+    [tag="flag", description="Message flags (Blaze defined)."]
+    MessageFlags mFlags;
+    
+    [tag="type", description="Message type (Sender defined)."]
+    MessageType mType;
+    
+    [tag="tag", description="Message tag (Sender defined)."]
+    MessageTag mTag;
+    
+    [tag="stat", description="Message status bits (Sender defined)."]
+    MessageStatus mStatus;
+    
+    [tag="attr", description="Attribute map (Blaze and/or Sender defined attributes).", allowref=true]
+    MessageAttrMap mAttrMap;
+};
+
+[
+ description = "Request object that is sent by the message sender to all online users.",
+ details = "Allow caller to send message to all online users."
+]
+class SendGlobalMessageRequest
+{
+    [tag="flag", description="Message flags (Blaze defined)."]
+    GlobalMessageFlags mFlags;
+ 
+    [tag="type", description="Message type (Sender defined)."]
+    MessageType mType;
+ 
+    [tag="tag", description="Message tag (Sender defined)."]
+    MessageTag mTag;
+ 
+    [tag="stat", description="Message status bits (Sender defined)."]
+    MessageStatus mStatus;
+ 
+    [tag="attr", description="Attribute map (Blaze and/or Sender defined attributes)."]
+    MessageAttrMap mAttrMap;
+};
+
+[
+ description = "Object that is delivered to the recipient of the message by the Blaze server.",
+ details = "This message type adds server provided fields to the Client message payload."
+]
+class ServerMessage
+{
+    [tag="mgid", description="Message ID (filled by the server)."]
+    MessageId mMessageId;
+    
+    [tag="srce", description="Source object id of the message sender (filled by the server), note EntityId portion is duplicated in CoreIdentification."] 
+    ObjectId mSource;
+
+    [tag="user", description="The core identification info (filled by the server)."]
+    CoreIdentification mSourceIdent; 
+
+    [tag="flag", description="Additional message flags (filled by the server)."]
+    ServerFlags mFlags;
+    
+    [tag="time", description="Message timestamp (filled by the server)."]
+    Timestamp mTimestamp;
+    
+    [tag="pyld", description="Message payload.", allowref=true]
+    ClientMessage mPayload;
+};
+
+[
+ description = "Fetch message(s) request object.",
+ details = "Specifies criteria for matching persistent message(s) to be fetched."
+]
+class FetchMessageRequest
+{
+    [tag="flag", description="Indicates which fields in the Request are used for matching Message objects. When set to 0, matches all messages in the client's inbox."]
+    MatchFlags mFlags;
+    
+    [tag="mgid", description="Message ID to match."]
+    MessageId mMessageId;
+    
+    [tag="srce", description="Message sender to match."] 
+    ObjectId mSource;
+    
+    [tag="targ", description="Message recipient to match."] 
+    ObjectId mTarget;
+    
+    [tag="type", description="Message type to match."]
+    MessageType mType;
+    
+    [tag="typl", description="List of message types to match."]  
+    MessageTypeList mTypeList;  
+    
+    [tag="smsk", description="Message status bitmask to match."]
+    MessageStatusMask mStatusMask;
+    
+    [tag="stat", description="Message status to match."]
+    MessageStatus mStatus;
+    
+    [tag="sort", description="Message sort order.", default=ORDER_DEFAULT]
+    MessageOrder mOrderBy;
+    
+    [tag="psiz", description="Number of results per page. 0 returns all.", default=0]
+    uint32_t mPageSize;
+    
+    [tag="pidx", description="Page index of results to return. 0 returns first page. PageSize must be non-0.", default=0]
+    uint32_t mPageIndex;
+};
+
+[
+ description = "Purge message(s) request object.",
+ details = "Specifies criteria for matching persistent message(s) to be deleted."
+]
+class PurgeMessageRequest
+{
+    [tag="flag", description="Indicates which fields in the Request are used for matching Message objects. When set to 0, matches all messages in the client's inbox."]
+    MatchFlags mFlags;
+    
+    [tag="mgid", description="Message ID to match."]
+    MessageId mMessageId;
+    
+    [tag="srce", description="Message sender to match."] 
+    ObjectId mSource;
+    
+    [tag="type", description="Message type to match."]
+    MessageType mType;
+
+    [tag="smsk", description="Message status bitmask to match."]
+    MessageStatusMask mStatusMask;
+    
+    [tag="stat", description="Message status to match."]
+    MessageStatus mStatus;
+};
+
+[
+ description = "Touch message(s) request object.",
+ details = "Specifies criteria for matching persistent message(s) to be touched."
+]
+class TouchMessageRequest
+{
+    [tag="flag", description="Indicates which fields in the Request are used for matching Message objects. When set to 0, matches all messages in the client's inbox."]
+    MatchFlags mFlags;
+    
+    [tag="mgid", description="Message ID to match."]
+    MessageId mMessageId;
+    
+    [tag="srce", description="Message sender to match."] 
+    ObjectId mSource;
+    
+    [tag="targ", description="Message recipient to match."] 
+    ObjectId mTarget;
+    
+    [tag="type", description="Message type to match."]
+    MessageType mType;
+
+    [tag="smsk", description="Message status bitmask to match."]
+    MessageStatusMask mStatusMask;
+
+    [tag="stat", description="Message status to match."]
+    MessageStatus mStatus;
+    
+    [tag="tmsk", description="Message status bitmask used to touch status."]
+    MessageStatusMask mTouchStatusMask;
+    
+    [tag="tsta", description="Message status to touch."]
+    MessageStatus mTouchStatus;
+};
+
+[
+ description = "Object that encapsulates a message to be sent along with a specified or omitted sender as the source.",
+ details = "Allows caller to specify or omit a sender as opposed to the normal sendMessage call."
+]
+class SendSourceMessageRequest
+{
+    [tag="pyld", description="Message payload.", allowref=true]
+    ClientMessage mPayload;
+    
+    [tag="srce", description="Message source. To omit, do not specify a valid ObjectId type."] 
+    ObjectId mSource;
+};
+
+[
+ description = "Send message response object.",
+ details = "Returns the results of the sendMessage command."
+]
+class SendMessageResponse
+{
+    [tag="mgid", description="Message ID of sent message."]
+    MessageId mMessageId;
+    [tag="mids", description="Message IDs of persistent messages sent to a UserGroup."]
+    MessageIdList mMessageIds;
+};
+
+[
+ description = "Send global message response object.",
+ details = "Returns the results of the sendGlobalMessage command."
+]
+class SendGlobalMessageResponse
+{
+    [tag="mids", description="Message IDs of messages."]
+    MessageIdList mMessageIds;
+};
+
+[
+ description = "Fetch messages response object.",
+ details = "Returns the results of the fetchMessages command."
+]
+class FetchMessageResponse
+{
+    [tag="mcnt", description="Number of messages that matched the specified FetchMessageRequest parameter(s)."]
+    uint32_t mCount;
+};
+
+[ description = "List of ServerMessage objects returned in GetMessagesResponse" ]
+typedef list<ServerMessage> ServerMessageList;
+
+[
+ description = "Fetch persistent messages response object.",
+ details = "Returns the results of the fetchPersistentMessages command."
+]
+class GetMessagesResponse
+{
+    [tag="mslt", description="List of messages"]    
+    ServerMessageList mMessages;
+};
+
+[
+ description = "Purge messages response object.",
+ details = "Returns the results of the purgeMessages command."
+]
+class PurgeMessageResponse
+{
+    [tag="mcnt", description="Number of messages that matched the specified PurgeMessageRequest parameter(s)."]
+    uint32_t mCount;
+};
+
+[
+ description = "Touch messages response object.",
+ details = "Returns the results of the touchMessages command."
+]
+class TouchMessageResponse
+{
+    [tag="mcnt", description="Number of messages that matched the specified TouchMessageRequest parameter(s)."]
+    uint32_t mCount;
+};
+
+} // Messaging
+} // Blaze

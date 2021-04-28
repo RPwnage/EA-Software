@@ -1,0 +1,801 @@
+/*! ************************************************************************************************/
+/*!
+    \file riverposter.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/attributes.h"]
+#include "framework/gen/attributes.tdf"
+
+[headername = "framework/tdf/externalsessiontypes.h"]
+#include "framework/gen/externalsessiontypes.tdf"
+
+namespace Blaze
+{
+namespace RiverPoster
+{
+// event core reserved name
+// any defined events not containing a member with this name won't be usable nor sent to river
+const char8_t* EVENT_HEADER_MEMBER_NAME = "core";
+
+const char8_t* PIN_REQUIRED_FIELD_VALUE_UNKNOWN = "unknown";
+
+// title id type to use for platform-agnostic events on shared-cluster deployments
+const char8_t* PIN_TITLE_ID_TYPE_COMMON = "service";
+
+const char8_t* PIN_EVENT_TYPE_BLAZE_SERVER = "server_blaze";
+const char8_t* PIN_SDK_TYPE_BLAZE = "blaze";
+const char8_t* PIN_ENTITY_TYPE_PLAYER = "player";
+const char8_t* PIN_PLAYER_ID_TYPE_ACCOUNT = "nucleus";
+const char8_t* PIN_PLAYER_ID_TYPE_PERSONA = "persona";
+const char8_t* PIN_GAMEGROUP_FRIEND_TYPE = "group";
+const char8_t* PIN_UNDERAGE_FLAG = "underage_flag";
+const char8_t* PIN_GAME_TYPE = "online";
+const char8_t* PIN_MODE_TYPE = "multiplayer";
+const char8_t* PIN_BLAZE_GAME_TYPE_GROUP = "group";
+const char8_t* PIN_BLAZE_GAME_TYPE_GAMESESSION = "gamesession";
+const char8_t* PIN_CROSSPLAY_OPTOUT_FLAG = "opt_out_crossplay_flag";
+
+// mp_match_info status codes
+const char8_t* MATCH_INFO_STATUS_JOIN = "join";
+const char8_t* MATCH_INFO_STATUS_LEAVE = "leave";
+const char8_t* MATCH_INFO_STATUS_BEGIN = "match_begin";
+const char8_t* MATCH_INFO_STATUS_END = "match_end";
+
+// mp_match_info teams_stats and player_stats keys
+const char8_t* MATCH_INFO_STATS_KEY_TEAM_INDEX = "team_index";
+
+// mp_match_info end reasons
+const char8_t* MATCH_INFO_END_REASON_NORMAL = "normal";
+const char8_t* MATCH_INFO_END_REASON_ERROR = "error";
+
+// connection technology status codes
+const char8_t* CONNECTION_TECHNOLOGY_NORMAL = "normal";
+const char8_t* CONNECTION_TECHNOLOGY_DEMANGLER = "demangler";
+const char8_t* CONNECTION_TECHNOLOGY_CONCIERGE = "concierge";
+
+// mp_match_join join methods
+const char8_t* MATCH_JOIN_METHOD_DIRECT = "direct";
+const char8_t* MATCH_JOIN_METHOD_MATCHMAKING = "matchmaking";
+const char8_t* MATCH_JOIN_METHOD_CREATED = "created";
+const char8_t* MATCH_JOIN_METHOD_REMATCH = "rematch";
+
+// mp_match_join statuses
+const char8_t* MATCH_JOIN_STATUS_SUCCESS = "success";
+const char8_t* MATCH_JOIN_STATUS_ERROR = "error";
+const char8_t* MATCH_JOIN_STATUS_TIMEOUT = "timeout";
+const char8_t* MATCH_JOIN_STATUS_CANCELED = "canceled";
+const char8_t* MATCH_JOIN_STATUS_MATCHMAKING_FOUND_GAME = "found";
+const char8_t* MATCH_JOIN_STATUS_MATCHMAKING_CREATED_GAME = "created";
+const char8_t* MATCH_JOIN_STATUS_SUCCESS_RESERVED = "success_reserved";
+const char8_t* MATCH_JOIN_STATUS_MATCHMAKING_FOUND_GAME_RESERVED = "found_reserved";
+const char8_t* MATCH_JOIN_STATUS_MATCHMAKING_CREATED_GAME_RESERVED = "created_reserved";
+
+// connection statuses
+const char8_t* CONNECTION_STATUS_SUCCESS = "success";
+const char8_t* CONNECTION_STATUS_FAILED = "failed";
+const char8_t* CONNECTION_STATUS_IMPACTING = "true";
+const char8_t* CONNECTION_STATUS_NOT_IMPACTING = "false";
+
+// connection types
+const char8_t* CONNECTION_TYPE_GAME = "GAME";
+const char8_t* CONNECTION_TYPE_VOIP = "VOIP";
+
+// PIN client platform types
+// we don't list every PIN-defined platform in the enumeration, only ones Blaze recognizes and supports
+[description="Enumeration of Blaze Client Platforms Type"]
+enum PINClientPlatform
+{
+    [description="unknown client platform type"]
+    unknown,
+    [description="PC"]
+    pc,
+    [description="Xbox One"]
+    xbox_one,
+    [description="PlayStation 4"]
+    ps4,
+    [description="Android"]
+    android,
+    [description="iOS"]
+    iOS,
+    [description="http user"]
+    web,
+    [description="other client platform type"]
+    other,
+    [description="PlayStation 5"]
+    ps5,
+    [description="Xbox Series X"]
+    xbsx,
+    [description="Stadia"]
+    stadia
+};
+
+[description="A player ID mapped it's PIN Player ID type (persona, nucleus, uid, etc.)"]
+typedef map<string(-1), string(-1)> PlayerIdTypeMap;
+
+[trackChanges = true]
+class PostPINEventRequestHeader
+{
+    [tag="appi", description="MD5 hash string to identify the Blaze server as trusted or non-throttled. Used to populate the custom HTTP header 'application-id'.", nameoverride="application-id"]
+    string(-1) mApplicationId;
+
+    [tag="tenv", description="The environment this Blaze instance is running in. Used to populate the custom HTTP header 'x-ea-env'.", nameoverride="x-ea-env"]
+    string(-1) mEnvironment;
+};
+
+typedef list<variable> PINEventList;
+[trackChanges = true]
+class PostPINEventRequestBody
+{
+    // class includes HTTP headers for POST request
+    [tag="taxv", description="PIN Taxonomy version. Also used to populate the custom HTTP header 'x-ea-taxv'.", nameoverride="taxv"]
+    string(128) mTaxonomyVersion;
+
+    [tag="tidt", description="Title Id type. Also used to populate the custom HTTP header 'x-ea-game-id-type'.", nameoverride="tidt"]
+    string(32) mTitleIdType;
+
+    [tag="tiid", description="Title Id. Also used to populate the custom HTTP header 'x-ea-game-id'.", nameoverride="tid"]
+    string(128) mTitleId;
+
+    [tag="psts", description="UTC timestamp for this request being sent to River (ISO standard format).", nameoverride="ts_post"]
+    string(-1) mPostTimestamp;
+
+    [tag="sdkt", default="blaze", description="Sdk type.", nameoverride="sdkt", printFormat="lower"]
+    string(32) mSdkType;
+
+    [tag="etyp", description="Used to differentiate different entity taxonomies now available through PIN. Will always be 'player' for Blaze.", default="player", nameoverride="entity_type"]
+    string(128) mEntityType;
+
+    // include list of variable TDFs for Events
+    [tag="elst", description="The list of PIN events to send.", nameoverride="events", allowref=true]
+    PINEventList mEventList;
+};
+
+// every defined event must include this as a member named 'core'
+[trackChanges = true]
+class PINEventHeaderCore
+{
+    // event header parameters
+    // mandatory
+    [tag="step", 
+        description="Step number. Should be sequential, and unique per event within a session. The combination of <sid, s> should globally uniquely identify an event within a title.", 
+        nameoverride="s"]
+    uint64_t mStepNumber; // (eliminate by: GOS-30204)
+
+    [tag="pidt", description="Player Id type.", nameoverride="pidt"]
+    string(16) mPlayerIdType;
+
+    [tag="plid", description="Player Id, generally a persona ID.", nameoverride="pid"]
+    string(128) mPlayerId;
+
+    [tag="evts", description="UTC timestamp for this event (ISO standard format).", nameoverride="ts_event"]
+    string(-1) mEventTimestamp; // (change to microsecond resolution by: GOS-30204)
+
+    [tag="evnm", description="The name of this event.", nameoverride="en"]
+    string(128) mEventName;
+
+    [tag="evty", default="server_blaze", description="Event type- identifies client vs server events and the specific source.", nameoverride="et"]
+    string(64) mEventType;
+
+    [tag="relt", description="Release Type.", nameoverride="rel"]
+    string(-1) mReleaseType;
+
+    [tag="plat", description="Title platform.", nameoverride="plat"]
+    string(16) mPlatform;
+    
+    [tag="cver", description="Game build version.", nameoverride="v", printFormat="lower"]
+    string(128) mGameBuildVersion;
+
+    [tag="pidm", description="Mapping of additonal player types, such as gamertags, to their ids when available.", nameoverride="pidm", printFormat="lower"]
+    map<string(-1),string(-1)> mAdditionalPlayerIdMap;
+
+    [tag="sid", description="SessionId, globally unique per title (Blaze uses UserSessionId).", nameoverride="sid"]
+    string(128) mSessionId;
+
+    [tag="ises", default=true, description="True if triggered when the player is in a session.", nameoverride="is_sess"]
+    bool mIsSession;
+
+    [tag="clip", description="Client IP for this player.", nameoverride="clientIP"]
+    string(128) mClientIp;
+
+    [tag="dloc", description="ISO standard for device locale <language>_<country>.", nameoverride="loc"]
+    string(5) mDeviceLocale;
+
+    [tag="cstm", description="Custom fields, if needed.", nameoverride="custom", printFormat="lower"]
+    map<string(-1), generic> mCustomDataMap;
+
+    [tag="didm", description="Mapping of device ids when available.", nameoverride="didm", printFormat="lower"]
+    map<string(-1),string(-1)> mDeviceIdMap;
+
+    [tag="sdkv", description="Sdk version.", nameoverride="sdkv"]
+    string(-1) mSdkVersion;
+
+    [tag="subs", description="List of subscriptions the player has, e.g. ea_access, origin_access", nameoverride="subs"]
+    list<string(16)> mSubscriptions;
+
+    [tag="mode", description="The game mode for this game session associated with this event, if any.", nameoverride="game_mode", printFormat="lower"]
+    string(-1) mGameMode;
+
+    [tag="mtyp", description="The game mode type used to enter the game. Titles can override this parameter with the value of 'gameModeTypeAttributeName' game attribute.", default="multiplayer", nameoverride="mode_type"]
+    string(64) mModeType;
+
+    [tag="gtyp", description="The type of game. Titles can override this parameter with the value of 'gameGameTypeAttributeName' game attribute.", default="online", nameoverride="game_type"]
+    string(16) mGameType;
+
+    [tag="map", description="The well-defined 'map' gamesession attribute, if available, at the time the event is generated.", nameoverride="map", printFormat="lower"]
+    string(-1) mMap;
+};
+
+class PostPINEventRequest
+{
+    [tag="rhdr", description="The headers of this PIN request", nameoverride="headers"]
+    PostPINEventRequestHeader mPostPINEventRequestHeader;
+ 
+    [tag="rbdy", description="The body of this PIN request", nameoverride="body"]
+    PostPINEventRequestBody mPostPINEventRequestBody;
+};
+
+// sample PIN event, demonstrating the required tags, format and included header member
+[trackChanges = true]
+class PinEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+};
+
+typedef map<string(-1), string(-1)> UserExtendedDataStringMap;
+
+class FriendInfo
+{
+    [tag="frid", description="Friend id.", nameoverride="pid"]
+    string(128) mPlayerId;
+
+    [tag="fidt", description="Friend id type. Must be either 'persona' for blazeId or 'nucleus' for nucleus accountId provided as the PlayerId", nameoverride="pidt"]
+    string(-1) mPlayerIdType;
+
+    [tag="fplt", description="Platform of the friend in the joined game.", nameoverride="plat"]
+    string(-1) mPlatform;
+
+    [tag="ingr", description="Indicates whether the friend is in a game group or not.", nameoverride="in_group"]
+    bool mInGroup;
+};
+
+[trackChanges = true]
+class GqfDetails
+{
+    [tag="qfnm", description="Configured GQF name", nameoverride="factor_name"]
+    string(-1) mFactorName;
+
+    [tag="qffv", description="Value of the property used in evaluation (existing game) or assigned by packer during game creation", nameoverride="factor_field_value"]
+    string(-1) mFactorFieldValue;
+
+    [tag="tval", description="Target value for the GQF", nameoverride="factor_target_value"]
+    float mFactorTargetValue;
+    
+    [tag="vval", description="Viable value for the GQF", nameoverride="factor_viable_value"]
+    float mFactorViableValue;
+
+    [tag="eval", description="Actual value for the GQF", nameoverride="factor_evaluated_value"]
+    float mFactorEvaluatedValue;
+
+    [tag="fsco", description="Score for the GQF", nameoverride="factor_quality_score"]
+    float mFactorQualityScore;
+
+    [tag="prto", description="Participation ratio for this factor", nameoverride="factor_participation_ratio"]
+    float mFactorParticipationRatio;
+};
+
+typedef list<GqfDetails> GqfDetailsList;
+
+const char8_t* MP_MATCH_JOIN_EVENT_NAME = "mp_match_join";
+[trackChanges = true]
+class MPMatchJoinEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+
+    [tag="mid", description="The match id (game reporting id) at the time of join.", nameoverride="mid"]
+    string(128) mMatchId;
+
+    [tag="goid", description="Game session ID.", nameoverride="goid"]
+    string(-1) mGameId;
+
+    [tag="svid", description="persistedGameId used to support the recommendation engine.", nameoverride="server_id"]
+    string(-1) mServerId;
+
+    [tag="ntop", description="The network topology for this game session.", nameoverride="net_topo", printFormat="lower"]
+    string(-1) mNetworkTopology;
+
+    [tag="gtyp", description="The game type (either group or gamesession).", nameoverride="blaze_game_type", printFormat="lower"]
+    string(32) mBlazeGameType;
+
+    [tag="ctyp", description="The client type for the user sending this event.", nameoverride="client_type", printFormat="lower"]
+    string(-1) mClientType;
+
+    [tag="jtyp", description="The join method used to enter this game.", nameoverride="join_method"]
+    string(-1) mJoinMethod;
+
+    [tag="stat", description="The result of the join attempt (including errors).", nameoverride="status"]
+    string(32) mJoinStatus;
+
+    [tag="scod", description="Optional string to capture any error ids or codes received.", nameoverride="status_code", printFormat="lower"]
+    string(32) mStatusCode;
+
+    [tag="phse", description="The game phase (pre-, in-, post-game).", nameoverride="phase", printFormat="lower"]
+    string(-1) mGamePhase;
+
+    // default is UINT64_MAX to ensure mp_match_join sent from GM master to MM slave can properly encode the PIN event when MM finishes in less than 1 second.
+    // EATDF_JAVA can't generate code for UINT64_MAX properly, so substituting -1 for UINT64_MAX
+    [tag="mmdr", default=-1, description="The duration of matchmaking, if the join was via matchmaking, in seconds.", nameoverride="mmdur"]
+    uint64_t mMatchmakingDurationSeconds;
+
+    [tag="ettm", description="The estimated time to match, in seconds.", nameoverride="est_mmdur"]
+    uint64_t mEstimatedTimeToMatchSeconds;
+
+    [tag="mmto", description="The timeout for matchmaking, in seconds.", nameoverride="max_mmdur"]
+    uint64_t mMatchmakingTimeoutDuration;
+
+    [tag="fits", description="The fit score from matchmaking, if the join was via matchmaking.", nameoverride="fitscore"]
+    uint32_t mMatchmakingFitScore;
+
+    [tag="maxf", description="Maximum possible fit score for this matchmaking attempt.", nameoverride="max_fitscore"]
+    uint32_t mMatchmakingMaxFitScore;
+
+    [tag="snam", description="Name of the matchmaking scenario used to join.", nameoverride="scenario", printFormat="lower"]
+    string(32) mScenarioName;
+
+    [tag="ssna", description="Name of the matchmaking scenario subsession used to join.", nameoverride="scenario_subsession", printFormat="lower"]
+    string(32) mScenarioSubsessionName;
+
+    [tag="svar", description="The matchmaking scenario variant used to join.", nameoverride="scenario_variant", printFormat="lower"]
+    string(32) mScenarioVariant;
+
+    [tag="sver", description="The matchmaking scenario version used to join.", nameoverride="scenario_version", printFormat="lower"]
+    string(32) mScenarioVersion;
+
+    [tag="pram", description="The scenario parameters used for this matchmaking attempt.", nameoverride="scenario_params", printFormat="lower"]
+    map<string(-1), string(128)> mScenarioParams;
+
+    [tag="prol", description="The role for the joining user.", nameoverride="player_role", printFormat="lower"]
+    string(-1) mPlayerRole;
+
+    [tag="ued", description="The UserExtendedData of the joining user.", nameoverride="player_data", printFormat="lower"]
+    UserExtendedDataStringMap mUserExtendedData;
+
+    [tag="qos", description="The latencies to each QoS data center for the joining user.", nameoverride="latencies"]
+    map<string(-1), uint32_t> mQoSLatencies;
+
+    [tag="frlt", description="List of friends in the game.", nameoverride="friends"]
+    list<FriendInfo> mFriendsList;
+
+    [tag="trac", description="The tracking tag of this matchmaking attempt for matchmaking A/B testing.", nameoverride="tracking_tag", printFormat="lower"]
+    string(-1) mTrackingTag;
+
+    [tag="tusr", description="The total number of online (gameplay) users.", nameoverride="tot_players"]
+    uint64_t mTotalUsersOnline;
+
+    [tag="tugm", description="The total number of users in an online game session.", nameoverride="tot_players_in_game"]
+    uint64_t mTotalUsersInGame;
+
+    [tag="tumm", description="The total number of users in matchmaking sessions.", nameoverride="tot_players_in_mm"]
+    uint64_t mTotalUsersInMatchmaking;
+
+    [tag="tmat", description="The total number of users that were matched by this session, may be greater than the number of users placed into a game. In packer flow, it's the number of players matched/cycled through a game, counted from the moment the session was assigned to the game; in case of failure, it's the biggest number of players matched in any silo. ", nameoverride="tot_players_matched"]
+    uint64_t mTotalUsersMatched;
+
+    [tag="tpma", description="The total number of users that were potentially matched by this session. In packer flow, it's the number of players in the largest silo this session was added to.", nameoverride="tot_players_potentially_matched"]
+    uint64_t mTotalUsersPotentiallyMatched;
+
+    [tag="init", description="The initiator of the matchmaking session that resulted in this event.", nameoverride="initiator_id"]
+    PlayerIdTypeMap mInitiatorId;
+
+    [tag = "tid", description = "Identifier of the tournament the game is part of.", nameoverride = "tournament_id"]
+    TournamentId mTournamentId;
+
+    [tag = "torg", description = "Name of organization running the tournament.", nameoverride = "tournament_organizer"]
+    TournamentOrganizer mTournamentOrganizer;
+    [tag="smig", description="Number of times this packer session was migrated to a new packer instance.", nameoverride="session_migrations"]
+    uint64_t mSessionMigrations;
+
+    [tag="silc", description="Cumulative number of silos this session had membership in, measured across all packer slaves the session is processed by.", nameoverride="silo_count"]
+    uint64_t mSiloCount;
+
+    [tag="evcn", description="Cumulative number of times this packer session is evicted from a game, measured across all packer slaves the session is processed by.", nameoverride="eviction_count"]
+    uint64_t mEvictionCount;
+
+    [tag="mpfs", description="Highest fitscore achieved by this session over its life.", nameoverride="max_provisional_fitscore"]
+    uint32_t mMaxProvisionalFitscore;
+
+    [tag="mafs", description="The lowest possible acceptable GQF score.", nameoverride="min_accepted_fitscore"]
+    uint32_t mMinAcceptedFitscore;
+
+    [tag="qfdt", description="List of GQF details for the matched game, in order of priority.", nameoverride="game_quality_details"]
+    GqfDetailsList mGqfDetails;
+};
+
+typedef map<string(-1),uint16_t,ignorecase> RoleMap;
+class TeamInfo
+{
+    [tag="tidx", description="Team index.", nameoverride="team_index"] // name is intended to match MATCH_INFO_STATS_KEY_TEAM_INDEX
+    uint32_t mTeamIndex;
+
+    [tag="pcnt", description="Player count.", nameoverride="player_cnt"]
+    uint32_t mPlayerCount;
+
+    [tag="rcnt", description="Reserved player count.", nameoverride="reserved_cnt"]
+    uint32_t mReservedPlayerCount;
+
+    [tag="tued", description="Calculated team UserExtendedData.", nameoverride="team_data", printFormat="lower"]
+    UserExtendedDataStringMap mTeamUeds;
+
+    [tag="trol", description="Team role counts.", nameoverride="team_roles", printFormat="lower"]
+    RoleMap mTeamRoles;
+};
+
+typedef map<string(-1),uint32_t> PlayerStats;
+
+const char8_t* MP_MATCH_INFO_EVENT_NAME = "mp_match_info";
+[trackChanges = true]
+class MPMatchInfoEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+
+    [tag="mid", description="The match id (game reporting id).", nameoverride="mid"]
+    string(-1) mMatchId;
+
+    [tag="goid", description="Game session ID.", nameoverride="goid"]
+    string(-1) mGameId;
+
+    [tag="ppst", description="Best ping site for this player.", nameoverride="player_ps"]
+    string(16) mPlayerPingSite;
+
+    [tag="gpst", description="Best ping site for this game.", nameoverride="game_ps"]
+    string(16) mGamePingSite;
+
+    [tag="ntop", description="The network topology for this game session.", nameoverride="net_topo", printFormat="lower"]
+    string(-1) mNetworkTopology;
+
+    [tag="gtyp", description="The game type (either group or gamesession).", nameoverride="blaze_game_type", printFormat="lower"]
+    string(32) mBlazeGameType;
+
+    [tag="ctyp", description="The client type for the user sending this event.", nameoverride="client_type", printFormat="lower"]
+    string(-1) mClientType;
+
+    [tag="jtyp", description="The join method used to enter this game.", nameoverride="join_method"]
+    string(-1) mJoinMethod;
+
+    [tag="stat", description="The status for this event.", nameoverride="status"]
+    string(-1) mMatchStatus;
+
+    [tag="scod", description="Optional string to capture any error ids or codes received.", nameoverride="status_code", printFormat="lower"]
+    string(32) mStatusCode;
+
+    [tag="endr", description="Additional detail into how the player left the game.", nameoverride="end_reason"]
+    string(-1) mEndReason;
+
+    [tag="phse", description="The game phase (pre-, in-, post-game).", nameoverride="phase", printFormat="lower"]
+    string(-1) mGamePhase;
+
+    [tag="crts", description="Timestamp for when the Blaze GameSession was created.", nameoverride="ts_screate"]
+    string(-1) mGameCreationTimestamp;
+
+    [tag="msts", description="Timestamp for when the current match started.", nameoverride="ts_mstart"]
+    string(-1) mMatchStartTimestamp;
+
+    [tag="pjts", description="Timestamp for when the player joined the game session.", nameoverride="ts_mjoin"]
+    string(-1) mPlayerJoinTimestamp;
+
+    [tag="mets", description="Timestamp for when the player left the game session (or the match ended).", nameoverride="ts_mend"]
+    string(-1) mMatchEndTimestamp;
+
+    [tag="pcnt", description="Player count at the time of this event.", nameoverride="player_cnt"]
+    uint16_t mPlayerCount;
+
+    [tag="pcap", description="Player capacity of this match.", nameoverride="max_players"]
+    uint16_t mPlayerCapacity;
+
+    [tag="tcnt", description="Number of teams in this match.", nameoverride="num_teams"]
+    uint16_t mTeamCount;
+
+    [tag="gatt", description="Game attributes.", nameoverride="game_attr", printFormat="lower"]
+    Collections::AttributeMap mGameAttributes;
+
+    //teams_stats
+    [tag="tlst", description="List of team stats in-game at the time of this event.", nameoverride="teams_stats", printFormat="lower"]
+    list<TeamInfo> mTeamStatsList;
+
+    //player_stats
+    [tag="psts", description="Stats for the current player.", nameoverride="player_stats", printFormat="lower"]
+    PlayerStats mPlayerStats;
+
+    [tag="patt", description="Player attributes (for the current player).", nameoverride="player_attr", printFormat="lower"]
+    Collections::AttributeMap mPlayerAttributes;
+
+    [tag="prol", description="Player role (for the current player).", nameoverride="player_role", printFormat="lower"]
+    string(-1) mPlayerRole;
+
+    [tag="cpe", description="Indicates whether the Game supports multiple platforms for cross play.", nameoverride="crossplay_enabled"]
+    bool mCrossplayEnabled;
+
+    [tag="cpg", description="Indicates if the game had more than one platform for cross play.", nameoverride="is_crossplay_game"]
+    bool mPINIsCrossplayGame;
+
+    [tag = "tid", description = "Identifier of the tournament the game is part of.", nameoverride = "tournament_id"]
+    TournamentId mTournamentId;
+
+    [tag = "torg", description = "Name of organization running the tournament.", nameoverride = "tournament_organizer"]
+    TournamentOrganizer mTournamentOrganizer;
+};
+
+const char8_t* CONNECTION_EVENT_NAME = "connection";
+[trackChanges = true]
+class ConnectionEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+     
+    // connection event fields
+    [tag="goid", description="Game session ID.", nameoverride="goid"]
+    string(-1) mGameId;
+
+    [tag="ppst", description="Best ping site for this player.", nameoverride="player_ps"]
+    string(-1) mPlayerPingSite;
+
+    [tag="addr", description="The IP address being connected to.", nameoverride="target_ip"]
+    string(-1) mTargetIpAddress;
+
+    [tag="tpst", description="Best ping site for the other endpoint of this connection.", nameoverride="target_ps"]
+    string(32) mTargetPingSite;
+
+    [tag="gpst", description="Best ping site for this game.", nameoverride="game_ps"]
+    string(-1) mGamePingSite;
+
+    [tag="ntop", description="The network topology for this game session.", nameoverride="net_topo", printFormat="lower"]
+    string(-1) mNetworkTopology;
+
+    [tag="jtyp", description="The join method used to enter this game.", nameoverride="join_method"]
+    string(-1) mJoinMethod;
+
+    [tag="ctyp", description="The client type for the user sending this event.", nameoverride="client_type", printFormat="lower"]
+    string(-1) mClientType;
+
+    [tag="lres", description="Additional detail into how the player left the game.", nameoverride="leave_reason", printFormat="lower"]
+    string(16) mLeaveReason;
+
+    [tag="cxnt", description="Connection tech used to establish connectivity, such as concierge or demangler.", nameoverride="cxn_tech"]
+    string(-1) mConnectionTechnology;
+
+    [tag="cxty", description="What kind of connection this is, such as GAME or VOIP.", nameoverride="cxn_type"]
+    string(-1) mConnectionType;
+
+    [tag="cpst", description="Ping site for CCS (if CCS was used).", nameoverride="ccs_ps"]
+    string(-1) mCcsPingSite;
+
+    [tag="loss", description="Packet loss on this connection.", nameoverride="pkt_loss"]
+    float mPacketLoss;
+
+    [tag="avgl", description="Average latency on this connection, in milliseconds.", nameoverride="avg_lat"]
+    float mAverageLatency;
+
+    [tag="maxl", description="Maximum measured latency on this connection, in milliseconds.", nameoverride="max_lat"]
+    float mMaximumLatency;
+
+// New data types: 
+//    [tag="ctad", description="Connection Time After Demangle.", nameoverride="conntime_after_dmgl"]
+//    uint32_t mConnTimeAfterDemangle;
+//    [tag="ctbd", description="Connection Time Before Demangle.", nameoverride="conntime_before_dmgl"]
+//    uint32_t mConnTimeBeforeDemangle
+//    [tag="ctdg", description="Connection Time spent Demangling.", nameoverride="conntime_demangling"]
+//    uint32_t mConnTimeDemangling;
+
+// Future data type:
+    //[tag="csat", description="Connection Time spent acquiring a Secure Association (xone).", nameoverride="conntime_secure_assoc"]
+    //uint32_t mConnTimeSecureAssociation;
+
+    [tag="stat", description="The game connection's status", nameoverride="status"]
+    string(-1) mStatus;
+
+    [tag="impc", description="If the connection was player impacting or not", nameoverride="impacting"]
+    bool mImpacting;
+};
+
+
+const char8_t* CONNECTION_STATS_EVENT_NAME = "connection_stats";
+[trackChanges = true]
+class ConnectionStatsEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+     
+    // connection event fields
+    [tag="goid", description="Game session ID.", nameoverride="goid"]
+    string(-1) mGameId;
+
+    [tag="addr", description="The IP address being connected to.", nameoverride="target_ip"]
+    string(-1) mTargetIpAddress;
+
+    [tag="type", description="The type of stats value that are included in this event."]
+    string(16) mType;
+
+    [tag="ists", description="A list of stats, if ints are used.", nameoverride="samples_int"]
+    list<int32_t> mSamplesInt;
+
+    [tag="fsts", description="A list of stats, if floats are used.", nameoverride="samples_float"]
+    list<float> mSamplesFloat;
+};
+
+
+const char8_t* LOGIN_EVENT_NAME = "login";
+[trackChanges = true]
+class LoginEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+
+    [tag="type", description="The type of service. This will always be 'blaze'.", default="blaze"]
+    string(16) mType;
+
+    [tag="stat", description="The status of the login. Will either be 'success' or 'error'."]
+    string(16) mStatus;
+
+    [tag="code", description="The status code, i.e., the Blaze error code string.", nameoverride="status_code", printFormat="lower"]
+    string(64) mStatusCode;
+};
+
+const char8_t* LOGOUT_EVENT_NAME = "logout";
+[trackChanges = true]
+class LogoutEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+
+    [tag="type", description="The type of service. This will always be 'blaze'.", default="blaze"]
+    string(16) mType;
+
+    [tag="stat", description="The status of the logout. Will either be 'normal' or 'error'.", nameoverride="end_reason"]
+    string(-1) mEndReason;
+
+    [tag="code", description="The status code, i.e., the Blaze error code string.", nameoverride="status_code", printFormat="lower"]
+    string(32) mStatusCode;
+
+    [tag="sdur", description="The session duration in seconds.", nameoverride="sdur"]
+    uint64_t mSessionDuration;
+};
+
+
+class AccessibilityElementAttributes
+{
+    [tag="subt", description="What sort of data is being submitted to the accessibility system.", nameoverride="submit_type"]
+    string(16) mSubmitType;
+
+    [tag="subc", description="How many elements were submitted to the accessibility system.", nameoverride="submit_cnt"]
+    uint32_t mSubmitCount;
+
+    [tag="rest", description="What sort of data is being returned from the accessibility system.", nameoverride="result_type"]
+    string(16) mResultType;
+
+    [tag="resc", description="How many elements were returned from the accessibility system.", nameoverride="result_cnt"]
+    uint32_t mResultCount;
+};
+
+class AccessibilityFeatureAttributes
+{
+    [tag="feat", description="Which accessibility feature is being used; stt, tts.", nameoverride="type"]
+    string(16) mFeature;
+
+    [tag="usgc", description="How many times was the feature used.", nameoverride="usage_cnt"]
+    uint32_t mUsageCount;
+
+    [tag="empc", description="How many times was the feature used, but the results were empty.", nameoverride="empty_result_cnt"]
+    uint32_t mEmptyResultCount;
+
+    [tag="errc", description="How many times was an error produced by the feature.", nameoverride="error_cnt"]
+    uint32_t mErrorCount;
+
+    [tag="durd", description="The sum of the amount of time spent waiting for the service to return results.", nameoverride="delay_dur"]
+    uint32_t mResponseDelay;
+
+    [tag="eatt", description="Properties of the data sent/received for the .accessibility feature.", nameoverride="element_attr"]
+    AccessibilityElementAttributes mElementAttr;
+};
+
+const char8_t* ACCESSIBILITY_EVENT_NAME = "accessibility_usage";
+[trackChanges = true]
+class AccessibilityUsageEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+
+    [tag="type", description="The type of service. This will always be 'blaze'.", default="blaze"]
+    string(16) mType;
+
+    [tag="fatt", description="List of accessibility events (tts,stt).", nameoverride="feature_attr"]
+    list<AccessibilityFeatureAttributes> mFeatureAttr;
+};
+
+// These all need to be defined as lower-case to comply with PIN taxonomy
+enum ErrorTypes
+{
+    game_creation_failed,
+    matchmaking_failed_to_start,
+    authentication_failed,
+    entitlement_grant_failed,
+    entitlement_access_failed,
+    entitlement_modify_failed,
+    entitlement_usage_count_fetch_failed,
+    age_requirement_check_failed,
+    modify_user_account_failed,
+    stat_update_failed,
+    external_system_unavailable,
+    gamelist_fetch_failed
+};
+
+enum ExternalSystemUnavailableErr
+{
+    NUCLEUS_SERVICE_UNAVAILABLE,
+    MPSD_SERVICE_UNAVAILABLE
+};
+
+const char8_t* ERROR_EVENT_NAME = "error";
+[trackChanges = true]
+class ErrorEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+
+    [tag="sid", description="SessionId, globally unique per title (Blaze uses UserSessionId), omit if event list contains events for multiple users.", nameoverride="sid"]
+    string(-1) mSessionId;
+
+    [tag="erty", description="The error type.", nameoverride="type"]
+    string(-1) mErrorType;
+
+    [tag="erid", description="The status code, i.e., the Blaze error code string.", nameoverride="errid", printFormat="lower"]
+    string(128) mErrorId;
+
+    [tag="sety", description="The type of service. This will always be 'blaze'.", default="blaze", nameoverride="server_type"]
+    string(32) mServerType;
+
+    [tag="sena", description="The name of the server (servicename).", nameoverride="server_name", printFormat="lower"]
+    string(32) mServerName;
+};
+
+
+[trackChanges = true]
+class GameEndGameReport
+{    
+    [tag="attr", description="Game Specific game report"]
+    string(-1) mAttributes;
+};
+
+[trackChanges = true]
+class GameEndCustomField
+{
+    [tag="bgr", description="Represent the custom field as a blaze gamereport", nameoverride="blaze_game_report"]
+    GameEndGameReport mGameReport;
+};
+
+const char8_t* GAME_END_EVENT_NAME = "game_end";
+[trackChanges = true]
+class GameEndEvent
+{
+    [tag="hcre", description="The PIN Event's defined core header data.", nameoverride="core"]
+    PINEventHeaderCore mHeaderCore;
+    
+    [tag="cust", description="Game End events custom data, specific to each game team"]
+    GameEndCustomField mCustom;
+    
+    [tag="endr", description="Indicates why the game ended", nameoverride="end_reason"]
+    string(-1) mEndReason;
+    
+    [tag="gatt", description="Game attributes about the game that just ended", nameoverride="game_attr"]
+    map<string(-1), string(-1)> mGameAttributes;
+    
+    [tag="mmto", description="The duration of the game in seconds", nameoverride="gdur"]
+    uint64_t mGameDuration;
+};
+
+} // namepsace RiverPoster
+} // namespace Blaze

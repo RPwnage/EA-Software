@@ -1,0 +1,350 @@
+[headername="framework/tdf/networkaddress.h"]
+#include "framework/gen/networkaddress.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/network.h"]
+#include "framework/gen/network.tdf"
+
+namespace Blaze
+{
+namespace Redirector
+{
+
+// Note that several types defined in this file are explicitly duplicated from previously
+// defined types in the Blaze framework code.  This is to provide isolation between the
+// redirector and the blaze instances.  Since there will be a single rdir instance running
+// supporting many blaze servers (with differing versions), it is important that API and type
+// changes are closely monitored.  Duplicating types already used in the framework allows a
+// given blaze instance to provide the necessary translation as changes are made without
+// affecting compatibility with the rdir.
+
+const uint32_t SERVICE_NAME_MAX_LENGTH = 64;
+const uint32_t CLIENT_NAME_MAX_LENGTH = 64;
+const uint32_t CLIENT_VERSION_MAX_LENGTH = 64;
+const uint32_t CLIENT_SKU_ID_MAX_LENGTH = 64;
+const uint32_t ENVIRONMENT_NAME_MAX_LENGTH = 16;
+const uint32_t PLATFORM_NAME_MAX_LENGTH = 16;
+const uint32_t CONNECTION_PROFILE_MAX_LENGTH = 32;
+const uint32_t SITE_NAME_MAX_LENGTH = 64;
+const uint32_t NAMESPACE_MAX_LENGTH = 32;
+
+[generateProto = true]
+enum InstanceType
+{
+    SLAVE,
+    AUX_MASTER,
+    CONFIG_MASTER,
+    AUX_SLAVE
+};
+
+
+[generateProto = true]
+class IpAddress
+{
+    [tag="host"] string(MAX_HOSTNAME_LENGTH) mHostname;
+    [tag="ip"] uint32_t mIp;
+    [tag="port"] uint16_t mPort;
+};
+
+[generateProto = true]
+class XboxServerAddress
+{
+    [tag="sid"] uint32_t mServiceId;
+    [tag="site"] string(SITE_NAME_MAX_LENGTH) mSiteName;
+    [tag="port"] uint16_t mPort;
+};
+
+// NOTE: This union does uses the VALU tags because it is used by the redirector (which needs it for backwards compatibility).
+[generateProto = true]
+union ServerAddress
+{
+    [tag="VALU"] IpAddress mIpAddress;
+    [tag="VALU"] XboxServerAddress mXboxServerAddress;
+};
+
+[generateProto = true]
+class AddressRemapEntry
+{
+    [tag="sip"] uint32_t mSrcIp;
+    [tag="mask"] uint32_t mNetMask;
+    [tag="sid"] uint32_t mServiceId;
+    [tag="sprt"] uint16_t mSrcPort;
+    [tag="dprt"] uint16_t mDstPort;
+};
+
+[generateProto = true]
+class NameRemapEntry
+{
+    [tag="sip"] string(MAX_HOSTNAME_LENGTH) mHostname;
+    [tag="sid"] uint32_t mServiceId;
+    [tag="site"] string(SITE_NAME_MAX_LENGTH) mSiteName;
+    [tag="sprt"] uint16_t mSrcPort;
+    [tag="dprt"] uint16_t mDstPort;
+};
+
+typedef list<AddressRemapEntry> AddressRemapList;
+typedef list<NameRemapEntry> NameRemapList;
+
+[generateProto = true]
+enum ServerAddressType
+{
+    INTERNAL_IPPORT,
+    EXTERNAL_IPPORT,
+    XBOX_SERVER_ADDRESS
+};
+
+[generateProto = true]
+class ServerAddressInfo
+{
+    [tag="type"] ServerAddressType mType;
+    [tag="addr"] ServerAddress mAddress;
+};
+
+[generateProto = true]
+class ServerEndpointInfo
+{
+    [tag="chan"] string(32) mChannel;
+    [tag="prot"] string(32) mProtocol;
+    [tag="enc"] string(32) mEncoder;
+    [tag="dec"] string(32) mDecoder;
+    [tag="bind"] BindType mBindType;
+    [tag="adrs"] list<ServerAddressInfo> mAddresses;
+    [tag="ccon", default=UINT32_MAX] uint32_t mCurrentConnections;
+    [tag="mcon", default=UINT32_MAX] uint32_t mMaxConnections;
+    [tag="ctyp", default=""] string(64) mConnectionTypeString;
+};
+
+[trackChanges = true, generateProto=true]
+class ServerInstance
+{
+    [tag="load"] int32_t mLoad;
+    [tag="svc", default=true] bool mInService;
+    [tag="id"] uint32_t mInstanceId;
+    [tag="type"] InstanceType mInstanceType;
+    [tag="name"] string(256) mInstanceName;
+    [tag="endp"] list<ServerEndpointInfo> mEndpoints;
+    [tag="cwd"] string(256) mCurrentWorkingDirectory;
+    [tag="cltp"] ClientTypeList mClientTypes;
+};
+
+typedef list<string(128)> ClientVersionList;
+
+[tdfid = "hash", trackChanges = true, generateProto=true]
+class ServerInfoData
+{
+    [tag="name"] ServiceName mName;
+    [tag="snms"] ServiceNameList mServiceNames;
+    [tag="plat"] string(256) mPlatform;
+    [tag="vers"] string(256) mVersion;
+    [tag="cgvs"] string(256) mConfigVersion;
+    [tag="btim"] string(256) mBuildTime;
+    [tag="locn"] string(256) mBuildLocation;
+    [tag="btgt"] string(256) mBuildTarget;
+    [tag="depo"] string(256) mDepotLocation;
+
+    typedef list<ServerInstance> ServerInstanceList;
+
+    [tag="mstr"] ServerInstance mMasterInstance;
+    [tag="xmst"] ServerInstanceList mAuxMasters;
+    [tag="xslv"] ServerInstanceList mAuxSlaves;
+    [tag="inst"] ServerInstanceList mInstances;
+
+    [tag="cver"] ClientVersionList mCompatibleClientVersions;
+    [tag="iver"] ClientVersionList mIncompatibleClientVersions;
+
+    [tag="amap"] AddressRemapList mAddressRemaps;
+    [tag="nmap"] NameRemapList mNameRemaps;
+    [tag="xdns"] uint32_t mDefaultDnsAddress;
+    [tag="svid"] uint32_t mDefaultServiceId;
+};
+
+
+const char8_t* ENVIRONMENT_SDEV = "sdev";
+const char8_t* ENVIRONMENT_STEST = "stest";
+const char8_t* ENVIRONMENT_SCERT = "scert";
+const char8_t* ENVIRONMENT_PROD = "prod";
+
+const char8_t* CONNECTIONPROFILE_STANDARD_CLIENT = "standardInsecure_v4";
+const char8_t* CONNECTIONPROFILE_STANDARD_CLIENT_SECURE = "standardSecure_v4";
+const char8_t* CONNECTIONPROFILE_XBOX360_CLIENT = "xbox360Insecure_v4";
+const char8_t* CONNECTIONPROFILE_XBOX360_CLIENT_SECURE = "xbox360Secure_v4";
+
+class XboxId
+{
+    [tag="xuid"] ExternalXblAccountId mXuid;
+    [tag="gtag"] string(32) mGamertag;
+    [tag="sbid"] string(32) mSandboxId;
+};
+
+union FirstPartyId
+{
+    [tag="VALU"] blob mPS3Ticket;
+    [tag="VALU"] XboxId mXboxId;
+    [tag="VALU"] string(MAX_PERSONA_LENGTH) mPersona;
+};
+
+[description="A request to get a specific Blaze server instance. The requesting client is uniquely identified by its name and version."]
+class ServerInstanceRequest
+{
+    [tag="name", description="The Blaze service name to connect to"] ServiceName mName;
+    [tag="env", description="The service's environment (dev, prod, etc.)"] string(ENVIRONMENT_NAME_MAX_LENGTH) mEnvironment;
+    [tag="plat", description="The service's platform (pc, xbl2, etc.)"] string(PLATFORM_NAME_MAX_LENGTH) mPlatform;
+    [tag="prof", description="The client's connection profile. Valid profiles are defined in the redirector server config"] string(CONNECTION_PROFILE_MAX_LENGTH) mConnectionProfile;
+
+    [tag="clnt", description="The client's name"] string(CLIENT_NAME_MAX_LENGTH) mClientName;
+    [tag="cver", description="The client's version"] string(CLIENT_VERSION_MAX_LENGTH) mClientVersion;
+    [tag="csku", description="The client's SKU ID"] string(CLIENT_SKU_ID_MAX_LENGTH) mClientSkuId;
+    [tag="loc", description="The client's locale"]  uint32_t mClientLocale;
+    [tag="tzof", description="The client's time zone offset from GMT (in seconds)", default=INT32_MIN] int32_t mTimeZoneOffset;
+    [tag="bsdk", description="The client's BlazeSDK version"] string(64) mBlazeSDKVersion;
+    [tag="btim", description="The client's BlazeSDK build date"] string(64) mBlazeSDKBuildDate;
+    [tag="dsdk", description="The client's DirtySDK version"] string(64) mDirtySDKVersion;
+    [tag="fpid", description="The client's first party ID"] FirstPartyId mFirstPartyId;
+    [tag="cltp", description="The client's type (console, web, etc.)", default=CLIENT_TYPE_INVALID] ClientType mClientType;
+    [tag="cplt", description="The client platform type", default=INVALID] ClientPlatformType mClientPlatform;
+    [tag="tria", description="True if the client is running a trial license."] bool isTrial;
+};
+
+const uint32_t MAX_MESSAGE_LENGTH = 1024;
+typedef string(MAX_MESSAGE_LENGTH) DisplayMessage;
+typedef list<DisplayMessage> DisplayMessageList;
+typedef blob CACertificate;
+typedef list<CACertificate> CACertificateList;
+
+class ServerInstanceInfo
+{
+    [tag="addr"] ServerAddress mAddress;
+    [tag="secu"] bool mSecure;
+    [tag="amap"] AddressRemapList mAddressRemaps;
+    [tag="nmap"] NameRemapList mNameRemaps;
+    [tag="xdns"] uint32_t mDefaultDnsAddress;
+    [tag="msgs"] DisplayMessageList mMessages;
+    [tag="cert"] CACertificateList mCertificateList;
+    [tag="tsvn"] string(256) mTrialServiceName;
+};
+
+class ServerInstanceError
+{
+    [tag="msgs"] DisplayMessageList mMessages;
+};
+
+class ServerListRequest
+{
+    [tag="name"] string(256) mName;
+    [tag="env"] string(256) mEnvironment;
+    [tag="plat"] string(256) mPlatform;
+    [tag="prof"] string(256) mConnectionProfile;
+    [tag="cnt"] uint32_t mCount;
+};
+
+class ServerListResponse
+{
+    [tag="list"] list<ServerInfoData> mServers;
+}; 
+
+[generateProto=true]
+class SlaveInfo
+{
+    [tag="inst"] ServerInstance mInstance;
+    [tag="type"] InstanceType mType;
+    [tag="name", description="The service name that the slave/aux instance component belongs to"] ServiceName mServiceName;
+    [tag="snms"] ServiceNameList mServiceNames;
+};
+
+[generateProto=true]
+class ServiceRemoveInfo
+{
+    [tag="name"] ServiceName mServiceName;
+};
+
+[generateProto=true]
+class InstanceRemoveInfo
+{
+    [tag="snam"] ServiceName mServiceName;
+    [tag="snms"] ServiceNameList mServiceNames;
+    [tag="inam"] string(256) mInstanceName;
+    [tag="iid"] int32_t mInstanceId;
+    [tag="type"] InstanceType mType;
+};
+
+
+class SunsetData
+{
+    [tag="wdat", default="", description="The date when the redirector will being giving the sunset warning to connecting users."]
+    string(64) mWarnDate;
+
+    [tag="wmsg", default="", description="The standard message to display when warning of an impending sunset."]
+    string(64) mWarnMessage;
+
+    [tag="ddat", default="", description="The Date when the redirector will no longer allow connections to the service name."]
+    string(64) mDownDate;
+
+    [tag="dmsg", default="", description="The standard message to display when the service is sunset."]
+    string(64) mDownMessage;
+};
+
+[description="This map contains a list of sunset entries keyed by the sunset serviceName, and the key is case sensitive."]
+typedef map<ServiceName, SunsetData> SunsetDataMap;
+
+[description="The list of sunset titles."]
+class SunsetListResponse
+{
+    [tag="stil"] SunsetDataMap mTitles;
+};
+
+typedef string(64) X509EntryName;
+typedef string(256) X509EntryValue;
+typedef map<X509EntryName, X509EntryValue> X509EntryMap;
+
+[description="Used in the CACertificateRequest to identify criteria that will be used to find and return a single ca certificate"]
+class X509MatchCriteria
+{
+    [tag="entr", description="A map of name/value pairs representing the entries in the issuers name contained in the certificates. This is used to filter the certificates sent in the response"]
+    X509EntryMap mX509EntryMap;
+
+    [tag="bits", description="If not 0, then the returned certificate's public key size must match the specified number of bits"]
+    int32_t mPublicKeyBits;
+
+    [tag="v", description="The requestor's DirtySDK version."]
+    string(32) mDirtySDKVersion;
+
+    [tag="vers", default=0, description="The requestor's DirtyCert version."]
+    uint32_t mDirtyCertVersion;
+
+    [tag="host", default="", description="The hostname from the URL for which a CA is needed."]
+    string(MAX_HOSTNAME_LENGTH) mHostname;
+
+    [tag="port", default=0, description="The port from the URL for which a CA is needed."]
+    int32_t mPort;
+
+    [tag="name", description="The service name identifying the title of the requestor."]
+    ServiceName mServiceName;
+};
+
+[description="Request the list of CA certificates that match the specified requirements.  Certificates configured as 'global' on the redirector will always be included in the response."]
+class CACertificateRequest
+{
+    [tag="plat", default=NATIVE, description="The platform name, as configured on the redirector"]
+    ClientPlatformType mPlatform;
+
+    [tag="name", description="The service name, as configured on the redirector"]
+    ServiceName mServiceName;
+};
+
+[description="The list of CA certificates that matched the specified requirements in the request.  Certificates configured as 'global' on the redirector will always be included in the response."]
+class CACertificateResponse
+{
+    [tag="cert", description="The list of certificates"]
+    CACertificateList mCertificateList;
+};
+
+} // namespace Redirector
+} // namespace Blaze
+
+
+
+
+
+

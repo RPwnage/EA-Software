@@ -1,0 +1,124 @@
+[headername="framework/tdf/networkaddress.h"]
+#include "framework/gen/networkaddress.tdf"
+
+// TODO: Disabling proto generation because of circular import caused by Blaze::Util namespace
+[headername="framework/tdf/qosdatatypesnetwork.h", includeProto=false]
+#include "framework/gen/qosdatatypesnetwork.tdf"
+
+namespace Blaze
+{
+
+[description="This is a number we pick randomly, used as the latency when we failed to get the real one from the ping site."]
+const uint32_t MAX_QOS_LATENCY  = 0x0FFF0FFF;
+
+[description="The bucket size, in ms, used when storing metrics by latency."]
+const uint16_t LATENCY_BUCKET_SIZE = 10;
+
+[description="The maximum number of buckets to use when storing metrics by latency (including the bucket for 0 latency)."]
+const uint16_t MAX_NUM_LATENCY_BUCKETS = 121;
+
+[description="For the purpose of gathering QOS metrics, this code is used to represent an error condition where the latency at a ping site exceeded MAX_QOS_LATENCY."]
+const int32_t MAX_QOS_LATENCY_ERR_CODE = 1;
+
+[description="The mask used to extract the error code from the hresult returned in QOS tests."]
+const int32_t QOS_HRESULT_ERR_CODE_MASK = 0xFFFF;
+
+[description="The mask used to extract the facility (i.e. DirtySDK module number) from the hresult returned in QOS tests, after the hresult is bit shifted."]
+const int32_t QOS_HRESULT_FACILITY_MASK = 0x7FF;
+
+[description="The bit shift used to extract the facility (i.e. DirtySDK module number) from the hresult returned in QOS tests."]
+const uint16_t QOS_HRESULT_FACILITY_SHIFT = 16;
+
+[description="Address of the qos corrdinator host."]
+typedef string(64) ServerAddress;
+
+[description="Contains name of ping site used to do qos ping."]
+typedef string(64) PingSiteAlias;
+
+[description="Qos latency by ping site name map."]
+typedef map<PingSiteAlias, int32_t, ignorecase> PingSiteLatencyByAliasMap;
+
+[description="Contains the name of the qos configuration to load from the qos coordinator."]
+typedef string(64) QosProfile;
+
+typedef list<int32_t> PingSiteLatencyList;
+
+
+[description="Contains qos ping site information including address and port."]
+class QosPingSiteInfo
+{
+  [tag="psa"] ServerAddress mAddress;
+  [tag="psp"] uint16_t      mPort;
+};
+
+typedef map<PingSiteAlias, QosPingSiteInfo, ignorecase> PingSiteInfoByAliasMap;
+
+[description="Helper request to  update the ping site info.  Only pings the Coordinator if there's a difference in the info."]
+class RefreshQosPingSiteMapRequest
+{
+    [tag="psam"] PingSiteInfoByAliasMap mPingSiteAliasMap;
+
+    [tag="cnfg", description="Qos Coordinator version of the config."]
+    int32_t mProfileVersion;
+};
+
+[description="Information about the Qos Pingsites for RPC response"]
+class QosPingSitesResponse
+{
+    [tag="qpr", description="Profile name used in QosCoordinator lookup.  Blank if QoS 1.0 was used."]
+    QosProfile mProfile;
+
+    [tag="ltps", description="Ping site's info used for latency qos service request, keyed by alias.  Dupe of config values when QoS 1.0 is used, copy of looked up info if QoS 2.0 is used."]
+    PingSiteInfoByAliasMap mPingSiteInfoByAliasMap;
+
+    [tag="cnfg", description="Qos Coordinator version of the config."]
+    int32_t mProfileVersion;
+};
+
+[description="Contains information to get setup with the qos coordinator service."]
+class QosCoordinatorInfo
+{
+  [tag="qca"] ServerAddress mAddress;
+  [tag="qcp"] uint16_t      mPort;
+  [tag="qpr"] QosProfile    mProfile;
+
+  [tag="dpsp", default=4001] uint16_t      mDefaultPingSitesPort;
+};
+
+[description="Contains qos related settings in util.cfg file."]
+class QosConfigInfo
+{
+    [tag="qcnf", description="Location to get the rest of the qos configuration."]
+    QosCoordinatorInfo      mQosCoordinatorInfo;
+
+    [tag="cqrr", default="0s", description="How often will client attempt to refresh their QoS information.  Disabled by default with 0s."]
+    TimeValue mClientQosRefreshRate;
+
+    [tag="cqfr", default="5m", description="How often will client attempt to refresh their QoS information after a failure.  Disabled by default with 0s."]
+    TimeValue mClientQosFailureRefreshRate;
+
+    [tag="sqrr", default="15s", description="How often will servers attempt to refresh their qos profile."]
+    TimeValue mServerQosRefreshRate;
+
+    [tag="vers", default=true, description="If set, the qos refresh will check the version provided by the client (in addition to checking the pingsite list)."]
+    bool mCheckQosProfileVersion;
+
+    [tag="ltps", description="[DEPRECATED] - QoS 1.0 ping site's info used for latency qos service request, keyed by alias."]
+    PingSiteInfoByAliasMap  mPingSiteInfoByAliasMap;
+};
+
+// TODO: Disabling proto generation because of circular import caused by Blaze::Util::NetworkQosData
+[description="Contains Qos data like ping site latency, bandwidth, and ip address.", generateProto=false]
+class NetworkInfo
+{
+    [tag="nlmp", description="Ping site latency map keyed by name."]
+    PingSiteLatencyByAliasMap mPingSiteLatencyByAliasMap;
+
+    [tag="nqos", description="Bandwidth and nat type."]
+    Blaze::Util::NetworkQosData mQosData;
+
+    [tag="addr", description="Address as seen by Qos."]
+    NetworkAddress mAddress;
+};
+
+}

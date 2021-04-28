@@ -1,0 +1,745 @@
+/*! ************************************************************************************************/
+/*!
+    \file matchmaker_server.tdf
+
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="gamemanager/tdf/matchmaker.h"]
+#include "gamemanager/gen/matchmaker.tdf"
+
+[headername="gamemanager/tdf/scenarios.h"]
+#include "gamemanager/gen/scenarios.tdf"
+
+[headername="framework/tdf/userinfotypes_server.h"]
+#include "framework/gen/userinfotypes_server.tdf"
+
+[headername="framework/tdf/userpineventtypes_server.h"]
+#include "framework/gen/userpineventtypes_server.tdf"
+
+[headername="gamemanager/tdf/gamemanager_server.h"]
+#include "gamemanager/gen/gamemanager_server.tdf"
+
+[headername="framework/tdf/qosdatatypesnetwork.h"]
+#include "framework/gen/qosdatatypesnetwork.tdf"
+
+[headername="gamemanager/tdf/matchmaking_properties_config_server.h"]
+#include "gamemanager/gen/matchmaking_properties_config_server.tdf"
+
+
+namespace Blaze
+{
+
+namespace GameManager
+{
+
+enum MatchmakerIdType
+{
+    MATCHMAKER_IDTYPE_SESSION
+};
+
+union GameRequest
+{
+    [tag="jgrq"] JoinGameMasterRequest joinGameRequest;
+    [tag="jgbg"] JoinGameByGroupMasterRequest joinGameByGroupRequest;
+};
+
+class MatchedGame
+{
+    class MemberInfo
+    {
+        [tag="tidx", description="team index"]
+        uint32_t mTeamIndex;
+        [tag="ugid", description="user group id"]
+        UserGroupId mUserGroupId;
+    };
+
+    typedef list<MemberInfo> MemberInfoList;
+
+    [tag="gid", description="matched GameId."]
+    GameId mGameId;
+    
+    [tag="rver"] // PACKER_TODO: Remove this once we change to GB list based queries from sharding broker versions should be added to the GB lists result
+    uint64_t mRecordVersion;
+
+    [tag="gnam", description="the game name."]
+    GameName mGameName;
+     
+    [tag="fit", description="fit score for this game"]
+    FitScore mFitScore;
+    
+    [tag="pac"]
+    uint16_t mParticipantCount;
+
+    [tag="mpc"]
+    uint16_t mParticipantCapacity;
+
+    [tag="mft", description="max possible fit score for this game"]
+    FitScore mMaxFitScore;
+    
+    [tag="ttm", description="The time it took to find the match."]
+    TimeValue mTimeToMatch;
+
+    [tag="ettm", description="The estimated time to find a match."]
+    TimeValue mEstimatedTimeToMatch;
+
+    [tag="ores", description="The overall result of the match against this game."]
+    DebugEvaluationResult mOverallResult;
+    
+    [tag="drr", description="Debug information about the match."]
+    DebugRuleResultMap mDebugResultMap;
+
+    [tag="mili", description="Game roster member info list. Size must match mUserInfoList!"]
+    MemberInfoList mMemberInfoList;
+
+    [tag="uili", description="Game roster user session info list. Size must match mMemberInfoList!"]
+    UserSessionInfoList mUserInfoList;
+};
+typedef list<MatchedGame> MatchedGameList;
+
+[ description = "List of matched games, along with info on the session that found them." ]
+class MatchmakingFoundGames
+{
+    [tag="oid", description="The matchmaking session's owner's user sessionid"]
+    UserSessionId mOwnerUserSessionId;
+    
+    [tag="sid", description="matchmaking session id"]
+    MatchmakingSessionId mMatchmakingSessionId;
+    
+    [tag="scid", description="matchmaking scenario id"]
+    MatchmakingScenarioId mMatchmakingScenarioId;
+    
+    [tag="gids", description="list of game ids to join"]
+    MatchedGameList mMatchedGameList;
+    
+    [tag="req", description="join request for this match"]
+    GameRequest mGameRequest;
+
+    [tag="treq", description="requirements for the team of the game this session is attempting to join."]
+    TeamSelectionCriteria mFoundTeam;
+};
+
+class MatchmakingFoundGameRequest
+{
+    [tag="oid", description="The matchmaking session's owner's user sessionid"]
+    UserSessionId mOwnerUserSessionId;
+    
+    [tag="sid", description="matchmaking session id"]
+    MatchmakingSessionId mMatchmakingSessionId;
+    
+    [tag="scid", description="matchmaking scenario id"]
+    MatchmakingScenarioId mMatchmakingScenarioId;
+
+    [tag="todu", description="The maximum duration of this MM session before timeout."]
+    TimeValue mMatchmakingTimeout;
+    
+    [tag="req", description="join request for this match"]
+    GameRequest mGameRequest;
+
+    [tag="smap", description="Map of user session setup reasons to user session ids."]
+    UserSessionGameSetupReasonMap mUserSessionGameSetupReasonMap;
+
+    [tag="maga", description="matched game info"]
+    MatchedGame mMatchedGame;
+
+    [tag="treq", description="requirements for the team of the game this session is attempting to join."]
+    TeamSelectionCriteria mFoundTeam;
+
+    [tag="ttag", description="The track tag stored from external data source and will be sent to PIN"]
+    string(32) mTrackingTag;
+
+    [tag="tusr", description="The total number of online (gameplay) users at start of matchmaking. (will be sent to PIN)"]
+    uint64_t mTotalUsersOnline;
+
+    [tag="tugm", description="The total number of users in an online game session at start of matchmaking. (will be sent to PIN)"]
+    uint64_t mTotalUsersInGame;
+
+    [tag="tumm", description="The total number of users in matchmaking sessions at start of matchmaking. (will be sent to PIN)"]
+    uint64_t mTotalUsersInMatchmaking;
+};
+
+class MatchmakingFoundGameResponse
+{
+    [tag="sid", description="matchmaking session id"]
+    MatchmakingSessionId mMatchmakingSessionId;
+
+    [tag="scid", description="matchmaking scenario id"]
+    MatchmakingScenarioId mMatchmakingScenarioId;
+    
+    [tag="oid", description="The matchmaking session's owner's user sessionid"]
+    UserSessionId mOwnerUserSessionId;
+
+    [tag="gid", default=INVALID_GAME_ID, description="The GameId if this session joined a game on the master, INVALID_GAME_ID otherwise."]
+    GameId mJoinedGameId;
+    
+    [tag="jext"] JoinExternalSessionParameters mExternalSessionParams;
+    
+    [tag="qosv"] bool mIsAwaitingQosValidation;
+
+    [tag="capa", description="Capacity of Found Game"]
+    uint16_t mFoundGameParticipantCapacity;
+
+    [tag="fgpl", description="Player count in found game"]
+    uint16_t mFoundGamePlayerCount;
+
+    [tag="fgpa", description="Participant count in found game"]
+    uint16_t mFoundGameParticipantCount;
+
+    [tag="fits", description="Fitscore"]
+    FitScore mFitScore;
+
+    [tag="mfit", description="Max possible Fitscore"]
+    FitScore mMaxFitscore;
+    
+    [tag="pins", description="PIN event to submit when MM is complete"]
+    PINSubmission mPinSubmission;
+};
+
+typedef map<UserSessionId, uint32_t> UserSessionsToExternalIpMap;
+class UserSessionExternalIpInformation
+{
+    [tag="rslv", default=false, description="True if all session members have resolved external IPs."]
+    bool mAreAllSessionIpsResolved;
+    
+    [tag="exip", description="Map of UserSessionIds to external IP for determining if users are behind the same firewall."]
+    UserSessionsToExternalIpMap mUserSessionsToExternalIpMap;
+};
+
+[
+    description = "Matching criteria for the connection validation rules."
+]
+class ConnectionCriteria
+{
+    [tag="gidl", description="List of game ids to avoid due to connectivity issues."]
+    Blaze::GameManager::GameIdList  mAvoidGameIdList;
+        
+    [tag="alst", description="List of player ids to avoid due to connectivity issues."]
+    BlazeIdList  mAvoidPlayerIdList;
+    
+    [tag="tier", description="Matchmaking QoS evaluation tier."]
+    uint16_t mTier;
+        
+    [tag="fcnt", description="Matchmaking attempts failed due to connectivity issues, for determining decay step."]
+    uint16_t mFailedConnectionAttempts; 
+};
+
+typedef map<GameNetworkTopology,ConnectionCriteria> QosCriteriaMap;
+
+class StartMatchmakingInternalRequest
+{
+    [tag="req", description="The base start matchmaking request as sent from the client."]
+    StartMatchmakingRequest mRequest;
+    
+    [tag="usrs", description="The matchmaking session's joining users"]
+    GameManager::UserJoinInfoList mUsersInfo;
+    
+    [tag="ownr", description="Session information for the user that initiated the session.  May not be the host, or even in the matchmaking attempt."]
+    UserSessionInfo mOwnerUserSessionInfo;
+
+    [tag="ses", description="The matchmaking session id to use for the created session on the master."]
+    MatchmakingSessionId mMatchmakingSessionId;
+    
+    [tag="addr", description="Data about the external IPs of matchmaking session members for determining if users with strict NATs are behind the same firewall."]
+    UserSessionExternalIpInformation mUserSessionIpInformation;
+
+    [tag="blck", description="a list of external ids that will be blocked by the XblBlockPlayersRule"]
+    ExternalXblAccountIdList mXblAccountIdBlockList;
+
+    [tag="exsd", description="external session data to potentially set on the matched game"]
+    ExternalSessionMasterRequestData mGameExternalSessionData;
+    
+    [tag="qosc", description="Matchmaking QoS criteria, contains per-topology avoid lists and failure counts."]
+    QosCriteriaMap mQosCriteria;
+
+    [tag="scto", description="The overall timeout for the scenario, if this session is part of one."]
+    TimeValue mScenarioTimeoutDuration;
+
+    [tag="ttag", description="The track tag stored from external data source and will be sent to PIN"]
+    string(32) mTrackingTag;
+
+    [tag="tusr", description="The total number of online (gameplay) users at start of matchmaking. (will be sent to PIN)"]
+    uint64_t mTotalUsersOnline;
+
+    [tag="tugm", description="The total number of users in an online game session at start of matchmaking. (will be sent to PIN)"]
+    uint64_t mTotalUsersInGame;
+
+    [tag="tumm", description="The total number of users in matchmaking sessions at start of matchmaking. (will be sent to PIN)"]
+    uint64_t mTotalUsersInMatchmaking;
+
+    [tag="tame", description="Create game template used by dedicated server search."]
+    TemplateName mCreateGameTemplateName;
+
+    [tag="find", description="Dedicated server attribute rules used for searching"]
+    FindDedicatedServerRulesMap mFindDedicatedServerRulesMap;
+
+    [tag="filt", description="The matchmaking session's property filters."]
+    MatchmakingFilterCriteria mMatchmakingFilters;
+
+    [tag="pmap", description="Property/value pairs included in the matchmaking request."]
+    PropertyNameMap mMatchmakingPropertyMap;
+
+    [tag="satt", description="Copy of the original input attributes sent from the client."]
+    ScenarioAttributes mScenarioAttributes;
+
+    [tag="plst", description="Property names referenced by filters in this request required by the template."]
+    PropertyNameList mMatchmakingPropertyList; // PACKER_TODO: This list could be removed in Urraca.1 (options: Dynamic packer property referencing, or packer knows about MM scenarios cfg)
+};
+
+[
+    description = "Cancel an existing matchmaking requests."
+]
+class CancelMatchmakingInternalRequest
+{
+    [tag="msid", description="The matchmaking session id to cancel."]
+    MatchmakingSessionId mMatchmakingSessionId;
+
+    [tag="oid", description="The matchmaking session's owner's user sessionid"]
+    UserSessionId mOwnerUserSessionId;
+
+};
+
+
+class MatchmakingStatus
+{
+    [tag="inid", description="The instance id of the matchmaker slave sending the status"]
+    uint16_t mInstanceId;
+
+    [tag="cpul", description="The the current CPU utilization of the MM slave, as a percentage."]
+    uint32_t mCpuUtilization;
+    
+    [tag="nses", description="The number of requests the MM master is running."]
+    uint32_t mNumSessions;
+};
+
+class StartMatchmakingInternalResponse
+{
+    [tag="resp", description="The base start matchmaking response as sent to the client."]
+    StartMatchmakingResponse mStartMatchmakingResponse;
+    
+    [tag="mmst", description="Matchmaker's status information used with load balancing."]
+    MatchmakingStatus mMatchmakingStatus;
+
+    [tag="ettm"]
+    TimeValue mEstimatedTimeToMatch;
+};
+
+
+//
+// GameManager Notifications
+//
+
+[description="notification that we've udpated specifying user to matchmake a specific dedicated server"]
+class NotifyMatchmakingDedicatedServerOverride
+{
+    [tag="bid"] BlazeId mBlazeId;
+    [tag="gid"] GameId mGameId;
+};
+
+[
+    description = "Contains list of players from the original matchmaking request's reserved external players list, who were reserved into the game."
+]
+class NotifyServerMatchmakingReservedExternalPlayers
+{
+    [tag="usid", description="The usersession id of the matchmaking session."]
+        UserSessionId mUserSessionId;
+
+    [tag="cnot", description="The notification data to send to client."]
+        NotifyMatchmakingReservedExternalPlayers mClientNotification;
+};
+
+
+//
+// Rule Salience Configuration
+//
+typedef list<RuleName> RuleSalienceList;
+[description="The object containing the list of rule names in order of salience."]
+class RuleSalienceConfig
+{
+    [tag="slst", description="List of rule names, ordered by salience."]
+    RuleSalienceList salienceList;
+};
+
+
+typedef int32_t Weight;
+
+//
+// Formulas
+//
+
+[description="The name of the formula used to calculate the fit percent between two numeric values."]
+enum FitFormulaName
+{
+    FIT_FORMULA_GAUSSIAN,
+    FIT_FORMULA_LINEAR,
+    FIT_FORMULA_BINARY
+};
+
+typedef string(32) ParamName;
+typedef string(32) ParamValue;
+
+typedef map<ParamName, ParamValue, ignorecase> FitFormulaParams;
+
+[description="The formula used to calculate the fit percent between two numeric values.", trackChanges = true]
+class FitFormulaConfig
+{
+    [tag="name", description="The name of the formula used to calculate the fit percent between two numeric values."]
+    FitFormulaName name;
+    
+    [tag="prms", description="The parameters of this fit formula."]
+    FitFormulaParams params;
+};
+
+//
+// Range offsets
+//
+[description="A range of values defined by min and max.", trackChanges = true]
+class Range
+{
+    [tag="rmin", description="The minimum value in the range."]
+    int64_t min;
+    
+    [tag="rmax", description="The maximum value in the range."]
+    int64_t max;
+};
+
+typedef string(32) RangeOffsetListName;
+
+typedef uint32_t Time;
+typedef list<string(32)> OffsetList;
+
+[description="A Range offset at a particular time.", trackChanges = true]
+class RangeOffset
+{
+    [tag="time", description="The time at which this range is applied."]
+    Time t;
+    
+    [tag="rnge", description="The range applied at time t."]
+    OffsetList offset;
+};
+
+typedef list<RangeOffset> RangeOffsets;
+
+[description="Range offset list is a name to RangeOffsets pair represents a list of ranges over time.", trackChanges = true]
+class RangeOffsetList
+{
+    [tag="name", description="The name of the Range offset list."]
+    RangeOffsetListName name;
+    
+    [tag="rofs", description="Range offset list used to determine the range at a specific time."]
+    RangeOffsets rangeOffsets;
+};
+
+typedef list<RangeOffsetList> RangeOffsetLists;
+
+
+//
+// Min Fit thresholds.
+//
+[description="String value of 'time:value', ie '0:.5', or '0:EXACT_MATCH_REQUIRED'"]
+typedef string(64) FitThresholdValue;
+typedef list<FitThresholdValue> FitThresholdList;
+typedef map<MinFitThresholdName, FitThresholdList, ignorecase> FitThresholdsMap;
+
+//
+// Possible values
+//
+typedef list<ParamValue> PossibleValuesList;
+
+//
+// Fit Table
+//
+typedef float FitValue;
+typedef list<FitValue> FitTableList;
+
+//
+// Sparse Fit Table
+//
+[description="A sparse fit table value specification.", trackChanges = true]
+class SparseFitValue
+{
+    [tag="col", description="The column value of the fit table."]
+    ParamValue col;
+    
+    [tag="row", description="The row value of the fit table."]
+    ParamValue row;
+    
+    [tag="val", description="The value associated with the col/row combination"]
+    FitValue value;
+};
+// This would be a cleaner implementation of sparse fit table parsing, but would require config change.
+//typedef list<SparseFitValue> SparseFitValueList;
+// Instead we just take a list of strings, similar to our fit threshold values, and parse them out as we read them in.
+typedef list<FitThresholdList> SparseFitValueList;
+
+[description="The sparse fit table.", trackChanges = true]
+class SparseFitTable
+{
+    [tag="diav", default=1.0, description="The diagonal values of the fit table."]
+    FitValue diagonalValue;
+    
+    [tag="offv", default=0.0, description="The off diagonal values of the fit table."]
+    FitValue offDiagonalValue;
+    
+    [tag="rand", default=1.0, description="The random value."]
+    FitValue randomValue;
+    
+    [tag="spar", description="Sparse fit table specific col/row values."]
+    SparseFitValueList sparseValues;
+};
+
+//
+// Voting
+//
+[description="Specify the way a group of players decide the value for a rule, ties are broken randomly."]
+enum RuleVotingMethod
+{
+    OWNER_WINS,
+    VOTE_LOTTERY,
+    VOTE_PLURALITY
+};
+
+enum QosValidationMetricResult
+{
+    PASSED_QOS_VALIDATION,         // success (and fully connected)
+    FAILED_PACKET_LOSS_CHECK,      // failed, but fully connected
+    FAILED_LATENCY_CHECK,          // failed, but fully connected
+    NOT_FULLY_CONNECTED_FAILED,    // failed
+    NOT_FULLY_CONNECTED_INCOMPLETE // user-initiated connection interruption
+};
+
+class GameSessionConnectionComplete
+{
+    [tag="msid", description="The matchmaking session id this request pertains to."]
+    MatchmakingSessionId mMatchmakingSessionId;
+    
+    [tag="gid", description="The the game id QoS was collected for."]
+    GameId mGameId;
+    
+    [tag="topo", description="The network topology of this game."]
+    GameNetworkTopology mNetworkTopology;
+    
+    [tag="qosm", description="Individual user Qos data."]
+    GameQosDataMap mGameQosDataMap;
+};
+
+class QosEvaluationResult
+{
+    [tag="dest", description="If true, the game created via matchmaking should be destroyed."]
+    bool mDestroyCreatedGame;
+    
+    [tag="join", description="List of player ids to transition to ACTIVE_CONNECTED after passing QoS validation."]
+    PlayerIdList  mPassedValidationList;
+    
+    [tag="rmov", description="List of player ids to remove from the game due to QoS validation failures."]
+    PlayerIdList  mFailedValidationList;
+};
+
+[ description = "UserSessionInfo to be used in place of the callers for a pseudo scenarios request.", generateProto = true ]
+class OverrideUserSessionInfo
+{  
+    [tag="uext"]
+    UserExtendedDataMap mDataMap;
+         
+    [tag="qdat", description="Bandwidth and NAT type info."]    
+    Util::NetworkQosData mQosData;
+         
+    [tag="bps", description="The best available ping site."]
+    PingSiteAlias mBestPingSiteAlias;
+    [tag="lat"]
+    PingSiteLatencyByAliasMap mLatencyMap;
+    [tag="long"]
+    float mLongitude;
+    [tag="lati"]
+    float mLatitude;
+    [tag="ctry"]
+    string(MAX_GEOCOUNTRY_LENGTH) mCountry;
+    [tag="tz"]
+    string(MAX_TIMEZONE_LENGTH) mTimeZone;
+    [tag="isp"]
+    string(MAX_ISP_LENGTH) mISP;
+};
+ 
+[ description = "Wraps a scenario matchmaking request with additional options for setting the UserSessionData to utilize for matchmaking.", generateProto = true ]
+class StartPseudoMatchmakingScenarioRequest
+{
+    // Scenario Data:
+    [tag="sreq", description="The scenario request parameters to use for matchmaking."]
+    StartMatchmakingScenarioRequest mStartMatchmakingScenarioRequest;
+     
+  
+    // UserSessionData
+    [tag="snfo", description="The user session data to use for the scenarios request, in place of the caller's user session data."]
+    OverrideUserSessionInfo mOverrideUserSessionInfo;
+};
+
+[tdfid = "hash"]
+class PlayerQosValidationData
+{
+    [tag="fail"]
+    uint16_t mFailureCount;
+
+    [tag="tier"]
+    uint16_t mCriteriaTier;
+
+    [tag="avpl"]
+    PlayerIdList mAvoidedPlayerList;
+
+    [tag="avgl"]
+    GameIdList mAvoidedGameList;
+};
+
+typedef map<GameNetworkTopology, PlayerQosValidationData> MatchmakingQosDataMap;
+typedef list<uint64_t> MatchmakingSessionSlaveIdList;
+typedef list<MatchmakingScenarioId> MatchmakingScenarioIdList;
+
+[tdfid = "hash"]
+class MatchmakingScenarioSessionData
+{
+    [tag="msid"]
+    MatchmakingSessionId mSessionId;
+
+    [tag="snam"]
+    SubSessionName mSubSessionName;
+
+    [tag="berr"]
+    uint32_t mError;
+
+    enum SessionState
+    {
+        INITIALIZED,
+        STARTING,
+        ACTIVE,
+        CANCELLING,
+        FINISHED
+    };
+
+    [tag="stat"]
+    SessionState mSessionState;
+};
+typedef map<MatchmakingSessionId, MatchmakingScenarioSessionData> MatchmakingScenarioSessionDataByIdMap;
+
+[tdfid = "hash"]
+class MatchmakingScenarioData
+{
+    [tag="msid"]
+    MatchmakingScenarioId mScenarioId;
+
+    [tag="sreq"]
+    StartMatchmakingScenarioRequest mScenarioRequest;
+
+    [tag="hbid"]
+    BlazeId mHostBlazeId;
+
+    [tag="huid"]
+    UserSessionId mHostUserSessionId;
+
+    [tag="scva"]
+    ScenarioVariantName mScenarioVariant;
+
+    [tag="ownd"]
+    MatchmakingScenarioSessionDataByIdMap mOwnedSessions;
+
+    [tag="grup"]
+    UserSessionIdList mGroupUserSessionIdList;
+
+    enum ScenarioResultType
+    {
+        FAILURE,
+        PSEUDO_SUCCESS,
+        SUCCESS
+    };
+
+    [tag="rslt"]
+    ScenarioResultType mResults;
+
+    [tag="succ"]
+    MatchmakingResult mMatchmakingSuccessResult;
+};
+typedef map<MatchmakingScenarioId, MatchmakingScenarioData> MatchmakingScenarioDataByIdMap;
+
+[tdfid = "hash"]
+class UserSessionMMStateData
+{
+    [tag="slav"]
+    MatchmakingSessionSlaveIdList mMatchmakingSessionSlaveIdList;
+
+    [tag="msid"]
+    MatchmakingScenarioDataByIdMap mMatchmakingScenarioDataByIdMap;
+
+    [tag="mqos"]
+    MatchmakingQosDataMap mMatchmakingQosDataMap;
+};
+
+[
+    description = "The matchmaking ttm estimate data for a specific ping site."
+]
+class PingSiteTimeToMatchEstimateData
+{
+    [tag="ettm", description="Estimated time to match for this ping site."]
+        TimeValue mEstimatedTimeToMatch;
+
+    [tag="estm", description="Timestamp for this TTM estimate's generation."]
+        TimeValue mEstimateTimeStamp;
+};
+
+typedef map<DelineationGroupType, PingSiteTimeToMatchEstimateData> TimeToMatchEstimateDataPerGroup;
+typedef map<PingSiteAlias, TimeToMatchEstimateDataPerGroup> TimeToMatchEstimateDataPerPingsiteGroup;
+
+[
+    description = "The matchmaking ttm estimate data for a specific scenario."
+]
+class InstanceTimeToMatchEstimateData
+{
+    [tag="gttm", description="Global estimated time to match for this scenario."]
+        TimeValue mGlobalEstimatedTimeToMatch;
+
+    [tag="gmts", description="Global last match timestamp."]
+        TimeValue mLastMatchTimestamp;
+
+    [tag="pttg", description="Time to match for estimate data for this scenario by ping site and delineation group."]
+        TimeToMatchEstimateDataPerPingsiteGroup mEstimatedTimeToMatchPerPingsiteGroup;
+};
+
+// We should look at ways to consolidate some of these maps. Not doing it for a point release though.
+typedef map<GameManager::ScenarioName, InstanceTimeToMatchEstimateData> TimeToMatchEstimateDataPerScenario;
+
+typedef map<DelineationGroupType, float> PlayerMatchmakingRateByGroup;
+typedef map<PingSiteAlias, PlayerMatchmakingRateByGroup> PlayerMatchmakingRateByPingsiteGroup;
+typedef map<GameManager::ScenarioName, PlayerMatchmakingRateByPingsiteGroup> PlayerMatchmakingRateByScenarioPingsiteGroup;
+
+typedef map<PingSiteAlias, uint32_t> MatchmamkingSessionsByPingSite;
+typedef map<GameManager::ScenarioName, MatchmamkingSessionsByPingSite> MatchmakingSessionsByScenario;
+
+[
+    description = "",
+    tdfid = "hash"
+]
+class MatchmakingInstanceStatusResponse
+{
+    [tag="nomm", description="Number of total matchmaking session attempts from client."]
+        NumOfSessions mNumOfMatchmakingSessions;
+
+    [tag="numm", description="Number of users in matchmaking currently."]
+        uint32_t mNumOfMatchmakingUsers;
+
+    [tag="gttm", description="Estimated time to match for matchmaking overall"]
+        InstanceTimeToMatchEstimateData mGlobalTimeToMatchEstimateData;
+
+    [tag="sdta", description="Per-scenario Time to Match census data."]
+        TimeToMatchEstimateDataPerScenario mScenarioTimeToMatchEstimateData;
+
+    [tag="pmrg", description="Player Matchmaking Rate, mapped to Scenario, Pingsite, and DelineationGroup."]
+        PlayerMatchmakingRateByScenarioPingsiteGroup mPlayerMatchmakingRateByScenarioPingsiteGroup;
+        
+    [tag="mms", description="Per-Scenario matchmaking census data."]
+        MatchmakingSessionsByScenario mScenarioMatchmakingData;
+};
+
+typedef list<MatchmakingSessionId> MatchmakingSessionIdList;
+
+
+} // namespace GameManager
+} // namespace Blaze

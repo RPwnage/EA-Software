@@ -1,0 +1,987 @@
+
+[ headername="framework/tdf/qosdatatypes.h" ]
+#include "framework/gen/qosdatatypes.tdf"
+
+[ headername="framework/tdf/userdefines.h" ]
+#include "framework/gen/userdefines.tdf"
+
+[
+  client_include = false,
+  headername="framework/tdf/usersessiontypes_server.h"
+]
+#include "framework/gen/usersessiontypes_server.tdf"
+
+[ headername="framework/tdf/userextendeddatatypes.h" ]
+#include "framework/gen/userextendeddatatypes.tdf"
+
+[
+  client_include = false,
+  headername="framework/tdf/accessgroup_server.h"
+]
+#include "framework/gen/accessgroup_server.tdf"
+
+[
+  client_include = false,
+  headername="framework/tdf/userextendeddatatypes_server.h"
+]
+#include "framework/gen/userextendeddatatypes_server.tdf"
+
+[
+  client_include = false,
+  headername="framework/tdf/userinfotypes_server.h"
+]
+#include "framework/gen/userinfotypes_server.tdf"
+
+[
+  client_include = false,
+  headername="framework/tdf/userevents_server.h"
+]
+#include "framework/gen/userevents_server.tdf"
+
+[
+  client_include = false,
+  headername="framework/tdf/entity.h"
+]
+#include "framework/gen/entity.tdf"
+
+[
+  client_include = false,
+  headername="framework/tdf/inetfilter.h"
+]
+#include "framework/gen/inetfilter.tdf"
+
+
+namespace Blaze
+{
+
+class UserSession;
+class ConnectionGroup;
+
+[
+  id = framework/2,
+  configurationType = UserSessionsConfig
+]
+component UserSessions
+{
+    types
+    {
+        [ name = "user" ]
+        ENTITY_TYPE_USER = 1;
+        [ name = "conngroup" ]
+        ENTITY_TYPE_CONN_GROUP = 2;
+        [ name = "localusergroup" ]
+        ENTITY_TYPE_LOCAL_USER_GROUP = 3;
+    }
+
+    permissions
+    {
+        PERMISSION_SET_AUTHGROUP_PERMISSION = 1;
+        PERMISSION_GET_AUTHGROUP_NAME = 2;
+        PERMISSION_CREATE_AUTHGROUP = 3;
+        PERMISSION_OTHER_USER_ATTRIBUTE = 4;
+        PERMISSION_RESET_SENT_FEEDBACK = 5;
+        PERMISSION_RESET_RECV_FEEDBACK = 6;
+        PERMISSION_RESET_DELETE_FEEDBACK = 7;
+        PERMISSION_FORCE_SESSION_LOGOUT = 8;
+        PERMISSION_OVERRIDE_GEOIP_DATA = 9;
+        PERMISSION_FETCH_GEOIP_DATA = 11;
+        PERMISSION_OTHER_NETWORK_ADDRESS = 12;
+        PERMISSION_FORCE_OWN_SESSION_LOGOUT = 13;
+        PERMISSION_GET_UED_INFORMATION_MAP = 14;
+        PERMISSION_USER_LOOKUP_CROSSPLATFORM = 15;
+        PERMISSION_OVERRIDE_CROSSPLAY_OPTIN = 16;
+    }
+
+    errors
+    {
+        [ description = "The referenced user was not found." ]
+        USER_ERR_USER_NOT_FOUND = 1;
+        [ description = "The referenced session was not found." ]
+        USER_ERR_SESSION_NOT_FOUND = 2;
+        [ description = "The session could not be added because one from that user already exists." ]
+        USER_ERR_DUPLICATE_SESSION = 3;
+        [ description = "The extended data could not be returned because there is no extended data for the given session" ]
+        USER_ERR_NO_EXTENDED_DATA = 4;
+        [ description = "The extended data attribute could not be added because the maximum number of attributes has been reached for this session" ]
+        USER_ERR_MAX_DATA_REACHED = 5;
+        [ description = "The extended data attribute could not be removed because key was not found" ]
+        USER_ERR_KEY_NOT_FOUND = 6;
+        [ description = "The session did not belong to the calling instance." ]
+        USER_ERR_INVALID_SESSION_INSTANCE = 7;
+        [ description = "Invalid parameter(s)." ]
+        USER_ERR_INVALID_PARAM = 8;
+        [ description = "The minimum of characters is 3." ]
+        USER_ERR_MINIMUM_CHARACTERS = 9;
+        [ description = "A duplicate user already exists" ]
+        USER_ERR_EXISTS = 20;        
+        
+        [ description = "The specified access group was not found." ]
+        ACCESS_GROUP_ERR_INVALID_GROUP = 10;
+        [ description = "The specified access group is default group for the referenced user." ]
+        ACCESS_GROUP_ERR_DEFAULT_GROUP = 11;
+        [ description = "The referenced user does not belong to the specified group." ]
+        ACCESS_GROUP_ERR_NOT_CURRENT_GROUP = 12;
+        [ description = "The referenced user already belong to the specified group." ]
+        ACCESS_GROUP_ERR_CURRENT_GROUP = 13;
+        [ description = "There is no group is found for specified external id and client type." ]
+        ACCESS_GROUP_ERR_NO_GROUP_FOUND = 14;
+
+        [ description = "Parameters in GeoIp request are incomplete: city, state region and country must be supplied." ]
+        GEOIP_INCOMPLETE_PARAMETERS = 15;
+        [ description = "GeoIp lookup failed. Returned to the caller so they can take action, e.g., region selection." ]
+        USER_ERR_GEOIP_LOOKUP_FAILED = 16;
+        [ description = "The requested user with opt-in field disabled." ]
+        GEOIP_ERR_USER_OPTOUT = 23;
+                
+        [ description = "The entity type is not recognized by the component." ]
+        ERR_ENTITY_TYPE_NOT_FOUND = 17;
+        [ description = "no entity is found matching the type name and name provided." ]
+        ERR_ENTITY_NOT_FOUND = 18;
+        [ description = "the entity provided is recognized, but searching by name is not supported." ]
+        ERR_NOT_SUPPORTED = 19;
+        
+        [ description = "Action not allowed for user opted-out of cross platform." ]
+        USER_ERR_CROSS_PLATFORM_OPTOUT = 30;
+        [ description = "The action requested required a disallowed cross platform interaction." ]
+        USER_ERR_DISALLOWED_PLATFORM= 31;
+    }
+
+    [requiresMaster=false]
+    slave
+    {
+        methods
+        {
+            [
+              id = 1,
+              description = "Validates a session key",
+              details = "Validates a session key",
+              errors = {USER_ERR_SESSION_NOT_FOUND},
+              requires_authentication = false,
+              generate_command_class = false
+            ]
+            SessionInfo validateSessionKey(ValidateSessionKeyRequest);
+
+            [
+                id = 3,
+                description = "Retrieves the user session extended data for a given user",
+                allowGuestCall = true,
+                generateProto = false, 
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_SESSION_NOT_FOUND,
+                    USER_ERR_NO_EXTENDED_DATA
+                }
+            ]
+            UserSessionExtendedData fetchExtendedData(FetchExtendedDataRequest);
+
+            [
+                id = 5,
+                description = "Adds, removes, or updates an attribute in the user session extended data for a user.",
+                allowGuestCall = true,
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND,
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_MAX_DATA_REACHED,
+                    USER_ERR_KEY_NOT_FOUND
+                }
+            ]
+            void updateExtendedDataAttribute(UpdateExtendedDataAttributeRequest);
+
+            [
+                id = 8,
+                errors = {
+                    USER_ERR_NO_EXTENDED_DATA
+                }
+            ]
+            void updateHardwareFlags(UpdateHardwareFlagsRequest);
+
+            [
+                id = 9,
+                allowGuestCall = true,
+                client_export = false
+            ]
+            GetPermissionsResponse getPermissions();
+
+            [
+                id = 10,
+                allowGuestCall = true,
+                errors = {
+                    ACCESS_GROUP_ERR_NO_GROUP_FOUND
+                },
+                client_export = false
+            ]
+            GetAccessGroupResponse getAccessGroup(GetAccessGroupRequest);
+
+            [
+                id = 12,
+                description = "Retrieves full user information.",
+                allowGuestCall = true,
+                generateProto = false,
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_CROSS_PLATFORM_OPTOUT,
+                    USER_ERR_DISALLOWED_PLATFORM
+                }
+            ]
+            UserData lookupUser(UserIdentification);
+
+            [
+                id = 13,
+                description = "Retrieves full user information.",
+                allowGuestCall = true,
+                generateProto = false, 
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_CROSS_PLATFORM_OPTOUT,
+                    USER_ERR_DISALLOWED_PLATFORM
+                }
+            ]
+            UserDataResponse lookupUsers(LookupUsersRequest);
+
+            [
+                id = 14,
+                description = "Retrieves user information with prefix search.",
+                details = "Note there is no guarantee that an exact match will be preferred over any other result.",
+                generateProto = false, 
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_MINIMUM_CHARACTERS,
+                    USER_ERR_CROSS_PLATFORM_OPTOUT,
+                    USER_ERR_DISALLOWED_PLATFORM
+                }
+            ]
+            UserDataResponse lookupUsersByPrefix(LookupUsersByPrefixRequest);
+
+            [
+                id = 15,
+                description = "Retrieves user information for a list of users (does not include extended user data).",
+                allowGuestCall = true,
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_CROSS_PLATFORM_OPTOUT,
+                    USER_ERR_DISALLOWED_PLATFORM
+                }
+            ]
+            LookupUsersResponse lookupUsersIdentification(LookupUsersRequest);
+
+            [
+                id = 20,
+                description = "Sets the QOS data, latency information, and network address for the current user.",
+                allowGuestCall = true,
+                generateProto = false, 
+                errors = {
+                    USER_ERR_NO_EXTENDED_DATA,
+                    USER_ERR_GEOIP_LOOKUP_FAILED
+                }
+            ]
+            void updateNetworkInfo(UpdateNetworkInfoRequest);
+
+            [
+                id = 21,
+                description = "list the default authorization group for each client type, need PERMISSION_GET_AUTHGROUP_NAME",
+                client_export = false
+            ]
+            ListDefaultAccessGroupsResponse listDefaultAccessGroup();
+
+            [
+                id = 22,
+                description = "the full list of users with non default permissions, need PERMISSION_GET_AUTHGROUP_NAME",
+                allowGuestCall = true,
+                client_export = false
+            ]
+            ListAuthorizationsResponse listAuthorization();
+
+            [
+                id = 23,
+                description = "Retrieves full user geoip information.",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    GEOIP_ERR_USER_OPTOUT,
+                    USER_ERR_GEOIP_LOOKUP_FAILED
+                }
+            ]
+            GeoLocationData lookupUserGeoIPData(UserIdentification);
+
+            [
+                id = 24,
+                description = "Overrides geoip data for current user.",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    GEOIP_INCOMPLETE_PARAMETERS
+                }
+            ]
+            void overrideUserGeoIPData(GeoLocationData);
+
+            [
+                id = 25,
+                description = "Updates a client attribute in the user session extended data for a user.",
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND,
+                    USER_ERR_USER_NOT_FOUND
+                }
+            ]
+            void updateUserSessionClientData(UpdateUserSessionClientDataRequest);
+
+            [
+                id = 26,
+                description = "Set the user info attribute value with the supplied mask on given user(s).",
+                errors = {USER_ERR_INVALID_PARAM}
+            ]
+            void setUserInfoAttribute(SetUserInfoAttributeRequest);
+
+            [
+                id = 27,
+                description = "Resets geoip data for current user.",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_GEOIP_LOOKUP_FAILED
+                }
+            ]
+            void resetUserGeoIPData(ResetUserGeoIPDataRequest);
+
+            [
+                id = 28,
+                description = "look up entity by type and name",
+                client_export = false,
+                errors = {
+                    ERR_ENTITY_TYPE_NOT_FOUND,
+                    ERR_ENTITY_NOT_FOUND,
+                    ERR_NOT_SUPPORTED
+                }
+            ]
+            EntityLookupResponse lookupEntityByName(EntityLookupRequest);
+
+            [
+                id = 29,
+                description = "look up entity name by id",
+                client_export = false,
+                allowGuestCall = true,
+                errors = {
+                    ERR_ENTITY_TYPE_NOT_FOUND,
+                    ERR_ENTITY_NOT_FOUND,
+                    ERR_NOT_SUPPORTED
+                }
+            ]
+            EntityLookupByIdResponse lookupEntityById(EntityLookupByIdRequest);
+
+            [
+                id = 30,
+                description = "look up entity names by ids",
+                client_export = false,
+                allowGuestCall = true,
+                errors = {
+                    ERR_ENTITY_TYPE_NOT_FOUND,
+                    ERR_NOT_SUPPORTED
+                }
+            ]
+            EntitiesLookupByIdsResponse lookupEntitiesByIds(EntitiesLookupByIdsRequest);
+            
+            [
+                id = 31,
+                internal = true,
+                description = "create a session on the remote slave we are connected to",
+                client_export = false,
+                generate_command_class = false,
+                requires_authentication = false
+            ]
+            void registerRemoteSlaveSession();           
+            
+            [   
+                id = 32,
+                description = "Retrieves the user's session id by user's blaze id",
+                allowGuestCall = true,
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_SESSION_NOT_FOUND,
+                    USER_ERR_CROSS_PLATFORM_OPTOUT,
+                    USER_ERR_DISALLOWED_PLATFORM
+                }                
+            ]
+            LookupUserSessionIdResponse lookupUserSessionId(LookupUserSessionIdRequest);
+
+            [
+                id = 33,
+                description = "fetch the user last locale setting used and last auth error",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND
+                },
+                requires_authentication = true
+            ]
+            FetchLastLocaleUsedAndAuthErrorResponse fetchLastLocaleUsedAndAuthError(FetchLastLocaleUsedAndAuthErrorRequest);
+
+            [
+                id = 34,
+                description = "fetch the user's first and last auth time",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND
+                }
+            ]
+            FetchUserFirstLastAuthTimeResponse fetchUserFirstLastAuthTime(FetchUserFirstLastAuthTimeRequest); 
+
+            [
+                id = 36,
+                client_export = false,
+                description = "Retrieves all permissions."
+            ]
+            ListAllPermissionsResponse listAllPermissions(ListAllPermissionsRequest);
+
+            [
+                id = 37,
+                description = "Change the geo opt-in for current user.",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND
+                }
+            ]
+            void setUserGeoOptIn(OptInRequest);
+
+            [
+                id = 38,
+                internal = true,
+                client_export = false,
+                allowGuestCall = true,
+                requires_authentication = false,
+                generateProto = false, 
+                description = "Invokes onLoadUserExtendedData() on local provider"
+            ]
+            UserSessionExtendedData remoteLoadUserExtendedData(RemoteUserExtendedDataUpdateRequest);
+
+            [
+                id = 39,
+                internal = true,
+                client_export = false,
+                allowGuestCall = true,
+                requires_authentication = false,
+                generateProto = false, 
+                description = "Invokes onRefreshUserExtendedData() on local provider"
+            ]
+            UserSessionExtendedData remoteRefreshUserExtendedData(RemoteUserExtendedDataUpdateRequest);
+
+            [
+                id = 40,
+                client_export = false,
+                description = "Immediately causes a session to be logged out",
+                requiresUserSession = false,
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                }
+            ]
+            void forceSessionLogout(ForceSessionLogoutRequest);
+
+            [
+                id = 41,
+                description = "(DEPRECATED) Immediately enables audit logging for the users specified in the request. Config reload will add, but not remove users from the audit list.",
+                details = "This RPC has been deprecated in favour of the more general enable audit logging command in the Blaze controller.",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND
+                }
+            ]
+            void enableUserAuditLogging(EnableUserAuditLoggingRequest);
+            
+            [
+                id = 42,
+                description = "(DEPRECATED) Immediately disables audit logging for the users specified in the request. Config reload will add, but not remove users from the audit list.",
+                details = "This RPC has been deprecated in favour of the more general disable audit logging command in the Blaze controller.",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND
+                }
+            ]
+            void disableUserAuditLogging(DisableUserAuditLoggingRequest);
+            
+            [
+                id = 43,
+                description = "Provides a listing of the local UserSessionExtendedDataProviders to the calling UserSessionManager.",
+                client_export = false,
+                internal = true,
+                generate_command_class = false,
+                requires_authentication = false,
+                ignoreShardingKey = true
+            ]
+            UpdateUserExtendedDataProviderRegistrationResponse requestUserExtendedDataProviderRegistration();
+
+            [
+                id = 44,
+                internal = true,
+                description = "Get user geoip information. If a valid BlazeId is supplied, first search the database for any location overrides for the user.",
+                errors = {
+                  USER_ERR_GEOIP_LOOKUP_FAILED
+                },
+                client_export = false,
+                generate_command_class = true,
+                requires_authentication = false,
+                setCurrentUserSession=false
+            ]
+            GeoLocationData getUserGeoIpData(GetUserGeoIpDataRequest);
+            
+            [
+                id = 45,
+                description = "Retrieves the unique device Id saved in local slave.",
+                requires_authentication = true
+            ]
+            GetUniqueDeviceIdResponse getUniqueDeviceId();
+
+            [
+                id = 46,
+                client_export = false,
+                requiresUserSession = false
+            ]
+            GetIpFilterByNameResponse getIpFilterByName(GetIpFilterByNameRequest);
+
+            [
+                id = 47,
+                description = "Retrieves user information with prefix search across all supported namespaces.",
+                details = "Note there is no guarantee that an exact match will be preferred over any other result.",
+                generateProto = false, 
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_MINIMUM_CHARACTERS
+                }
+            ]
+            UserDataResponse lookupUsersByPrefixMultiNamespace(LookupUsersByPrefixMultiNamespaceRequest);
+
+            [
+                id = 48,
+                description = "Retrieves user information with persona search across all supported namespaces.",
+                details = "Note there is no guarantee that an exact match will be preferred over any other result.",
+                generateProto = false, 
+                errors = {
+                    USER_ERR_USER_NOT_FOUND
+                }
+            ]
+            UserDataResponse lookupUsersByPersonaNameMultiNamespace(LookupUsersByPersonaNameMultiNamespaceRequest);
+
+            [
+                id = 49,
+                description = "Retrieves user information with persona search across all supported namespaces.",
+                details = "Note there is no guarantee that an exact match will be preferred over any other result.",
+                generateProto = false, 
+                errors = {
+                    USER_ERR_USER_NOT_FOUND
+                }
+            ]
+            UserDataResponse lookupUsersByPersonaNamesMultiNamespace(LookupUsersByPersonaNamesMultiNamespaceRequest);
+
+            [
+                id = 50,
+                description = "Retrieves user information with persona search across a specified namespace.",
+                generateProto = false, 
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_CROSS_PLATFORM_OPTOUT,
+                    USER_ERR_DISALLOWED_PLATFORM
+                }
+            ]
+            UserDataResponse lookupUsersByPersonaNames(LookupUsersByPersonaNamesRequest);
+
+            [
+                id = 53,
+                description = "Determine whether a user session is still connected to a client.",
+                internal = true,
+                client_export = false,
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            CheckConnectivityResponse checkConnectivity(CheckConnectivityRequest);
+
+            [
+                id = 54,
+                description = "Immediately causes a user's unresponsive session to log itself out",
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND, USER_ERR_INVALID_PARAM
+                }
+            ]
+            void forceOwnSessionLogout(ForceOwnSessionLogoutRequest);
+
+            [
+                id = 55,
+                description = "Update the local user indices in the local user group by its connection id.",
+                generate_command_class = false,
+                blocking = true
+            ]
+            UpdateLocalUserGroupResponse updateLocalUserGroup(UpdateLocalUserGroupRequest);
+            
+            [
+                id = 100,
+                description = "Get a mapping of all this server's defined UED",
+                details = "For creating a pseudo user session with caller-specified user session info.",
+                client_export = false,
+                requires_authentication = true,
+                allowGuestCall = false
+            ]
+            GetUedInformationMapResponse getUedInformationMap(GetUedInformationMapRequest);
+            
+            [
+                id = 56,
+                description = "(DEPRECATED) Fetch audit state for users. If not user specified, the results will be a list of blazeIds that are being audited.",
+                details = "This RPC has been deprecated in favour to the more generic getAudits Controller RPC.",
+                internal = true,
+                client_export = false,
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            FetchUsersAuditStateResponse fetchUsersAuditState(FetchUsersAuditStateRequest);
+
+            [
+                id = 57,
+                description = "Attempt to update the QoS Data used on the BlazeServer.  Only used by QoS 2.0.",
+                internal = true,
+                client_export = false,
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void refreshQosPingSiteMap(RefreshQosPingSiteMapRequest);
+
+            [
+                id = 58,
+                description = "Gets the ping site .  Usable on QoS 1.0 or 2.0.",
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            QosPingSitesResponse getQosPingSites();
+
+            [
+                id = 60,
+                description = "Change the crossPlatform opt-in for user identified in the request or current user.",
+                errors = {
+                    USER_ERR_USER_NOT_FOUND
+                }
+            ]
+            void setUserCrossPlatformOptIn(OptInRequest);
+
+            [
+                id = 61,
+                description = "Retrieves full user information. Supports lookups by Origin persona name, Origin persona id, Nucleus account id, and 1st party id.",
+                allowGuestCall = true,
+                generateProto = false, 
+                errors = {
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_CROSS_PLATFORM_OPTOUT,
+                    USER_ERR_DISALLOWED_PLATFORM
+                }
+            ]
+            UserDataResponse lookupUsersCrossPlatform(LookupUsersCrossPlatformRequest);
+
+            [
+                id = 62,
+                description = "Retrieves the device locality saved in local slave."
+            ]
+            GetDeviceLocalityResponse getDeviceLocality();
+
+            
+        }
+
+        notifications
+        {
+            [
+                id = 1,
+                generateProto = false, 
+                description = "Sent when the user session extended data is updated"
+            ]
+            UserSessionExtendedDataUpdate(Blaze::UserSessionExtendedDataUpdate);
+
+            [
+                id = 2,
+                description = "Sent when the server would like the client to cache a users information",
+                generateProto = false, 
+                obfuscate_platform_info = true
+            ]
+            UserAdded(NotifyUserAdded);
+
+            [
+                id = 3,
+                description = "Sent when a user can be removed from the client"
+            ]
+            UserRemoved(NotifyUserRemoved);
+
+            [
+                id = 5,
+                description = "Sent when the server needs to notify the client of some change to a users status"
+            ]
+            UserUpdated(UserStatus);
+            
+            [
+                id = 6,
+                client_export = false,
+                description = "Used by aux slave to notify the core slave of a session to user subscription change"
+            ]
+            UserSubscriptionsUpdated(NotifyUpdateUserSubscriptions);
+
+            [
+                id = 7,
+                client_export = false,
+                description = "Used by aux slave to notify the core slave of a session to session subscription change"
+            ]
+            SessionSubscriptionsUpdated(NotifyUpdateSessionSubscriptions);
+
+            [
+                id = 8,
+                description = "Used to notify the UserManager (BlazeSDK) when a user becomes fully authentication",
+                obfuscate_platform_info = true
+            ]
+            UserAuthenticated(UserSessionLoginInfo);
+
+            [
+                id = 9,
+                description = "Used to notify the UserManager (BlazeSDK) when a user has logged out (loses authentication)"
+            ]
+            UserUnauthenticated(UserSessionLogoutInfo);
+
+            [
+                id = 10,
+                client_export = false,
+                description = "Sent when the user session extended data is updated"
+            ]
+            NotifyUserInfoUpdated(UserInfoUpdated);
+
+            [
+                id = 11,
+                description = "Sent to trigger a network info update from BlazeSDK when the qos settings have been reconfigured on the server"
+            ]
+            NotifyQosSettingsUpdated(Blaze::QosConfigInfo);
+        }
+
+        events
+        {
+            [ id = 1000 ]
+            LoginEvent(Login);
+
+            [ id = 1001 ]
+            LoginFailureEvent(Login);
+
+            [ id = 1002, generateProto = false ]
+            LogoutEvent(Logout);
+
+            [ id = 1003, generateProto = false]
+            DisconnectEvent(Logout);
+        }
+    }
+
+    [isSharded=true, shardingKey="sessionId", useSlivers=true]
+    master
+    {
+        methods
+        {
+            [
+                id = 1,
+                requires_authentication = false,
+                ignoreShardingKey = true
+            ]
+            UserManagerCensusData getCensusData();
+
+            [
+                id = 6,
+                errors = { USER_ERR_SESSION_NOT_FOUND },
+                requires_authentication = false,
+                ignoreShardingKey = true
+            ]
+            void updateExtendedDataMaster(UpdateExtendedDataRequest);
+
+            [
+                id = 7,
+                errors = { USER_ERR_SESSION_NOT_FOUND },
+                requires_authentication = false,
+                ignoreShardingKey = true
+            ]
+            void updateBlazeObjectIdList(UpdateBlazeObjectIdListRequest);
+
+            [
+                id = 12,
+                errors = {
+                    USER_ERR_NO_EXTENDED_DATA
+                },
+                requires_authentication = false
+            ]
+            void updateHardwareFlagsMaster(UpdateHardwareFlagsMasterRequest);
+
+            [
+                id = 20,
+                description = "Updates NetworkInfo with correct data.",
+                errors = {
+                    USER_ERR_NO_EXTENDED_DATA,
+                    USER_ERR_GEOIP_LOOKUP_FAILED
+                },
+                allowGuestCall = true,
+                blocking = true,
+                generateProto = false, 
+                requires_authentication = false
+            ]
+            void updateNetworkInfoMaster(UpdateNetworkInfoMasterRequest);
+
+            [
+                id = 21,
+                errors = { USER_ERR_USER_NOT_FOUND },
+                requires_authentication = false,
+                ignoreShardingKey = true
+            ]
+            void updateGeoDataMaster(GeoLocationData);
+
+            [
+                id = 22,
+                description = "Updates a client attribute in the user session extended data for a user.",
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND,
+                    USER_ERR_USER_NOT_FOUND
+                },
+                requires_authentication = false
+            ]
+            void updateUserSessionClientDataMaster(UpdateUserSessionClientDataMasterRequest);
+
+            [
+                id = 25,
+                description = "Retrieve user extended data from a remote session.",
+                errors = { USER_ERR_SESSION_NOT_FOUND },
+                requires_authentication = false,
+                allowGuestCall = true,
+                generateProto = false, 
+                shardingKey = "userSessionId"
+            ]
+            GetUserExtendedDataResponse getUserExtendedData(GetUserExtendedDataRequest);
+
+            [
+                id = 26,
+                description = "Retrieve user info from a remote session.",
+                errors = { USER_ERR_SESSION_NOT_FOUND },
+                requires_authentication = false,
+                allowGuestCall = true,
+                shardingKey = "userSessionId"
+            ]
+            GetUserInfoDataResponse getUserInfoData(GetUserInfoDataRequest);
+
+            [
+                id = 27,
+                description = "Adds, removes, or updates the server data for a user.",
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND,
+                    USER_ERR_USER_NOT_FOUND,
+                    USER_ERR_KEY_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                ignoreShardingKey = true
+            ]
+            void updateUserSessionServerAttributeMaster(UpdateUserSessionAttributeMasterRequest);
+
+            [
+                id = 28,
+                description = "Retrieve user session info from a remote session, along with shared connection counts.",
+                errors = { USER_ERR_SESSION_NOT_FOUND },
+                requires_authentication = false,
+                allowGuestCall = true,
+                internal = true,
+                generateProto = false, 
+                shardingKey = "userSessionId"
+            ]
+            GetUserSessionDataResponse getUserSessionData(GetUserInfoDataRequest);
+
+
+            [
+                id = 30,
+                description = "Store the Unique Device ID in local slave (IOS).",
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                shardingKey = "userSessionId"
+            ]
+            void insertUniqueDeviceIdMaster(InsertUniqueDeviceIdMasterRequest);
+
+            [
+                id = 31,
+                description = "Updates the dirty sock user index on the user session.",
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                allowGuestCall = true,
+                shardingKey = "userSessionId"
+            ]
+            void updateDirtySockUserIndexMaster(UpdateDirtySockUserIndexMasterRequest);
+
+            [
+                id = 46,
+                description = "Retrieves real peer IP address for a local user session",
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                shardingKey = "userSessionId"
+            ]
+            GetUserIpAddressResponse getUserIpAddress(GetUserIpAddressRequest);
+
+            [
+                id = 47,
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                allowGuestCall = true,
+                shardingKey = "notifierSessionId"
+            ]
+            void addUserSessionSubscriber(UserSessionSubscriberRequest);
+
+            [
+                id = 48,
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                allowGuestCall = true,
+                shardingKey = "notifierSessionId"
+            ]
+            void removeUserSessionSubscriber(UserSessionSubscriberRequest);
+
+            [
+                id = 49,
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                allowGuestCall = true,
+                generateProto = false, 
+                ignoreShardingKey = true
+            ]
+            FetchUserSessionsResponse fetchUserSessions(FetchUserSessionsRequest);
+            
+            [
+                id = 51,
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                allowGuestCall = true,
+                shardingKey = "userSessionId"
+            ]
+            void validateUserExistence(ValidateUserExistenceRequest);
+
+            [
+                id = 52,
+                errors = {
+                    USER_ERR_SESSION_NOT_FOUND
+                },
+                internal = true,
+                requires_authentication = false,
+                allowGuestCall = true,
+                blocking = true
+            ]
+            void forceSessionLogoutMaster(ForceSessionLogoutRequest);
+
+            [
+                id = 57,
+                description = "Attempt to update the QoS Data used on the BlazeServer.  Only used by QoS 2.0.",
+                internal = true,
+                client_export = false,
+                requires_authentication = false,
+                requiresUserSession = false,
+                ignoreShardingKey = true
+            ]
+            void refreshQosPingSiteMapMaster(RefreshQosPingSiteMapRequest);
+        }
+    }
+}
+}

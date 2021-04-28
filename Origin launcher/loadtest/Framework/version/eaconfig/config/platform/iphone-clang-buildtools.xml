@@ -1,0 +1,236 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- 
+  ios platforms don't have SDK package.  
+  So we setup some extra properties that are typically setup in an SDK package.
+  -->
+
+  <include file="xcode-buildtools.xml"/>
+
+  <do unless="@{PropertyExists('package.iphonesdk.appdir')}">
+    <property name="package.iphonesdk.appdir" value="${xcode-app-developer-dir}"/>
+  </do>
+
+  <!-- Create these properties for backward compatibility in case they got referenced directly somewhere else. -->
+  <property name="package.iphonesdk.toolbindir"      value="${package.xcode.toolbindir}"/>
+  <property name="package.iphonesdk.xcrundir"        value="${package.xcode.toolbindir}"/>
+  <property name="package.iphonesdk.toolchainbindir" value="${package.xcode.toolchainbindir}"/>
+  <property name="package.iphonesdk.bindir"          value="${package.xcode.toolchainbindir}"/>
+  <do.once context="project" key="SetIPhoneSDKVersion">
+    <SetAppleSDKVersion VersionPropertyName="package.iphonesdk.sdk-version" SdkName="iphone" />
+  </do.once>
+
+  <property name="iphone-platform"     value="OS"          unless="${config.iphone-sim}"/>
+  <property name="iphone-platform"     value="Simulator"   if="${config.iphone-sim}"/>
+  <property name="iphone-platform-dir" value="${xcode-app-developer-dir}/Platforms/iPhone${iphone-platform}.platform/Developer"/>
+  <property name="iphone-platform-sdkdir" value="${iphone-platform-dir}/SDKs/iPhone${iphone-platform}.sdk"/>
+
+  <choose>
+    <do if="'${config-processor??}'=='arm64' or '${config-processor??}'=='x64'">
+      <property name="arch"                   value="arm64"                          unless="${config.iphone-sim}"/>
+      <property name="arch"                   value="x86_64"                         if="${config.iphone-sim}"/>
+      <do if="${universal-binary??true} and @{StrCompareVersions('${iphone-deployment-target-version}','11.0')} lt 0">
+        <property name="arch"                 value="${property.value} armv7"        unless="${config.iphone-sim}"/>
+        <property name="arch"                 value="${property.value} i386"         if="${config.iphone-sim}"/>
+      </do>
+    </do>
+    <do>
+      <property name="arch"                   value="armv7"                          unless="${config.iphone-sim}"/>
+      <property name="arch"                   value="i386"                           if="${config.iphone-sim}"/>
+    </do>
+  </choose>
+  <do if="@{StrContains('${arch}','armv7')} or @{StrContains('${arch}','i386')}">
+    <property name="mfpu"                     value="neon"    unless="@{PropertyExists('mfpu')}" if="@{StrContains('${arch}','armv7')}" />
+    <property name="mfpu"                     value="vfp"     unless="@{PropertyExists('mfpu')}"/>
+    <property name="mfloat"                   value="softfp"  unless="@{PropertyExists('mfloat')}"/>
+  </do>
+
+  <property name="arch_switch" value="" local="true"/>
+  <foreach property="curr_arch" item="string" in="${arch}">
+    <property name="arch_switch" value="${property.value} -arch ${curr_arch} ${nant.endline}"/>
+  </foreach>
+
+  <property name="arch_specific_options" value="" local="true"/>
+  <do if="@{StrContains('${arch}', 'armv7')}">
+    <property name="arch_specific_options">${property.value} -marm ${nant.endline}</property>
+    <property name="arch_specific_options" unless="@{StrIsEmpty('${mfpu??}')}">${property.value} -mfpu=${mfpu??} ${nant.endline}</property>
+    <property name="arch_specific_options" unless="@{StrIsEmpty('${mfloat??}')}">${property.value} -mfloat-abi=${mfloat??} ${nant.endline}</property>
+  </do>
+
+  <property name="compiler_args"              value=""        unless="@{PropertyExists('compiler_args')}"/>
+  <property name="linker_args"                value=""        unless="@{PropertyExists('linker_args')}"/>
+  <property name="iphone-extra-frameworks"    value=""        unless="@{PropertyExists('iphone-extra-frameworks')}"/>
+
+  <property name="frameworks-link-options" local="true">
+    -weak_framework Foundation
+    -weak_framework UIKit
+    -weak_framework CoreGraphics
+    -weak_framework QuartzCore
+    -weak_framework AudioToolBox
+  </property>
+
+  <foreach property="weak_framework" item="String" in="${iphone-extra-frameworks}">
+    <property name="frameworks-link-options">
+      ${property.value}
+      -weak_framework ${weak_framework}
+    </property>
+  </foreach>
+
+  <property name="extra-link-options">
+    -dead_strip
+    -ObjC
+  </property>
+
+  <compiler
+    path="${package.xcode.compiler}"
+    path-clanguage="${package.xcode.c-compiler}"
+    version="${package.xcode.version}"
+    >
+    <common-defines>
+    </common-defines>
+    <common-options>
+      ${arch_switch}
+      ${arch_specific_options}
+      -miphoneos-version-min=${iphone-deployment-target-version}
+      -Wno-trigraphs
+      -Wreturn-type
+      -Wno-missing-braces
+      -fpascal-strings
+      -isysroot ${iphone-platform-sdkdir}
+      -fvisibility=hidden
+      -gdwarf-2
+      -Wno-write-strings
+      -Wunused-variable
+      -B${package.xcode.toolchainbindir}
+      ${compiler_args}
+    </common-options>
+    <system-includedirs>
+    </system-includedirs>
+    <template>
+      <commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%objectfile%"
+        -c "%sourcefile%"
+      </commandline>
+      <pch.commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%pchfile%"        <!-- pch file -->
+        -c "%sourcefile%"     <!-- source file -->
+      </pch.commandline>
+      <responsefile>
+        <commandline>
+          @%responsefile%
+        </commandline>
+      </responsefile>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <!-- Need to make sure %system-includedir% is in unix path format -->
+      <system-includedir>-isystem "%system-includedir%"</system-includedir>
+    </template>
+  </compiler>
+
+  <assembler 
+    path="${package.xcode.assembler}"
+    version="${package.xcode.version}"
+    >
+    <common-defines>
+    </common-defines>
+    <common-options>
+      ${arch_switch}
+      -isysroot ${iphone-platform-sdkdir}
+      -miphoneos-version-min=${iphone-deployment-target-version}
+    </common-options>
+    <system-includedirs>
+    </system-includedirs>
+    <template>
+      <commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%objectfile%"
+        -c "%sourcefile%"
+      </commandline>
+      <responsefile>
+        <commandline>
+          @%responsefile%
+        </commandline>
+      </responsefile>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <system-includedir>-isystem "%system-includedir%"</system-includedir>
+    </template>
+  </assembler>
+
+  <property name='lib.responsefile.separator' value='${nant.endline}'/>
+  <property name='lib.template.responsefile.objectfile' value='%objectfile%'/>
+  <librarian
+    path="${package.xcode.archiver}"
+    version="${package.xcode.version}"
+    >
+    <common-options>
+      -syslibroot ${iphone-platform-sdkdir}
+      -o "%liboutputname%"
+    </common-options>
+    <template>
+      <commandline>
+        %options%
+        %objectfiles%
+      </commandline>
+      <responsefile>
+        <commandline>
+          %options% 
+          -filelist %responsefile%
+        </commandline>
+        <contents>
+          %objectfiles%
+        </contents>
+      </responsefile>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </librarian>
+
+  <linker
+    path="${package.xcode.linker}"
+    version="${package.xcode.version}"
+    >
+    <common-options>
+      ${arch_switch}
+      -isysroot ${iphone-platform-sdkdir}
+      -miphoneos-version-min=${iphone-deployment-target-version}
+      -B${package.xcode.toolchainbindir}
+      -lpthread
+      -Xlinker -objc_abi_version -Xlinker 2
+      ${extra-link-options}
+      ${frameworks-link-options}
+      ${linker_args}
+    </common-options>
+    <system-librarydirs>
+    </system-librarydirs>
+    <system-libs>
+    </system-libs>
+    <template>
+      <commandline>
+        %options%
+        %objectfiles%
+        %librarydirs%
+        %libraryfiles%
+      </commandline>
+      <responsefile>
+        <commandline>
+          @%responsefile%
+        </commandline>
+      </responsefile>
+      <librarydir>-L "%librarydir%"</librarydir>
+      <libraryfile>"%libraryfile%"</libraryfile>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </linker>
+
+</project>

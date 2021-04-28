@@ -1,0 +1,292 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+@using System.Xml;
+<Package xmlns="http://schemas.microsoft.com/appx/2010/manifest" @if(Module.Configuration.System == "capilano") { WriteLiteral(Environment.NewLine+"          xmlns:mx=\"http://schemas.microsoft.com/appx/2013/xbox/manifest\" IgnorableNamespaces=\"mx\"");} >
+  @{
+    // according to the appxmanifest specification the identity name field must be a string between 3 and 50 characters in length that consists of alpha-numeric, period, and dash characters.
+    var identityName = Model.Options["identity.name"];
+
+    // start by removing any underscores in the project name
+    identityName = identityName.Replace("_", "");
+
+    // Append some dummy characters to the Identity name value to meet minimum length requirement
+    while (identityName.Length < 3)
+    {
+        identityName += "X";
+    }
+  }
+
+  <Identity Name="@identityName"  
+            Publisher="CN=@Model.Options["identity.publisher"]"  
+            Version="@Model.Options["identity.version"]"
+            ProcessorArchitecture="@Model.Options["identity.processor-architecture"]"
+            ResourceId="@Model.Options["identity.resourceid"]" />
+
+  <Properties>
+    <DisplayName>@Model.Options["properties.displayname"]</DisplayName>
+    <PublisherDisplayName>@Model.Options["properties.publisherdisplayname"]</PublisherDisplayName>
+    <Logo>@Model.GetImageRelativePath(Model.Options["properties.logo"])</Logo>
+    <Description>@Model.Options["properties.description"]</Description>
+    @if(!String.IsNullOrEmpty(Model.Options["properties.framework"]))
+    {
+    <Framework>@Model.Options["properties.framework"]</Framework>
+    }
+    @if(!String.IsNullOrEmpty(Model.Options["properties.content-package"]))
+    {
+    <mx:ContentPackage>@Model.Options["properties.content-package"]</mx:ContentPackage>
+    }
+  </Properties>
+
+  <Prerequisites>
+    <OSMinVersion>6.2.0</OSMinVersion>
+    <OSMaxVersionTested>6.2.0</OSMaxVersionTested>
+	@if(!String.IsNullOrEmpty(Model.Options["properties.application-environment"]))
+	{
+	<mx:ApplicationEnvironment>@Model.Options["properties.application-environment"]</mx:ApplicationEnvironment>
+	}
+	@if(!String.IsNullOrEmpty(Model.Options["properties.os-name"]))
+	{
+	<mx:OSName>@Model.Options["properties.os-name"]</mx:OSName>
+	}
+  </Prerequisites>
+
+  <Resources>
+     @foreach(var lang in StringExtensions.ToArray(Model.Options["resource.languages"] ?? "en-us"))
+     {
+       <Resource Language="@lang"/>
+     }
+  </Resources>
+
+  <Applications>
+    @{
+    var ids = StringExtensions.ToArray(Model.Options["application.id"] ?? Model.VsProjectFileNameWithoutExtension + ".App");
+    var executables = StringExtensions.ToArray(Model.Options["application.executable"] ?? Module.LinkerOutputName());
+    var entrypoints = StringExtensions.ToArray(Model.Options["application.entrypoint"] ?? Module.PrimaryOutputName() + ".App");
+    var startpages = StringExtensions.LinesToArray(Model.Options["application.startpage"]);
+    var displaynames = StringExtensions.ToArray(Model.Options["visualelements.displayname"]);
+	var foregroundtext = Model.Options["visualelements.foregroundtext"] ?? "light";
+	var backgroundcolor = Model.Options["visualelements.backgroundcolor"] ?? "#464646";
+
+    if(displaynames.Count > executables.Count)
+    {
+       // Looks like display name(s) contain spaces. Split by new lines:
+       displaynames = StringExtensions.LinesToArray(Model.Options["visualelements.displayname"]);
+    }
+
+    var maxCount = Math.Max(ids.Count, Math.Max(executables.Count, displaynames.Count));
+
+    if(executables.Count < maxCount)
+    {
+      Log.Warning.WriteLine("AppXManifest template: Number of executable names defined in option 'application.executable' is {0} which is less than number of 'visualelements.displayname' elements {1} or 'application.id' elements {2}.",executables.Count, displaynames.Count, ids.Count);
+    }
+
+    for(int i= 0; i < maxCount; i++)
+    {
+        // according the appxmanifest specification the application id can only contain alpha-numeric and dot characters, and must start with a letter character.
+        var applicationId = ids[Math.Min(i, ids.Count-1)];
+
+        // remove dashes and underscores which are the non-alpha-numeric characters that most commonly appear in package names
+        applicationId = applicationId.Replace("-", "").Replace("_", "");
+
+    <Application Id="@applicationId"
+      Executable="@executables[Math.Min(i, executables.Count-1)]"
+      EntryPoint="@entrypoints[Math.Min(i, entrypoints.Count-1)]" 
+      StartPage="@(startpages.Count > 0 ? startpages[Math.Min(i, startpages.Count-1)] : null)">
+
+      <VisualElements  
+        DisplayName="@displaynames[Math.Min(i, displaynames.Count-1)]"
+        Logo="@Model.GetImageRelativePath(Model.Options["visualelements.logo"])"
+        SmallLogo="@Model.GetImageRelativePath(Model.Options["visualelements.smalllogo"])"
+        Description="@Model.Options["visualelements.description"]"
+        ForegroundText="@foregroundtext"
+        BackgroundColor="@backgroundcolor" 
+		ToastCapable="@Model.Options["visualelements.toastcapable"]">
+        <DefaultTile 
+          WideLogo="@Model.GetImageRelativePath(Model.Options["visualelements.widelogo"])"
+          ShortName="@Model.GetImageRelativePath(Model.Options["visualelements.shortname"])"
+          ShowName="allLogos" 
+        />
+        <SplashScreen Image="@Model.GetImageRelativePath(Model.Options["visualelements.splashscreen"])" BackgroundColor="@Model.GetImageRelativePath(Model.Options["visualelements.splashscreen-backgroundcolor"])" />
+        @{ 
+          if(!String.IsNullOrEmpty(Model.Options["visualelements.lockscreen-badgelogo"]) || !String.IsNullOrEmpty(Model.Options["visualelements.lockscreen-notification"]))
+          {
+            <LockScreen BadgeLogo="@Model.GetImageRelativePath(Model.Options["visualelements.lockscreen-badgelogo"])" Notification="@Model.GetImageRelativePath(Model.Options["visualelements.lockscreen-notification"])"/>
+          }
+          var rotationPrefs = StringExtensions.LinesToArray(Model.Options["visualelements.initialrotation"]);
+          if(rotationPrefs.Count > 0)
+          {
+            <InitialRotationPreference>
+            @foreach(var rotation in rotationPrefs)
+            {
+                <Rotation Preference="@rotation"/>
+            }
+            </InitialRotationPreference>
+          }
+          var viewStates = StringExtensions.LinesToArray(Model.Options["visualelements.viewstates"]);
+          if(viewStates.Count > 0)
+          {
+            <mx:ViewStates>
+            @foreach(var viewstate in viewStates)
+            {
+                <mx:ViewState Name="@viewstate"/>
+            }
+            </mx:ViewStates>
+          }
+        }
+      </VisualElements>
+      @{
+       var includeUriRules = StringExtensions.LinesToArray(Model.Options["application.include.urirules"]);
+       var excludeUriRules = StringExtensions.LinesToArray(Model.Options["application.exclude.urirules"]);
+       if(includeUriRules.Count > 0 || excludeUriRules.Count > 0)
+       {
+          <ApplicationContentUriRules>
+            @foreach(var irule in includeUriRules)
+            {
+               <Rule Type="include" Match="@irule"/>
+            }
+            @foreach(var erule in excludeUriRules)
+            {
+               <Rule Type="exclude" Match="@erule"/>
+            }
+          </ApplicationContentUriRules>
+       }
+      }
+      @{
+        var networkingFragments = new Dictionary<string, StringBuilder>();
+        var duplicates = new Dictionary<string, Location>();
+        foreach (var file in StringExtensions.LinesToArray(Project.Properties[Module.GroupName + ".networking-manifest-files"]))
+        {
+            var path = Project.GetFullPath(file);
+            if (File.Exists(path))
+            {
+                var doc = LineInfoDocument.Load(path);
+                foreach (XmlNode node in doc.DocumentElement.ChildNodes)
+                {
+                    if (node.LocalName == "XboxNetworkingManifest")
+                    {
+                        if(!node.Name.StartsWith("mx:"))
+                        {
+                           Log.Warning.WriteLine("AppXManifest generation: Elements in the network manifest file '{0}' must be in the 'mx:' namespace (xmlns:mx=\"http://schemas.microsoft.com/appx/2013/xbox/manifest\").", Location.GetLocationFromNode(node).ToString());
+                        }
+                        foreach (XmlNode child in node.ChildNodes)
+                        {
+                            if (child.NodeType == XmlNodeType.Comment)
+                                continue;
+                            foreach (XmlNode datanode in child.ChildNodes)
+                            {
+                                if (datanode.NodeType == XmlNodeType.Comment)
+                                    continue;
+                                if (datanode.Attributes["BoundPort"] != null)
+                                {
+                                    string boundPort = datanode.Attributes["BoundPort"].Value;
+                                    if (datanode.Attributes["SecureIpProtocol"] != null) {
+                                        boundPort += "-" + datanode.Attributes["SecureIpProtocol"].Value;
+                                    }
+
+                                    Location location;
+                                    if (duplicates.TryGetValue(boundPort, out location))
+                                    {
+                                        Log.Warning.WriteLine("AppXManifest generation: duplicate BoundPort + Protocol '{0}' defined in file '{1}' and in file '{2}'", boundPort, location.ToString(), Location.GetLocationFromNode(datanode).ToString());
+                                    }
+                                    else
+                                    {
+                                        duplicates.Add(boundPort, Location.GetLocationFromNode(datanode));
+                                    }
+                                }
+                            }
+                            StringBuilder fragment;
+                            if (!networkingFragments.TryGetValue(child.LocalName, out fragment))
+                            {
+                                fragment = new StringBuilder();
+                                networkingFragments[child.LocalName] = fragment;
+                            }
+                            fragment.AppendFormat("<!-- Data from file: '{0} -->{1}", path, Environment.NewLine);
+                            fragment.AppendLine(XmlExtensions.GetFormattedInnerXml(child));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Log.Warning.WriteLine("Network manifest file '{0}' defined in property '{1}' does not exist.", path, Module.GroupName + ".networking-manifest-files");
+            }
+        }
+      }
+      @if(!String.IsNullOrEmpty(Model.Options["extension_options"]) || networkingFragments.Count > 0) 
+      {
+      <Extensions>
+        @foreach(var extension_option in StringExtensions.ToArray(Model.Options["extension_options"] + " EATestPrintServerSocketExtension"))
+        {
+           @Model.Options[extension_option]
+        }
+        @if(networkingFragments.Count > 0)
+        {
+          <!-- Networking extensions -->
+          <mx:Extension Category="windows.xbox.networking">
+            <mx:XboxNetworkingManifest>
+            @foreach(var fragment in networkingFragments)
+            {
+                 WriteLiteral("<mx:"+fragment.Key+">"+Environment.NewLine);
+                    @fragment.Value.ToString()
+                 WriteLiteral("</mx:"+fragment.Key+">"+Environment.NewLine);
+            }
+             </mx:XboxNetworkingManifest>
+          </mx:Extension>
+        }
+      </Extensions>
+      }
+      @foreach(var ratingCategory in StringExtensions.ToArray("general game application"))
+      {
+         var ratings = StringExtensions.LinesToArray(Model.Options[ratingCategory + ".ratings"]);
+         if(ratings.Count > 0)
+         {
+            <mx:Ratings Category="@ratingCategory">
+              @foreach(var rating in ratings)
+              {
+                <mx:Rating>@rating</mx:Rating>
+              }
+            </mx:Ratings>
+         }
+      }
+    </Application>
+    }
+  }
+  </Applications>
+  <Capabilities>
+    @{
+        var mxCapabilities = StringExtensions.ToArray(Model.Options["mx.capability.list"] ?? "contentRestrictions kinectVision kinectAudio kinectFace kinectExpressions kinectGamechat kinectRequired");
+        @foreach(var capability in UtilExtensions.OrderedDistinct(StringExtensions.ToArray(Model.Options["capabilities"])))
+        {
+          if(mxCapabilities.Contains(capability))
+          {
+            <mx:Capability Name="@capability" />
+          }
+          else
+          {
+            <Capability Name="@capability" />
+          }
+        }
+        @foreach(var device_capability in StringExtensions.ToArray(Model.Options["devicecapabilities"]))
+        {
+          <DeviceCapability Name="@device_capability" />
+        }
+    }
+  </Capabilities>
+  @if(!String.IsNullOrEmpty(Model.Options["package_extension_options"]))
+  {
+  <Extensions>
+    @foreach(var extension_option in StringExtensions.ToArray(Model.Options["package_extension_options"]))
+    {
+     @Model.Options[extension_option]
+    }
+  </Extensions>
+  }
+  @if(!String.IsNullOrEmpty(Model.Options["package_dependencies_options"]))
+  {
+  <Dependencies>
+    @foreach(var dependency_option in StringExtensions.ToArray(Model.Options["package_dependencies_options"]))
+    {
+     @Model.Options[dependency_option]
+    }
+  </Dependencies>
+  }
+</Package>

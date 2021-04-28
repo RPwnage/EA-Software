@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <masterversions>
+
+    <!-- Build system packages -->
+    <package name="UnixClang"              version="9.0.0" />
+
+    <package name="jdk"                    version="container-proxy-1" />
+    <package name="libopenssl"             version="container-proxy" />
+    <package name="mariadb"                version="container-proxy-2" />
+    <package name="libcurl"                version="container-proxy-3" />
+
+    <!-- Code generation -->
+    <package name="antlr"                  version="3.5.2" />
+    <package name="bison"                  version="2.1" />
+    <package name="flex"                   version="2.5.4a" />
+    <package name="ActivePython"           version="2.7.6.9" />
+
+    <package name="google_perftools"       version="container-proxy-1" />
+    <package name="google_coredumper"      version="container-proxy" />
+    <package name="ptmalloc3"              version="1.0-1-custom" />
+    <package name="hiredis"                version="container-proxy-1" />
+    <package name="blazeserver_grpc_tools" version="15.1.1.10.1" />
+
+    <!-- EA Libraries -->
+    <package name="EABase"                 version="2.09.13" />
+    <package name="EASTL"                  version="3.16.01" />
+    <package name="EAThread"               version="1.33.00" />
+    <package name="EACallstack"            version="2.02.01" />
+    <package name="EAAssert"               version="1.05.07" />
+    <package name="PPMalloc"               version="1.26.07" />
+    <package name="EAStdC"                 version="1.26.07" />
+    <package name="EAIO"                   version="3.01.11" />
+    <package name="EAJson"                 version="1.06.05-maverick" /> <!-- upgrade to latest after https://jira.frostbite.ea.com/browse/SUP-1154 has been addressed -->
+    <package name="UTFXml"                 version="3.08.09" />
+    <package name="coreallocator"          version="1.04.02" />
+    <package name="EATDF"                  version="15.1.1.10.1" />
+    <package name="EATDF_Java"             version="1.09.00" />
+    <package name="GamePacker"             version="1.04.01" />
+    <package name="blaze_base"             version="flattened" />
+
+    <!-- gtest -->
+    <package name="gtest"                  version="1.10.0.ea.6" />
+    <!-- for running gTest via test-run -->
+    <package name="EARunner"               version="1.09.04" />
+
+    <package name="zlib"                   version="1.2.11" />
+
+    <!-- packages that we want to be able to switch between
+           prebuilt and live-built.
+           the reason we use this grouptype is that the prebuilt
+           packages have .build files which are used to let us know
+           what link dependencies it has. since we already depend
+           on those packages we can skip loading it to save
+           some build time. -->
+    <grouptype name="Prebuilt" autobuildclean="false">
+      <exception propertyname="use-live-build">
+        <condition value="true" name="LiveBuild" />
+      </exception>
+
+      <package name="grpc"                 version="1.10.0-3.1-prebuilt">
+        <exception propertyname="use-live-build">
+          <condition value="true" version="1.10.0-3" />
+        </exception>
+      </package>
+
+      <package name="protobuf"             version="3.4.1-3.2-prebuilt">
+        <exception propertyname="use-live-build">
+          <condition value="true" version="3.4.1-3" />
+        </exception>
+      </package>
+    </grouptype>
+    <grouptype name="LiveBuild" autobuildclean="true" />
+  </masterversions>
+
+  <buildroot>build</buildroot>
+  <ondemand>true</ondemand>
+  <ondemandroot>../../packages</ondemandroot>
+
+  <!-- Note: Setting unix64-x64.march to an empty string prevents the UnixClang package from applying the -march flag (and forcing the build
+         to target a particular CPU architecture). This is necessary to allow container-built blazeservers to be run outside containers. -->
+  <globalproperties>
+    cc.std=c++17
+    exclude
+    stress
+    bulkbuild
+    gdbtools
+    stripdebug=false
+    protobuf.use_zlib=true
+    unix64-x64.march=
+    global.defines                    <!-- expose the global.defines so it can be overriden in the build scripts -->
+    blazeserver.proto_rootdir=eadp/blaze
+    <if condition="${blazeserver.asan_enabled??false}">
+      use-live-build=true
+      eaconfig.warningsaserrors=false
+      eaconfig.clang.sanitize=address,leak
+    </if>
+    <if condition="${blazeserver.lsan_enabled??false}">
+      eaconfig.clang.sanitize=leak
+    </if>
+    <globalproperty name="eaconfig.warningsaserrors.packages.excludes">
+      grpc
+      protobuf
+    </globalproperty>
+    blazeserver.pch_enabled=false <!-- false due to unresolved incremental build issues on Linux-->
+  </globalproperties>
+
+  <config package="eaconfig" default="unix64-clang-debug" includes="unix64-clang-debug unix64-clang-debug-opt unix64-clang-opt" />
+
+  <packageroots>
+    <packageroot>../</packageroot>
+  </packageroots>
+</project>
+

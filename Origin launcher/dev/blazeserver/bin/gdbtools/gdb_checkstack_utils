@@ -1,0 +1,32 @@
+#
+# This function will print out the register for the stack pointer, the difference between frames
+# and cummulative stack usage.  This is to help identify areas of code to investigate for stack
+# overruns.
+#
+define checkStack
+    set $cumm=0
+    set $diff=0
+    set $prev=0
+    set $f=$arg0
+    frame $arg0
+    while ($f >= 0)
+        printf "#%-2d rsp=%p", $f, $rsp
+        if ($f != $arg0)
+            printf " difference=%-8d total=%-8d", $diff, $cumm
+        end
+        printf "\n"
+        set $prev=$rsp
+        if ($f > 0)
+            down-silently
+        end
+        set $f=$f-1
+        set $diff=$prev-$rsp
+        set $cumm=$cumm+$diff
+    end
+end
+
+document checkStack
+checkStack <frameCount>: This script prints the total stack usage of the callstack as well as the usage difference between each frame. 
+    The script requires number of frames to dump as the argument which you would usually want to set 1 less than the number of frames 
+    in the callstack. The frame number with the biggest difference contributes the most usage of stack.
+end

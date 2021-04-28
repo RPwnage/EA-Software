@@ -1,0 +1,78 @@
+namespace Blaze
+{
+
+[trackChanges = true, description = "Ip v4 address and port"]
+class IpAddress
+{
+   [tag="ip", description="ipv4 address"] 
+   uint32_t Ip;
+
+   [tag="port", description="ipv4 port"] 
+   uint16_t Port;
+   
+   [tag="maci"] uint64_t MachineId;
+};
+
+const uint32_t MAX_HOSTNAME_LENGTH = 256;
+
+[trackChanges = true]
+class HostNameAddress
+{
+   [tag="name", description="Name of the host."]
+   string(MAX_HOSTNAME_LENGTH) HostName;
+   
+   [tag="port", description="ipv4 port"] 
+   uint16_t Port;
+
+   [tag="maci"] uint64_t MachineId;
+};
+
+
+[trackChanges = true, description = "Internal and External Ip address pair"]
+class IpPairAddress
+{
+   [tag="inip", description="Internal Ip Address"] 
+   IpAddress InternalAddress;
+
+   [tag="exip", description="External Ip Address as seen from outside firewall"] 
+   IpAddress ExternalAddress;
+
+   [tag="maci"] uint64_t MachineId;
+};
+
+[trackChanges = true ,description = "xbox client address"]
+class XboxClientAddress
+{
+    [tag="xuid"] uint64_t Xuid;
+    [tag="xddr"] blob XnAddr;
+
+   [tag="maci"] uint64_t MachineId;
+};
+
+[trackChanges = true, description = "DummyStruct - Previously the XboxServerAddress.  (Needed to preserve old-style Union.)"]
+class DummyStruct
+{
+    [tag="svid"] uint32_t Sid;
+    [tag="site"] string(64) SiteName;
+    [tag="port"] uint16_t Port;
+    [tag="maci"] uint64_t MachineId;
+};
+
+
+// NOTE: This union does uses the VALU tags because it is used by the redirector (which needs it for backwards compatibility).
+[trackChanges = true, allocInPlace = true]
+union NetworkAddress
+{        
+    [tag="VALU"] XboxClientAddress xboxClientAddress;
+    [tag="VALU"] DummyStruct dummyStruct;     // This was the XboxServerAddress. We can't remove it because this old-style union relies on member order. If a new address is added, please replace this one. 
+    [tag="VALU"] IpPairAddress ipPairAddress;
+    [tag="VALU"] IpAddress ipAddress;
+    [tag="VALU"] HostNameAddress hostNameAddress;
+};
+
+typedef list<NetworkAddress> NetworkAddressList;
+
+typedef list<string(32)> NetworkFilterConfig;
+
+
+}

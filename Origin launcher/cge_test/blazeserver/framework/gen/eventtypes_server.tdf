@@ -1,0 +1,133 @@
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+namespace Blaze
+{
+
+namespace Event
+{
+
+typedef list<string(256)> NotificationNameList;
+typedef map<string(128), NotificationNameList, ignorecase> NotificationNameListMap;
+
+class SubscriptionInfo
+{
+    typedef list<ComponentName> ComponentNameList;
+
+    [tag="name", description="The name of the client.  Any value can be used. (Required)"] 
+    string(256) mClientName;
+
+    [tag="all", default=false, description="If set, all component notifications will be tracked"] 
+    bool mAllComponents;
+    [tag="fltr", description="List of components to track events, if all components are not used." ] 
+    ComponentNameList mComponentList;
+    [tag="evwl", description="Whitelist of component events.  If set, only these events will be tracked."] 
+    NotificationNameListMap mEventWhitelist;
+    [tag="evbl", description="Blacklist of component events.  If set, these events will be ignored.  (Overrides whitelist tracking)"] 
+    NotificationNameListMap mEventBlacklist;
+
+    [tag="alls", default=false, description="If set, all component events will be tracked"] 
+    bool mAllSessNotifications;
+    [tag="sess", description="List of components to track notifications, if all components are not used."] 
+    ComponentNameList mCompSessNotifyList;
+    [tag="nfwl", description="Whitelist of component notifications.  If set, only these notifications will be tracked."] 
+    NotificationNameListMap mSessNotificationWhitelist;
+    [tag="nfbl", description="Blacklist of component notifications.  If set, these notifications will be ignored.  (Overrides whitelist tracking)"] 
+    NotificationNameListMap mSessNotificationBlacklist;
+
+    [tag="mcgi", default="", description="Optional connection group to use.  If not set, a default will be provided."] 
+    string(256) mConnectionGroupId;
+    [tag="endv", default=true, description="If set, default values will be encoded.  Can be disabled to save space."] 
+    bool mEncodeDefaultValues;
+};
+
+[
+    description = "This class is used by HeartBeat event triggered in EventManager, it's an empty tdf since no data is needed for the event."
+]
+class HeartBeat
+{
+};
+
+[description="Configuration for event."]
+class EventConfig
+{
+    typedef string(256) MessageType;
+    typedef map<string(256), MessageType> MessageTypeByEventName;
+
+    class ComponentNotifyEvent
+    {
+        [tag="mtbe"] MessageTypeByEventName mMessages;
+        [tag="plst"] ClientPlatformTypeList mPlatforms;
+    };
+    typedef map<string(256), ComponentNotifyEvent> ComponentNotifyEventMap;
+
+    [tag="csze", description="The number of events to cache per eventId before submitting to the Notify service.", default=1000]
+    uint32_t mEventCacheSize;
+
+    [tag="cmsz", description="The maximum number of events to cache per eventId. When the maxiumum size is reached, the oldest event in the cache will be deleted whenever a new event is added - even if it has not been successfully submitted to the Notify service.", default=3000000]
+    uint32_t mEventCacheMaxSize;
+
+    [tag="evnt", description="The messageTypes to submit to the notify service, broken down by component & event name."]
+    ComponentNotifyEventMap mMessageTypesByComponentEvent;
+ 
+    [tag="ptmr", description="The amount of time to wait before checking if events should be published to the Notify service. 0 disables Notify event publishing.", default="0s"]
+    TimeValue mEventPublishPeriod;
+ 
+    [tag="ptmo", description="The amount of time to allow the publish to complete", default="5s"]
+    TimeValue mEventPublishTimeout;
+    
+    [tag="hbit", default="20s", reconfigurable="yes", description="Event manager heartbeat event interval."]
+    TimeValue mHeartBeatInterval;
+
+    [tag="mbes", reconfigurable="yes", description="Subscription information for the message bus.  Some params are not used (mConnectionGroupId, mEncodeDefaultValues, Notify stuff)."]
+    SubscriptionInfo mMessageBusEventSubscription;
+};
+
+class EventEnvelope
+{
+    [tag="dtm", description="DateTime the metric event occured"]
+    TimeValue mTimestamp;
+
+    [tag="svc", description="Service name of Blaze cluster"]
+    ServiceName mServiceName;
+
+    [tag="inst", description="Blaze instance name associated with the event."]
+    string(1024) mInstanceName;
+
+    [tag="cid", description="ComponentId that generated the metric"]
+    uint16_t mComponentId;
+
+    [tag="bid", description="The persona/blaze id of the user associated with the event "]
+    ObjectId mBlazeObjId;
+
+    [tag="sid", description="The session id of the session associated with the event"]
+    UserSessionId mSessionId;
+
+    [tag="vers", default=-1, description="Reserved for future use (potentially used for versioning)"]
+    int32_t mVersion;
+
+    [tag="mtyp", description="The type of metric event"]
+    uint16_t mEventType;
+
+    [tag="data", description="The metric event data"]
+    variable mEventData;
+};  
+
+class EventEnvelopeTdfList
+{
+    [tag="evel", description="A list of event envelopes"]
+    list<EventEnvelope> mEventEnvelopes;
+};
+
+typedef map<string(1024), uint64_t> EventMetricsMap;
+class EventManagerStatus
+{
+    [tag="nreg", description="The current number of Event registrants."]
+    uint32_t mNumRegistrants;
+    
+    [tag="ecnt", description="The count sent for each event."]
+    EventMetricsMap mEventMetrics;
+};
+
+}
+}
+

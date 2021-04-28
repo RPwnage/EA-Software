@@ -1,0 +1,671 @@
+/*! ************************************************************************************************/
+/*!
+    \file arsontournamentorganizer.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf" // for UserIdentification in GetTournamentRequest
+
+[headername="gamemanager/tdf/gamemanager.h"]
+#include "gamemanager/gen/gamemanager.tdf" // for TournamentIdentification in CreateTournamentRequest, TournamentInfoResponse
+
+namespace Blaze
+{
+
+namespace Arson
+{
+
+////////////////////////////////////////////////////////////////////////////////
+// External Sessions / First Party Tournament Service TDFs /////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="External Service's Tournament state. For Xbox, possible values are: Active, Canceled, Completed.."]
+typedef string(17) ExternalTournamentState; // 17 chars for 'registrationEnded' on X1
+
+[description="For X1. A set of format strings indicating possible friendly strings a team/tournament can have.  This may be a '{0}W - {1}L' to represent a win-loss record, or a 'Qualified with {0}' to indicate a team qualified with a certain time. This should be treated as a dictionary and supports arbitrary keys. The keys specified here are examples."]
+typedef map<string(-1), string(-1)> ExternalTournamentFormatStrings;
+
+[description="List of tournaments", trackChanges = true]
+typedef list<GameManager::TournamentIdentification> TournamentIdentificationList;
+
+
+[description="References a format string and provides values for the substitution tokens. required fields: formatMoniker, params. 'Wraps' the Blazeserver side FormattedString", trackChanges = true]
+class ArsonArenaFormattedString
+{
+    [tag="frmt", description="Refers to a format string by name which are defined in the tournament."]
+    string(-1) mFormatMoniker;
+    
+    [tag="itms", description="Values to insert into the formatted string. Values are inserted positionally, e.g., the formatted string '{0}W - {1}L' will have '{0}' replaced by the first item the array. May be empty if the formatted string has no substitution tokens."]
+    list<string(-1)> mParams;
+};
+
+[description="For X1. Localized display names. Required: name, description, gameMode, tournamentStyle, formatStrings, organizerName"]
+class TournamentLocalizedDisplayStrings
+{
+    [tag="name", description="A friendly name for the tournament, intended for display."]
+    string(-1) mName;
+    [tag="desc", description="An additional, longer description of the tournament, intended for display."]
+    string(-1) mDescription;
+    [tag="mode", description="A string representing the friendly name of the game mode."]
+    string(-1) mGameMode;
+    [tag="styl", description="A string representing the style of the tournament, such as Single Elimination or Round Robin"]
+    string(-1) mTournamentStyle;
+    [tag="fmts", description="A set of format strings indicating possible friendly strings a team can have."]
+    ExternalTournamentFormatStrings mFormatStrings;
+};
+
+[description="For each language, every string must be specified.  At least en-US must be specified. The default language must be specified.", trackChanges = true]
+typedef map<string(5), TournamentLocalizedDisplayStrings, ignorecase> TournamentFullDisplayStrings; // locale format is usually xx-XX, but allowing case insensitive for user convenience.
+
+[description="A list of all start and end times for this tournament. All times are in UTC. Required values: registrationStart, playingStart", trackChanges = true]
+class ArsonExternalTournamentScheduleInfo
+{
+    [tag="rgns", description="The start time of registration. Must be before or the same as checkinStart."]
+    UtcTimeString mRegistrationStart;
+    
+    [tag="rgne", description="The end time of registration."]
+    UtcTimeString mRegistrationEnd;
+    
+    [tag="chks", description="The start time of checkin. Must be before or the same as playingStart."]
+    UtcTimeString mCheckinStart;
+    
+    [tag="chke", description="The end time of checkin."]
+    UtcTimeString mCheckinEnd;
+    
+    [tag="plys", description="The time at which the tournament begins."]
+    UtcTimeString mPlayingStart;
+    
+    [tag="plye", description="The time at which the tournament ends."]
+    UtcTimeString mPlayingEnd;
+};
+
+[description="Image monikers. Required: heroArtMoniker, badgeArtMoniker, tileArtMoniker", trackChanges = true]
+class ImageMonikers
+{
+    [tag="hero", description="A string representing a moniker which is configured separately to represent a URI."]
+    string(-1) mHeroArtMoniker;
+    [tag="bdge", description="A string representing a moniker which is configured separately to represent a URI."]
+    string(-1) mBadgeArtMoniker;
+    [tag="tile", description="A string representing a moniker which is configured separately to represent a URI."]
+    string(-1) mTileArtMoniker;
+};
+
+[description="URLs to images based on the image monikers specified by the tournament organizer.", trackChanges = true]
+class ImageLinks
+{
+    [tag="hero", description="A URI which is converted from a moniker via a lookup through configuration"]
+    string(-1) mHeroArtUri;
+    [tag="bdge", description="A URI which is converted from a moniker via a lookup through configuration"]
+    string(-1) mBadgeUri;
+    [tag="tile", description="A URI which is converted from a moniker via a lookup through configuration"]
+    string(-1) mTileArtUri;
+};
+
+[description="XBL platform info", trackChanges = true]
+class PlatformInfo
+{
+    [tag="ttid", description="The XBL title ID for this platform, as a base 10 integer."]
+    TitleId mTitleId;    
+    [tag="pfn", description="Package family name, an alternative identifier for platforms."]
+    string(-1) mPfn;
+};
+
+[description="One or more descriptions of a tournament organizers app information. This should be treated as a dictionary where the keys are the platform. Only platforms that are supported are present.", trackChanges = true]
+class AppInfoObject
+{
+    [tag="era"] PlatformInfo mEra;
+    [tag="uwpx"] PlatformInfo mUwp_xboxone;
+    [tag="uwpd"] PlatformInfo mUwp_desktop;
+    [tag="ios"] PlatformInfo mIos;
+    [tag="and"] PlatformInfo mAndroid;
+};
+
+[description="For Xbox Tournaments. Details of a Tournament", trackChanges = true]
+class ArsonExternalTournamentDetails
+{
+    /////////////////////////////////
+    //TournamentCommonDetails: Required values: hasPrize, paused, minTeamSize, maxTeamSize, schedule, regions    
+    
+    [tag="rgns", description="An array of strings describing the regions where this tournament is available. Ex: US, GB, CA. Regions cannot be duplicated. Passing a one element array with * specifies all Xbox supported regions."]
+    list<string(-1)> mRegions;
+
+    [tag="schd", description="A list of all start and end times for this tournament."]
+    ArsonExternalTournamentScheduleInfo mSchedule;
+
+    [tag="stat", description="The current state of the tournament. Tournaments are Active by default. Organizers can set the tournament to Canceled or Completed by explicitly updating the tournament. Poss values: Active, Canceled, Completed"]
+    ExternalTournamentState mState;
+
+    [tag="paus", description="A flag indicating whether the tournament is currently paused. The Hub doesn't actually do anything differently when this is set to true. It's just a way for the organizer to let the client know that things are on hold."]
+    bool mPaused;
+    
+    [tag="priz", description="True if the tournament has a prize. False otherwise."]
+    bool mHasPrize;
+    
+    [tag="crtr", description="If this is a user-generated tournament, this is the xuid (as a base 10 unsigned long) of the user who created this tournament. If TO created, not present."]
+    string(-1) mCreator;
+    
+    [tag="visb", description="This field describes whether a tournament is visible and joinable by all or restricted by creator/club. Public by default. Poss values: Public or Private"]
+    string(-1) mVisibility;
+
+    [tag="maxt", description="The max number of players that can play on a team. Must be greater than 0, and greater than or equal to the largest team size currently enlisted in this tournament (when applicable)."]
+    int32_t mMaxTeamSize;
+    
+    [tag="mint", description="The min number of players required in a team. Must be greater than 0, and smaller than or equal to the smallest team size currently enlisted in this tournament (when applicable)."]
+    int32_t mMinTeamSize;
+    
+    [tag="maxr", description="This is the maximum number of registered teams. This does not include waitlisted teams. Must be greater than 0 and the count of teams currently registered in this tournament (when applicable)."]
+    int32_t mMaxRegistrationCount;
+    
+    [tag="minr", description="This is the minimum number of registered teams. Must be greater than or equal to 0."]
+    int32_t mMinRegistrationCount;
+
+    [tag="maxw", description="This is the maximum number of waitlisted teams. Must be greater than or equal to 0 and the count of teams currently waitlisted in this tournament (when applicable)."]
+    int32_t mMaxWaitlistCount;
+    
+    [tag="maxp", default=100, description="This is the maximum number of teams that can play at one time. If set, must be greater than 0 and less than or equal to maxRegistrationCount."]
+    int32_t mMaxPlayingCount;
+
+    ////////////////////
+    //  XBL TournamentDetails based values (not present in server side API):
+    // required values: (none)
+
+    [tag="trid", description="The ID of the tournament. This should be treated as an opaque string (don't assume it's a GUID for example) since it is specified by the tournament organizer."]
+    string(-1) mId;
+    
+    [tag="torg", description="The organizer of this tournament."]
+    string(-1) mOrganizerId;
+
+    [tag="endt", description="The datetime in UTC when this tournament has reached either the Canceled or Completed state. This is set automatically when a tournament is updated to be Canceled or Complete. This is in UTC."]
+    string(-1) mEndTime;
+    
+    [tag="imgs", description="Image links."]    
+    ImageLinks mImages;
+    
+    [tag="logo", description="URL to organizer logo image.."]
+    string(-1) mOrganizerLogo;
+
+    [tag="appi", description="Details for the organizer's app on each supported platform. Only platforms that are supported are present."]
+    AppInfoObject mOrganizerAppInfo;
+
+    [tag="tnam", description=" Localized title name. Pulled from the SCID."]
+    string(-1) mTitleName;
+
+    [tag="isro", description="True when registration is open. This is computed from the schedule and is provided to clients as a convenience so they can get a yes/no based on the server's time."]
+    bool mIsRegistrationOpen;
+    [tag="isco", description="True when check-in is open. This is computed from the schedule and is provided to clients as a convenience so they can get a yes/no based on the server's time."]
+    bool mIsCheckinOpen;
+    [tag="ispo", description="True when play is open. This is computed from the schedule and is provided to clients as a convenience so they can get a yes/no based on the server's time."]
+    bool mIsPlayingOpen;
+
+    [tag="nmtr", description="The number of teams registered for the tournament, not including waitlisted teams. This will in the range 0, maxRegistrationCount."]
+    int32_t mNumTeamsRegistered;
+    [tag="nmtc", description="The number of teams checked in for the tournament."]
+    int32_t mNumTeamsCheckedIn;
+    [tag="nmtw", description="The number of teams waitlisted for the tournament. This will be in the range 0, maxWaitlistCount."]
+    int32_t mNumTeamsWaitlisted;
+    [tag="nmtp", description="The number of teams currently playing in the tournament. This will be in the range 0, maxPlayingCount."]
+    int32_t mNumTeamsPlaying;
+    [tag="nmts", description="The number of teams currently on standby in the tournament."]
+    int32_t mNumTeamsStandby;
+    [tag="nmtm", description="The number of teams that have completed the tournament."]
+    int32_t mNumTeamsCompleted;
+    
+    //unused:
+    //[tag="rtas", description="The RTA subscription clients can subscribe to for getting notified of changes to the tournament. This is the resource URI clients should pass to RTA in the SUBSCRIBE message."]
+    //string(-1) mRtaSubscription;
+
+    [tag="ginf", description="Details for the game being played for each platform. Only platforms that are supported are present."]
+    AppInfoObject mGameInfo;
+
+    [tag="club", description="Club Id if there is one."]
+    string(-1) mClubId;
+    
+    [tag="name", description="A friendly name for the tournament, intended for display."]
+    string(-1) mName;
+    [tag="desc", description="An additional, longer description of the tournament, intended for display."]
+    string(-1) mDescription;
+    [tag="mode", description="A string representing the friendly name of the game mode."]
+    string(-1) mGameMode;
+    [tag="styl", description="A string representing the style of the tournament, such as Single Elimination or Round Robin"]
+    string(-1) mTournamentStyle;
+    [tag="fmts", description="A set of format strings indicating possible friendly strings a team can have."]
+    ExternalTournamentFormatStrings mFormatStrings;
+};
+
+[description="For Xbox Tournaments. This defines the tournament. Tournament organizers PUT this object to create tournaments. Organizers can also GET back what they PUT.", trackChanges = true]
+class ArsonExternalTournamentInfo
+{
+    /////////////////////////////////
+    //TournamentCommonDetails: Required values: hasPrize, paused, minTeamSize, maxTeamSize, schedule, regions    
+    
+    [tag="rgns", description="An array of strings describing the regions where this tournament is available. Ex: US, GB, CA. Regions cannot be duplicated. Passing a one element array with * specifies all Xbox supported regions."]
+    list<string(-1)> mRegions;
+    
+
+    [tag="schd", description="A list of all start and end times for this tournament."]
+    ArsonExternalTournamentScheduleInfo mSchedule;
+
+    [tag="stat", description="The current state of the tournament. Tournaments are Active by default. Organizers can set the tournament to Canceled or Completed by explicitly updating the tournament. Poss values: Active, Canceled, Completed"]
+    ExternalTournamentState mState;
+
+    [tag="paus", description="A flag indicating whether the tournament is currently paused. The Hub doesn't actually do anything differently when this is set to true. It's just a way for the organizer to let the client know that things are on hold."]
+    bool mPaused;
+    
+    [tag="priz", description="True if the tournament has a prize. False otherwise."]
+    bool mHasPrize;
+    
+    [tag="crtr", description="If this is a user-generated tournament, this is the xuid (as a base 10 unsigned long) of the user who created this tournament. If TO created, not present."]
+    string(-1) mCreator;
+    
+    [tag="visb", description="This field describes whether a tournament is visible and joinable by all or restricted by creator/club. Public by default. Poss values: Public or Private"]
+    string(-1) mVisibility;
+
+    [tag="maxt", description="The max number of players that can play on a team. Must be greater than 0, and greater than or equal to the largest team size currently enlisted in this tournament (when applicable)."]
+    int32_t mMaxTeamSize;
+    
+    [tag="mint", description="The min number of players required in a team. Must be greater than 0, and smaller than or equal to the smallest team size currently enlisted in this tournament (when applicable)."]
+    int32_t mMinTeamSize;
+    
+    [tag="maxr", description="This is the maximum number of registered teams. This does not include waitlisted teams. Must be greater than 0 and the count of teams currently registered in this tournament (when applicable)."]
+    int32_t mMaxRegistrationCount;
+    
+    [tag="minr", description="This is the minimum number of registered teams. Must be greater than or equal to 0."]
+    int32_t mMinRegistrationCount;
+
+    [tag="maxw", description="This is the maximum number of waitlisted teams. Must be greater than or equal to 0 and the count of teams currently waitlisted in this tournament (when applicable)."]
+    int32_t mMaxWaitlistCount;
+    
+    [tag="maxp", default=100, description="This is the maximum number of teams that can play at one time. If set, must be greater than 0 and less than or equal to maxRegistrationCount."]
+    int32_t mMaxPlayingCount;
+
+    //////////////////////
+    // other XBL server based API settings (not present in client XDK API)
+    // required values: defaultLanguage, displayStrings, imageMonikers, titleId, platforms
+
+    [tag="dlan", description="The language that will be used if a user requests a language that is not defined by the tournament. The language must be supported by Xbox Live. Ex: 'en-US'."]
+    string(-1) mDefaultLanguage;
+    
+    [tag="dstr", description="display strings"]
+    TournamentFullDisplayStrings mDisplayStrings;
+    
+    [tag="imgm", description="Images"] 
+    ImageMonikers mImageMonikers;
+    
+    [tag="ttid", description="The XBL title ID of the title to be played for this tournament. This is a base 10 integer. It must be associated with a scid and a sandbox."]
+    TitleId mTitleId;
+
+    [tag="plat", description="The supported platforms. Participants can play the title on these platforms. Valid values are XboxOne and WindowsOneCore."]
+    list<string(-1)> mPlatforms;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Common TDFs /////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+typedef string(-1) ArsonTournamentTeamName;
+
+typedef int64_t ArsonTournamentRank;
+const ArsonTournamentRank INVALID_TOURNAMENT_RANK = 0; // note: XBL disallows non-positive
+const uint64_t UNSPECIFIED_RANKING = 0;
+
+[description="A tournament team's final result in the tournament.", trackChanges = true]
+class TournamentTeamFinalResult
+{
+    [tag="rank", default=INVALID_TOURNAMENT_RANK] ArsonTournamentRank mRank;
+};
+
+
+[description="Tournament registration state."]
+enum TeamRegistrationState
+{
+    [description="Team is registered for the tournament. Team will be scheduled for upcoming tournament matches by tournament organizer."]
+    TEAM_REGISTRATION_REGISTERED,
+    [description="Optional state used as a waiting state, when TOs need to review the submitted tournament team/registration first, by moving to other states."]
+    TEAM_REGISTRATION_WAITLISTED,
+    [description="State where the tournament team/registration is pending approval from tournament organizer, before it can be registered, or updated."]
+    TEAM_REGISTRATION_STANDBY,
+    [description="The submitted tournament team is in the check in stage."]
+    TEAM_REGISTRATION_CHECKEDIN,
+    [description="The tournament team is in game play."]
+    TEAM_REGISTRATION_PLAYING,
+    [description="The tournament team completed or was eliminated from the tournament."]
+    TEAM_REGISTRATION_COMPLETED
+};
+
+[description="Response info for a tournament team.", trackChanges = true]
+class TournamentTeamIdentification
+{
+    [tag="tmnm", description="Tournament team unique name string."]
+    ArsonTournamentTeamName mUniqueName;
+
+    [tag="dnam", description="Team display name string."]
+    ArsonTournamentTeamName mDisplayName;
+};
+
+[description="creation info for a tournament team.", trackChanges = true]
+class TournamentTeamInfo
+{
+    [tag="tmid"] TournamentTeamIdentification mTeamIdentification;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+    [tag="tmrs"] TeamRegistrationState mRegistrationState;
+    [tag="tmrd"] UtcTimeString mRegistrationDate;
+    [tag="reas"] string(-1) mRegistrationStateReason;
+    [tag="mbrs"] Blaze::UserIdentificationList mMembers;
+    [tag="esid"] ExternalSessionIdentification mMatchIdentification;
+    [tag="finl"] TournamentTeamFinalResult mFinalResult;
+    [tag="bye"] bool mBye;
+    [tag="stnd"] ArsonArenaFormattedString mStanding;
+    //QA_todo implement as needed:
+    //[tag="frmt", description="A label that describes the match. This generic formatted string provides organizers the flexibility to label the match with richer text such as Final or Heat 1. This is required. This was previously round which was just a number."]
+    //ArsonArenaFormattedString mLabel;
+};
+typedef list<TournamentTeamInfo> TournamentTeamInfoList;
+
+
+[description="Tournament match outcome for a team or player."]
+enum TournamentMatchResult
+{
+    [description="The team or player won the match."]
+    TOURNAMENT_MATCH_RESULT_WIN,
+    [description="The team or player lost match."]
+    TOURNAMENT_MATCH_RESULT_LOSS,
+    [description="The team or player drew match."]
+    TOURNAMENT_MATCH_RESULT_DRAW,
+    [description="The team or player achieved a ranking in the match."]
+    TOURNAMENT_MATCH_RESULT_RANK,
+    [description="The team or player didn't show up for the match."]
+    TOURNAMENT_MATCH_RESULT_NOSHOW
+};
+
+[description="Specifies the outcome for a player or team in a tournament match"]
+class TournamentMatchTeamResult
+{
+    [tag="team", description="The team which got the result."]
+    TournamentTeamIdentification mTeam;
+    [tag="outc", description="Enumeration of possible outcomes for the player or team."]
+    TournamentMatchResult mResult;
+    [tag="rank", description="Ranking result. Used if outcome is 'rank'.", default = UNSPECIFIED_RANKING]
+    uint64_t mRanking;
+};
+typedef list<TournamentMatchTeamResult> TournamentMatchTeamResultList;
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Create and Update Tournament TDFs ///////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Response Info For a Tournament"]
+class TournamentInfoResponse
+{
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+    [tag="ecfg"] ArsonExternalTournamentInfo mArsonExternalTournamentInfo;
+};
+
+[description="Request for creating tournament"]
+class CreateTournamentRequest
+{
+    [tag="user"] UserIdentification mUser;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+    [tag="ecfg"] ArsonExternalTournamentInfo mArsonExternalTournamentInfo;
+};
+
+[description="Request for updating tournament"]
+class UpdateTournamentRequest
+{
+    [tag="user"] UserIdentification mUser;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+    [tag="ecfg"] ArsonExternalTournamentInfo mArsonExternalTournamentInfo;
+};
+
+[description="Request for removing tournament"]
+class RemoveTournamentRequest
+{
+    [tag="user"] UserIdentification mUser;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+
+    [tag="rnam", default="", description="if non-empty, will rename with this prefix added, after tournament is removed. Optional, for test use mainly."]
+    string(-1) mPostRemoveNameSuffix;
+};
+
+[description="Request to get tournament for a user"]
+class GetTournamentRequest
+{
+    [tag="user"] UserIdentification mUser;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Create or Update Tournament Team TDFs ///////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request for creating a tournament team."]
+class CreateTournamentTeamRequest
+{
+    [tag="dnam", description="Optional team display name."]
+    ArsonTournamentTeamName mDisplayName;
+
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+    
+    [tag="tmrs", description="Initial registration state", default=TEAM_REGISTRATION_REGISTERED]
+    TeamRegistrationState mRegistrationState;
+    
+    [tag="stnd", description="team external session standing info"]
+    ArsonArenaFormattedString mStanding;
+    
+    [tag="addu", description="Users to add to the team."]
+    UserIdentificationList mMembers;
+};
+
+[description="Request for updating a tournament team."]
+class UpdateTournamentTeamRequest
+{
+    [tag="calr", description="(As needed) User info used to call external/1st-party service. If unspecified, will use the current Blaze RPC user session. May be needed for calls to Blaze from WAL"]
+    UserIdentification mCaller;
+
+    [tag="tmid"] TournamentTeamIdentification mTeamIdentification;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+    [tag="tmrs"] TeamRegistrationState mRegistrationState;
+    [tag="reas"] string(-1) mRegistrationStateReason;
+    
+    [tag="finl", description="team final result info"]
+    TournamentTeamFinalResult mFinalResult;
+    
+    [tag="stnd", description="team external session standing info"]
+    ArsonArenaFormattedString mStanding;
+
+    [tag="frmt", description="A label that describes the match. This generic formatted string provides organizers the flexibility to label the match with richer text such as Final or Heat 1. This is required. This was previously round which was just a number."]
+    ArsonArenaFormattedString mLabel;//QA_todo implement as needed
+    
+    [tag="bye"] bool mBye;
+};
+
+[description="Request for joining a tournament team."]
+class JoinTournamentTeamRequest
+{
+    [tag="user"] UserIdentification mUser;
+    [tag="tmid"] TournamentTeamIdentification mTeamIdentification;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+};
+
+[description="Request for leaving a tournament team."]
+class LeaveTournamentTeamRequest
+{
+    [tag="user"] UserIdentification mUser;
+    [tag="tmid"] TournamentTeamIdentification mTeamIdentification;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Get Tournament Info TDFs ///////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request to get tournament team for user"]
+class GetTournamentTeamRequest
+{
+    [tag="user"] UserIdentification mUser;
+    [tag="team"] TournamentTeamIdentification mTournamentTeamIdentification;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+};
+
+[description="Request to get tournament teams for a user"]
+class GetTournamentTeamsRequest
+{
+    [tag="user"] UserIdentification mUser;
+    [tag="trid"] TournamentIdentificationList mTournaments;
+};
+
+[description="Response to get tournament teams"]
+class GetTournamentTeamsResponse
+{
+    [tag="tems"] TournamentTeamInfoList mTeams;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Sett Tournament Team Match TDFs /////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request for setting a tournament team's scheduled match, or setting status to 'bye' for the current tournament round."]
+class SetTournamentTeamMatchRequest
+{
+    [tag="calr", description="(As needed) User info used to call external/1st-party service. If unspecified, will use the current Blaze RPC user session. May be needed for calls to Blaze from WAL"]
+    UserIdentification mCaller;
+
+    [tag="tmid"] TournamentTeamIdentification mTeamIdentification;
+    [tag="trid"] GameManager::TournamentIdentification mTournamentIdentification;
+    [tag="mtid", default=GameManager::INVALID_GAME_ID, description="GameId of Game to set as the team's next match."]
+    GameManager::GameId mMatchId;
+
+    [tag="frmt", description="A label that describes the match. This generic formatted string provides organizers the flexibility to label the match with richer text such as Final or Heat 1. This is required. This was previously round which was just a number."]
+    ArsonArenaFormattedString mLabel;//QA_todo implement as needed
+    
+    [tag="bye", description="If the team has a bye for the tournament round, instead of specifying a match, set to this true. Only used if mMatchId is INVALID_GAME_ID"]
+    bool mBye;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Submit Tournament Result TDFs ///////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request to post a result to the tournament game's external session."]
+class SubmitTournamentMatchResultRequest
+{
+    [tag="calr", description="User we are submitting this report on behalf of. If empty, the calling user session is assumed."]
+    UserIdentification mReporter;
+
+    [tag="mtid", default=GameManager::INVALID_GAME_ID, description="GameId of Tournament Match Game to submit for."]
+    GameManager::GameId mMatchId;
+
+    [tag="outc", description="The results for players/teams in the match"]
+    TournamentMatchTeamResultList mTeamResults;
+};
+
+class SubmitTournamentMatchResultResponse
+{
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Get All Tournaments TDFs ////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request to get all tournaments for the title", trackChanges=true]
+class GetTournamentsRequest
+{
+    [tag="user"] UserIdentification mUser;
+
+    [tag="torg", default="", description="if non-empty, will filter by this tournament organizer. If empty, will fetches any tournaments for the title."]
+    TournamentOrganizer mTournamentOrganizer;
+
+    [tag="stat", default="", description="if non-empty, will filter by this tournament state"]
+    string(-1) mStateFilter;
+
+    [tag="uflt", description="if non-empty, will filter by tournaments where these users are members"]
+    UserIdentification mMemberFilter;
+
+    [tag="club", default="", description="if non-empty, will filter by this tournament club. If empty, will retrieve only non-club tournaments"]
+    string(-1) mClubIdFilter;
+    
+    [tag="name", default="", description="if non-empty, will filter by tournaments having this prefix in their name."]
+    string(-1) mNamePrefixFilter;
+
+    [tag="maxr", default=0, description="if non-0, will at most return this number of tournaments in response"]
+    uint64_t mMaxResults;
+};
+
+[trackChanges=true]
+typedef list<ArsonExternalTournamentDetails> ArsonExternalTournamentDetailsList;
+
+[description="Response for get all tournaments for the title", trackChanges=true]
+class GetTournamentsResponse
+{
+    [tag="list"] ArsonExternalTournamentDetailsList mTournamentDetailsList;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Cleanup Tournaments TDFs ////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request to cleanup tournaments for the title", trackChanges=true]
+class CleanupTournamentsRequest
+{
+    [tag="user"] UserIdentification mUser;
+    
+    [tag="trid", description="(optional) Specifies organizers and optionally tournament ids, to filter by. If tournamentIds are omitted, all tournaments for the organizer may be cleaned up. If empty list, all the title's tournaments may be cleaned up."]
+    TournamentIdentificationList mTournaments;
+
+    [tag="stat", default="Active,Completed", description="if non-empty, will filter by this tournament state"]//Note the defaults 'Active,Completed' are X1 specific. They may apparently be case sensitive currently.
+    string(-1) mStateFilter;
+
+    [tag="uflt", description="if non-empty, will filter by tournaments where these users are members"]
+    UserIdentification mMemberFilter;
+
+    [tag="club", default="", description="if non-empty, will filter by this tournament club. If empty, will retrieve only non-club tournaments"]
+    string(-1) mClubIdFilter;
+    
+    [tag="name", default="", description="if non-empty, will filter by tournaments having this prefix in their name. Note: may be case insensitive"]
+    string(-1) mNamePrefixFilter;
+
+    [tag="maxr", default=0, description="if non-0, will attempt to remove at most this number of of the tournaments"]
+    uint64_t mMaxTournamentsToProcess;
+
+    [tag="rnam", default="", description="if non-empty, will rename with this prefix added, after tournament is removed. Optional, for test use mainly."]
+    string(-1) mPostRemoveNameSuffix;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Test Send Tournament Game Event TDFs ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request to test sending tournament game event to its event URL"]
+class TestSendTournamentGameEventRequest
+{
+    [tag="mtid", description="GameId of Game to trigger the event for."]
+    GameManager::GameId mMatchId;
+
+    [tag="fakr", description="If a player's data is specified in this list, it will be used for its entry in the event data sent. Players in the game, that don't have entries in this list will have their actual data from the game sent instead."]
+    list<GameManager::ExternalHttpGamePlayerEventData> mFakeGameRoster;
+};
+
+[description="Response/error-response for the test Blaze sending tournament game event"]
+class TestSendTournamentGameEventResponse
+{
+    [tag="burl", description="URL of the request Blaze internally attempted to send to, for the game."]
+    GameManager::GameStatusURL mAttemptedUrl;
+    
+    [tag="meth", description="Http method of the request Blaze internally attempted to send, for the game."]
+    string(-1) mAttemptedHttpMethod;
+
+    [tag="data", description="Body of the request Blaze internally attempted to send, for the game."]
+    GameManager::ExternalHttpGameEventData mAttemptedEventData;
+
+    [tag="msg", description="Error details, if the game event request Blaze internally attempted, failed. N/A on success."]
+    string(-1) mErrorDetails;
+};
+
+}
+}

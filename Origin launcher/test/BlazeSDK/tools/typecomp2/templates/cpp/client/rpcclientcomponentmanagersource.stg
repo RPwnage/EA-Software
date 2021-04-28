@@ -1,0 +1,219 @@
+group rpcclientcomponentmanagersource : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+rootComponent(fileNode, node) ::= <<
+<centralFileHeader()>
+
+/*** Include Files ********************************************************************************/
+
+#include "BlazeSDK/internal/internal.h"
+#include "BlazeSDK/fire2connection.h"
+#include "BlazeSDK/httpconnection.h"
+#include "BlazeSDK/blazeerrors.h"
+#include "BlazeSDK/componentmanager.h"
+#include "BlazeSDK/component.h"
+#include "BlazeSDK/callback.h"
+#include "BlazeSDK/shared/framework/util/blazestring.h"
+
+namespace Blaze
+{
+
+/*! **** Public Methods ******************************************************************************/
+
+ComponentManager::ComponentManager() 
+:   mComponentMap(MEM_GROUP_FRAMEWORK, "ComponentManager::mComponentMap"),
+    mComponentConnMap(MEM_GROUP_FRAMEWORK, "ComponentManager::mComponentConnMap"),
+    mBlazeHub(nullptr),
+    mDefaultSender(nullptr),
+    mUserIndex(0)
+    
+{
+}
+
+ComponentManager::~ComponentManager()
+{
+    // Delete any remaining components
+    for (ComponentMap::iterator componentMapIter = mComponentMap.begin(), componentMapEnd = mComponentMap.end();
+         componentMapIter != componentMapEnd; ++componentMapIter)
+    {
+        Component *component = componentMapIter->second;
+        BLAZE_DELETE(MEM_GROUP_FRAMEWORK, component);
+    }
+    
+    // Delete any remaining connections
+    for (ComponentConnectionMap::iterator connIter = mComponentConnMap.begin(), connEnd = mComponentConnMap.end();
+        connIter != connEnd; ++connIter)
+    {
+        BlazeSender *conn = connIter->second;
+        BLAZE_DELETE(MEM_GROUP_FRAMEWORK, conn);
+    }
+}
+
+void ComponentManager::init(BlazeHub* hub, BlazeSender* conn, uint32_t userIndex) 
+{
+    mBlazeHub = hub;
+    mDefaultSender = conn;
+    mUserIndex = userIndex;
+}
+
+void ComponentManager::createComponent(EA::TDF::ComponentId componentId, CreationFunction createFunction)
+{
+    eastl::pair\<ComponentMap::iterator, bool\> res = mComponentMap.insert(componentId);
+    ComponentMap::iterator& iter = res.first;
+    if (res.second)
+    {
+        iter->second = createFunction(this);
+    }
+}
+
+
+void ComponentManager::createComponent(EA::TDF::ComponentId componentId, CreationFunction createFunction, const BlazeSender::ServerConnectionInfo& addr, Encoder::Type encoderType, const char8_t* certData, const char8_t* keyData, size_t certDataSize, size_t keyDataSize)
+{
+    createComponent(componentId, createFunction);
+    
+    // Override the default BlazeConneciton with a HTTP connection to the specified address.
+    eastl::pair\<ComponentConnectionMap::iterator, bool\> res = mComponentConnMap.insert(componentId);
+    ComponentConnectionMap::iterator& iter = res.first;
+    if (res.second)
+    {
+        // create the connection;
+        HttpConnection* conn = BLAZE_NEW(MEM_GROUP_FRAMEWORK, "ComponentManager::HttpConnection") HttpConnection(*mBlazeHub, encoderType);
+        conn->setServerConnInfo(addr);
+        conn->setAuthenticationData(certData, keyData, certDataSize, keyDataSize);
+        iter->second = conn;
+    }
+}
+
+void ComponentManager::destroyComponent(EA::TDF::ComponentId componentId)
+{
+    ComponentMap::const_iterator iter = mComponentMap.find(componentId);
+    if (iter != mComponentMap.end())
+    {
+        Component *component = iter->second;
+        BLAZE_DELETE(MEM_GROUP_FRAMEWORK, component);
+        mComponentMap.erase(componentId);
+    }
+
+    ComponentConnectionMap::iterator connIter = mComponentConnMap.find(componentId);
+    if (connIter != mComponentConnMap.end())
+    {
+        BlazeSender *conn = connIter->second;
+        BLAZE_DELETE(MEM_GROUP_FRAMEWORK, conn);
+        mComponentConnMap.erase(componentId);
+    }
+}
+
+JobId ComponentManager::sendRequest(EA::TDF::ComponentId componentId, EA::TDF::ComponentId commandId, const EA::TDF::Tdf* request,     
+                                    RpcJobBase* job, const JobId& reserveId, uint32_t timeout)
+{   
+    JobId jobId;
+    // Check for override connection
+    ComponentConnectionMap::iterator iter = mComponentConnMap.find(componentId);
+    if (iter != mComponentConnMap.end())
+    {
+        BlazeSender *conn = iter->second;
+        if (conn != nullptr)
+        {
+            return conn->sendRequest(mUserIndex, componentId, commandId, request, job, reserveId, timeout);
+        }
+    }
+    
+    // rely on the default
+    if (mDefaultSender != nullptr)
+    { 
+        return mDefaultSender->sendRequest(mUserIndex, componentId, commandId, request, job, reserveId, timeout);
+    }
+    return jobId;
+}
+
+void ComponentManager::handleNotification(EA::TDF::ComponentId componentId, uint16_t commandId, const uint8_t* buf, size_t bufSize)
+{
+    Component* component = getComponentById(componentId);
+    if (component != nullptr)
+    {
+        component->handleNotification(commandId, buf, bufSize, mUserIndex);
+    }
+    else
+    {
+        BLAZE_SDK_DEBUGF("ComponentManager: Could not handle notificationId %i for unknown or unregistered componentId %i.", commandId, componentId);
+    }
+    
+}  /*lint !e1762 - Avoid lint to check whether the member function could be made const*/
+
+
+BlazeSender* ComponentManager::getBlazeSender(uint16_t componentId)
+{
+    ComponentConnectionMap::iterator iter = mComponentConnMap.find(componentId);
+    if (iter != mComponentConnMap.end())
+    {
+        return iter->second;
+    }
+    return nullptr;
+}
+
+
+const char8_t* ComponentManager::getComponentName(EA::TDF::ComponentId componentId) const
+{
+#ifndef BLAZESDK_SUPPRESS_NAMING
+    Component* component = getComponentById(componentId);
+    if (component != nullptr)
+    {
+        return component->getComponentName();
+    }
+#endif
+   return "";
+}
+
+const char8_t* ComponentManager::getCommandName(EA::TDF::ComponentId componentId, uint16_t commandId) const
+{
+#ifndef BLAZESDK_SUPPRESS_NAMING
+    Component* component = getComponentById(componentId);
+    if (component != nullptr)
+    {
+        return component->getCommandName(commandId);
+    }
+#endif
+   return "";
+}
+
+const char8_t* ComponentManager::getNotificationName(EA::TDF::ComponentId componentId, uint16_t notificationId) const
+{
+#ifndef BLAZESDK_SUPPRESS_NAMING
+    Component* component = getComponentById(componentId);
+    if (component != nullptr)
+    {
+        return component->getNotificationName(notificationId);
+    }
+#endif
+   return "";
+}
+
+const char8_t* ComponentManager::getErrorName(BlazeError errorCode) const
+{
+#ifndef BLAZESDK_SUPPRESS_NAMING
+    switch(errorCode)
+    {
+       case ERR_OK: return "ERR_OK";
+       <node.Errors:{ error | case <error.Name>: return "<error.Name>"; }; separator="\n">
+       <node.SdkErrors:{ error | case <error.Name>: return "<error.Name>"; }; separator="\n">
+       default:
+       {
+            Component* component = getComponentById(BLAZE_COMPONENT_FROM_ERROR(errorCode));
+            if (component != nullptr)
+            {
+                return component->getErrorName(errorCode);
+            }
+       }
+       break;
+    }
+#endif
+   return "";
+}
+
+} // Blaze
+
+<standardFileFooter()>
+
+>>

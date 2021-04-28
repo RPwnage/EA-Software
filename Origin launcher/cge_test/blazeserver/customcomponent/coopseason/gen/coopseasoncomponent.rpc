@@ -1,0 +1,130 @@
+// Defines the RPCs and async notifications used in the coopseason component.
+//  RPC classes are compiled with RPCComp, generating C++ classes (or class stubs) that the component must implement.
+//
+// Note: see http://gos.online.ea.com/confluence/display/tech/RPCComp for info on the .rpc file/lang spec and the compiler, RpcComp
+//
+// We assume that all request and response types are valid and just use them
+// directly in the code generation.
+//
+// The compiler should ensure that all commands within a component have a unique ID.
+// The compiler should ensure that all components within a file have a unique ID.
+// Zero is not a valid component or command ID
+// Enforce that method names must start with lowercase letter.
+// Enforce C++ rules for method names and TDF type names.
+// Allow C++ style comments.
+//
+
+[ headername="coopseason/tdf/coopseasontypes.h" ]
+#include "coopseason/gen/coopseasontypes.tdf"
+
+[ 
+  client_include = false,
+  headername="coopseason/tdf/coopseasontypes_server.h" 
+]
+#include "coopseason/gen/coopseasontypes_server.tdf"
+
+
+namespace Blaze
+{
+namespace CoopSeason
+{
+[
+  id = custom/22,
+  description = "A component used strictly as a template.",
+  details = "This component will compile.  It will not be configured to run by default.",
+  configurationType = CoopSeasonConfig
+]
+component CoopSeason
+{
+    types
+    {
+        [ name = "coop" ]
+        ENTITY_TYPE_COOP = 1;
+    }
+    
+	errors
+	{
+		[ description = "An unknown error occurred." ]
+		COOPSEASON_ERR_GENERAL = 1;
+		[ description = "A database error has occurred." ]
+		COOPSEASON_ERR_DB = 2;
+		[ description = "Target user Not found." ]
+		COOPSEASON_ERR_USER_NOT_FOUND = 3;
+		[ description = "Coop Pair Not found." ]
+		COOPSEASON_ERR_PAIR_NOT_FOUND = 4;
+	}
+
+	slave
+	{						
+		methods
+		{
+   			[
+				id = 1,
+				errors = {COOPSEASON_ERR_GENERAL},
+				errortype = CoopSeasonError,
+				description = "This command will poke the Blaze server and return a response.",
+				details = "If a negative number is passed in the num field, this command will return an error."
+   			]
+   			CoopSeasonResponse poke(CoopSeasonRequest);
+   			
+			[
+				id = 2,
+				errors = {
+                       COOPSEASON_ERR_GENERAL,
+                       COOPSEASON_ERR_DB,
+                       COOPSEASON_ERR_USER_NOT_FOUND
+				}				
+			]
+			GetAllCoopIdsResponse getAllCoopIds(GetAllCoopIdsRequest);
+
+			[
+				id = 3,
+				errors = {
+                       COOPSEASON_ERR_GENERAL,
+                       COOPSEASON_ERR_DB,
+                       COOPSEASON_ERR_PAIR_NOT_FOUND                       
+				},
+                requiresUserSession=false
+			]
+			GetCoopIdDataResponse getCoopIdData(GetCoopIdDataRequest);
+
+			[
+				id = 4,
+				errors = {
+                       COOPSEASON_ERR_GENERAL,
+                       COOPSEASON_ERR_DB,
+                       COOPSEASON_ERR_PAIR_NOT_FOUND                       
+				},
+				requires_authentication = false
+			]
+			SetCoopIdDataResponse setCoopIdData(SetCoopIdDataRequest);
+
+			[
+				id = 5,
+				errors = {
+                       COOPSEASON_ERR_GENERAL,
+                       COOPSEASON_ERR_DB,
+                       COOPSEASON_ERR_PAIR_NOT_FOUND                       
+				}
+			]
+			RemoveCoopIdDataResponse removeCoopIdData(RemoveCoopIdDataRequest);
+
+		} // methods
+	} // slave
+
+	master
+	{		
+		methods
+		{
+   			[
+   			  id = 1,
+   			  errors = {COOPSEASON_ERR_GENERAL} 
+   			]
+   			CoopSeasonResponse pokeMaster(CoopSeasonRequest);			
+		} // methods
+	} // master
+}
+}
+}
+
+

@@ -1,0 +1,134 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- 
+  Note that different Unix hosts (Ubuntu, CentOS, windows cross tools) can have different installed build tools.  So embedding the
+  system name info to the version property.
+  -->
+
+  <compiler
+    path="${package.UnixClang.compiler??${cc}}"
+    path-clanguage="${package.UnixClang.c-compiler??${cc-clanguage??${cc}}}"
+    version="${package.UnixClang.clang.version??${clang_version}}-${__system_name??${nant.platform_host}}"
+    >
+    <common-defines>
+      ${package.UnixClang.cc.common-defines??${cc.defines??}}
+    </common-defines>
+    <common-options>
+      ${package.UnixClang.cc.common-options??${cc.options??}}
+    </common-options>
+    <system-includedirs>
+      ${package.UnixClang.includedirs??${cc.includedirs??}}
+    </system-includedirs>
+    <template>
+      <!-- Swapped options and includedirs so that -nostdinc can be specified in cc.options in general.xml -->
+      <commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%objectfile%"     <!-- object file -->
+        -c "%sourcefile%"     <!-- source file -->
+      </commandline>
+      <pch.commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%pchfile%"
+        -c "%sourcefile%"
+      </pch.commandline>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <!-- Need to make sure %system-includedir% is in unix path format -->
+      <system-includedir>-isystem "%system-includedir%"</system-includedir>
+    </template>
+  </compiler>
+
+  <assembler 
+    path="${package.UnixClang.assembler??${as}}"
+    version="${package.UnixClang.assembler.version??${clang_version}}-${__system_name??${nant.platform_host}}"
+    >
+    <common-defines>
+      ${package.UnixClang.as.common-defines??}
+    </common-defines>
+    <common-options>
+      ${package.UnixClang.as.common-options??${as.options??}}
+      --MD "%dependencyfile%"
+    </common-options>
+    <system-includedirs>
+      ${package.UnixClang.includedirs??}
+    </system-includedirs>
+    <template>
+      <commandline>
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%objectfile%"
+        -c "%sourcefile%"
+      </commandline>
+      <define>--defsym %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <system-includedir>-I "%includedir%"</system-includedir>
+    </template>
+  </assembler>
+
+  <librarian
+    path="${package.UnixClang.archiver??${lib}}"
+    version="${package.UnixClang.archiver.version??${clang_version}}-${__system_name??${nant.platform_host}}"
+    >
+    <common-options>
+      ${package.UnixClang.lib.common-options??-crs "%liboutputname%"}
+    </common-options>
+    <template>
+      <commandline>
+        %options%
+        %objectfiles%
+      </commandline>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </librarian>
+
+  <linker
+    path="${package.UnixClang.linker??${link}}"
+    version="${package.UnixClang.clang.version??${clang_version}}-${__system_name??${nant.platform_host}}"
+    >
+    <common-options>
+      ${package.UnixClang.link.common-options??${link.options??}}
+    </common-options>
+    <system-librarydirs>
+      ${package.UnixClang.librarydirs??${link.librarydirs??}}
+    </system-librarydirs>
+    <system-libs>
+      ${package.UnixClang.libraries??${link.libraries??}}
+    </system-libs>
+    <template>
+      <commandline>
+        %options%
+        %objectfiles%
+        %librarydirs%
+        -Xlinker --start-group
+        %libraryfiles%
+        -Xlinker --end-group
+      </commandline>
+      <librarydir>-L "%librarydir%"</librarydir>
+      <libraryfile>"%libraryfile%"</libraryfile>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </linker>
+
+  <!-- 
+  Clear these generic properties that are setup by SDK packages. 
+  We like to avoid the situation where people doing explicit dependent on other config's SDK packages and 
+  got these build settings accidentally overridden by other platform's settings.  We are slowly converting 
+  eaconfig's script to use new properties and clear these generic ones.  In the future, we are
+  slowly deprecating the definition of these generic properties and opt for more platform specific property names.
+  -->
+  <property name="cc.options" />
+  <property name="cc.defines" />
+  <property name="cc.includedirs"/>
+  <property name="link.options"/>
+  <property name="link.libraries"/>
+  <property name="link.librarydirs"/>
+  <property name="lib.options"/>
+
+</project>

@@ -1,0 +1,297 @@
+[headername="framework/tdf/network.h"] // for CCSConnectionSetId
+#include "framework/gen/network.tdf"
+
+namespace Blaze
+{
+namespace CCS
+{
+
+const uint64_t INVALID_CCS_REQUEST_ID = 0;
+const int64_t INVALID_CCS_PING_SITE_LATENCY = -1;
+const uint16_t DEFAULT_LEASE_TIME_MINUTES = 10;
+typedef string(64) ClientID;
+typedef string(-1) AccessToken;
+typedef string(64) Str64; // various misc. strings
+typedef uint32_t RequestId;
+typedef uint16_t LeaseTime;
+ 
+class CCSErrorResponse
+{
+    [tag="id", description="The id of the original request for which we received the response.", default=0, nameoverride="request_id"]
+    RequestId mRequestId;
+
+    [tag="erde", description="The reason due to which the request failed.", default="", nameoverride="message"]
+    string(128) mErrorDescription; 
+};
+
+class ConnectionInfo
+{
+    [tag="cpvr", description="The version of the protocol the client is using.", default="", nameoverride="prototunnel_ver"]
+    Str64 mProtoTunnelVer; 
+
+    [tag="tuke", description="The tunnel key for this connection.", default="", nameoverride="prototunnel_key"]
+    string(128) mProtoTunnelKey;
+
+    [tag="gcin", description="The index of the console in game.", default=-1, nameoverride="game_console_index"] 
+    uint32_t mGameConsoleIndex;  
+
+    [tag="gcid", description="The unique tag that identifies this console in the Blaze installation.", default="", nameoverride="game_console_unique_tag"] 
+    Str64 mGameConsoleUniqueTag; 
+};
+
+typedef list<map<Str64, ConnectionInfo> > Connections; // An array of connections requested between pairs of consoles so [{"gc1":info,"gc2":info}, {"gc3":info,"gc4":info}]
+
+class GetHostedConnectionRequestInfo
+{
+    [tag="id", description="A unique identifier for debugging and logging this request.", default=0, nameoverride="request_id" ]
+    RequestId mRequestId;
+    
+    [tag="clid", description="The unique identifier for the blaze server making the request.", default="", nameoverride="ccs_client_id"]
+    ClientID mCCSClientId;
+
+    [tag="leti", description="The lease time in minutes that we want the connection set id to stay around.", default=DEFAULT_LEASE_TIME_MINUTES, nameoverride="leasetime"]
+    LeaseTime mLeasetime;
+
+    [tag="cimp", description="The game consoles connection info for which we are requesting hosted connection."]
+    Connections mConnections; 
+};
+
+// DEPRECATED - Only used for "v1" support.  Replaced by "v2" request - GetHostedConsoleConnectionRequest.
+class GetHostedConnectionRequest
+{
+    [tag="body", description="The data to be sent in the body of the request."]
+    GetHostedConnectionRequestInfo mRequestBody;
+
+    [tag="apvr", description="The API version being used by this request.", default=""]
+    Str64 mAPIVersion;
+    
+    [tag="csid", description="Identifier provided by CCS the first time a connection is made on on a particular DC instance.", default="", nameoverride="conn_set_id"]
+    CCSConnectionSetId mConnectionSetId;
+
+    [tag="cdct", description="The data center the hosted resource should come from", default="", nameoverride="data_center"]
+    Str64 mDataCenter; 
+
+    [tag="clpl", description="Pool of servers we're using from CC", default="", nameoverride="pool"]
+    Str64 mPool;
+
+    [tag="tokn", description="The Nucleus access token to use for authentication.", default=""]
+    AccessToken mAccessToken;
+
+    [tag="accp", description="The accept header to send with the request", default="application/JSON"]
+    Str64 mAcceptHeader;
+};
+
+class PingSiteInfo
+{
+    [tag="ping", description="The ping site's name.", default="", nameoverride="ping_site"] 
+    Str64 mPingSite; 
+
+    [tag="late", description="The latency to the ping site", default=INVALID_CCS_PING_SITE_LATENCY] 
+    int64_t mLatency; 
+};
+typedef list<PingSiteInfo> PingSites; 
+
+class ConsoleInfo
+{
+    [tag="cpvr", description="The version of the protocol the client is using.", default="", nameoverride="prototunnel_ver"]
+    Str64 mProtoTunnelVer; 
+
+    [tag="tuke", description="The tunnel key for this connection.", default="", nameoverride="prototunnel_key"]
+    string(128) mProtoTunnelKey;
+
+    [tag="gcin", description="The index of the console in game.", default=-1, nameoverride="game_console_index"] 
+    uint32_t mGameConsoleIndex;  
+
+    [tag="gcid", description="The unique tag that identifies this console in the Blaze installation.", default="", nameoverride="game_console_unique_tag"] 
+    Str64 mGameConsoleUniqueTag; 
+
+    [tag="gcip", description="The ip address of the client console.", default="", nameoverride="game_console_ip"]
+    Str64 mGameConsoleIp; 
+
+    [tag="ping", description="The ping sites with latencies for the given console.", nameoverride="ping_sites"]
+    PingSites mPingSites; 
+};
+typedef list<ConsoleInfo> Consoles;
+typedef list<map<Str64, uint64_t> > ConnectionsToConsoles; // An array of connections requested between pairs of consoles so [{"gc1":0,"gc2":1}, {"gc3":2,"gc4":3}]
+
+class GetHostedConsoleConnectionRequestInfo
+{
+    [tag="id", description="A unique identifier for debugging and logging this request.", default=0, nameoverride="request_id" ]
+    RequestId mRequestId;
+    
+    [tag="clid", description="The unique identifier for the blaze server making the request.", default="", nameoverride="ccs_client_id"]
+    ClientID mCCSClientId;
+
+    [tag="leti", description="The lease time in minutes that we want the connection set id to stay around.", default=DEFAULT_LEASE_TIME_MINUTES, nameoverride="leasetime"]
+    LeaseTime mLeasetime;
+
+    [tag="cons", description="The game consoles info for which we are requesting hosted connection."]
+    Consoles mConsoles; 
+
+    [tag="cimp", description="The game connection associating connections with the consoles that need them."]
+    ConnectionsToConsoles mConnections; 
+};
+
+
+class GetHostedConsoleConnectionRequest
+{
+    [tag="body", description="The data to be sent in the body of the request."]
+    GetHostedConsoleConnectionRequestInfo mRequestBody;
+
+    [tag="apvr", description="The API version being used by this request.", default=""]
+    Str64 mAPIVersion;
+    
+    [tag="csid", description="Identifier provided by CCS the first time a connection is made on on a particular DC instance.", default="", nameoverride="conn_set_id"]
+    CCSConnectionSetId mConnectionSetId;
+
+    [tag="cdct", description="The data center the hosted resource should come from", default="", nameoverride="data_center"]
+    Str64 mDataCenter; 
+
+    [tag="clpl", description="Pool of servers we're using from CC", default="", nameoverride="pool"]
+    Str64 mPool;
+
+    [tag="tokn", description="The Nucleus access token to use for authentication.", default=""]
+    AccessToken mAccessToken;
+
+    [tag="accp", description="The accept header to send with the request", default="application/JSON"]
+    Str64 mAcceptHeader;
+};
+
+typedef map<Str64, uint32_t> ConnIdMap;
+typedef list<ConnIdMap> AllocatedResources;
+
+class GetHostedConnectionResponse
+{
+    [tag="id", description="The id of the original request for which we received the response.", default=0, nameoverride="request_id"]
+    RequestId mRequestId;
+
+    [tag="alre", description="The hosted servers allocated to satisfy this request.", nameoverride="allocated_resources"]
+    AllocatedResources mAllocatedResources;
+    
+    [tag="csid", description="Identifier provided by CCS the first time a connection is made on on a particular DC instance.", default="", nameoverride="conn_set_id"]
+    CCSConnectionSetId mConnectionSetId;
+
+    [tag="cdct", description="The data center of the host that will service this connection.", default="", nameoverride="data_center"]
+    Str64 mDataCenter; 
+
+    [tag="hsid", description="The id of the host that will service this connection.", default=0, nameoverride="hosting_server_id"]
+    uint32_t mHostingServerConnectivityId;
+
+    [tag="hsip", description="The IP address of the host that will service this connection.", default="", nameoverride="ip"]
+    Str64 mHostingServerIP; 
+
+    [tag="hspr", description="The port of the host that will service this connection.", default="", nameoverride="port"]
+    Str64 mHostingServerPort; 
+
+    [tag="leti", description="The lease time in minutes by which the connection set id life is extended.", default=DEFAULT_LEASE_TIME_MINUTES, nameoverride="leasetime"]
+    LeaseTime mLeasetime;
+};
+
+class FreeHostedConnectionRequestInfo
+{
+    [tag="id", description="A unique identifier for debugging and logging this request.", default=0, nameoverride="request_id" ]
+    RequestId mRequestId;
+
+    [tag="clid", description="The unique identifier for the blaze server making the request.", default="", nameoverride="ccs_client_id"]
+    ClientID mCCSClientId;
+};
+
+class FreeHostedConnectionRequest
+{
+    [tag="body", description="The data to be sent in the body of the request."]
+    FreeHostedConnectionRequestInfo mRequestBody;
+
+    [tag="apvr", description="The API version being used by this request.", default=""]
+    Str64 mAPIVersion;
+    
+    [tag="csid", description="The connection set id to which the freed connections belong.", default="", nameoverride="conn_set_id"]
+    CCSConnectionSetId mConnectionSetId;
+    
+    [tag="cid1", description="The ccs allocated id of the console 1.", default=0] 
+    uint32_t mGameConsoleId1; 
+
+    [tag="cid2", description="The ccs allocated id of the console 2.", default=0] 
+    uint32_t mGameConsoleId2;
+
+    [tag="tokn", description="The Nucleus access token to use for authentication.", default=""]
+    AccessToken mAccessToken;
+
+    [tag="accp", description="The accept header to send with the request", default="application/JSON"]
+    Str64 mAcceptHeader;
+};
+
+class FreeHostedConnectionResponse
+{
+    [tag="id", description="The id of the original request for which we received the response.", default=0, nameoverride="request_id"]
+    RequestId mRequestId;
+};
+
+
+class LeaseExtensionRequestInfo
+{
+    [tag="id", description="A unique identifier for debugging and logging this request.", default=0, nameoverride="request_id" ]
+    RequestId mRequestId;
+
+    [tag="clid", description="The unique identifier for the blaze server making the request.", default="", nameoverride="ccs_client_id"]
+    ClientID mCCSClientId;
+
+    [tag="leti", description="The lease time in minutes by which we want the connection set id to extend its life.", default=DEFAULT_LEASE_TIME_MINUTES, nameoverride="leasetime"]
+    LeaseTime mLeasetime;
+};
+
+class LeaseExtensionRequest
+{
+    [tag="body", description="The data to be sent in the body of the request."]
+    LeaseExtensionRequestInfo mRequestBody;
+
+    [tag="apvr", description="The API version being used by this request.", default=""]
+    Str64 mAPIVersion;
+    
+    [tag="csid", description="The connection set id whose lease we are extending.", default="", nameoverride="conn_set_id"]
+    CCSConnectionSetId mConnectionSetId;
+    
+    [tag="tokn", description="The Nucleus access token to use for authentication.", default=""]
+    AccessToken mAccessToken;
+
+    [tag="accp", description="The accept header to send with the request", default="application/JSON"]
+    Str64 mAcceptHeader;
+};
+
+class LeaseExtensionResponse
+{
+    [tag="id", description="The id of the original request for which we received the response.", default=0, nameoverride="request_id"]
+    RequestId mRequestId;
+
+    [tag="leti", description="The lease time in minutes by which the lease of this connection set id was increased.", default=DEFAULT_LEASE_TIME_MINUTES, nameoverride="leasetime"]
+    LeaseTime mLeasetime;
+};
+
+class FreeClientHostedConnectionsRequest
+{
+    [tag="id", description="A unique identifier for debugging and logging this request.", default=0, nameoverride="request_id" ]
+    RequestId mRequestId;
+
+    [tag="clid", description="The unique identifier for the blaze server making the request.", default="", nameoverride="ccs_client_id"]
+    ClientID mCCSClientId;
+
+    [tag="apvr", description="The API version being used by this request.", default=""]
+    Str64 mAPIVersion;
+    
+    [tag="clpl", description="Pool of servers we're using from CC", default="", nameoverride="pool"]
+    Str64 mPool;
+    
+    [tag="tokn", description="The Nucleus access token to use for authentication.", default=""]
+    AccessToken mAccessToken;
+
+    [tag="accp", description="The accept header to send with the request", default="application/JSON"]
+    Str64 mAcceptHeader;
+};
+
+class FreeClientHostedConnectionsResponse
+{
+    [tag="id", description="The id of the original request for which we received the response.", default=0, nameoverride="request_id"]
+    RequestId mRequestId;
+};
+
+} // namepsace CCS
+} // namespace Blaze

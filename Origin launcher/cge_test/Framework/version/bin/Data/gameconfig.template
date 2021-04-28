@@ -1,0 +1,162 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+@using System.Xml;
+<Game configVersion="0">
+  @{
+    // according to the appxmanifest specification the identity name field must be a string between 3 and 50 characters in length that consists of alpha-numeric, period, and dash characters.
+    var identityName = Model.Options["identity.name"];
+
+    // start by removing any underscores in the project name
+    identityName = identityName.Replace("_", "");
+
+    // Append some dummy characters to the Identity name value to meet minimum length requirement
+    while (identityName.Length < 3)
+    {
+        identityName += "X";
+    }
+  }
+
+  <Identity Name="@identityName"  
+            Publisher="CN=@Model.Options["identity.publisher"]"  
+            Version="@Model.Options["identity.version"]"/>
+
+  @{
+	  var foregroundtext = Model.Options["shellvisuals.foregroundtext"] ?? "light";
+	  var backgroundcolor = Model.Options["shellvisuals.backgroundcolor"] ?? "#464646";
+  }
+  <ShellVisuals DefaultDisplayName="@Model.Options["shellvisuals.defaultdisplayname"]"
+                PublisherDisplayName="@Model.Options["shellvisuals.publisherdisplayname"]"
+                StoreLogo="@Model.GetImageRelativePath(Model.Options["shellvisuals.storelogo"])"
+                Square150x150Logo="@Model.GetImageRelativePath(Model.Options["shellvisuals.square150x150logo"])"
+                Square44x44Logo="@Model.GetImageRelativePath(Model.Options["shellvisuals.square44x44logo"])"
+                Description="@Model.Options["shellvisuals.description"]"
+                ForegroundText="@foregroundtext"
+                BackgroundColor="@backgroundcolor"
+                SplashScreenImage="@Model.GetImageRelativePath(Model.Options["shellvisuals.splashscreen"])"/>
+
+  <Resources>
+     @foreach(var lang in StringExtensions.ToArray(Model.Options["resource.languages"] ?? "en-us"))
+     {
+       <Resource Language="@lang"/>
+     }
+  </Resources>
+
+  @{if (Model.Options["title.gameosversion"] != null){
+  <GameOsVersion>@Model.Options["title.gameosversion"]</GameOsVersion>
+  }}
+
+  @{if (Model.Options["title.id"] != null){
+  <TitleId>@Model.Options["title.id"]</TitleId>
+  }}
+
+  @{if (Model.Options["store.id"] != null){
+  <StoreId>@Model.Options["store.id"]</StoreId>
+  }}
+
+  @{if (Model.Options["msaappid.id"] != null){
+  <MSAAppId>@Model.Options["msaappid.id"]</MSAAppId>
+  }}
+
+  @{if (Model.Options["title.dbgport"] != null || Model.Options["title.ekbidoverride"] != null || Model.Options["title.contentidoverride"] != null){
+  <DevelopmentOnly>
+    @{if (Model.Options["title.dbgport"] != null) {
+    <DebugNetworkPortList>
+     @foreach(var port in StringExtensions.ToArray(Model.Options["title.dbgport"]))
+     {
+       <DebugNetworkPort>@port</DebugNetworkPort>
+     }
+    </DebugNetworkPortList>
+    }}
+    @{if (Model.Options["title.ekbidoverride"] != null) {
+    <EKBIDOverride>@Model.Options["title.ekbidoverride"]</EKBIDOverride>
+    }}
+    @{if (Model.Options["title.contentidoverride"] != null) {
+    <ContentIdOverride>@Model.Options["title.contentidoverride"]</ContentIdOverride>
+    }}
+  </DevelopmentOnly>
+  }}
+
+  @{if (Model.Options["title.persistentlocalstorage"] != null){
+  <PersistentLocalStorage>
+    <SizeMB>@Model.Options["title.persistentlocalstorage"]</SizeMB>
+  </PersistentLocalStorage>
+  }}
+
+  @{if (Model.Options["title.msafulltrust"] != null){
+  <MSAFullTrust>@Model.Options["title.msafulltrust"]</MSAFullTrust>
+  }}
+
+  @{if (Model.Options["title.requiresxboxlive"] != null){
+  <RequiresXboxLive>@Model.Options["title.requiresxboxlive"]</RequiresXboxLive>
+  }}
+
+  @{if (Model.Options["title.relatedproducts"] != null){
+  <RelatedProducts>
+   @foreach(var productid in StringExtensions.ToArray(Model.Options["title.relatedproducts"]))
+   {
+     <RelatedProduct>@productid</RelatedProduct>
+   }
+  </RelatedProducts>
+  }}
+
+  @{if (Model.Options["title.allowedproduct"] != null){
+  <AllowedProducts>
+   @foreach(var productid in StringExtensions.ToArray(Model.Options["title.allowedproduct"]))
+   {
+     <AllowedProduct>@productid</AllowedProduct>
+   }
+  </AllowedProducts>
+  }}
+
+  @{if (Model.Options["title.gamedvrsystemcomponent"] != null){
+  <MediaCapture>
+     @{if (Model.Options["title.gamedvrsystemcomponent"] != null) {
+     <GameDVRSystemComponent>@Model.Options["title.gamedvrsystemcomponent"]</GameDVRSystemComponent>
+     }}
+     @{if (Model.Options["title.blockbroadcast"] != null) {
+     <BlockBroadcast>@Model.Options["title.blockbroadcast"]</BlockBroadcast>
+     }}
+     @{if (Model.Options["title.blockgamedvr"] != null) {
+     <BlockGameDVR>@Model.Options["title.blockgamedvr"]</BlockGameDVR>
+     }}
+  </MediaCapture>
+  }}
+
+  <ExecutableList>
+    @{
+    var ids = StringExtensions.ToArray(Model.Options["executable.id"] ?? Model.VsProjectFileNameWithoutExtension);
+    var executables = StringExtensions.ToArray(Model.Options["executable.executable"] ?? Module.LinkerOutputName());
+    var targetDeviceFamily = Model.Options["executable.targetDeviceFamily"];
+    
+    for(int i= 0; i < executables.Count; i++)
+    {
+        // according the appxmanifest specification the executable id can only contain alpha-numeric and dot characters, and must start with a letter character.
+        var executableId = ids[Math.Min(i, ids.Count-1)];
+
+        // remove dashes and underscores which are the non-alpha-numeric characters that most commonly appear in package names
+        executableId = executableId.Replace("-", "").Replace("_", "");
+
+        <Executable Id="@executableId"
+                    Name="@executables[Math.Min(i, executables.Count-1)]"
+                    TargetDeviceFamily="@targetDeviceFamily"/>
+    }
+  </ExecutableList>
+  
+  @{if (Model.Options["virtualmachine.titlememory.anaconda"] != null || Model.Options["virtualmachine.titlememory.xb1x"] != null
+    || Model.Options["virtualmachine.smtenabled"] != null || Model.Options["virtualmachine.requires.erashim"] != null){
+  <VirtualMachine>
+    @{if (Model.Options["virtualmachine.titlememory.anaconda"] != null) {
+    <XboxAnacondaTitleMemory>@Model.Options["virtualmachine.titlememory.anaconda"]</XboxAnacondaTitleMemory>
+    }}
+    @{if (Model.Options["virtualmachine.titlememory.xb1x"] != null) {
+    <XboxOneXTitleMemory>@Model.Options["virtualmachine.titlememory.xb1x"]</XboxOneXTitleMemory>
+    }}
+    @{if (Model.Options["virtualmachine.smtenabled"] != null) {
+    <SMTEnabled>@Model.Options["virtualmachine.smtenabled"]</SMTEnabled>
+    }}
+    @{if (Model.Options["virtualmachine.requires.erashim"] != null) {
+    <RequiresEraShim>@Model.Options["virtualmachine.requires.erashim"]</RequiresEraShim>
+    }}
+  </VirtualMachine>
+  }}
+
+</Game>

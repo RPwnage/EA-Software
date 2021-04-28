@@ -1,0 +1,115 @@
+<!--
+================================================================================
+Initialize.xml
+
+Initialize script for the VisualStudio package, which exports properties
+pointing to the Visual C++ compiler.
+
+(c) 2014 Electronic Arts. All Rights Reserved
+================================================================================
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<!-- Used by the DotNet package to determine if this version of the visual studio package exports reference assemblies 
+	since we add this to 15.6.27428.2002 but also backported it to several older versions. -->
+	<property name="package.VisualStudio.supports-non-proxy" value="true"/>
+
+	<property name="package.VisualStudio.SkipInstallationCheck" value="false" unless="@{PropertyExists('package.VisualStudio.SkipInstallationCheck')}"/>
+
+	<property name="package.VisualStudio.exportbuildsettings" value="true" unless="@{PropertyExists('package.VisualStudio.exportbuildsettings')}"/>
+
+	<property name="package.VisualStudio.useCustomMSVC" value="false" unless="@{PropertyExists('package.VisualStudio.useCustomMSVC')}"/>
+
+	<do if="${package.VisualStudio.SkipInstallationCheck}">
+		<property name="package.VisualStudio.appdir" value="Should not use package.VisualStudio.appdir when package.VisualStudio.SkipInstallationCheck is true." unless="@{PropertyExists('package.VisualStudio.appdir')}"/>
+		<property name="package.VisualStudio.vcdir" value="Should not use package.VisualStudio.vcdir when package.VisualStudio.SkipInstallationCheck is true." unless="@{PropertyExists('package.VisualStudio.vcdir')}"/>
+	</do>
+
+	<do unless="${package.VisualStudio.SkipInstallationCheck}">
+
+		<!-- Details on how to detect service pack (for different editions) can be found on the following link:
+		http://blogs.msdn.com/b/heaths/archive/2012/08/03/detection-keys-for-visual-studio-2012.aspx -->
+
+		<include file="init-common-tools.xml"/>
+
+		<do if="${package.VisualStudio.exportbuildsettings}">
+
+			<do if="(${config-compiler??} == 'vc') or ((${config-system??} == 'pc' || ${config-system??} == 'pc64' ) and ${config-compiler??} == 'clang')">
+				<property name="package.VisualStudio.assembler" value="${package.VisualStudio.hosttoolspath}\${__tmp_ml_exe??ml.exe}"/>
+
+				<property name="package.VisualStudio.archiver" value="${package.VisualStudio.hosttoolspath}\lib.exe"/>>
+				<fail unless="@{FileExists('${package.VisualStudio.archiver}')}" message="Visual C++ lib tool not found at ${package.VisualStudio.archiver}"/>
+
+				<property name="package.VisualStudio.linker" value="${package.VisualStudio.hosttoolspath}\link.exe"/>
+				<fail unless="@{FileExists('${package.VisualStudio.linker}')}" message="Visual C++ linker not found at ${package.VisualStudio.linker}"/>
+
+				<property name="package.VisualStudio.librarydirs">
+					${package.VisualStudio.nativetoolsroot}\LIB\${config-processor}
+					${package.VisualStudio.nativetoolsroot}\atlmfc\LIB\${config-processor}
+				</property>
+			</do>
+
+			<do if="${config-compiler??} == 'vc'">
+				<property name="package.VisualStudio.compiler" value="${package.VisualStudio.hosttoolspath}\cl.exe"/>
+				<property name="package.VisualStudio.c-compiler" value="${package.VisualStudio.compiler}"/>
+				<fail unless="@{FileExists('${package.VisualStudio.compiler}')}" message="Visual C++ compiler not found at ${package.VisualStudio.compiler}"/>
+				
+				<property name="package.VisualStudio.includedirs">
+					${package.VisualStudio.nativetoolsroot}\include
+					${package.VisualStudio.nativetoolsroot}\atlmfc\include
+				</property>
+
+				<!-- in VS 2017 some of these  files are still labeled with 140 version.  Microsoft likely made an error here. -->
+				<fileset name="cc.dependencies">
+					<includes name="${package.VisualStudio.hosttoolspath}/c1.dll"/>
+					<includes name="${package.VisualStudio.hosttoolspath}/c1xx.dll"/>
+					<includes name="${package.VisualStudio.hosttoolspath}/c2.dll"/>
+					<includes name="${package.VisualStudio.hosttoolspath}/1033\\clui.dll"/> <!-- assuming en-us language here -->
+					<!-- The following only exists if targetting 64-bit build -->
+					<includes name="${package.VisualStudio.hosttoolspath}/msobj140.dll" if="@{FileExists('${package.VisualStudio.hosttoolspath}/msobj140.dll')}"/>
+					<includes name="${package.VisualStudio.hosttoolspath}/mspdb140.dll" if="@{FileExists('${package.VisualStudio.hosttoolspath}/mspdb140.dll')}"/>
+					<includes name="${package.VisualStudio.hosttoolspath}/mspdbsrv.exe" if="@{FileExists('${package.VisualStudio.hosttoolspath}/mspdbsrv.exe')}"/>
+					<includes name="${package.VisualStudio.hosttoolspath}/mspdbcore.dll" if="@{FileExists('${package.VisualStudio.hosttoolspath}/mspdbcore.dll')}"/>
+					<includes name="${package.VisualStudio.hosttoolspath}/mspft140.dll" if="@{FileExists('${package.VisualStudio.hosttoolspath}/mspft140.dll')}"/>
+				</fileset>
+
+				<fileset name="ms.redist-files">
+					<includes name="${package.VisualStudio.crtredistpath}/*.dll"/>
+				</fileset>
+				<fileset name="ms.redist-debug-files">
+					<includes name="${package.VisualStudio.debug_crtredistpath}/*.dll"/>
+				</fileset>
+				<fail message="Fileset 'ms.redist-files' must contain a list of the msvc redist dlls or msvc based builds may fail since they will be missing important dlls! package.VisualStudio.crtredistpath=${package.VisualStudio.crtredistpath}, package.VisualStudio.vc-redist-root=${package.VisualStudio.vc-redist-root}" unless="@{FileSetCount('ms.redist-files')} > 0" />
+				<fail message="Fileset 'ms.redist-debug-files' must contain a list of the msvc redist dlls or msvc based builds may fail since they will be missing important dlls!" unless="@{FileSetCount('ms.redist-debug-files')} > 0" />
+			</do>
+
+			<!-- TODO: verify that service packs are installed in later versions of this package -->
+
+			<!-- cl.exe requires the mspdbXXX.dll in this folder in the this path.
+				Also need cvtres.exe to compile resource files. -->
+			<do if="@{PropertyExists('package.VisualStudio.hostdependenciesdir')}"> <!-- this won't be set if we <dependent> Visual Studio before / without a config -->
+				<property name="build.env.PATH" value="${package.VisualStudio.hostdependenciesdir};${property.value}"/>
+			</do>
+
+			<!-- WINDIR is required so managed C++ code can be compiled with the /unsafe option.
+				Also, if windir env variable is not set (very unlikely, could be an error) -->
+			<property name='build.env.WINDIR' value='${sys.env.windir??}' />
+			<property name='exec.env.WINDIR' value='${sys.env.windir??}' />
+
+		</do> <!-- package.VisualStudio.exportbuildsettings -->
+
+	</do> <!-- package.VisualStudio.SkipInstallationCheck -->
+
+	<!-- target to assembly reference config file override, create this in temp root so we can hardcode the path in the config file -->
+	<target name="vs-init-reference-config-override">
+		<!-- 
+		This target is called by the DotNet package.  So left this dummy target here. It's old implementation should no longer be used.  
+		If there are any missing components, people should just update MSBuildTools package.
+		-->
+	</target>
+
+	<!-- defines a bunch of legacy properties that are no longer relevant but that packages still depend on and expect to exist -->
+	<!-- please do not use legacy properties and remove them from your scripts if you find them. -->
+	<include file="legacy-properties.xml" if="${package.VisualStudio.legacy-properties??true}"/>
+
+</project>

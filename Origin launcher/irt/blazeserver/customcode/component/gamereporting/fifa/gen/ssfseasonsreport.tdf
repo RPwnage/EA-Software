@@ -1,0 +1,333 @@
+[headername="gamereporting/tdf/gamereporting.h"]
+#include "gamereporting/gen/gamereporting.tdf"
+
+[headername="gamereporting/fifa/tdf/ssfcommonreport.h"]
+#include "gamereporting/fifa/gen/ssfcommonreport.tdf"
+
+[headername="gamereporting/fifa/tdf/ssfmatchendresult.h"]
+#include "gamereporting/fifa/gen/ssfmatchendresult.tdf"
+
+namespace Blaze
+{
+[usePtrOption=true]
+namespace GameReporting
+{
+
+///////////////////////////////////////////////////////////////////////////////
+//  SSF Seasons reports
+//
+//  Submitted report TDFs. 
+///////////////////////////////////////////////////////////////////////////////
+namespace SSFSeasonsReportBase
+{
+
+
+///////////////////////////////////////////////////////////////////////////////
+//  SSF Seasons Game Report
+///////////////////////////////////////////////////////////////////////////////
+const uint32_t FIFA_MOM_MAX_LENGTH = 32;
+
+
+class AvatarId
+{
+    [tag="pId", description="Persona Id"] 
+    int64_t mPersonaId;
+
+    [tag="sId", description="Slot Id"] 
+    uint8_t mSlotId;
+
+    [tag="plId", description="Player index on the squad"] 
+    int32_t mPlayerId;
+};
+
+class GoalEvent
+{
+    [tag="gtim", description="time goal was scored"] 
+    int64_t mGoalEventTime;
+
+    [tag="sctm", description="team that scored"] 
+    int64_t mScoringTeam;
+
+	[tag="gtyp", description="Goal type"] 
+    int32_t mGoalType;
+
+	typedef list<int32_t> IntFlags;
+	[tag="gflg", description="Goal flag"] 
+    IntFlags mGoalFlags;
+	
+    [tag="scId", description="AvatarId of the scorer"] 
+    AvatarId mScorer;
+	
+	[tag="a1Id", description="Primary Assist AvatarId of the goal"] 
+    AvatarId mPrimaryAssist;
+	
+	[tag="a1ty", description="Primary Assist type"] 
+    int32_t mPrimaryAssistType;
+
+	[tag="a1fl", description="Primary Assist flags"] 
+    IntFlags mPrimaryAssistFlags;
+
+	[tag="a2Id", description="Secondary Assist AvatarId of the goal"] 
+    AvatarId mSecondaryAssist;
+	
+	[tag="a2ty", description="Secondary Assist type"] 
+    int32_t mSecondaryAssistType;
+
+	[tag="a2fl", description="Secondary Assist flags"] 
+    IntFlags mSecondaryAssistFlags;
+};
+typedef list<GoalEvent> GoalEventVector;
+
+[
+    tdfid = "hash",
+    description = "SSF Seasons game report TDF that takes a variable TDF representing game data.",
+    details = "SSF Seasons game report TDF"
+]
+class SSFSeasonsGameReport
+{   
+   [tag="cmgr", description="Common Game report"]
+	Blaze::GameReporting::SSF::CommonGameReport mCommonGameReport;	
+	
+    [tag="ccmm", description="mom game report"]
+    string(FIFA_MOM_MAX_LENGTH) mom;
+	
+	[tag="gsum", description="List of Goal Events"]
+    GoalEventVector mGoalSummary;
+};
+
+	enum SsfUserEndSubReason
+	{
+		SSF_USER_RESULT_NONE,
+		SSF_USER_RESULT_IDLE,
+		SSF_USER_RESULT_OWNGOALS,
+		SSF_USER_RESULT_CONSTRAINED,
+		SSF_USER_RESULT_NOCONTEST,
+		SSF_USER_RESULT_QUIT,
+
+		SSF_USER_RESULT_COUNT
+	};
+
+///////////////////////////////////////////////////////////////////////////////
+//  SSF Seasons Player Report
+///////////////////////////////////////////////////////////////////////////////
+[
+    tdfid = "hash",
+    description = "SSF Seasons player game report takes a variable TDF representing player data.",
+    details = "SSF Seasons player report TDF"
+]
+
+class SSFSeasonsPlayerReport
+{  
+    [tag="cmpr", description="Common player report"]
+    Blaze::GameReporting::SSF::CommonStatsReport mCommonPlayerReport;  
+  
+    [tag="copo", description="Player position"]
+    uint32_t pos;
+
+    [tag="mtid", description="team entity id"]
+    int64_t mTeamEntityId;   
+	  
+    [tag="csha", description="Player any clean sheets count"]
+    uint16_t cleanSheetsAny;
+    
+    [tag="cshd", description="Player defender clean sheets count"]
+    uint16_t cleanSheetsDef;
+    
+    [tag="cshg", description="Player goal keeper clean sheets count"]
+    uint16_t cleanSheetsGoalKeeper;
+    
+    [tag="cmom", description="Player man of match count"]
+    uint16_t manOfTheMatch;
+
+    [tag="iscp", description="Is Captain"]
+    uint16_t mIsCaptain;
+
+    [tag="usrt", description="User's reported match end result additional information"]
+    SsfUserEndSubReason mUserEndSubReason;
+
+    [tag="uend", description="User's end match result - server calculated"]
+    SsfMatchEndResult mSsfEndResult;
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+//  SSF Seasons Team Report
+///////////////////////////////////////////////////////////////////////////////
+
+typedef uint32_t SkillType;
+class SkillEvent
+{	
+	[tag="stim", description="skill type that was executed"] 
+    SkillType mSkillType;
+
+	[tag="scnt", description="number of times skill was executed"] 
+    uint16_t mCount;
+	
+	[tag="dcnt", description="number of times skill was used to dribble past an opponent"] 
+    uint16_t mDribblePast;
+};
+typedef map<SkillType, SkillEvent> SkillEventMap;
+
+class TimeBucket
+{
+	[tag="tmpd", description="time period"] 
+    int32_t mTimePeriod;
+	
+	[tag="skmp", description="map of skills for this time period"] 
+    SkillEventMap mSkillMap;
+};
+typedef map<int32_t, TimeBucket> SkillTimeBucketMap;
+
+class AvatarEntry
+{
+	[tag="avid", description="avatar id"] 
+    AvatarId mAvatarId;
+
+    [tag="cmst", description="Common avatar report"]
+    Blaze::GameReporting::SSF::CommonStatsReport mAvatarStatReport;
+
+	[tag="sbtb", description="map of timebucket skill maps"] 
+    SkillTimeBucketMap  mSkillTimeBucketMap;
+};
+typedef list<AvatarEntry> AvatarVector;
+
+[
+    tdfid = "hash",
+    description = "Generic SSF Seasons Team TDF that takes a variable TDF representing team data.",
+    details = "SSF Seasons Team report TDF"
+]
+
+class SSFTeamReport
+{  
+    [tag="cmst", description="Common team report"]
+    Blaze::GameReporting::SSF::CommonStatsReport mCommonTeamReport;
+	
+	[tag="asev", description="Avatar Skill Summary"]
+	AvatarVector mAvatarVector;
+	
+	[tag="sdic", description="squad disconnect"]
+    uint32_t squadDisc;
+
+    [tag="shom", description="squad home or away"]
+    bool     home;
+
+	[tag="srlt", description="squad game result"]
+    uint32_t gameResult;
+
+    [tag="sscr", description="squad score or points for count"]
+    uint32_t score;
+
+    [tag="swdf", description="squad winner by dnf"]
+    uint8_t winnerByDnf;
+        
+    [tag="swin", description="squad wins"]
+    uint8_t wins;
+
+    [tag="slos", description="squad losses"]
+    uint8_t losses;
+    
+    [tag="stie", description="squad ties"]
+    uint8_t ties;    
+
+    [tag="stsm", description="skill move count"]
+    int32_t mSkillMoveCount;    
+};
+typedef map<int64_t, SSFTeamReport> SSFTeamReportMap;
+
+class SSFTeamSummaryReport
+{  
+    [tag="strm", description="SSF team reports"]
+    SSFTeamReportMap mSSFTeamReportMap; 
+};
+
+class SSFNotificationUserReport
+{  
+    [tag="nuid", description="User id"] 
+    int64_t mPersonaId;
+
+    [tag="nusi", description="Team side this user was on"] 
+    int32_t mTeamSide;
+
+	[tag="nuen", description="User's end match result - SSF"]
+	SsfMatchEndResult mSsfEndResult;
+};
+typedef list<SSFNotificationUserReport> SSFNotificationUserReportVector;
+
+class SSFNotificationAvatarStats
+{
+    [tag="naid", description="Avatar id"] 
+	AvatarId mAvatarId;
+
+    [tag="naty", description="Avatar type"] 
+	int32_t mAvatarType;
+
+    [tag="nash", description="Shots taken"] 
+	int32_t mShots;
+
+    [tag="naas", description="Assists made"] 
+	int32_t mAssists;
+
+    [tag="nago", description="Goals scored"] 
+	int32_t mGoals;
+
+    [tag="npss", description="Passes made"] 
+	int32_t mPasses;
+
+    [tag="ntkl", description="Tackles made"] 
+	int32_t mTackles;
+
+    [tag="nblk", description="Blocks made"] 
+	int32_t mBlocks;
+
+    [tag="nart", description="Avatar's match rating"] 
+	float mAvatarRating;
+
+	[tag="nask", description="map of timebucket skill maps"] 
+    SkillTimeBucketMap  mSkillTimeBucketMap;
+};
+typedef list<SSFNotificationAvatarStats> SSFNotificationAvatarVector;
+
+class SSFNotificationTeamReport
+{  
+    [tag="ntid", description="Team id"] 
+    int64_t mTeamId;
+
+    [tag="ntgo", description="Goals scored"] 
+    int32_t mGoals;
+
+    [tag="ntpm", description="Play of the match"] 
+    int32_t mPlayOfTheMatch;
+
+    [tag="ntav", description="Avatar stats"] 
+	SSFNotificationAvatarVector mAvatarVector;
+};
+typedef map<int32_t, SSFNotificationTeamReport> SSFNotificationTeamReportMap;
+
+const uint32_t HASH_MAX_LENGTH = 128;
+class SSFNotificationCustomGameData
+{
+	[tag="ntim", description="Game time, in seconds"]
+	int64_t mSecondsPlayed;
+
+	[tag="nend", description="End match reason"]
+	int32_t mMatchEndReason;
+
+	[tag="ntus", description="Notification user report"]
+	SSFNotificationUserReportVector mSSFUserReport;
+
+	[tag="nttm", description="Notification team report"]
+	SSFNotificationTeamReportMap mSSFTeamReport;
+
+	[tag="ngsm", description="List of Goal Events"]
+	GoalEventVector mGoalSummary;
+
+	[tag="grid", description="The unique value assigned at the beginning of the game."]
+	GameManager::GameReportingId gameReportingId;   
+	
+	[tag="ghas", description="The Hash computed for match (currently only for FUT match)."]
+	string(HASH_MAX_LENGTH) matchHash;
+};
+
+} // namespace SSFSeasonsReportBase
+} // namespace GameReporting
+} // namespace Blaze

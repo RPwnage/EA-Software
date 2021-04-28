@@ -1,0 +1,49 @@
+version: '2.4'
+x-blaze: &blazeinstance
+  network_mode: 'host'
+  build:
+    context: .
+    args:
+        BLAZE_BASE_IMAGE: ${DC_BLAZE_BASE_IMAGE}
+        BLAZE_BASE_DIR: ${DC_BLAZE_BASE_DIR}
+  image: ${DC_BLAZE_IMAGE}
+  volumes:
+    - "${DC_BLAZE_BASE_DIR}/component:${DC_BLAZE_BASE_DIR}/component"
+    - "${DC_BLAZE_BASE_DIR}/customcomponent:${DC_BLAZE_BASE_DIR}/customcomponent"
+    - "${DC_BLAZE_BASE_DIR}/etc:${DC_BLAZE_BASE_DIR}/etc"
+    - "${DC_BLAZE_BASE_DIR}/etc.ilt.sports:${DC_BLAZE_BASE_DIR}/etc.ilt.sports"
+    - "${DC_BLAZE_BASE_DIR}/framework:${DC_BLAZE_BASE_DIR}/framework"
+  user: "${DC_UID}:${DC_GID}"
+  working_dir: "${DC_BLAZE_BASE_DIR}/etc"
+  # CAP_SYS_PTRACE is required by gdb and google coredumper
+  cap_add:
+    - SYS_PTRACE
+  command: /launch.sh
+  depends_on:
+    redis:
+      condition: service_healthy
+  environment:
+    USER: ${USER}
+    HOME: ${HOME}
+    LD_LIBRARY_PATH: "${DC_BLAZE_BASE_DIR}/lib"
+    BLAZE_BASE_PORT: 10000
+    BLAZE_RUN_ARGS: -DCONTAINER=1 --dbdestructive env/local.boot
+services:
+  redis:
+    network_mode: 'host'
+    build: ../redis
+    image: ${DC_REDIS_IMAGE}
+    volumes:
+      - "${DC_BLAZE_BASE_DIR}/docker/test/launch_redis.sh:${DC_BLAZE_BASE_DIR}/docker/test/launch_redis.sh"
+    command: "${DC_BLAZE_BASE_DIR}/docker/test/launch_redis.sh"
+    scale: 2
+    healthcheck:
+      test: redis-cli PING
+  configMaster: *blazeinstance
+  coreMaster: *blazeinstance
+  coreNSMaster: *blazeinstance
+  coreSlave: *blazeinstance
+  mmSlave: *blazeinstance
+  searchSlave: *blazeinstance
+  grSlave: *blazeinstance
+  gdprAuxSlave: *blazeinstance

@@ -1,0 +1,52 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- Common test code generation targets, defines -->
+  <!-- ********************* -->
+
+  <property name="TestGenExe"       value="${package.dir}/test/common/bin/protoc.exe"  if="${config-system} == pc64" />
+  <property name="TestGenExe"       value="${package.dir}/test/common/bin/protoc"      if="${config-system} == unix64" />
+
+  <!-- outputs-->
+  <property name="GenBuildRoot"                value="${package.builddir}/gen"/>
+  <property name="TestGenBuildRoot"            value="${GenBuildRoot}/test/gen"/><!-- Protobuf spec: note custom protos that reference the 'common' protos below, should be under this (or its subdirs) to compile -->
+  <!-- inputs -->
+  <property name="TestGenInputRoot"            value="${package.dir}/test/gen" /><!-- Protobuf spec: note custom protos that reference the 'common' protos below, must also include this for the protoc.exe search dir -->
+  <fileset  name="TestGenInputFiles"           basedir="${TestGenInputRoot}"><includes name="**.proto"/></fileset>
+  <property name="TestGenExeArgs"              value="--cpp_out=${TestGenBuildRoot} -I=${TestGenInputRoot} -I=${package.dir}"/>
+  <fileset  name="TestGenInputFilesCommonOnly" basedir="${TestGenInputRoot}"><includes name="${TestGenInputRoot}/common/**.proto"/></fileset>
+  <property name="TestGenExeArgsCommonOnly"    value="--cpp_out=${TestGenBuildRoot} -I=${TestGenInputRoot}"/>
+
+  <!-- Generate all test helper classes and common util classes-->
+  <property name="PrebuildGenCode" value="true" unless="@{PropertyExists('PrebuildGenCode')}"/>
+  <target name="generatetestcode">
+    <do if="${PrebuildGenCode} == true">
+        <echo message="Generating test code from ${TestGenInputRoot}..."/>
+        <mkdir dir="${TestGenBuildRoot}" if="NOT @{DirectoryExists(${TestGenBuildRoot})}"/>
+        <foreach item="FileSet" in="TestGenInputFiles" property="filename">
+          <echo message="Generating:   ${TestGenExe} ${TestGenExeArgs} ${filename}"/>
+          <exec program="${TestGenExe}" commandline="${TestGenExeArgs} ${filename}" workingdir="${TestGenInputRoot}" />
+        </foreach>
+    </do>
+  </target>
+  
+  <!-- Optional Helper Target: Tools like GamePacker reuse only the common util classes, without rest of gtest specific classes-->
+  <target name="generatetestcommoncode">
+    <do if="${PrebuildGenCode} == true">
+        <echo message="Generating test common util code from ${TestGenInputRoot}/common..."/>
+        <mkdir dir="${TestGenBuildRoot}" if="NOT @{DirectoryExists(${TestGenBuildRoot})}"/>
+        <foreach item="FileSet" in="TestGenInputFilesCommonOnly" property="filename">
+          <echo message="Generating:   ${TestGenExe} ${TestGenExeArgsCommonOnly} ${filename}"/>
+          <exec program="${TestGenExe}" commandline="${TestGenExeArgsCommonOnly} ${filename}" workingdir="${TestGenInputRoot}" />
+        </foreach>
+    </do>
+  </target>
+  
+  <!--Note, don't call clean right before generate in same nant call, as generate may fail finding dir-->
+  <target name="cleangeneratedtestcode">
+    <echo message="Cleaning generated test code..."/>
+    <delete dir="${TestGenBuildRoot}" failonerror="false">
+      <fileset> <includes name="**"/> </fileset>
+    </delete>
+  </target>
+
+</project>

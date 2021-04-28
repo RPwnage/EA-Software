@@ -1,0 +1,339 @@
+// (c) Electronic Arts. All Rights Reserved.
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf" 
+
+[headername="framework/tdf/userextendeddatatypes.h"]
+#include "framework/gen/userextendeddatatypes.tdf" 
+
+namespace Blaze
+{
+namespace Association
+{
+    typedef uint64_t ListId;
+    typedef string(32) ListName;
+    typedef uint32_t MemberHash;
+
+    const MemberHash INVALID_MEMBER_HASH = 0x0;
+
+    typedef uint16_t ListType;
+    [description="Unknown list type."]
+    const uint32_t LIST_TYPE_UNKNOWN = 0x00;
+    [description="Friend list type."]
+    const uint32_t LIST_TYPE_FRIEND = 0x01;
+    [description="Recent players list type."]
+    const uint32_t LIST_TYPE_RECENTPLAYER = 0x02;
+    [description="Muted players list type."]
+    const uint32_t LIST_TYPE_MUTE = 0x03;
+    [description="Blocked players list type."]
+    const uint32_t LIST_TYPE_BLOCK = 0x04;
+    [description="Start of custom list types."]
+    const uint32_t LIST_TYPE_FIRST_CUSTOM = 0x20;
+
+    bitfield ListMemberAttributes
+    {
+        [description="Favorite Attribute for List Member"]
+        Favorite : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit1 : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit2 : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit3 : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit4 : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit5 : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit6 : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit7 : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit8 : 1;
+
+        [description="Reserved for future use"]
+        ReservedBit9 : 1;
+    };
+
+    [description="List member Id"]
+    class ListMemberId
+    {
+        [tag="user", description="User core identification"]
+        CoreIdentification mUser;
+
+        [tag="plat", default=INVALID, description="Client platform type"]
+        ClientPlatformType mExternalSystemId;
+
+        [tag="attr", description="Attributes for list member"]
+        ListMemberAttributes mAttributes;
+    };
+    typedef list<ListMemberId> ListMemberIdVector; 
+
+    [description="Class to hold information about a list member."]
+    class ListMemberInfo
+    {
+        [tag="time", description="Time of the member added to the list."]
+        int64_t mTimeAdded;
+        
+        [tag="lmid", description="List member id." ]
+        ListMemberId mListMemberId;
+    };
+    typedef list<ListMemberInfo> ListMemberInfoVector;
+    
+    [description="Class to hold association list information."]
+    class ListIdentification
+    {
+        [tag="type", description="Type identifier for the association list from config file."]
+        ListType mListType;
+
+        [tag="lnm", description="Name for the association list from config file."]
+        ListName mListName;
+    };
+    typedef list<ListIdentification> ListIdentificationVector;
+    
+    [description="Flags that represent additional information about this AssociationList."]
+    bitfield ListStatusFlags
+    {
+        [description="The association list is subscribed to"]
+        Subscribed : 1;
+        [description="The association list is set to rollover"]
+        Rollover   : 1;
+        [description="The association list supports mutual actions"]
+        MutualAction : 1;
+        [description="The association list is Pair/Paired list"]
+        Paired     : 1;
+        [description="The association list loads extended data information for offline users."]
+        OfflineUED : 1;
+    };
+
+    [description="Class to hold association list information."]
+    class ListInfo
+    {
+        [tag="lid", description="Id for the association list from config file."]
+        ListIdentification mId;
+
+        [tag="lms", description="Max size for the association list from config file."]
+        uint32_t mMaxSize;
+
+        [tag="flgs", description="Flags that represent additional information about this AssociationList."]
+        ListStatusFlags mStatusFlags;
+  
+        [tag="prid", description="Indicates the corresponding Pair/Paired list."]
+        ListType mPairId;
+
+        [tag="pnam", description="Name for the Pair/Paired list."]
+        ListName mPairName;
+
+        [tag="prms", description="Max size for the Pair/Paired list."]
+        uint32_t mPairMaxSize;
+
+        [tag="boid", description="Unique blaze object id for the association list."]
+        ObjectId mBlazeObjId;
+    };
+    typedef list<ListInfo> ListInfoVector;
+
+    [description="Class that represents a complete association list."]
+    class ListMembers
+    {
+        [tag="info"]
+        ListInfo mInfo;
+
+        [tag="meml", description="Members of the association list." ]
+        ListMemberInfoVector mListMemberInfoVector; 
+
+        [tag="toct", description="The total count of a list."] 
+        uint32_t mTotalCount; 
+
+        [tag="ofrc", description="Just echo back the value."] 
+        uint32_t mOffset;
+    };
+    typedef list<ListMembers> ListMembersVector;
+
+    [description="Class to hold a list of AssociationLists."]
+    class Lists
+    {
+        [tag="lmap", description="A list of ListMembers." ]
+        ListMembersVector mListMembersVector;
+    };
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // Requests and Responses
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    [description="TDF requirement for subscribe/unsubscribe to association list."]
+    class UpdateListsRequest
+    {
+        [tag="bid", default=INVALID_BLAZE_ID, description="Blaze id for the user whose assocication list is to be updated, 0 means own's settings. Otherwise, requires PERMISSION_ASSOCIATIONLIST_ANY_USER_EDIT"]
+        BlazeId mBlazeId;
+
+        [tag="lids", description = "The names and/or ids of the association lists to update." ]
+        ListIdentificationVector mListIdentificationVector;
+    };
+        
+    [description="Class used to send requirement for add/remove/update member from/to list."]    
+    class UpdateListMembersRequest
+    {
+        [tag="bid", default=INVALID_BLAZE_ID, description="Blaze id for the user whose association list is to be updated, 0 means own's settings. Otherwise, requires PERMISSION_ASSOCIATIONLIST_ANY_USER_EDIT"]
+        BlazeId mBlazeId;
+
+        [tag="lid", description = "The name and/or id of the association list to update." ]
+        ListIdentification mListIdentification;
+        
+        [tag="bidl", description = "List of members who will be updated." ]
+        ListMemberIdVector mListMemberIdVector;
+
+        [tag="hash", description="Hash of the member set.  Should be non-zero for a set operation, ignored for all others."]
+        MemberHash mMemberHash;
+        
+        [tag="vald", default=true, description = "Performs validation before deleting members from the list."]
+        bool validateDelete;
+
+        [tag="atmk", description = "Mask applied to each member's attributes. This Mask indicates which field are going to change"]
+        ListMemberAttributes mAttributesMask;
+    };
+    
+    [description="Class used to send response for add/remove/update member from/to list."]    
+    class UpdateListMembersResponse
+    {
+        [tag="bid", description="Blaze id who's list was updated"]
+        BlazeId mOwnerId;
+
+        [tag="type", description="List type that was updated."]
+        ListType mListType;
+    
+        [tag="lmid", description="List of members affected by the update." ]
+        ListMemberInfoVector mListMemberInfoVector;
+        
+        [tag="rem", description="List of members removed due to rollover." ]
+        ListMemberIdVector mRemovedListMemberIdVector;
+    };
+    
+    [description="Class used to send requirement for add/remove/update member from/to list."]    
+    class GetMemberHashRequest
+    {
+        [tag="bid", default=INVALID_BLAZE_ID, description="Blaze id for the user whose association list is to be checked, 0 means own's settings. Otherwise, requires PERMISSION_ASSOCIATIONLIST_ANY_USER_EDIT"]
+        BlazeId mBlazeId;
+
+        [tag="lid", description = "The name and/or id of the association list to update." ]
+        ListIdentification mListIdentification;
+    };
+
+    [description="Class used to send requirement for add/remove/update member from/to list."]    
+    class GetMemberHashResponse
+    {
+        [tag="bid", default=INVALID_BLAZE_ID, description="Blaze id for the user whose association list is to be updated, 0 means own's settings. Otherwise, requires PERMISSION_ASSOCIATIONLIST_ANY_USER_EDIT"]
+        BlazeId mBlazeId;
+    
+        [tag="type", description="List type that was updated."]
+        ListType mListType;
+    
+        [tag="hash", description="Hash of the member set.", default=INVALID_MEMBER_HASH]
+        MemberHash mMemberHash;
+    };
+    
+    [description="Tdf requirement for getListForUser RPC."]
+    class GetListForUserRequest
+    {
+        [tag="bid", description="Blaze id for the user whose assocication list is to be retrieved."]
+        BlazeId mBlazeId;
+        
+        [tag="lid", description = "The name and/or id of the association list to retrieve."]
+        ListIdentification mListIdentification;
+        
+        [tag="mxrc", default=UINT32_MAX, description="Maximum count of results to return."] 
+        uint32_t mMaxResultCount; 
+
+        [tag="ofrc", default=0, description="Skip rows before starting to count the Maximum rows that are returned."] 
+        uint32_t mOffset;
+    };
+    
+    class GetListsRequest
+    {
+        [tag="alst", description = "A list of association list the user would like to get and subscribe to." ]
+        ListInfoVector mListInfoVector;
+        
+        [tag="mxrc", default=UINT32_MAX, description="Maximum count of results to return."] 
+        uint32_t mMaxResultCount; 
+
+        [tag="ofrc", default=0, description="Skip rows before starting to count the Maximum rows that are returned."] 
+        uint32_t mOffset;
+    };
+    
+    class ListData
+    {
+        [tag="name", default="", description="Name for the association list from config file."]
+        string(32) mName;
+
+        [tag="id", default=0, description="Id for the association list from config file."]
+        ListType mId;
+
+        [tag="size", default=0, description="Max size for the association list from config file.", reconfigurable="no"]
+        uint32_t mMaxSize;
+        
+        [tag="roll", default=false, description="The association list is set to rollover."]
+        bool mRollover;
+        
+        [tag="scri", default=false, description="The association list is subscribed to."]
+        bool mSubscribe;
+        
+        [tag="muta", default=false, description="The association list supports mutual actions.", reconfigurable="no"]
+        bool mMutualAction;
+        
+        [tag="prid", default=0, description="Indicates the corresponding Pair list for Paired list.", reconfigurable="no"]
+        ListType mPairId;
+        
+        [tag="offl", default=false, description="Load UED information for offline users when retrieving list."]
+        bool mLoadOfflineUED;
+    };
+    typedef list<ListData> ListDataVector; 
+
+    class ConfigLists
+    {
+        [tag="lsdt", description="Lists data form config."]
+        ListDataVector mListsInfo;
+    };
+
+    [description="Class to hold a list of member Ids."]
+    class ListBlazeIds
+    {
+        [tag="bids", description="A list of Blaze Ids." ]
+        BlazeIdList mBlazeIds;
+    };
+    
+    [description="Tdf requirement for checkListMembership RPC."]
+    class CheckListMembershipRequest
+    {
+        [tag="lbid", description="Blaze ids of the lists' owner to search from" ]
+        ListBlazeIds mOwnersBlazeIds;    
+    
+        [tag="bid", description="Blaze id for the member we are checking membership for"]
+        BlazeId mMemberBlazeId;
+        
+        [tag="lid", description = "The name and/or id of the association list to retrieve."]
+        ListIdentification mListIdentification;                   
+    };
+
+    [description="Tdf requirement for checkListContainsMembers RPC."]
+    class CheckListContainsMembersRequest
+    {
+        [tag="lbid", description="Blaze ids of the members we are looking for for the given list" ]
+        ListBlazeIds mMembersBlazeIds;    
+    
+        [tag="bid", description="Blaze id of the list owner"]
+        BlazeId mOwnerBlazeId;
+        
+        [tag="lid", description = "The name and/or id of the association list to retrieve."]
+        ListIdentification mListIdentification;                   
+    };        
+
+} // Association
+} // Blaze

@@ -1,0 +1,111 @@
+<!-- 
+package with a nuget package dependency
+-->
+<project default="regress" xmlns="schemas/ea/framework3.xsd">
+	<package/>
+
+	<CSharpProgram name="NuGetDepender">
+		<copylocal>true</copylocal>
+		<sourcefiles basedir="${package.dir}/source">
+			<includes name="${package.dir}/source/**.cs" />
+		</sourcefiles>
+		<dependencies>
+			<auto>
+				Antlr4
+				DotNetOpenAuth
+				EntityFramework
+				Extended.Wpf.Toolkit
+				Hipchat-CS
+				IronPython
+				IronPython.StdLib
+				jQuery
+				log4net
+				Lz4.Net
+				lz4net
+				MarkdownSharp
+				Microsoft.ApplicationInsights
+				Microsoft.AspNet.Mvc
+				Microsoft.AspNet.Razor
+				Microsoft.AspNet.WebApi
+				Microsoft.Bcl
+				Microsoft.Bcl.Build
+				Microsoft.CodeDom.Providers.DotNetCompilerPlatform
+				Microsoft.jQuery.Unobtrusive.Validation
+				Microsoft.Tpl.Dataflow
+				MiniProfiler
+				Moq
+				Newtonsoft.Json
+				NuGet.Core
+				OpenCover
+				Refit
+				RestSharp
+				ReportGenerator
+				Rx-Main
+				structuremap
+				System.Collections.Immutable
+				YamlDotNet
+				NEST
+			</auto>
+		</dependencies>
+	</CSharpProgram>
+
+	<target name="DependsRxMainTarget">
+		<dependent name="Rx-Main"/>
+	</target>
+
+	<target name="MultiProcessNuGetDependentTest">
+		<!-- 
+			This unit test verify the fix with multi-process scenario where the "wait" process didn't get 
+			auto dependents NuGet versions added to process. Without the fix, you will get error message
+			complaining package version is not in masterconfig.xml file.
+		-->
+		<parallel.foreach item="String" in="1 2 3 4 5" property="TestProcId">
+			<nant buildfile="${nant.project.buildfile}" target="DependsRxMainTarget" failonerror="false">
+				<property name="config" value="pc64-vc-opt"/>
+				<property name="package.configs" value="pc64-vc-opt"/>
+			</nant>
+		</parallel.foreach>
+	</target>
+
+	<target name="regress">
+		<!-- basic test, make sure we can build NuGetDepender package and pull in all its nuget dependencies -->
+		<nant buildfile="${nant.project.buildfile}" target="slnruntime msbuild">
+		  <property name="config" value="pc64-vc-opt"/>
+		  <property name="package.configs" value="pc64-vc-opt"/>
+		</nant>
+
+		<!-- check that the IronPython.StdLib generated initialize.xml has contentfiles -->
+		<dependent name="IronPython.StdLib"/>
+		<fail if="@{FileSetCount('package.IronPython.StdLib.nuget-content-files')} eq 0" message="IronPython.StdLib is missing contentfiles"/>
+
+		<!-- test a nant build of the above module fails because are using nuget features which are VisualStudio only -->
+		<record property="build-log">
+			<nant buildfile="${nant.project.buildfile}" target="build" failonerror="false">
+				<property name="config" value="pc64-vc-opt"/>
+				<property name="package.configs" value="pc64-vc-opt"/>
+			</nant>
+		</record>
+		<fail unless="@{StrContains('${build-log}', 'Build dependent on NuGet fileset')}" message="ERROR: Build should have failed with NuGet unsupported message."/>
+
+		<!-- test an in place update of a package from old version of nuget protocol works  -->	 <!-- TODO: test doesn't work with <nant> calls because package map is not reset -->
+		<!--<dependent name="jQuery"/>
+		<property name="jquery-nuget-marker" value="@{PathCombine(${package.jQuery.dir}, 'nugetinstall.marker')}" local="true"/>
+		<echo file="${jquery-nuget-marker}" message="20"/> <!- set nuget protocol version to 20, due to nuget api changes we always reinstall below 20 ->
+		<record property="build-log">
+			<nant buildfile="${nant.project.buildfile}" target="slnruntime">
+				<property name="config" value="pc64-vc-opt"/>
+				<property name="package.configs" value="pc64-vc-opt"/>
+			</nant>
+		</record>
+		<fail unless="@{StrContains('${build-log}', 'Restoring NuGet package jQuery Framework files...')}" message="ERROR: Build should have restored nuget framework files."/>-->
+
+		<!-- 
+		Do multi-process test that download Rx-Main package (which has auto dependency to Rx-Core, Rx-Interfaces, Rx-Linq, and Rx-PlatformServices).
+		We want to make sure that under multi-process usage, those auto dependencies' version do get properly added internally in Framework.
+		-->
+		<do unless="@{StrCompareVersions('${nant.version}','7.05.02')} gt 0">
+			<call target="MultiProcessNuGetDependentTest"/>
+		</do>
+
+	</target>
+</project>

@@ -1,0 +1,189 @@
+// Defines the RPCs and async notifications used in the fifacups component.
+//  RPC classes are compiled with RPCComp, generating C++ classes (or class stubs) that the component must implement.
+//
+// Note: see http://gos.online.ea.com/confluence/display/tech/RPCComp for info on the .rpc file/lang spec and the compiler, RpcComp
+//
+// We assume that all request and response types are valid and just use them
+// directly in the code generation.
+//
+// The compiler should ensure that all commands within a component have a unique ID.
+// The compiler should ensure that all components within a file have a unique ID.
+// Zero is not a valid component or command ID
+// Enforce that method names must start with lowercase letter.
+// Enforce C++ rules for method names and TDF type names.
+// Allow C++ style comments.
+//
+
+[ headername="fifacups/tdf/fifacupstypes.h" ]
+#include "fifacups/gen/fifacupstypes.tdf"
+
+[ 
+  client_include = false,
+  headername="fifacups/tdf/fifacupstypes_server.h" 
+]
+#include "fifacups/gen/fifacupstypes_server.tdf"
+
+namespace Blaze
+{
+namespace FifaCups
+{
+[
+  id = custom/21,
+  description = "FifaCups component to handle cup window for 1v1 play",
+  details = "FifaCups allows users to participate in cup games",
+  configurationType = FifaCupsConfig 
+]
+component FifaCups
+{
+	errors
+	{
+		[ description = "An error has occurred." ]
+		FIFACUPS_ERR_GENERAL =              1;
+		[ description = "A database error has occurred." ]
+		FIFACUPS_ERR_DB      =              2;
+		[ description = "Error parsing seasonal play configuration." ]
+		FIFACUPS_ERR_CONFIGURATION_ERROR =  3;
+		[ description = "Parameters are invalid." ]
+		FIFACUPS_ERR_INVALID_PARAMS =       4;
+		[ description = "Season not found." ]
+		FIFACUPS_ERR_SEASON_NOT_FOUND =     5;
+		[ description = "Entity not registered in a season" ]
+		FIFACUPS_ERR_NOT_REGISTERED =       6;
+		[ description = "Already registered in a season" ]
+		FIFACUPS_ERR_ALREADY_REGISTERED =   7;
+		[ description = "Not registered in a tournament" ]
+		FIFACUPS_ERR_NOT_IN_TOURN =   8;
+	}
+
+	[ clientname = "FifaCupsComponent" ]
+	slave
+	{			
+		methods
+		{ 
+              [
+                 id = 1,
+                 errors = {
+                       FIFACUPS_ERR_GENERAL,
+                       FIFACUPS_ERR_DB,
+                       FIFACUPS_ERR_NOT_REGISTERED
+                   },
+                   requiresUserSession=false
+               ]
+               CupInfo getCupInfo(GetCupInfoRequest);
+               
+               [
+                 id = 2,
+                 errors = {
+                       FIFACUPS_ERR_GENERAL,
+                       FIFACUPS_ERR_DB,
+                       FIFACUPS_ERR_NOT_REGISTERED,
+                       FIFACUPS_ERR_NOT_IN_TOURN
+                   }
+               ]
+               void resetCupStatus(ResetCupStatusRequest);
+
+               [
+                 id = 3,
+                 errors = {
+                       FIFACUPS_ERR_GENERAL,
+                       FIFACUPS_ERR_DB,
+                       FIFACUPS_ERR_NOT_REGISTERED
+                   }
+               ]
+               void setActiveCupId(SetActiveCupIdRequest);
+               
+               [
+                 id = 4,
+                 errors = {
+                       FIFACUPS_ERR_GENERAL,
+                       FIFACUPS_ERR_DB,
+                       FIFACUPS_ERR_NOT_REGISTERED
+                   },
+                 client_export = false,
+                 requiresUserSession=false
+               ]
+               void updateTournamentResult(UpdateTournamentResultRequest);
+               
+               [
+                 id = 5,
+                 errors = {
+                       FIFACUPS_ERR_GENERAL,
+                       FIFACUPS_ERR_DB,
+                       FIFACUPS_ERR_NOT_REGISTERED
+                   },
+                 client_export = false,
+                 requiresUserSession=false
+               ]
+               void setQualifyingDiv(SetQualifyingDivRequest);
+               
+               [
+               id = 6,
+               errors = {
+                       FIFACUPS_ERR_GENERAL,
+                       FIFACUPS_ERR_DB,
+                       FIFACUPS_ERR_NOT_REGISTERED
+                   },
+                 client_export = false,
+                 requiresUserSession=false
+               ]
+               void registerClub(RegisterClubRequest);
+               
+               [
+               id = 7,
+               errors = {
+                       FIFACUPS_ERR_GENERAL,
+                       FIFACUPS_ERR_DB,
+                       FIFACUPS_ERR_NOT_REGISTERED
+                   },
+                 client_export = false,
+                 requiresUserSession=false,
+                 requires_authentication = false
+               ]
+               void registerEntity(RegisterEntityRequest);
+	                                  
+		} // methods
+	} // slave
+
+	master
+	{
+	    methods
+	    {
+	        [
+	          id = 1000,
+	          description = "Notify the master that end of season processing should be initiated",
+	          requires_authentication = false
+	        ]
+	        void startEndOfSeasonProcessing(EndOfSeasonRolloverData);
+	        
+	        [
+	          id = 1001,
+	          description = "Notify the master that end of season processing has been finished",
+	          requires_authentication = false
+	        ]
+	        void finishedEndOfSeasonProcessing(EndOfSeasonRolloverData);
+	    }
+	
+		replication
+		{
+		    [
+		      id = 1,
+		      tdf_type = SeasonConfigurationServer 
+		    ]
+		    static_map ReplicatedSeasonConfiguration;
+		    
+		} // replication
+		
+		notifications
+		{
+		    [
+		      id = 0,
+		      description = "Signals slave to begin end of season processing"
+		    ]
+		    ProcessEndOfSeasonNotification(EndOfSeasonRolloverData);
+		}
+	} // master
+}
+}
+}
+
+

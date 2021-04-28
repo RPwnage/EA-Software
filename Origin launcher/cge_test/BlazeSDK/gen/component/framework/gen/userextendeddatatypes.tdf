@@ -1,0 +1,230 @@
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/qosdatatypes.h"]
+#include "framework/gen/qosdatatypes.tdf"
+
+// TODO: Disabling proto generation because of circular import caused by Blaze::Util namespace
+[headername="framework/tdf/qosdatatypesnetwork.h", includeProto=false]
+#include "framework/gen/qosdatatypesnetwork.tdf"
+
+[headername="framework/tdf/networkaddress.h"]
+#include "framework/gen/networkaddress.tdf"
+
+namespace Blaze
+{
+
+
+[description="Key for the UserExtendedDataMap (component id = high 16 bits, Extended Data Id = low 16 bits)."]
+typedef uint32_t UserExtendedDataKey;
+
+const UserExtendedDataKey INVALID_USER_EXTENDED_DATA_KEY = 0;
+
+[description="Data Value Type for the UserExtendedDataMap."]
+typedef int64_t UserExtendedDataValue;
+
+const UserExtendedDataValue INVALID_USER_EXTENDED_DATA_VALUE = INT64_MIN;
+
+[description="Integer keyed map of attributes"]
+typedef map<UserExtendedDataKey, UserExtendedDataValue> UserExtendedDataMap;
+typedef list<UserExtendedDataMap> UserExtendedDataMapList;
+
+[description="Integer keyed map of attributes"]
+typedef map<uint64_t, uint64_t> UserSessionAttributeMap;
+typedef list<ObjectId> ObjectIdList;
+typedef ObjectIdList BlazeObjectIdList;
+
+[ description="Flags used to keep track of hardware status" ]
+bitfield HardwareFlags
+{
+    [description="Voip Headset status"]
+    VoipHeadsetStatus : 1;
+};
+
+[description="String identifier for the User Extended data in the form of componentName.dataKey (ie. stats.dnfpercent)."]
+typedef string(64) UserExtendedDataName;
+
+[description="Contains Hadware status information"]
+class UpdateHardwareFlagsRequest
+{
+    [tag="hwfg", description="Hardware flags."]
+    HardwareFlags mHardwareFlags;
+};
+
+// TODO: Disabling proto generation because of circular import caused by Blaze::Util::NetworkQosData
+[trackChanges = true, description = "This class defines all the data that describes the component customizable extended data for logged in user.", generateProto=false]
+class UserSessionExtendedData
+{
+    [tag="dmap", description="An integer keyed map of data specific to this user."]
+    UserExtendedDataMap mDataMap;
+
+    [tag="ulst", description="A list of BlazeObjectIds that the user session belongs to."]
+    ObjectIdList mBlazeObjectIdList;
+    
+    [tag="bps", description="The best available ping site."]
+    PingSiteAlias mBestPingSiteAlias;
+
+    [tag="pslm", description="DEPRECATED A list of ping site latency the user session owns (included for backwards compatibility only; use mLatencyMap instead)."]
+    PingSiteLatencyList mLatencyList;
+
+    [tag="psm", description="A map of ping site aliases to latencies owned by the user session."]
+    PingSiteLatencyByAliasMap mLatencyMap;
+    
+    [tag="qdat", description="Bandwidth and NAT type info."]    
+    Blaze::Util::NetworkQosData mQosData;
+    
+    [tag="addr", allowref="true", description="Network address of the user as determined by QOS and desired gameport."]
+    NetworkAddress mAddress;
+
+    [tag="cvar", description="An variable tdf set by the client."]
+    variable mClientData;
+
+    [tag="hwfg", description="Hardware flags."]
+    HardwareFlags mHardwareFlags;
+
+    [tag="cty", description="Country Code provided by the GeoIp database."]
+    string(MAX_GEOCOUNTRY_LENGTH) mCountry;
+
+    [tag="tz", description="Time zone provided by the GeoIP database."]
+    string(MAX_TIMEZONE_LENGTH) mTimeZone;
+
+    [tag="isp", description="ISP provided by the GeoIP database."]
+    string(MAX_ISP_LENGTH) mISP;
+
+    [tag="uatt", description="Custom user info attribute."]
+    UserInfoAttribute mUserInfoAttribute;
+
+    [tag="xplt", default=true, description="Is this user opted in to cross platform interactions."] 
+    bool mCrossPlatformOptIn;
+};
+
+
+// TODO: Proto generation is disabled for UserSessionExtendedData
+[description = "The update class for notifications on user's extended data changed", generateProto=false]
+class UserSessionExtendedDataUpdate
+{
+    [tag="data", description="The user's extended data", allowref=true]
+    UserSessionExtendedData mExtendedData;
+    
+    [tag="usid", description="The user's unique blaze Id"]
+    BlazeId mBlazeId;
+    
+    [tag="subs", description="True if this UED update is sent/received due to a subscription"]
+    bool mSubscribed;
+};
+
+// TODO: Proto generation is disabled for UserSessionExtendedData
+[description = "The class for notifications when a user is added", generateProto=false]
+class NotifyUserAdded
+{
+    [tag="user", description="User information."]
+    UserIdentification mUserInfo;
+    
+    [tag="data", description="The user's extended data", allowref=true]
+    UserSessionExtendedData mExtendedData;
+};
+
+[description = "The class for notifications when a user is removed"]
+class NotifyUserRemoved
+{
+    [tag="buid", description="The ID of the user whose data is to be fetched."]
+    BlazeId mBlazeId;
+};
+
+[description = "The request class for the UserSession fetch Extended data command."]
+class FetchExtendedDataRequest
+{
+    [tag="buid", description="The ID of the user whose data is to be fetched."]
+    BlazeId mBlazeId;
+};
+
+[description = "The request class for the UserSession check online status command."]
+class CheckOnlineStatusRequest
+{
+    [tag="buid", description="The ID of the user whose status is to be checked."]
+    BlazeId mBlazeId;
+};
+
+[description = "The response for an online status check."]
+class OnlineStatus
+{
+    [tag="buid", description="Whether or not the user is online."]
+    bool mOnline;
+};
+
+class UpdateUserSessionClientDataRequest
+{
+    [tag="cvar", description="An variable tdf set by the client."]
+    variable mClientData;
+};
+
+class UpdateExtendedDataAttributeRequest
+{
+    [tag="oper", description="If true then removes the attribute - if false then adds/updates it."]
+    bool mRemove;
+
+    [tag="key", description="The attribute's key"]
+    uint16_t mKey;
+
+    [tag="comp", default=0, description="The attribute's key (default is INVALID_COMPONENT_ID for client attributes)"]
+    uint16_t mComponent;
+
+    [tag="valu", description="The attribute's value"]
+    UserExtendedDataValue mValue;
+};
+
+class UpdateUserSessionAttributeRequest
+{
+    [tag="oper", description="If true then removes the attribute - if false then adds/updates it."]
+    bool mRemove;
+
+    [tag="atid", description="The attribute's key"]
+    uint64_t mKey;
+
+    [tag="valu", description="The attribute's value"]
+    uint64_t mValue;
+    
+    [tag="urea", description="The reason for updating this attribute"]
+    uint32_t mUpdateReason;
+};
+
+// TODO: Proto generation is disabled for UserSessionExtendedData
+[ description="This structure aggregates all user data to minimize trips to the server.", generateProto=false ]
+class UserData
+{
+    [tag="user", description="User information."]
+    UserIdentification mUserInfo;
+
+    [tag="edat", description="User extended data"]
+    UserSessionExtendedData mExtendedData;
+
+    [tag="flgs", description="User status flags"]
+    UserDataFlags mStatusFlags;
+};
+
+typedef list<UserData> UserDataList;
+
+// TODO: Proto generation is disabled for UserDataList
+[ description="The response for lookupUsers() RPC, batches multiple users.", generateProto=false ]
+class UserDataResponse
+{
+    [tag="ulst", description="User data list."]
+    UserDataList mUserDataList;
+};
+
+typedef uint64_t UserInfoAttributeMask;
+
+[description = "The request class for setting the custom user info attribute."]
+class SetUserInfoAttributeRequest
+{
+    [tag="ulst", description="A list of BlazeObjectIds that the new attribute value will be applied on."]
+    ObjectIdList mBlazeObjectIdList;
+    
+    [tag="attv", description="The new attribute value bits to set."]
+    UserInfoAttribute mAttributeBits;
+    
+    [tag="mask", description="A bitmask used to limit which bits in the existing attribute value to modify."]
+    UserInfoAttributeMask mMaskBits;
+};
+
+}

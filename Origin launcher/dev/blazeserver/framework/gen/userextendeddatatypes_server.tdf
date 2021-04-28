@@ -1,0 +1,164 @@
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/userextendeddatatypes.h"]
+#include "framework/gen/userextendeddatatypes.tdf"
+
+[headername="framework/tdf/userinfotypes_server.h"]
+#include "framework/gen/userinfotypes_server.tdf"
+
+namespace Blaze
+{
+[description="String identifier for the User Extended data in the form of componentName.dataKey (ie. stats.dnfpercent)."]
+typedef map<UserExtendedDataName, UserExtendedDataKey, ignorecase> UserExtendedDataIdMap;
+
+[description = "This class holds a mapping of DataNames to DataIds for all components.",
+ tdfid = "hash", trackChanges = true]
+class UserSessionExtendedDataIds
+{
+    [tag="udid", description="The map of DataNames to DataIds."]
+        UserExtendedDataIdMap mDataIdMap;
+};
+
+
+[ description = "The request class for the UserSession update Extended data command." ]
+class UpdateExtendedDataRequest
+{
+    [tag="cpid", description="The components Id."]
+    uint16_t mComponentId;
+
+    [tag="ktyp", description="Whether or not the map is keyed by session or blaze id."]
+    bool mIdsAreSessions;
+
+    [tag="rmve", default=false, description="Whether or not the data keys provided should be removed from the map."]
+    bool mRemove;
+
+    class ExtendedDataUpdate
+    {   
+        [tag="dmap", description="Map of data to insert or update."]
+        UserExtendedDataMap mDataMap;   
+    };
+    
+    typedef map<EntityId, ExtendedDataUpdate> UserOrSessionToUpdateMap;
+    [tag="umap"] UserOrSessionToUpdateMap mUserOrSessionToUpdateMap;
+};
+
+class UpdateBlazeObjectIdInfo
+{
+    [tag="sess", description="The ID of the session to update."]
+    UserSessionId mSessionId;
+
+    [tag="uset", description="Adds/Removes a ObjectId in the UserSessionExtendedData, (if mBlazeObjectId.id==0, && mAdd=false removes all BlazeObjectIds matched by mBlazeObjectId.type)"]
+    ObjectId mBlazeObjectId;
+    
+    [tag="oper", description="If true then adds the ObjectId - if false then removes it."]
+    bool mAdd;
+};
+
+class UpdateBlazeObjectIdListRequest
+{
+    [tag="info", description="The information to update.", allowref=true]
+    UpdateBlazeObjectIdInfo mInfo;
+};
+
+// TODO: Proto generation is disabled for UserSessionExtendedData
+[ description = "Remote extended data update request for federated UED provider feature", generateProto=false ]
+class RemoteUserExtendedDataUpdateRequest
+{
+    [tag="cpid", description="The ID of the provider component"]
+    ComponentId mComponentId;
+
+    [tag="uinf", description="The user to fetch the UED for", allowref=true]
+    UserInfoData mUserInfo;
+    
+    [tag="uexd", description="Current state of user extendad data being updated"]
+    UserSessionExtendedData mUserSessionExtendedData;
+};
+
+typedef list<ComponentId> ComponentIdList;
+
+[ description = "Request for registration of UED provider" ]
+class UpdateUserExtendedDataProviderRegistrationRequest
+{
+    [tag="cidl", description="List of components to register as UED providers"]
+    ComponentIdList mComponentIds;
+
+    [tag="hiid", description="The ID of the instance that hosts the providers."]
+    InstanceId mHostInstanceId;
+
+    [tag="oper", description="If true then register new providers, if false then deregister them."]
+    bool mRegistered;
+};
+
+[ description = "Response for registration of UED provider" ]
+class UpdateUserExtendedDataProviderRegistrationResponse
+{
+    [tag="cidl", description="List of components to register as UED providers"]
+    ComponentIdList mComponentIds;
+    
+    [tag="udid", description="The map of DataNames to DataIds."]
+    UserExtendedDataIdMap mDataIdMap;
+
+    [tag="hiid", description="The ID of the instance that hosts the providers."]
+    InstanceId mHostInstanceId;
+};
+
+[ description = "Registry of instances", tdfid = "hash", trackChanges = true]
+class InstanceRegistry
+{
+    [tag="insl", description="List of instance Ids of instances from the registry"]
+    InstanceIdList mInstanceIds;
+};
+
+[ description = "Request for UED from a remote session." ]
+class GetUserExtendedDataRequest
+{
+    [tag="sid", description="Remote session id."]
+    UserSessionId mUserSessionId;
+
+    [tag="subs", description="Subscriber session id."]
+    UserSessionId mSubscriberSessionId;
+};
+
+// TODO: Proto generation is disabled for UserSessionExtendedData
+[ description = "Response containing UED from a remote session.", generateProto=false ]
+class GetUserExtendedDataResponse
+{
+    [tag="ued", description="Remote UED.", allowref=true]
+    UserSessionExtendedData mExtendedData;
+};
+
+class UedDefinition
+{
+    [tag="uedn", description="User Extended Data Name in the form component.data (ie. stats.dnf)."]
+        UserExtendedDataName mUserExtendedDataName;
+    [tag="uedk", description="User Extended Data Key, this is the key used in the UED map to look up UED values."] 
+        UserExtendedDataKey mDataKey;
+    [tag="defv", description="Default value for this UED map entry, for reference."] 
+        UserExtendedDataValue mDefaultValue;
+};
+ 
+typedef list<UedDefinition> UedDefinitionList;
+ 
+class ComponentUedDefinitions
+{
+    [tag="comp", description="Component Id for the definitions."] 
+        ComponentId mComponentId;
+    [tag="uedl", description="List of all UED this component generates."]
+        UedDefinitionList mComponentUedList;
+};
+ 
+typedef map<ComponentName, ComponentUedDefinitions, ignorecase> ComponentUedDefinitionsMap;
+class GetUedInformationMapResponse
+{
+    [tag="uedm", description="Map of component names to UED defined on this Blaze instance."] 
+        ComponentUedDefinitionsMap mComponentUedDefinitionsMap;
+};
+
+class GetUedInformationMapRequest
+{
+    [tag="uidn", description="If provided, the UED retrieved will be provided for the requested user."] 
+        UserIdentification mTargetUserIdentification;
+};
+
+}

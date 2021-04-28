@@ -1,0 +1,205 @@
+syntax = "proto3";
+
+package eadp.stats;
+
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+import "google/protobuf/wrappers.proto";
+import "eadp/stats/entity_stats.proto";
+
+option java_package = "com.ea.gs.stats.grpc";
+option java_outer_classname = "CategoriesProto";
+option java_multiple_files = true;
+
+enum EntityType {
+    // ENTITY_TYPE_GLOBAL and ENTITY_TYPE_GROUP are not yet supported
+    ENTITY_TYPE_INVALID = 0;
+    ENTITY_TYPE_PLAYER = 1;
+    // ENTITY_TYPE_GLOBAL = 2;
+    ENTITY_TYPE_CUSTOM = 3;
+    // ENTITY_TYPE_GROUP = 4;
+}
+
+enum CategoryStatus {
+    STATUS_UNKNOWN = 0;
+    STATUS_UPDATING = 1;
+    STATUS_READY = 2;
+    STATUS_DELETING = 3;
+}
+
+message ServerSources {
+    message IPValues {
+        repeated string ips = 1;
+    }
+
+    // a map of client id to server sources
+    map<string, IPValues> ip_values = 1;
+}
+
+message CategoryRequest {
+    string description = 1;
+
+    /**
+    Currently only ENTITY_TYPE_PLAYER and ENTITY_TYPE_CUSTOM are supported.
+    entity_description is only required if ENTITY_TYPE_CUSTOM is provided.
+    */
+    EntityType entity_type = 2;
+    string entity_description = 3;
+
+    repeated Statistic statistics = 4;
+
+    Permissions permissions = 5;
+
+    //list of trusted S2S ips under client ids (case sensitive). By default when it's empty, all S2S connections are forbidden.
+    ServerSources server_sources = 8;
+}
+
+message CategoryResponse {
+    string category_id = 1;
+    string context_id = 2;
+    string description = 3;
+
+    //hash of certain configuration properties
+    string version = 4;
+
+    google.protobuf.Timestamp created_timestamp = 5;
+    google.protobuf.Timestamp updated_timestamp = 6;
+
+    EntityType entity_type = 7;
+    string entity_description = 8;
+
+    repeated Statistic statistics = 9;
+
+    CategoryStatus status = 10;
+
+    Permissions permissions = 13;
+
+    //identifier for the category in the underlying storage system
+    string database_alias = 14;
+
+    //list of trusted S2S ips under client ids (case sensitive). By default when it's empty, all S2S connections are forbidden.
+    ServerSources server_sources = 18;
+}
+
+message ListCategoriesRequest {
+    string context_id = 1;
+
+    // The maximum number of results to be returned. Max value is 50, default value is 10.
+    int32 max_result_count = 2;
+
+    // Continuation key returned on previous call. The first element returned will be the one directly
+    // after this identifier. Note that sort order can change between calls and the use of continuation
+    // key does not necessarily mean that all entities will be fetched.
+    string continuation_key = 3;
+
+    // Partial ID of the category. Prefix search only, case-insensitive, min character length of three.
+    string category_id = 4;
+
+    // If specified, only categories with the specified entity type will be included.
+    EntityType entity_type = 5;
+
+    string entity_description = 6;
+}
+
+message ListCategoriesResponse {
+    google.rpc.Status status = 1;
+    oneof response {
+        CategoryResponse category = 2;
+        string continuation_key = 3;
+    }
+}
+
+message GetCategoryRequest {
+    // ID of the context
+    string context_id = 1;
+    // ID of the category
+    string category_id = 2;
+}
+
+message GetCategoryResponse {
+    google.rpc.Status status = 1;
+    CategoryResponse result = 2;
+}
+
+/*
+* Bitmasks for who can do what with.
+* Owner = entity that is being actioned on
+* s2s = S2S request
+* everyone = everyone else
+* For example, if owner should be able to read/write, owner = 3 (3 = 011 in binary)
+* And if s2s should be able to do all, s2s = 7 (7 = 111 in binary)
+*/
+message Permissions {
+    // [default = 0];
+    int32 owner = 1;
+    // [default = 0];
+    int32 everyone = 2;
+    // [default = 0];
+    int32 s2s = 3;
+
+    enum Value {
+        PERMISSION_NONE = 0; // protobuf enum's first value must be 0
+        PERMISSION_READ = 1; // 001
+        PERMISSION_WRITE = 2; // 010
+        PERMISSION_DELETE = 4; // 100
+    }
+}
+
+message Statistic {
+    string id = 1;
+    //string name = 2; deprecated
+    //string description = 3; deprecated
+    //double default_value = 4; placeholder
+
+    //CollectionOperator operator = 6; deprecated
+
+    //string derivedFormula = 7; placeholder
+
+    bool generate_event = 8;
+
+    // Derived statistics configuration for this stat declaration.
+    DerivedStatistic derived_statistic = 2;
+
+    /*
+    * This message represents dimension configuration for the stat definition. Stat config may have multiple dimensions
+    */
+    message Dimension {
+        // Dimension name
+        string dimension = 1;
+        // Whitelist which may be used as a filter for accepted values for this dimensions.
+        WhiteList white_list = 2;
+
+        /*
+        * This message represents the list of accepted values for the dimension confguration.
+        */
+        message WhiteList {
+            repeated string accepted_values = 1;
+        }
+    }
+    // List of dimension configs for this stat definition.
+    repeated Dimension dimensions = 12;
+
+    /*
+    * Message for definitng derived statistic configuration.
+    */
+    message DerivedStatistic {
+        // Derived statistic expression. If any depended stats from this expression is missing, it will be replaced with 0 value.
+        // Example: foobar = foo + bar
+        // Given foo = 1; bar = 2. Then the result is 3
+        // Given foo is not defined and bar = 1. Then the result is 1 (because foo is replaced with 0 value)
+        string expression = 1;
+        // Default value which will be returned to the client if provided expression evaluation fails, or the expression evaluates to +Inf/-Inf/NaN
+        google.protobuf.DoubleValue default = 2;
+    }
+
+    //deprecated
+    /*enum CollectionOperator {
+        OPERATION_UNDEFINED = 0;
+        OPERATION_SUM = 1;
+        OPERATION_DECREMENT = 2;
+        OPERATION_MIN = 3;
+        OPERATION_MAX = 4;
+        OPERATION_REPLACE = 5;
+    }*/
+
+}

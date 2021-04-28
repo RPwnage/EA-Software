@@ -1,0 +1,564 @@
+<project xmlns="schemas/ea/framework3.xsd">
+  
+  <dependent name="blazeserver_grpc_tools"/>
+
+  <do.once key="pchGenDoOnceKey" blocking="true">
+    <mkdir dir="${package.builddir}/gen/"/>
+    <echo file="${package.builddir}/gen/_pch.cpp" message='#include "framework/blaze.h"' unless="@{FileExists('${package.builddir}/gen/_pch.cpp')}"/>
+  </do.once>
+
+  <property name="coreprojects" value="" />
+  <property name="customprojects" value="" />
+  <property name="codegenprojects" value=""/>
+
+  <Library name="grpc_helpers" frompartial="BlazeCommonLibrary">
+    <sourcefiles>
+      <includes name="${protogen.helpersdir}/**.cc"/>
+    </sourcefiles>
+    <headerfiles>
+      <includes name="${protogen.helpersdir}/**.h"/>
+    </headerfiles>
+    <bulkbuild enable="false"/><!-- Grpc generated code may not work well with bulk build stuff -->
+    <visualstudio>
+      <excludedbuildfiles>
+        <includes name="${package.blazeserver_grpc_tools.dir}/protos/**/*.proto"/>
+      </excludedbuildfiles>
+    </visualstudio>
+    <config>
+      <buildoptions>
+        <option name="debugsymbols"    value="off" />
+        <option name="editandcontinue" value="off"/>
+      </buildoptions>
+    </config>
+  </Library>
+
+  <Library name="outboundgrpc" frompartial="BlazeCommonLibrary">
+    <sourcefiles>
+      <includes name="${protogen.outbounddir}/**.cc"/>
+    </sourcefiles>
+    <headerfiles>
+      <includes name="${protogen.outbounddir}/**.h"/>
+    </headerfiles>
+    <bulkbuild enable="false"/><!-- Grpc generated code may not work well with bulk build stuff -->
+    <visualstudio>
+      <excludedbuildfiles>
+        <includes name="${package.dir}/outboundprotos/**/*.proto"/>
+      </excludedbuildfiles>
+    </visualstudio>
+    <config>
+      <buildoptions>
+        <option name="debugsymbols"    value="off" />
+        <option name="editandcontinue" value="off"/>
+      </buildoptions>
+    </config>
+  </Library>
+
+  <Library name="proxycomponents" frompartial="BlazeCommonLibrary">
+    <includedirs>
+      ${package.dir}/proxycomponent
+      ${package.builddir}/gen/proxycomponent
+      ${protogen.inbounddir}/${blazeserver.proto_rootdir??}/proxycomponent
+    </includedirs>
+    <headerfiles>
+      <includes name="${package.dir}/proxycomponent/**.h"/>
+      <includes name="${package.builddir}/gen/proxycomponent/**.h"/>
+      <includes name="${protogen.inbounddir}/${blazeserver.proto_rootdir??}/proxycomponent/**.h"/>
+      <excludes name="${package.dir}/proxycomponent/**/stress/**.h"/>
+    </headerfiles>
+    <sourcefiles>
+      <includes name="${package.dir}/proxycomponent/**.cpp"/>
+      <includes name="${package.builddir}/gen/proxycomponent/**.cpp"/>
+      <includes name="${protogen.inbounddir}/${blazeserver.proto_rootdir??}/proxycomponent/**.cc"/>
+      <excludes name="${package.dir}/proxycomponent/**/stress/**.cpp"/>
+    </sourcefiles>
+    <bulkbuild enable="true" partial="true">
+      <sourcefiles name="gen">
+        <includes name="${package.builddir}/gen/proxycomponent/**.cpp"/>
+      </sourcefiles>
+      <sourcefiles name="genproto">
+        <includes name="${protogen.inbounddir}/${blazeserver.proto_rootdir??}/proxycomponent/**.cc"/>
+      </sourcefiles>
+    </bulkbuild>
+    <visualstudio>
+      <excludedbuildfiles>
+        <includes name="${package.dir}/proxycomponent/**.tdf"/>
+        <includes name="${package.dir}/proxycomponent/**.rpc"/>
+        <includes name="${package.builddir}/gen/protos/${blazeserver.proto_rootdir??}/proxycomponent/**.proto"/>
+      </excludedbuildfiles>
+    </visualstudio>
+    <config>
+      <buildoptions>
+        <option name="debugsymbols"    value="off" />
+        <option name="editandcontinue" value="off"/>
+      </buildoptions>
+    </config>
+  </Library>
+
+  <property name="blazeserver.gamemanager.dependencies" local="true">
+    GamePacker
+  </property>
+
+  <!-- Add the customcode common lib -->
+  <include file="customcode.xml"/>
+
+
+
+  <!-- Run the component task on each included component -->
+  <foreach item="String" in="framework ${components}" delim=" " property="component">
+    <property name="componentdir" value="" local="true"/>
+    <property name="componentdir" value="framework" local="true" if="${component} == 'framework'"/>
+    <property name="componentdir" value="component/${component}" local="true" if="@{DirectoryExists('${package.dir}/component/${component}')}"/>
+    <property name="componentdir" value="customcomponent/${component}" local="true" if="@{DirectoryExists('${package.dir}/customcomponent/${component}')}"/>
+
+    <do if="${componentdir} != ''">
+      <property name="component.path" value="${package.dir}/${componentdir}" local="true"/>
+      <property name="component.buildpath" value="${package.builddir}/gen/${componentdir}" local="true"/>
+      <property name="component.protos" value="${package.builddir}/gen/protos/${blazeserver.proto_rootdir??}/${componentdir}" local="true"/>
+      <property name="component.protogen" value="${protogen.inbounddir}/${blazeserver.proto_rootdir??}/${componentdir}" local="true"/>
+
+      <property name="customcode.path" value="${package.dir}/customcode/${componentdir}" local="true"/>
+      <property name="customcode.buildpath" value="${package.builddir}/gen/customcode/${componentdir}" local="true"/>
+      <property name="customcode.protos" value="${package.builddir}/gen/protos/${blazeserver.proto_rootdir??}/customcode/${componentdir}" local="true"/>
+      <property name="customcode.protogen" value="${protogen.inbounddir}/${blazeserver.proto_rootdir??}/customcode/${componentdir}" local="true"/>
+
+      <fileset name="blazeserver.${component}.pchexclude"/>
+      <property name="pchenabled" value="false" local="true"/>
+      <do if="${blazeserver.pch_enabled??true}">
+        <do if="@{FileExists('${component.path}/_pch.h')}">
+          <property name="pchenabled" value="true" local="true"/>
+          <foreach item="Line" in="${component.path}/_pch.h" property="line">
+            <RegexMatch Input="${line}" Pattern="^// *?pchenabled *?: *?(yes|no) *?$" Properties="PchEnabledLine;YesOrNo"/>
+            <property name="pchenabled" value="false" local="true" if="${YesOrNo} == 'no'"/>
+            <RegexMatch Input="${line}" Pattern="^// *?pchexclude *?: *?(.*) *?$" Properties="PchExcludeLine;ExcludePath"/>
+            <fileset name="blazeserver.${component}.pchexclude" append="true">
+              <includes name="${component.path}/${ExcludePath}" if="${ExcludePath} != ''"/>
+            </fileset>
+          </foreach>
+        </do>
+      </do>
+
+      <property name="coreprojects" if="@{StrStartsWith('${componentdir}', 'component')}">
+        ${property.value}
+        blazeserver/${component}
+      </property>
+      <property name="customprojects" if="@{StrStartsWith('${componentdir}', 'customcomponent')}">
+        ${property.value}
+        blazeserver/${component}
+      </property>
+
+      <property name="librarytype" value="BlazeFullLibrary" local="true"/>
+      <property name="librarytype" value="BlazeCommonLibrary" local="true" if="${component} == 'framework'"/>
+
+      <Library name="${component}" frompartial="${librarytype}">
+        <includedirs>
+          ${component.path}
+          ${component.buildpath}
+          ${component.protogen}
+          ${component.path}/custom
+
+          ${customcode.path}
+          ${customcode.buildpath}
+          ${customcode.protogen}
+        </includedirs>
+
+        <headerfiles>
+          <includes name="${component.path}/**.h"/>
+          <includes name="${component.path}/**.l"/>
+          <includes name="${component.path}/**.y"/>
+          <excludes name="${component.path}/**/test/**.h"/>
+          <excludes name="${component.path}/**/stress/**.h"/>
+          <excludes name="${component.path}/**/custom-qa/**.h"/>
+
+          <includes name="${customcode.path}/**.h"/>
+          <includes name="${customcode.path}/**.l"/>
+          <includes name="${customcode.path}/**.y"/>
+          <excludes name="${customcode.path}/**/test/**.h"/>
+          <excludes name="${customcode.path}/**/stress/**.h"/>
+          <excludes name="${customcode.path}/**/custom-qa/**.h"/>
+        </headerfiles>
+
+        <sourcefiles>
+          <do if="${component} == 'framework'">
+            <includes name="${package.dir}/framework/lobby/**.cpp" optionset="disable-precompiled-header"/>
+            <includes name="${package.dir}/framework/**lexer.cpp" optionset="disable-precompiled-header"/>
+            <includes name="${package.dir}/framework/**.c" optionset="BlazeCLibrary"/>
+          </do>
+
+          <includes name="${component.path}/**.cpp"/>
+          <excludes name="${component.path}/**/test/**.cpp"/>
+          <excludes name="${component.path}/**/stress/**.cpp"/>
+          <excludes name="${component.path}/**/custom-qa/**.cpp"/>
+
+          <includes name="${customcode.path}/**.cpp"/>
+          <excludes name="${customcode.path}/**/test/**.cpp"/>
+          <excludes name="${customcode.path}/**/stress/**.cpp"/>
+          <excludes name="${customcode.path}/**/custom-qa/**.cpp"/>
+
+          <includes name="${package.builddir}/gen/_pch.cpp" optionset="create-precompiled-header" if="${pchenabled}"/>
+        </sourcefiles>
+
+        <dependencies>
+          <auto>
+            <do if="${google-coredumper}">
+              google_coredumper
+            </do>
+            <do if="${google-tcmalloc}">
+              google_perftools/tcmalloc
+            </do>
+            <do if="${google-profile}">
+              google_perftools/profile
+            </do>
+            <do if="${config-system} == 'pc64'">
+              flex
+            </do>
+            blazeserver/customcode
+
+            <!-- Import any custom dependencies for the components, this is primarily used for custom components -->
+            ${blazeserver.${component}.dependencies??}
+          </auto>
+        </dependencies>
+
+        <bulkbuild enable="true" partial="true" SplitByDirectories="${blazeserver.SplitBulkBuildDir??false}">
+          <sourcefiles name="component">
+            <includes name="${component.path}/**.cpp" unless="${pchenabled}"/>
+            <includes fromfileset="blazeserver.${component}.pchexclude"/>
+            <excludes name="${component.path}/**/test/**.cpp"/>
+            <excludes name="${component.path}/**/stress/**.cpp"/>
+            <excludes name="${component.path}/**/custom-qa/**.cpp"/>
+            <excludes name="${component.path}/**lexer.cpp"/>
+            <excludes name="${component.path}/**parser.tab.cpp"/>
+            <do if="${component} == 'framework'">
+              <excludes name="${package.dir}/framework/lobby/**.cpp"/>
+            </do>
+
+            <includes name="${customcode.path}/**.cpp"  unless="${pchenabled}"/>
+            <excludes name="${customcode.path}/**/test/**.cpp"/>
+            <excludes name="${customcode.path}/**/stress/**.cpp"/>
+            <excludes name="${customcode.path}/**/custom-qa/**.cpp"/>
+            <excludes name="${customcode.path}/**lexer.cpp"/>
+            <excludes name="${customcode.path}/**parser.tab.cpp"/>
+          </sourcefiles>
+        </bulkbuild>
+
+        <visualstudio>
+          <excludedbuildfiles>
+            <includes name="${component.path}/**.tdf"/>
+            <includes name="${component.path}/**.rpc"/>
+            <includes name="${customcode.path}/**.tdf"/>
+            <includes name="${component.protos}/**.proto"/>
+            <includes name="${customcode.protos}/**.proto"/>
+            <includes name="${component.path}/**.cfg"/>
+            <includes name="${package.dir}/etc/component/${component}/*.cfg" if="@{DirectoryExists('${package.dir}/etc/component/${component}')}"/>
+            <includes name="${package.dir}/etc/component/${component}.cfg" if="@{FileExists('${package.dir}/etc/component/${component}.cfg')}"/>
+          </excludedbuildfiles>
+        </visualstudio>
+
+        <config>
+          <pch enable="${pchenabled}" pchheader="framework/blaze.h" />
+          <defines if="${component} != 'framework'">
+            BLAZE_COMPONENT_TYPE_INDEX_NAME=COMPONENT_TYPE_INDEX_${component}
+            BLAZE_COMPONENT_MEMGROUP_NAME=COMPONENT_MEMGROUP_${component}
+          </defines>
+          <defines>
+            COMPONENT_${component}
+
+            <do if="${google-coredumper}">
+              GOOGLE_COREDUMPER_LIB
+            </do>
+            <!-- Set defines specific to a component, primarily used for cusomcomponents -->
+            ${blazeserver.${component}.defines??}
+          </defines>
+          <defines value='BLAZE_PCH_FORCE_INCLUDE_HEADER=\"${component.path}/_pch.h\"' if="${pchenabled}"/>
+          <preprocess>
+            ${blazeserver.${component}.preprocess??}
+          </preprocess>
+          <postprocess>
+            ${blazeserver.${component}.postprocess??}
+          </postprocess>
+          <buildoptions if="${config-system} == 'pc64'and ${config-name} == 'debug'">
+            <option name="editandcontinue" value="on"/>
+            <option name="buildset.cc.options">
+              ${option.value}
+              /GS-  <!-- Disable buffer security check to decrease build times (https://docs.microsoft.com/en-us/cpp/build/reference/gs-buffer-security-check) -->
+            </option>
+          </buildoptions>
+        </config>
+
+        <buildsteps>
+          <do if="@{TargetExists('blazeserver.${component}.prebuild')}">
+            <prebuild-step targetname="blazeserver.${component}.prebuild"/>
+          </do>
+          <do if="@{TargetExists('blazeserver.${component}.postbuild')}">
+            <postbuild-step targetname="blazeserver.${component}.postbuild"/>
+          </do>
+        </buildsteps>
+      </Library>
+
+      <property name="codegenprojects">
+        ${property.value}
+        blazeserver/${component}_gen
+      </property>
+      <Library name="${component}_gen" frompartial="${librarytype}">
+        <headerfiles>
+          <includes name="${component.buildpath}/**.h"/>
+          <includes name="${customcode.buildpath}/**.h"/>
+
+          <includes name="${component.protogen}/**.h"/>
+          <includes name="${customcode.protogen}/**.h"/>
+
+          <excludes name="${package.builddir}/gen/**/test/**.h"/>
+          <excludes name="${package.builddir}/gen/**/stress/**.h"/>
+          <excludes name="${package.builddir}/gen/**/custom-qa/**.h"/>
+        </headerfiles>
+
+        <sourcefiles>
+          <includes name="${component.buildpath}/**.cpp"/>
+          <includes name="${customcode.buildpath}/**.cpp"/>
+
+          <includes name="${component.protogen}/**.cc"/>
+          <includes name="${customcode.protogen}/**.cc"/>
+
+          <do if="${component} == 'framework'">
+            <includes name="${protogen.inbounddir}/${blazeserver.proto_rootdir??}/*.cc"/><!-- For the root component -->
+          </do>
+        </sourcefiles>
+
+        <bulkbuild enable="true" partial="true">
+          <sourcefiles name="gen">
+            <includes name="${component.buildpath}/**.cpp"/>
+            <excludes name="${component.buildpath}/**lexer.cpp"/>
+            <excludes name="${component.buildpath}/**parser.tab.cpp"/>
+
+            <includes name="${customcode.buildpath}/**.cpp"/>
+            <excludes name="${customcode.buildpath}/**lexer.cpp"/>
+            <excludes name="${customcode.buildpath}/**parser.tab.cpp"/>
+
+            <includes name="${component.protogen}/**.cc"/>
+            <includes name="${customcode.protogen}/**.cc"/>
+          </sourcefiles>
+        </bulkbuild>
+
+        <dependencies>
+          <auto>
+            <do if="${google-coredumper}">
+              google_coredumper
+            </do>
+            <do if="${google-tcmalloc}">
+              google_perftools/tcmalloc
+            </do>
+            <do if="${google-profile}">
+              google_perftools/profile
+            </do>
+            <do if="${config-system} == 'pc64'">
+              flex
+            </do>
+          </auto>
+        </dependencies>
+
+        <config>
+          <defines if="${component} != 'framework'">
+            BLAZE_COMPONENT_TYPE_INDEX_NAME=COMPONENT_TYPE_INDEX_${component}
+            BLAZE_COMPONENT_MEMGROUP_NAME=COMPONENT_MEMGROUP_${component}
+          </defines>
+          <defines>
+            COMPONENT_${component}
+            <!-- Set defines specific to a component, primarily used for cusomcomponents -->
+            ${blazeserver.${component}.defines??}
+          </defines>
+          <buildoptions>
+            <option name="debugsymbols"    value="off" />
+            <option name="editandcontinue" value="off"/>
+          </buildoptions>
+        </config>
+      </Library>
+    </do>
+  </foreach>
+
+  <dependent name="EATDF"/>
+
+  <!-- this property formats the components as dependencies that
+       can be used by the programs that depend on components
+       (blazeserver, stress). they need to be prefixed with
+       blazeserver so that the build system knows they are
+       internal -->
+  <property name="blazeserver.internal.component.dependencies"/>
+
+  <foreach item="String" in="${components}" property="component">
+    <do if="@{DirectoryExists('${package.dir}/component/${component}')} or @{DirectoryExists('${package.dir}/customcomponent/${component}')}">
+      <property name="blazeserver.internal.component.dependencies">
+        ${property.value}
+        blazeserver/${component}
+        blazeserver/${component}_gen
+      </property>
+    </do>
+  </foreach>
+
+  <Library name="blazeserver_main" frompartial="BlazeFullLibrary">
+    <headerfiles>
+      <includes name="${package.builddir}/gen/blazerpcerrors.h"/>
+    </headerfiles>
+    <sourcefiles>
+      <excludes name="${package.dir}/blazeserver/main.cpp"/>
+
+      <includes name="${package.dir}/blazeserver/**.cpp"/>
+      <includes name="${package.builddir}/gen/blazecomponentdb.cpp"/>
+      <includes name="${package.builddir}/gen/blazerpcerrors.cpp"/>
+      <includes name="${package.builddir}/gen/blazerpcproxy.cpp"/>
+
+      <do unless="${blazeserver.lite??false}">
+        <includes name="${package.dir}/tools/cfgtest/**.cpp"/>
+        <includes name="${package.dir}/tools/email2hash/**.cpp"/>
+        <includes name="${package.dir}/tools/profantest/**.cpp"/>
+        <includes name="${package.dir}/tools/profancomp/**.cpp"/>
+        <includes name="${package.dir}/tools/heat2logreader/**.cpp"/>
+        <includes name="${package.dir}/tools/memtest/**.cpp"/>
+        <includes name="${package.dir}/tools/obfuscate/**.cpp"/>
+        <includes name="${package.dir}/tools/rdirtransform/**.cpp"/>
+        <includes name="${package.dir}/tools/rpcinfo/**.cpp"/>
+        <includes name="${package.dir}/tools/codecperformance/**.cpp"/>
+        <includes name="${package.dir}/tools/metricsinjector/**.cpp"/>
+        <includes name="${package.dir}/tools/protobuftest/**.cpp"/>
+
+        <do if="${config-system} == 'unix64'">
+          <includes name="${package.dir}/tools/firedrill/**.cpp"/>
+          <includes name="${package.dir}/tools/monitor/**.cpp"/>
+          <includes name="${package.dir}/tools/redisinspector/**.cpp"/>
+        </do>
+      </do>
+    </sourcefiles>
+
+    <bulkbuild enable="true" partial="true"/>
+
+    <dependencies>
+      <interface>
+        blazeserver/framework
+        blazeserver/framework_gen
+        blazeserver/proxycomponents
+        blazeserver/outboundgrpc
+        blazeserver/grpc_helpers
+        blazeserver/customcode
+        ${blazeserver.internal.component.dependencies}
+        <do if="${config-system} == 'pc64'">
+          bison
+        </do>
+      </interface>
+      <auto>
+        <do if="${config-system} == 'pc64'">
+          bison
+        </do>
+      </auto>
+    </dependencies>
+
+    <config>
+      <defines>
+        _BLAZECOMPONENT
+        COMPONENT_server
+        TARGET_server
+      </defines>
+      <remove>
+        <defines>
+          DIRTYCODE_DEBUG=0
+          DS_PLATFORM
+        </defines>
+      </remove>
+    </config>
+  </Library>
+
+  <!-- Specify the Blaze server program build. -->
+  <Program name="blazeserver" frompartial="BlazeProgram">
+    <sourcefiles>
+      <includes name="${package.dir}/blazeserver/main.cpp"/>
+    </sourcefiles>
+    <dependencies>
+      <auto>
+        blazeserver/framework
+        blazeserver/framework_gen
+        blazeserver/proxycomponents
+        blazeserver/outboundgrpc
+        blazeserver/grpc_helpers
+        blazeserver/customcode
+        blazeserver/blazeserver_main
+        ${blazeserver.internal.component.dependencies}
+        <do if="${config-system} == 'pc64'">
+          bison
+        </do>
+      </auto>
+    </dependencies>
+    <config>
+      <buildoptions>
+        <option name="editandcontinue" value="on" if="${config-name} == 'debug'"/>
+      </buildoptions>
+    </config>
+    <visualstudio>
+      <excludedbuildfiles>
+        <includes name="${package.dir}/etc/**.boot"/>
+        <includes name="${package.dir}/etc/**.cfg"/>
+      </excludedbuildfiles>
+    </visualstudio>
+    <buildsteps>
+      <postbuild-step>
+        <target>
+          <call target="prepforcontainer" if="${config-system} == 'unix64'"/>
+        </target>
+      </postbuild-step>
+      <run workingdir="${package.dir}/etc"/>
+    </buildsteps>
+  </Program>
+
+
+  <!-- ********************* -->
+  <!-- Test configuration    -->
+  <!-- ********************* -->
+
+  <tests>
+
+    <Program name="blazeserverTest" frompartial="BlazeProgram">
+
+      <config>
+        <buildoptions>
+          <option name="exceptions" value="on"/><!--For gtest exception checking-->
+        </buildoptions>
+      </config>
+
+      <includedirs>
+        ${package.dir}/test
+      </includedirs>
+      <sourcefiles>
+        <includes name="${package.dir}/test/**.cpp" />
+        <includes name="${package.builddir}/gen/blazecomponentdb.cpp"/>
+        <includes name="${package.builddir}/gen/blazerpcerrors.cpp"/>
+        <includes name="${package.builddir}/gen/blazerpcproxy.cpp"/>
+      </sourcefiles>
+
+      <headerfiles>
+        <includes name="${package.dir}/test/**.h" />
+      </headerfiles>
+
+      <dependencies>
+        <auto>
+          blazeserver/framework
+          blazeserver/framework_gen
+          blazeserver/proxycomponents
+          blazeserver/outboundgrpc
+          blazeserver/grpc_helpers
+          ${blazeserver.internal.component.dependencies}
+          gtest
+        </auto>
+      </dependencies>
+
+      <!-- Make sure runtime DLLs are available in the tests local folder-->
+      <copylocal value="true"/>
+
+      <visualstudio>
+        <excludedbuildfiles>
+          <includes name="${package.dir}/etc/**.boot"/>
+          <includes name="${package.dir}/etc/**.cfg"/>
+        </excludedbuildfiles>
+      </visualstudio>
+    </Program>
+
+    <property name="TestProgramName" value="blazeserverTest"/>
+    <include file ="${package.dir}/scripts/tools/unittest_gen.xml" />
+  </tests>
+
+</project>

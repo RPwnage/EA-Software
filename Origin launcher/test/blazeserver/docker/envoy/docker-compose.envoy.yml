@@ -1,0 +1,115 @@
+# Documentation - https://docs.docker.com/compose/compose-file/
+# (make sure to read the documentation of the version number specified below - currently 3.8)
+# We try and use the known versions of following containers currently to keep things stable.
+
+version: "3.8"
+services:
+
+  gen-json-redis-config:
+    image: bash:latest
+    restart: "no"
+    volumes:
+      - ./../../init:/init
+    command: [sh,-c,"echo '{ \"main\": { \"nodes\": [ \"redis-cluster:30000\", \"redis-cluster:30001\", \"redis-cluster:30002\" ] } }' > /init/redis_cfg.json"]
+
+  # Reads the blaze endpoint info from the redis-cluster.
+  # Each envoy-blaze-ingress makes a gRPC call to retrieve the endpoints.
+  # The address (e.g. blaze-control-plane-1) and port number used for the gRPC listener (e.g. 9090) is configured in envoy-blaze-ingress.yaml
+  blaze-control-plane-1:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/blazecontrolplane:0.4
+    volumes:
+      - ./../../init:/init
+    command:
+      - -port=9090
+      - -jsonRedisCfgFile=/init/redis_cfg.json
+    depends_on:
+      - gen-json-redis-config
+
+  # Listens for gRPC requests from the edge mesh.
+  envoy-blaze-ingress-1:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/envoy-blaze-ingress:0.4
+    ports:
+      - 10002:10002
+    depends_on:
+      - blaze-control-plane-1
+    volumes:
+      - ./../../etc/ssl:/certs
+    labels:
+      # TODO: Put your Blaze server's default service name here
+      - 'eadp.mesh.endpoints={"namespaces":{ "eadp.edge": {"registrations": [{"service":"eadp.blaze", "port_spec":"10002/tcp", "tags":{ "x-eadp-servergroup":"gosblaze-johndoe-common" } }] } }}'
+    environment:
+      # Common Container Configuration
+      ENVOY_LOG_LEVEL: info
+      #
+      # TLS Configuration
+      ENVOY_SERVER_CERT_CA: /certs/ca-certs/ea-sha1.pem
+      ENVOY_SERVER_CERT_PRIVATE_KEY: /certs/nucleus/integration-key-decrypt.pem
+      ENVOY_SERVER_CERT_PUBLIC_KEY: /certs/nucleus/integration-cert.crt
+      #
+      # Blaze Provider specific Container Configuration
+      ENVOY_INGRESS_LISTENER_PORT: 10002
+      BLAZE_CONTROL_PLANE_ADDRESS: blaze-control-plane-1
+      BLAZE_CONTROL_PLANE_PORT: 9090
+
+  envoy-blaze-ingress-2:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/blaze-mesh/envoy-blaze-ingress:0.4
+    ports:
+      - 10005:10005
+    depends_on:
+      - blaze-control-plane-1
+    volumes:
+      - ./../../etc/ssl:/certs
+    labels:
+      # TODO: Put your Blaze server's default service name here
+      - 'eadp.mesh.endpoints={"namespaces":{ "eadp.edge": {"registrations": [{"service":"eadp.blaze", "port_spec":"10005/tcp", "tags":{ "x-eadp-servergroup":"gosblaze-johndoe-common" } }] } }}'
+    environment:
+      # Common Container Configuration
+      ENVOY_LOG_LEVEL: info
+      #
+      # TLS Configuration
+      ENVOY_SERVER_CERT_CA: /certs/ca-certs/ea-sha1.pem
+      ENVOY_SERVER_CERT_PRIVATE_KEY: /certs/nucleus/integration-key-decrypt.pem
+      ENVOY_SERVER_CERT_PUBLIC_KEY: /certs/nucleus/integration-cert.crt
+      #
+      # Blaze Provider specific Container Configuration
+      ENVOY_INGRESS_LISTENER_PORT: 10005
+      BLAZE_CONTROL_PLANE_ADDRESS: blaze-control-plane-1
+      BLAZE_CONTROL_PLANE_PORT: 9090
+
+  # Used by the xds-agent to register each envoy-blaze-ingress node
+  # with the S2S service edge Mesh Control Plane.
+  envoy-blaze-egress:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/envoy-mesh-node:3.0.0
+    volumes:
+      - ./../../etc/ssl:/certs
+    environment:
+      # Common Container Configuration
+      MESH_SERVICE: dummy
+      MESH_NAMESPACE: eadp.edge
+      JAEGER_ENABLED: 0
+      ENVOY_XDS_HOST: servicemesh.int.gameservices.ea.com
+      ENVOY_LOG_LEVEL: info
+      #
+      # TLS Configuration
+      ENVOY_CLIENT_TLS_ENABLED: 1
+      ENVOY_CLIENT_CERT_CA: /certs/ca-certs/ea-sha1.pem
+      ENVOY_CLIENT_CERT_PRIVATE_KEY: /certs/nucleus/integration-key-decrypt.pem
+      ENVOY_CLIENT_CERT_PUBLIC_KEY: /certs/nucleus/integration-cert.crt
+      #
+      # Consumer specific Container Configuration
+      EGRESS_CLIENTSPACE: dummy
+      EGRESS_SERVERSPACE: dummy
+      EGRESS_MESH_ID: INT
+
+  xds-agent:
+    image: src.ent.ea.com:8443/gs-envoy-mesh/envoy-xds-docker-agent:2.1.0
+    depends_on:
+      - envoy-blaze-egress
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      ENVOY_XDS_ENDPOINTS: '{"eadp.edge": "envoy-blaze-egress:9001"}'
+      # TODO: Put your Blaze server's externally accessible IP address here
+      NODE_ADDRESS: 10.8.911.911
+      NODE_REGION: local
+      NODE_ZONE: local

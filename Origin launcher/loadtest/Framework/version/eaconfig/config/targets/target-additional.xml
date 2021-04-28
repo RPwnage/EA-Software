@@ -1,0 +1,468 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'sln-taskdef')}' == 'exclude'">
+    <target name="sln-taskdef" style="use" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <!-- catch any exceptions and try to generate solution with task files using whatever data were collected before exception -->
+      <trycatch>
+        <try>
+          <call target="eaconfig-build-graph-all" force="true" />
+        </try>
+        <catch>
+          <echo message="
+                WARNING: There was an error during processing:
+                ----------------------------------------------
+                     ${trycatch.error}
+                ----------------------------------------------
+                Task solution file will contain data that were collected before error occured."/>
+        </catch>
+      </trycatch>
+      <taskdef-sln-generator/>
+    </target>
+  </do>
+  
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'sln-taskdef-open')}' == 'exclude'">
+    <target name="sln-taskdef-open" allowoverride="true">
+	  <property name="task-def-sln-path" value="@{PathCombine(${nant.project.temproot}, @{PathCombine('TaskDefVisualStudioSolution', 'TaskDefCodeSolution.sln')})}"/>
+	  <set-config-vs-version/>
+	  <call target="get-visualstudio-installdir"/>
+        <choose>
+            <do if="@{FileExists('${task-def-sln-path}')}">
+                <start filename="${eaconfig.dev-env}" useshell="false" detached="true">
+                    <args>
+                        <arg value="${task-def-sln-path}"/>
+                    </args>
+                </start>
+            </do>
+            <do>
+                <echo>Visual Studio solution file '${task-def-sln-path}' does not exist </echo>
+            </do>
+        </choose>
+    </target>
+  </do>
+
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'GenerateBuildLayout')}' == 'exclude'">
+    <!--
+    Just a wrapper target to call GenerateBuildLayout task so that other packages can test if they are on 
+    proper Framework version that has this task provided.  More specifically. this target is being used by 
+    newer version of XcodeProjectizer.
+    -->
+    <target name="GenerateBuildLayout" style="use" allowoverride="true">
+      <GenerateBuildLayout/>
+    </target>
+  </do>
+  
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'report-dep-graph')}' == 'exclude'">
+    <target name="report-dep-graph" style="use" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <property name="report-dep-graph.packagename" value="${report-dep-graph.packagename??${package.name}}"/>
+      <WritePackageGraphViz
+        configurations="${eaconfig.build.configs}"
+        packagename="${report-dep-graph.packagename}"
+        graphfile="${report-dep-graph.graphfile??${nant.project.temproot}/@{StrReplace(${report-dep-graph.packagename}, '/', '_')}_graph.viz}"
+        graphmodules="${report-dep-graph.graphmodules??true}"
+        groupbypackages="${report-dep-graph.groupbypackages??true}"
+        dependency-filter="${report-dep-graph.dependency-filter??}"
+        exclude-dependency-filter="${report-dep-graph.exclude-dependency-filter??}"
+        find-ancestors="${report-dep-graph.find-ancestors??false}"
+        dependency-color-scheme="${report-dep-graph.dependency-color-scheme??standard}"
+        >
+        <excludemodules if="@{PropertyExists('report-dep-graph.excludemodules')}">
+          ${report-dep-graph.excludemodules??}
+        </excludemodules>
+      </WritePackageGraphViz>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-report-dep-graph')}' == 'exclude'">
+    <target name="test-report-dep-graph" style="use" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+      <call target="report-dep-graph"/>
+    </target>
+  </do>
+  
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'clang-compilation-database')}' == 'exclude'">
+    <target name="clang-compilation-database" style="use" allowoverride="true">
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+      <ClangCompilationDatabase outputdir="${clangcompiledatabase.outputdir??}"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'print-property-declarations')}' == 'exclude'">
+    <target name="print-property-declarations" style="use" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <print-public-properties/>
+    
+    </target>
+  </do>
+
+	<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+	<!-- A target for collecting debug information to help the CM team debug nant related support issues -->
+	<target name="dump-debug-info">
+		<!-- delete the debuginfo directory so that we don't accidentally zip any old files -->
+		<delete dir="${nant.project.buildroot}/debuginfo"/>
+		<!-- setup a directory to copy and write information to that we can zip up at the end -->
+		<mkdir dir="${nant.project.buildroot}/debuginfo"/>
+
+		<trycatch>
+			<try>
+				<!-- copy the masterconfig file -->
+				<copy file="${nant.project.masterconfigfile}" todir="${nant.project.buildroot}/debuginfo"/>
+
+				<!-- copy the top level build files -->
+				<copy todir="${nant.project.buildroot}/debuginfo">
+					<fileset basedir="${package.dir}">
+						<includes name="**.build"/>
+						<includes name="**/initialize.xml"/>
+					</fileset>
+				</copy>
+
+				<do if="${config-isFrostbite??false}">
+					<property name="frostbite-debug-info">
+						TNT_ROOT: ${frostbite.TNT_ROOT}
+						LOCAL_ROOT: ${frostbite.LOCAL_ROOT}
+						GAME_DATA_DIR: ${frostbite.GAME_DATA_DIR}
+
+						username: ${frostbite.username}
+						userdomain: ${frostbite.userdomain}
+						branch_id: ${frostbite.branch_id}
+
+						FB_ISAUTOBUILD: ${frostbite.FB_ISAUTOBUILD}
+					</property>
+					<echo message="${frostbite-debug-info}" file="${nant.project.buildroot}/debuginfo/frostbite_properties.txt"/>
+				</do>
+				
+				<trycatch>
+					<try>
+						<!-- call the build info target and write output to the debuginfo directory -->
+						<property name="buildinfo.outputdir" value="${nant.project.buildroot}/debuginfo"/>
+						<call target="buildinfo"/>
+					</try>
+					<catch>
+						<echo message="${trycatch.error}" file="${nant.project.buildroot}/debuginfo/BUILDINFO_FAILED.txt"/>
+					</catch>
+				</trycatch>
+
+				<!-- run the users build in verbose mode so we can get a verbose copy of the log -->
+				<do if="@{PropertyExists('dumpdebuginfo.targets')}">
+
+					<!-- For backward compatibility between eaconfig and older versions of Framework 
+					prior to the addition of the file attribute for the record task.
+					remove the second case when backward compatibility is no longer needed. -->
+					<choose>
+						<do if="@{StrCompareVersions('${package.Framework.version}', '7.06.00')} gt 0">
+							<record file="${nant.project.buildroot}/debuginfo/verbose.log">
+								<nant target="${dumpdebuginfo.targets}" buildfile="${nant.project.buildfile}" verbose="true">
+									<property name="config" value="${config}"/>
+									<property name="package.configs" value="${package.configs??${config}}"/>
+									<property name="masterconfigfile" value="${nant.project.masterconfigfile}"/>
+								</nant>
+							</record>
+						</do>
+						<do>
+							<record property="verbose-log">
+								<nant target="${dumpdebuginfo.targets}" buildfile="${nant.project.buildfile}" verbose="true">
+									<property name="config" value="${config}"/>
+									<property name="package.configs" value="${package.configs??${config}}"/>
+									<property name="masterconfigfile" value="${nant.project.masterconfigfile}"/>
+								</nant>
+							</record>
+							<echo message="${verbose-log}" file="${nant.project.buildroot}/debuginfo/verbose.log"/>
+						</do>
+					</choose>
+
+				</do>
+			</try>
+			<catch>
+				<echo message="${trycatch.error}" file="${nant.project.buildroot}/debuginfo/DUMPDEBUGINFO_FAILED.txt"/>
+			</catch>
+			<finally>
+				<!-- put all of the files in a zip file to make it easy for the user to send -->
+				<!-- this is done in a finally block in case any of the previous steps crash -->
+				<zip zipfile="${nant.project.buildroot}/debuginfo.zip">
+					<fileset basedir="${nant.project.buildroot}/debuginfo">
+						<includes name="**.*"/>
+					</fileset>
+				</zip>
+			</finally>
+		</trycatch>
+	</target>
+	
+	<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'buildinfo')}' == 'exclude'">
+    <target name="buildinfo" style="use" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <property name="report-dep-graph.packagename" value="${report-dep-graph.packagename??${package.name}}"/>
+      <WriteBuildInfo
+        outputdir="${buildinfo.outputdir??}"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'tool-buildinfo')}' == 'exclude'">
+    <target name="tool-buildinfo" style="use" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+      
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <property name="report-dep-graph.packagename" value="${report-dep-graph.packagename??${package.name}}"/>
+      <WriteBuildInfo
+        outputdir="${buildinfo.outputdir??}"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-buildinfo')}' == 'exclude'">
+    <target name="test-buildinfo" style="use" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <property name="report-dep-graph.packagename" value="${report-dep-graph.packagename??${package.name}}"/>
+      <WriteBuildInfo
+        outputdir="${buildinfo.outputdir??}"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'example-buildinfo')}' == 'exclude'">
+    <target name="example-buildinfo" style="use" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <property name="report-dep-graph.packagename" value="${report-dep-graph.packagename??${package.name}}"/>
+      <WriteBuildInfo
+        outputdir="${buildinfo.outputdir??}"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'buildinfo-all')}' == 'exclude'">
+    <target name="buildinfo-all" style="use" allowoverride="true">
+      <property name="__eaconfig.build.groups" value="${eaconfig.build.groups??runtime test example tool}" />
+
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <property name="report-dep-graph.packagename" value="${report-dep-graph.packagename??${package.name}}"/>
+      <WriteBuildInfo
+        outputdir="${buildinfo.outputdir??}"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <!-- ////////////////////////////////////////////////////////////////// -->
+  <!-- Print packages used by a certain config and the master packages.   -->
+  <!-- ////////////////////////////////////////////////////////////////// -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'print-referenced-packages-list')}' == 'exclude'">
+    <target name="print-referenced-packages-list" style="use" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <PrintReferencedPackages/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'tool-print-referenced-packages-list')}' == 'exclude'">
+    <target name="tool-print-referenced-packages-list" style="use" allowoverride="true">
+      <property name="eaconfig.build.group" value="tool" />
+
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <PrintReferencedPackages/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'test-print-referenced-packages-list')}' == 'exclude'">
+    <target name="test-print-referenced-packages-list" style="use" allowoverride="true">
+      <property name="eaconfig.build.group" value="test" />
+
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <PrintReferencedPackages/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'example-print-referenced-packages-list')}' == 'exclude'">
+    <target name="example-print-referenced-packages-list" style="use" allowoverride="true">
+      <property name="eaconfig.build.group" value="example" />
+
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <PrintReferencedPackages/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'print-referenced-packages-list-all')}' == 'exclude'">
+    <target name="print-referenced-packages-list-all" style="use" allowoverride="true">
+      <property name="__eaconfig.build.groups" value="${eaconfig.build.groups??runtime test example tool}" />
+
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <call target="eaconfig-build-graph-all" force="true" />
+
+      <PrintReferencedPackages/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'get-all-dependent-packages')}' == 'exclude'">
+    <target name="get-all-dependent-packages" style="use" allowoverride="true">
+      <property name="eaconfig.buildall.target" value="load-package-generate" />
+      <property name="eaconfig.build.autobuild-target" value="load-package-generate" />
+      <property name="eaconfig.build.configs" value="${package.configs}"/>
+      <property name="eaconfig.build.configs" value="${config}" if="${generate-single-config??false}"/>
+      <property name="eaconfig.build.process-generation-data" value="true"/>
+      <choose>
+          <do if="@{PropertyExists('top-package')}">
+              <create-build-graph-for-package package="${top-package}"/>
+          </do>
+          <do if="'${package.name}' != 'eaconfig'">
+              <create-build-graph-for-package/>
+          </do>
+          <do>
+              <fail message="Please provide the property 'top-package' to indicate which package you like to examine."/>
+          </do>
+      </choose>
+      <get-all-dependent-packages/>
+    </target>
+  </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="print-nant-properties">
+    <nant-coredump echo="true" format="Text" dump-filesets="false" dump-optionsets="false"/>
+  </target>
+
+  <target name="print-nant-properties-tofile">
+    <nant-coredump echo="false" tofile="nantprops.txt" format="Text" dump-filesets="false" dump-optionsets="false"/>
+  </target>
+
+  <target name="verify-package-versions">
+    <exec program="${package.Framework.dir}/bin/MasterConfigUpdater.exe" commandline="-l ${nant.project.masterconfigfile}"/>
+  </target>
+
+  <!-- ////////////////////////////////////////////////////////////////// -->
+  <!-- Help                                                               -->
+  <!-- ////////////////////////////////////////////////////////////////// -->
+
+  <target name="mobile-help" style="use">
+    <echo>
+      --------------------------------------------------------------------------------
+
+      EAConfig-${package.eaconfig.version}
+
+      Targets:
+      mobile-help
+      copy-asset-files
+
+      **mobile-ListAssets
+      print-referenced-packages-list
+      print-nant-properties = &lt;nant-coredump echo='true' format="text" dump-filesets="false" dump-optionsets="false"/&gt;
+      print-nant-properties-tofile = &lt;nant-coredump echo="false" tofile="nantprops.txt" format="text" dump-filesets="false" dump-optionsets="false"/&gt;
+      **mobile-UpdateDeploymentAssets * winrt, winprt
+      remotebuild
+
+      Tasks:
+
+      &lt;get-module-asset-files module-groupname="" asset-filesets-property="" /&gt;
+      &lt;nant-coredump . . ./&gt; - see Framework docs for more info
+      **mobile-UpdateAssetsWin8(Module='Required', PackageDir='Required', FileSetName='Required', Verbose='')
+      **mobile-Validate(LibPack='Required', PrebuiltPackages='Required')
+
+      --------------------------------------------------------------------------------
+    </echo>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'clang-format')}' == 'exclude'">
+    <target name="clang-format" style="use" allowoverride="true">
+      <dependent name="ClangFormat"/>
+      <call target="apply-clang-format" force="true"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'copy-clang-format-file')}' == 'exclude'">
+    <target name="copy-clang-format-file" style="use" allowoverride="true">
+      <dependent name="ClangFormat"/>
+      <call target="copy-clang-format-file-to-packageroots" force="true"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('config.targetoverrides', 'validatecodeconventions')}' == 'exclude'">
+    <target name="validate-code-conventions" allowoverride="true">
+      <validate-code-conventions/>
+    </target>
+  </do>
+
+</project>

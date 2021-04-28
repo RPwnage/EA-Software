@@ -1,0 +1,362 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <property name="kettle.support-shared-pch" value="true"/>
+  <property name="kettle.shared-pch-generate-lib" value="false"/>
+
+  <dependent name="kettlesdk" />
+
+  <do if="@{StrEndsWith(${link},orbis-clang++.exe)}">
+    <!-- Override the linker, as we no longer use the '-Wl,' prefix for linker options -->
+    <!-- TODO this override will need to be removed when all teams transition to the ps4 SDK that has orbis-ld.exe set as linker -->
+    <property name="link" value="${package.kettlesdk.appdir}/orbis-ld.exe"/>
+  </do>
+
+  <include file="kettle-sdklibs.xml"/>
+
+  <property name="platform-ptrsize"     value="64bit"/>
+  <property name="platform-wordsize"    value="64bit"/>
+
+  <property name="incredibuild.supports.sln" value="true"/>
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle"    value="Unix"/>
+  <property name="lib-prefix"        value="lib"/>
+  <property name="lib-suffix"        value=".a"/>
+  <property name="dll-suffix"        value=".prx"/>
+  <property name="exe-suffix"        value=".elf"/>
+  <!-- used to run test programs during build -->
+
+  <!-- Compile in parallel on multiple CPUs         -->
+  <property name="cc.parallelcompiler"    value="true"/>
+
+  <property name="cc.useresponsefile" value="${kettle.cc.useresponsefile??true}"/>
+  <property name="lib.useresponsefile" value="${kettle.lib.useresponsefile??true}"/>
+  <property name="link.useresponsefile" value="${kettle.link.useresponsefile??true}"/>
+
+  <property name="cc.usealtsepinresponsefile" value="true"/>
+  <property name="lib.usealtsepinresponsefile" value="true"/>
+  <property name="link.usealtsepinresponsefile" value="true"/>
+
+  <!-- 
+      These properties will be used to setup the build tools in kettle-clang-buildtools.xml.
+      Currently cc.options, etc are set to empty in kettlesdk.
+  -->
+  <property name="required_ps4_common_cc_options"/>
+  <property name="required_ps4_common_as_options"/>
+  <property name="required_ps4_common_link_options"/>
+  <property name="required_ps4_common_libs"/>
+
+	<!-- According to Sony Docs, there are special conditions that need to be satisfied when using undefinedBehaviorSanitizer -->
+	<property name="kettle_config-sanitizer-undefined" value="false"/>
+	<property name="kettle_config-sanitizer-undefined-trap" value="false"/>
+	<property name="kettle_config-sanitizer-vptr" value="false"/>
+	<property name="kettle_config-sanitizer-no-vptr" value="false"/>
+	<property name="kettle_config-sanitizer-address" value="false"/>
+	<property name="finalSanitizerList" value=""/>
+	<property name="finalSanitizerNoList" value=""/>
+	<foreach item="String" in="${eaconfig.clang.sanitize??}" property="__clang_sanitize" delim=" ," >
+		<eval property="__clang_sanitize_check" code="@{StrTrimWhiteSpace('${__clang_sanitize}')}" type="Function"/>
+		<choose>
+			<do if="'${__clang_sanitize_check}' == 'address'">
+				<property name="kettle_config-sanitizer-address" value="true"/>
+			</do>
+			<do if="'${__clang_sanitize_check}' == 'undefined'">
+				<property name="kettle_config-sanitizer-undefined" value="true"/>
+			</do>
+			<do if="'${__clang_sanitize_check}' == 'undefined-trap'">
+				<property name="kettle_config-sanitizer-undefined-trap" value="true"/>
+			</do>
+			<do if="'${__clang_sanitize_check}' == 'vptr'">
+				<property name="kettle_config-sanitizer-vptr" value="true"/>
+			</do>
+		</choose>
+		<property name="finalSanitizerList">${property.value},${__clang_sanitize_check}</property>
+	</foreach>
+	<foreach item="String" in="${eaconfig.clang.no-sanitize??}" property="__clang_no-sanitize" delim=" ," >
+		<eval property="__clang_no-sanitize_check" code="@{StrTrimWhiteSpace('${__clang_no-sanitize}')}" type="Function"/>
+		<choose>
+			<do if="'${__clang_no-sanitize_check}' == 'vptr'">
+				<property name="kettle_config-sanitizer-no-vptr" value="true"/>
+			</do>
+		</choose>
+		<property name="finalSanitizerNoList">${property.value},${__clang_no-sanitize_check}</property>
+	</foreach>
+	<do unless="@{StrIsEmpty('${finalSanitizerList}')}">
+		<!-- Remove the first comma -->
+		<property name="finalSanitizerList" value="@{StrSubstring('${property.value}',1)}"/>
+		<do unless="@{StrIsEmpty('${finalSanitizerNoList}')}">
+			<property name="finalSanitizerNoList" value="@{StrSubstring('${property.value}',1)}"/>
+		</do>
+
+		<!-- Now setup the build options -->
+		<property name="fsanitize-options">
+			${property.value??}
+			-fsanitize=${finalSanitizerList}
+		</property>
+		<property name="fsanitize-options" unless="@{StrIsEmpty('${finalSanitizerNoList}')}">
+			${property.value??}
+			-fno-sanitize=${finalSanitizerNoList}
+		</property>
+		<!--
+			Documentation say that the -fsanitizer=undefined-trap is intended to be use in conjunction with
+			-fsanitize-undefined-trap-on-error.  However, this option is actually also being marked as deprecated
+			by official clang.exe release and advice to use -fsanitize-trap=undefined instead.  But since we are
+			using orbis-clang.  For now, we'll keep Sony's instruction.
+		-->
+		<property name="fsanitize-options" if="${kettle_config-sanitizer-undefined-trap} or ${eaconfig.clang.sanitize-undefined-trap-on-error??false}">
+			${property.value??}
+			-fsanitize-undefined-trap-on-error
+		</property>
+		<!-- According to Sony documentation, if vptr or undefined (but not undefined and no-vptr) is used, we must build with rtti -->
+		<do if="(${kettle_config-sanitizer-vptr} or ${kettle_config-sanitizer-undefined}) and !(${kettle_config-sanitizer-undefined} and ${kettle_config-sanitizer-no-vptr})">
+			<do.once key="Show-force-turn-on-rtti-because-undefined-sanitizer-message-key">
+				<echo message="NOTE: Because -fsanitizer is either set to undefined or vptr, we need to force turn on -frtti compiler options!"/>
+			</do.once>
+			<property name="required_ps4_common_cc_options">
+				${property.value??}
+				-frtti
+			</property>
+		</do>
+
+		<!-- Now update compiler options -->
+		<property name="required_ps4_common_cc_options">
+			${property.value}
+			${fsanitize-options}
+		</property>
+
+		<!-- Update linker options -->
+		<!-- 
+			orbis-clang++.exe can handle the -fsanitize command line and link with the selected library.  But under SN-VSI 
+			when building in Visual Studio, orbis-ld.exe seems to get called directly and that one doesn't handle the -fsanitize
+			command line switches.  So we have to explicitly specify the library to link with instead.
+		-->
+		<do if="${kettle_config-sanitizer-undefined} or ${kettle_config-sanitizer-undefined-trap}">
+			<property name="required_ps4_common_libs">
+				${property.value}
+				-lSceDbgUBSanitizer_stub_weak
+			</property>
+		</do>
+		<do if="${kettle_config-sanitizer-address}">
+			<property name="required_ps4_common_libs">
+				${property.value}
+				-lSceDbgAddressSanitizer_stub_weak
+			</property>
+		</do>
+	</do>
+
+  <!-- Suppress misleading indentation warnings on ps4 8.0 or higher - we have a lot of these,
+       could clean them up at some point but not worth the effort for now -->
+  <do if="@{StrVersionGreaterOrEqual('${package.kettlesdk.InstalledVersion}', '8.0')}">
+    <property name="required_ps4_common_cc_options">
+      ${property.value??}
+      -Wno-misleading-indentation
+    </property>
+  </do>
+
+  <include file="kettle-clang-buildtools.xml"/>
+
+  <!-- 
+  Clear the cc.includedirs and as.includedirs properties.  We should be using cc.system-includedirs and as.system-includedirs.
+  Clearing those properties to make sure the includes don't get added to multiple places on command line.  The system-includes
+  for compiler uses different switches.
+  -->
+  <property name="cc.includedirs"/>
+  <property name="as.includedirs"/>
+
+  <property name="cc.std.kettle.default" value="${cc.std.kettle.default??c++17}"/>
+
+  <optionset name="config-options-common">
+    <option name="print_link_timings" value="on" if="${package.eaconfig.printlinktime??false}"/>
+    <option name="preprocess"/>
+    <option name="postprocess">
+      kettle-clang-postprocess
+    </option>
+    <option name="buildset.cc.includedirs" >
+      ${option.value}
+    </option>
+    <option name="buildset.cc.system-includedirs" >
+      ${option.value}
+      ${cc.system-includedirs}
+    </option>
+    <!--- cc -->
+    <option name="buildset.cc.defines">
+      ${option.value}
+      ${cc.common-defines}
+    </option>
+    <option name="buildset.cc.options">
+      ${option.value}
+      ${cc.common-options??}
+    </option>
+    <!--- as -->
+    <option name="buildset.as.options">
+      ${option.value}
+      ${as.common-options??}
+    </option>
+    <option name="buildset.as.includedirs">
+      ${option.value}
+      ${as.system-includedirs??}
+    </option>
+    <option name="buildset.as.usingdirs">
+      ${option.value}
+      ${as.usingdirs??}
+    </option>
+    <!--- link -->
+    <option name="buildset.link.options" >
+      ${option.value}
+      ${link.common-options??}
+    </option>
+    <option name="buildset.link.librarydirs">
+      ${option.value}
+      ${link.system-librarydirs}
+    </option>
+    <option name="buildset.link.libraries">
+      ${option.value}
+      ${link.system-libs??}
+    </option>
+  </optionset>
+
+  <optionset name="config-options-library">
+    <option name="liboutputname" value="%outputdir%/${lib-prefix}%outputname%${lib-suffix}" />
+    <option name="buildset.lib.options">
+      ${lib.common-options??}
+    </option>
+  </optionset>
+
+
+  <optionset name="config-options-dynamiclibrary" >
+    <option name="generatedll"                          value="on" />
+    <option name="buildset.name"                        value="DynamicLibrary" />
+    <option name="buildset.tasks"                       value="asm cc link" />
+    <option name="buildset.cc.defines"                  value="EA_DLL" />
+    <option name="linkoutputname" value="%outputdir%\%outputname%${dll-suffix}" />
+    <option name="impliboutputname" value="%outputlibdir%\%outputname%_stub${lib-suffix}"/>
+    <option name="buildset.link.librarydirs">
+      ${link.system-librarydirs}
+    </option>
+    <option name="buildset.link.options">
+      --oformat=prx
+      --prx-stub-output-dir="%outputlibdir%"
+    </option>
+  </optionset>
+
+  <optionset name="config-options-program">
+    <option name="deployassets" value="false"/>
+    <option name="buildset.link.options">
+      --prx-stub-output-dir=%outputdir%
+    </option>
+  </optionset>
+
+  <property name="visualstudio.hide.unsupported.csharp" value="${visualstudio.hide.unsupported.csharp??true}"/>
+
+  <optionset name="config-options-csharplibrary">
+    <option name="buildset.name"            value="CSharpLibrary" />
+    <option name="buildset.tasks"           value="csc" />
+    <option name="buildset.csc.target"      value="library" />
+  </optionset>
+
+  <optionset name="config-options-csharpprogram">
+    <option name="buildset.name"            value="CSharpProgram" />
+    <option name="buildset.tasks"           value="csc" />
+    <option name="buildset.csc.target"      value="exe" />
+  </optionset>
+
+  <optionset name="config-options-csharpwindowsprogram">
+    <option name="buildset.name"            value="CSharpWindowsProgram" />
+    <option name="buildset.tasks"           value="csc" />
+    <option name="buildset.csc.target"      value="winexe" />
+  </optionset>
+
+    <optionset name="config-build-layout-entrypoint-common">
+		<option name="elf" value="%output%"/>
+	</optionset>
+
+  <!-- clear properties that are appended to optionsets above-->
+  <property name="cc.defines"/>
+  <property name="cc.options"/>
+  <property name="cc.includedirs"/>
+  <property name="link.libraries"/>
+
+  <!-- Now create the platform.sdklibs.regular / debug that will be used by Framework as list of default libraries to link with. -->
+  <foreach item="String" in="regular debug lto" property="libtype">
+    <property name="platform.sdklibs.${libtype}" value=""/>  <!-- Initialize property with empty string -->
+    <foreach item="String" in="${package.kettlesdk.library.default-set}" property="libset">
+      <do if="@{FileSetExists('package.kettlesdk.${libset}.${libtype}lib')}">
+          <property name="platform.sdklibs.${libtype}">
+            ${property.value}
+            @{FileSetToString('package.kettlesdk.${libset}.${libtype}lib','${nant.endline}')}
+          </property>
+      </do>
+    </foreach>
+  </foreach>
+  <!-- 
+    Create the platform.sdklibs.ltcglibs for backward compatibility.  Want to stop using get-ps4-ltcglib-property task because it seems kinda
+    unnecessary performance penality to loop for all files in fileset to test for _lto.a while there are really only about 4 _lto.a files.
+  -->
+  <choose>
+    <do unless="@{StrIsEmpty('${platform.sdklibs.lto}')}">
+      <property name="platform.sdklibs.ltcglibs">${platform.sdklibs.lto}</property>
+    </do>
+    <do>
+      <get-ps4-ltcglib-property ForFrostbite="false"/>
+      <property name="platform.sdklibs.lto">${platform.sdklibs.ltcglibs}</property>
+    </do>
+  </choose>
+
+  <!-- Visual Studio solution generation -->
+  <property name="visualstudio.platform.name" value="ORBIS"/>
+  <property name="package.VisualStudio.platformtoolset" value="Clang"/>
+  <property name="platform.name.kettle" value="ORBIS"/>
+  <property name="eaconfig.visual-studio.ComputeCustomBuildOutput.ext" value=".o .a .obj .lib"/>
+
+  <optionset name="sdk.portable-gen-data">
+    <option name="SCE_ORBIS_SDK_DIR" value="package.kettlesdk.sdkdir"/>
+  </optionset>
+
+  <createtask name="AddNetworkLibsToModule" overload="true">
+    <parameters>
+      <option name="module" value="Required"/>
+      <!-- Need to pass in the group name as well.  That is pass in <group> or <group>.<module_name> for this variable. -->
+    </parameters>
+    <code>
+      <property name="debugcode.enabled" value="false"/>
+      <property name="debugcode.enabled" value="true" if="@{OptionSetGetValue('config-options-common', 'usedebuglibs')} == 'on'"/>
+
+      <property name="libsuffix" value=""/>
+      <property name="libsuffix" value="d" if="${debugcode.enabled}==true"/>
+
+      <dependent name="kettlesdk"/>
+
+      <fileset name="${AddNetworkLibsToModule.module}.libs" append="true">
+        <includes name="${package.kettlesdk.libdir}/libSceNet_stub_weak.a"/>
+        <includes name="${package.kettlesdk.libdir}/libSceNetCtl_stub_weak.a"/>
+      </fileset>
+
+    </code>
+  </createtask>
+
+  <!-- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <!-- +-+-               Asset Deployment                                                        -+-+- -->
+  <!-- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+
+  <target name="copy-asset-files.kettle" style="use" description="Deploy files to the package" hidden="true">
+    <property name="package.asset-configbuilddir" value="@{GetModuleOutputDir('bin', '${package.name}')}/assets" />
+    <property name="${groupname}.CopyAssetsWithoutSync" value="${${groupname}.CopyAssetsWithoutSync??true}"/>
+    <call target="copy-asset-files"/>
+  </target>
+
+  <!-- 
+    On PS4, SN-VSI added $(ORBISIntelliSense) to "AdditionalOptions" on default projects which basically added force include of 
+    a special header file to undefine Windows Preprocessor defines and add in Orbis / clang's preprocessor define to let 
+    Visual Studio's IntelliSense to work. The following property instruct Framework to append $(ORBISIntelliSense) at the end of 
+    it's list during vcproj generation.  For this fix to work, it requires Framework version after 7.06.00 release that 
+    support this property (check Framework's release notes).
+  -->
+  <property name="backend.VisualStudio.cc.additional-options" value="$(ORBISIntelliSense)"/>
+
+  <!-- need ProDG_VSI package to be loaded here to be able to do proper msbuild file generation and builds -->
+  <dependent name="ProDG_VSI"/>
+
+</project>

@@ -1,0 +1,446 @@
+/*! ************************************************************************************************/
+/*!
+    \file psnsessionmanager.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/externalsessiontypes.h"]//for PsnServiceLabel etc
+#include "framework/gen/externalsessiontypes.tdf"
+
+[ headername="psnsessionmanager/tdf/psncommondefines.h" ]//for PsnWebApiHeader, PsnOnlineId etc
+#include "psnsessionmanager/gen/psncommondefines.tdf"
+
+namespace Blaze
+{
+
+namespace PSNServices
+{
+
+namespace PlayerSessions
+{
+
+[description="invitableUserType max string len (6 chars max for NO_ONE, LEADER or MEMBER)"]
+const uint16_t MAX_PLAYERSESSION_INVITABLETYPE_LEN = 6;
+
+[description="Enum for parsing valid PSN PlayerSession joinableUserTypes. (Defines who can join a PlayerSession without invitation)."]
+enum PsnJoinableUserTypeEnum
+{
+    INVALID_JOINABLE_USER_TYPE,//Blaze sentinel
+    ANYONE,
+    FRIENDS,
+    FRIENDS_OF_FRIENDS,
+    NO_ONE,
+    SPECIFIED_USERS
+};
+[description="joinableUserType max string len (18 chars max for FRIENDS_OF_FRIENDS)"]
+const uint16_t MAX_PLAYERSESSION_JOINABLETYPE_LEN = 18;
+
+[description="Enum for parsing valid PSN PlayerSession leaderPrivileges. (Defines leader privileges for a PlayerSession)."]
+enum PsnLeaderPrivilegesEnum
+{
+    INVALID_LEADER_PRIVILEGES_TYPE,//Blaze sentinel
+    KICK,
+    UPDATE_JOINABLE_USER_TYPE
+};
+[description="leaderPrivileges max string len (25 chars max for UPDATE_JOINABLE_USER_TYPE)"]
+const uint16_t MAX_PLAYERSESSION_LEADERPRIV_LEN = 25;
+
+[description="list of PSN PlayerSession leader privileges"]
+typedef list<string(MAX_PLAYERSESSION_LEADERPRIV_LEN)> PlayerSessionLeaderPrivilegeList;
+
+[description="list of supported PSN platforms"]
+typedef list<string(MAX_PSN_PLATFORMNAME_LEN)> PsnPlatformNameList;
+
+[description="Contains client push context id", trackChanges = true]
+class PushContext
+{
+    [tag="push", description="push context id"]
+    PsnPushContextId mPushContextId;
+};
+
+[description="Player session member in PSN reqs and rsps", trackChanges = true]
+class PlayerSessionMember
+{
+    [tag="acid", description="The PSN SCE Account Id."]
+    PsnAccountId mAccountId;
+
+    [tag="psid", description="The PSN SCE Online Id."]
+    PsnOnlineId mOnlineId; //this class's trackChanges is true, so this field can be omitted entirely in some requests
+
+    [tag="plat", description="The platform"]
+    string(MAX_PSN_PLATFORMNAME_LEN) mPlatform;
+
+    [tag="jtim", description="Date and time when the member joined the session (Unix Timestamp ms)."]
+    string(MAX_PSN_TIMESTAMP_LEN) mJoinTimestamp;
+
+    [tag="push", description="push contexts"]
+    list<PushContext> mPushContexts; //this class's trackChanges is true, so this field can be omitted entirely in some requests
+    
+    [tag="cst1", description="session custom data"]
+    string(MAX_PSN_EXTERNALSESSION_CUSTOMDATA_LEN) mCustomData1;
+};
+
+[trackChanges = true]
+class PlayerSessionRosters
+{
+    [tag="flst"] list<PlayerSessionMember> mPlayers;
+    [tag="slst"] list<PlayerSessionMember> mSpectators; //note: this class's trackChanges is true, so this field can be omitted entirely in some requests (createPlayerSession etc)
+};
+
+[description="joinableSpecifiedUsers list item.", trackChanges = true]
+class JoinableSpecifiedUsersListItem
+{
+    [tag="acid", description="The PSN SCE Account Id."]
+    PsnAccountId mAccountId;
+};
+typedef list<JoinableSpecifiedUsersListItem> JoinableSpecifiedUsersList;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Create PSN PlayerSession Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Create PSN PlayerSession request's session params.", trackChanges = true]
+class CreatePlayerSessionRequestItem
+{
+    [tag="rost", description="rosters"]
+    PlayerSessionRosters mMember;
+
+    [tag="ldrp", description="leader privileges."]
+    PlayerSessionLeaderPrivilegeList mLeaderPrivileges;
+
+    [tag="lock", description="when true, join buttons are disabled in the shell UX."]
+    bool mJoinDisabled;
+
+    [tag="maxp", description="max players."]
+    int32_t mMaxPlayers;
+
+    [tag="maxs", description="max spectators"]
+    int32_t mMaxSpectators;
+
+    [tag="name", description="session name localized"]
+    MultilingualText mLocalizedSessionName;
+
+    [tag="invt", description="Specifies what members who can send invitations to the Player Session."]
+    string(MAX_PLAYERSESSION_INVITABLETYPE_LEN) mInvitableUserType;
+
+    [tag="joit", description="Specifies what non-invited users can join. NO_ONE: Nobody can join without an invitation, FRIENDS: Friends of the leader can join without invitations, FRIENDS_OF_FRIENDS: Friends of friends of the leader can join without invitations, ANYONE: Anybody can join."]
+    string(MAX_PLAYERSESSION_JOINABLETYPE_LEN) mJoinableUserType;
+
+    [tag="plat", description="session available platforms."]
+    PsnPlatformNameList mSupportedPlatforms;
+
+    [tag="cus1", description="session custom data 1. By Blaze spec, this data is specified by Blaze. Blaze stores the GameId here."]
+    string(MAX_PSN_EXTERNALSESSION_CUSTOMDATA_LEN) mCustomData1;
+
+    [tag="cus2", description="session custom data 1. By Blaze spec, this data may be specified by titles."]
+    string(MAX_PSN_EXTERNALSESSION_CUSTOMDATA_LEN) mCustomData2;
+
+    [tag="swap", description="Whether members can switch from players to spectators and vice versa themselves, via the system UX, without leaving."]
+    bool mSwapSupported;
+
+    [tag="svcl", description="The PSN service label"]
+    PsnServiceLabel mNpServiceLabel;
+};
+
+[description="Create PlayerSession request body.", trackChanges = true]
+class CreatePlayerSessionRequestBody
+{
+    [tag="plys"] list<CreatePlayerSessionRequestItem> mPlayerSessions;
+};
+
+[trackChanges = true]
+class CreatePlayerSessionRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="body", description="The payload data"]
+    CreatePlayerSessionRequestBody mBody;
+};
+
+[description="Create PlayerSession response's session info.", trackChanges = true]
+class CreatePlayerSessionResponseItem
+{
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+
+    [tag="flst", description="rosters"]
+    PlayerSessionRosters mMember;
+};
+
+[description="Create PlayerSession response.", trackChanges = true]
+class CreatePlayerSessionResponse
+{
+    [tag="plys"] list<CreatePlayerSessionResponseItem> mPlayerSessions;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Join PSN PlayerSession Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Join PSN PlayerSession request body.", trackChanges = true] //note: trackChanges must be true as some descendants' class members should be omitted from some sent requests
+class JoinPlayerSessionRequestBody
+{
+    [tag="plys"] list<PlayerSessionMember> mPlayers;
+    [tag="spcs"] list<PlayerSessionMember> mSpectators;
+};
+
+[trackChanges = true]
+class JoinPlayerSessionRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+    
+    [tag="body"]
+    JoinPlayerSessionRequestBody mBody;
+};
+
+[trackChanges = true]
+class JoinPlayerSessionResponse
+{
+    [tag="plys"] list<PlayerSessionMember> mPlayers;
+    [tag="spcs"] list<PlayerSessionMember> mSpectators;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Leave PSN PlayerSession Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Leave PSN PlayerSession request.", trackChanges = true]
+class LeavePlayerSessionRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+
+    [tag="acid", description="The PSN SCE Account Id. If leaving self, this can be 'me'."]
+    PsnAccountId mAccountId;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get PSN PlayerSessionIds Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Get PSN PlayerSessionIds request.", trackChanges = true]
+class GetPlayerSessionIdsRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="acid", description="The PSN SCE Account Id."]
+    PsnAccountId mAccountId;
+
+    [tag="plts", description="Specify the platforms for the list of Player Sessions joined, separated by commas. Possible values in the list are PS4, PS5. If unspecified, it will be treated as though PS5 had been specified."]
+    string(-1) mPlatformFilter;
+};
+
+[description="Get PlayerSessionIds response item.", trackChanges = true]
+class GetPlayerSessionIdResponseItem
+{
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+
+    [tag="plat", description="The platform"]
+    string(MAX_PSN_PLATFORMNAME_LEN) mPlatform;
+};
+
+[trackChanges = true]
+class GetPlayerSessionIdsResponse
+{
+    [tag="ssls"] list<GetPlayerSessionIdResponseItem> mPlayerSessions;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Get PSN PlayerSession Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Get PSN PlayerSession request.", trackChanges = true]
+class GetPlayerSessionRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+
+    [tag="lang", description="The language code to retrieve multilingual results for."]
+    string(MAX_PSN_LANGUAGE_CODE_LEN) mLanguage;
+};
+
+
+[description="Get PSN PlayerSession response item.", trackChanges = true]
+class GetPlayerSessionResponseItem
+{
+    [tag="flst", description="rosters"]
+    PlayerSessionRosters mMember;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+
+    [tag="ctim", description="Date and time of creation of the Player Session ms (Unix Timestamp)."]
+    string(MAX_PSN_TIMESTAMP_LEN) mCreatedTimestamp;
+
+    [tag="ldr", description="session leader"]
+    PlayerSessionMember mLeader;
+
+    [tag="ldrp", description="leader privileges."]
+    PlayerSessionLeaderPrivilegeList mLeaderPrivileges;
+
+    [tag="lock", description="when true, join buttons are disabled in the shell UX."]
+    bool mJoinDisabled;
+
+    [tag="maxp", description="max players."]
+    int32_t mMaxPlayers;
+
+    [tag="maxs", description="max spectators"]
+    int32_t mMaxSpectators;
+
+    [tag="nam", description="session name"]
+    string(MAX_PSN_LOCALIZABLE_TEXT_LEN) mSessionName;
+
+    [tag="name", description="session name localized"]
+    MultilingualText mLocalizedSessionName;
+
+    [tag="invt", description="Specifies what members who can send invitations to the Player Session."]
+    string(MAX_PLAYERSESSION_INVITABLETYPE_LEN) mInvitableUserType;
+
+    [tag="joit", description="Specifies what non-invited users can join. NO_ONE: Nobody can join without an invitation, FRIENDS: Friends of the leader can join without invitations, FRIENDS_OF_FRIENDS: Friends of friends of the leader can join without invitations, ANYONE: Anybody can join."]
+    string(MAX_PLAYERSESSION_JOINABLETYPE_LEN) mJoinableUserType;
+
+    [tag="aplt", description="session available platforms."]
+    PsnPlatformNameList mSupportedPlatforms;
+
+    [tag="cst1", description="session custom data"]
+    string(MAX_PSN_EXTERNALSESSION_CUSTOMDATA_LEN) mCustomData1;
+
+    [tag="cst2", description="session custom data"]
+    string(MAX_PSN_EXTERNALSESSION_CUSTOMDATA_LEN) mCustomData2;
+
+    [tag="swap", description="Whether members can switch from players to spectators and vice versa themselves, via the system UX, without leaving."]
+    bool mSwapSupported;//for debugging
+
+    [tag="jsus", description="List of users who can join without an invitation when joinableUserType is SPECIFIED_USERS."]
+    JoinableSpecifiedUsersList mJoinableSpecifiedUsers;//for debugging
+};
+
+[description="Get PSN PlayerSession response.", trackChanges = true]
+class GetPlayerSessionResponse
+{
+    [tag="plys"] list<GetPlayerSessionResponseItem> mPlayerSessions;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Update PSN PlayersSession Properties Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Update PSN PlayerSession properties request body.", trackChanges = true]
+class UpdatePlayerSessionPropertiesRequestBody
+{
+    [tag="ldrp", description="leader privileges."]
+    PlayerSessionLeaderPrivilegeList mLeaderPrivileges;
+
+    [tag="lock", description="when true, join buttons are disabled in the shell UX."]
+    bool mJoinDisabled;
+
+    [tag="maxp", description="max players."]
+    int32_t mMaxPlayers;
+
+    [tag="maxs", description="max spectators"]
+    int32_t mMaxSpectators;
+
+    [tag="name", description="session name localized"]
+    MultilingualText mLocalizedSessionName;
+
+    [tag="invt", description="Specifies what members who can send invitations to the Player Session."]
+    string(MAX_PLAYERSESSION_INVITABLETYPE_LEN) mInvitableUserType;
+
+    [tag="joit", description="Specifies what non-invited users can join. NO_ONE: Nobody can join without an invitation, FRIENDS: Friends of the leader can join without invitations, FRIENDS_OF_FRIENDS: Friends of friends of the leader can join without invitations, ANYONE: Anybody can join."]
+    string(MAX_PLAYERSESSION_JOINABLETYPE_LEN) mJoinableUserType;
+
+    [tag="cst1", description="session custom data"]
+    string(MAX_PSN_EXTERNALSESSION_CUSTOMDATA_LEN) mCustomData1;
+
+    [tag="cst2", description="session custom data"]
+    string(MAX_PSN_EXTERNALSESSION_CUSTOMDATA_LEN) mCustomData2;
+
+    [tag="swap", description="Whether members can switch from players to spectators and vice versa themselves, via the system UX, without leaving.", default=false] //swapSupported kept by default false. slot changes via UX currently unsupported by Blaze
+    bool mSwapSupported;
+};
+
+[trackChanges = true]
+class UpdatePlayerSessionPropertiesRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+
+    [tag="body", description="Request body"]
+    UpdatePlayerSessionPropertiesRequestBody mBody;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Add PSN PlayersSession joinableSpecifiedUsers Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Add user to PSN PlayerSession joinableSpecifiedUsers request body.", trackChanges = true]
+class AddPlayerSessionJoinableSpecifiedUsersRequestBody
+{
+    [tag="jsus", description="List of users to register who can join without an invitation when joinableUserType is SPECIFIED_USERS."]
+    JoinableSpecifiedUsersList mJoinableSpecifiedUsers;
+};
+
+[trackChanges = true]
+class AddPlayerSessionJoinableSpecifiedUsersRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+
+    [tag="body", description="Request body"]
+    AddPlayerSessionJoinableSpecifiedUsersRequestBody mBody;
+};
+
+[description="Add user to PSN PlayerSession joinableSpecifiedUsers response.", trackChanges = true]
+class AddPlayerSessionJoinableSpecifiedUsersResponse
+{
+    [tag="jsus", description="List of users registered who can join without an invitation when joinableUserType is SPECIFIED_USERS."]
+    JoinableSpecifiedUsersList mJoinableSpecifiedUsers;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//      Delete PSN PlayersSession joinableSpecifiedUsers Request & Response Objects
+/////////////////////////////////////////////////////////////////////////////////////////
+
+[description="Delete PSN PlayerSession joinableSpecifiedUsers request.", trackChanges = true]
+class DeletePlayerSessionJoinableSpecifiedUsersRequest
+{
+    [tag="head", description="Request header"]
+    PsnWebApiHeader mHeader;
+
+    [tag="ssid", description="The PlayerSessionId."]
+    PsnPlayerSessionId mSessionId;
+    
+    [tag="acid", description="The PSN SCE Account Id."]
+    PsnAccountId mAccountIds;
+};
+
+
+}//ns PlayerSessions
+}//ns PSNServices
+}//ns Blaze

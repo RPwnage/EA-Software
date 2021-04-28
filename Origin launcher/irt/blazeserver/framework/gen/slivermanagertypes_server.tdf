@@ -1,0 +1,366 @@
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="framework/tdf/frameworkconfigtypes_server.h"]
+#include "framework/gen/frameworkconfigtypes_server.tdf"
+
+[headername="framework/tdf/network.h"]
+#include "framework/gen/network.tdf"
+
+[headername="framework/tdf/networkaddress.h"]
+#include "framework/gen/networkaddress.tdf"
+
+namespace Blaze
+{
+
+typedef ComponentId SliverNamespace;
+typedef string(128) SliverNamespaceStr;
+
+typedef uint16_t SliverId;
+typedef list<SliverId> SliverIdList;
+
+typedef int64_t SliverRevisionId;
+const SliverRevisionId INVALID_SLIVER_REVISION_ID = 0;
+
+typedef uint16_t SliverListenerRank;
+const uint16_t INVALID_SLIVER_INSTANCE_ID = 0;
+
+class SliverNamespaceConfig
+{
+    [tag="scnt", default=1000]
+    uint16_t mSliverCount;
+
+    [tag="part", default=0, description="If 0, the server will automatically and dynamically update the partition count as the number of sliver listeners change. (i.e., 0 enables auto-partitioning)", reconfigurable="yes"]
+    uint16_t mPartitionCount;
+
+    [tag="lmsm", default=5, description="When automatic partitioning is enabled (see the partitionCount setting), this setting determines the shape of the listener matrix.", reconfigurable="yes"]
+    int8_t mListenerMatrixShapeModifier;
+
+    [tag="ptmr", default="10s", description="The amount of time after a change to the number of sliver listeners that must elapse before the system will perform an automatic re-partition. (only applicable when auto re-partitioning is enabled)", reconfigurable="yes"]
+    TimeValue mPartitionCountUpdateDelay;
+
+    [tag="ptrs", default=false, description="When true, extend the partition count update delay after a change to the number of sliver listeners (rather than waiting only the configured amount of time after the first change) before the system will perform an automatic re-partition. (only applicable when auto re-partitioning is enabled)", reconfigurable="yes"]
+    bool mPartitionCountUpdateDelayExtendOnChange;
+
+    [tag="coal", default="0s", description="This setting is used by a StorageTable as a hint about how long of a delay is acceptable before it should commit and replicate any changes to an a slivered object.", reconfigurable="yes"]
+    TimeValue mUpdateCoalescePeriod;
+
+    [tag="shut", default=true, description="When true, sliver migration (export) will be initiated automatically when the server begins shutting down.", reconfigurable="yes"]
+    bool mAutoMigrationOnShutdown;
+
+    [tag="strt", default=true, description="When true, sliver migration (import) will be initiated automatically when the server is started.", reconfigurable="yes"]
+    bool mAutoMigrationOnStartup;
+
+    [tag="aosm", default=true, description="When true, sliver migration (import/export) will occur automatically, regardless of sliver ownership, at the Sliver Coordinator's discretion in order to balance load.", reconfigurable="yes"]
+    bool mOwnedSliverMigration;
+
+    [tag="nsvc", default=true, description="When true, prevent transitioning to the IN-SERVICE state, which enables the redirector to return this instance to clients, until at least one sliver is owned.", reconfigurable="yes"]
+    bool mRequireSliversForInServiceState;
+
+    [tag="mexp", default=5, description="Set the maximum number of slivers that can be exported at the same time.", reconfigurable="yes"]
+    uint16_t mMaxConcurrentSliverExports;
+};
+typedef map<SliverNamespaceStr, SliverNamespaceConfig> SliverNamespaceConfigMap;
+
+[description="Configuration for Slivers."]
+class SliversConfig
+{
+    typedef list<string(128)> InstanceTypeNameList;
+
+    [tag="pcit"]
+    InstanceTypeNameList mPreferredCoordinatorTypes;
+
+    [tag="cact", default="10s"]
+    TimeValue mCoordinatorActivationTimeout;
+
+    [tag="cexp", default="4s"]
+    TimeValue mCoordinatorExpiryPeriod;
+
+    [tag="crfs", default="2s"]
+    TimeValue mCoordinatorRefreshInterval;
+
+    [tag="dsnc", description="DEPRECATED - Unused"]
+    SliverNamespaceConfig mDefaultSliverNamespaceConfig;
+
+    [tag="snsm"]
+    SliverNamespaceConfigMap mSliverNamespaces;
+};
+
+[tdfid="hash"]
+class SliverCoordinatorInfo
+{
+    [tag="inst"]
+    uint16_t mInstanceId;
+};
+
+[tdfid="hash"]
+class SliverPartitionInfo
+{
+    [tag="lbnd"]
+    SliverId mLowerBoundSliverId;
+
+    [tag="ubnd"]
+    SliverId mUpperBoundSliverId;
+};
+typedef list<SliverPartitionInfo> SliverPartitionInfoList;
+
+class OwnedSliverState
+{
+    [tag="revn", default=INVALID_SLIVER_REVISION_ID]
+    SliverRevisionId mRevisionId;
+
+    [tag="load"]
+    int32_t mLoadCounter;
+};
+typedef map<SliverId, OwnedSliverState> OwnedSliverStateBySliverIdMap;
+
+class SliverOwnerState
+{
+    [tag="regi"]
+    bool mIsRegistered;
+
+    [tag="osst", allowref=true]
+    OwnedSliverStateBySliverIdMap mOwnedSliverStateBySliverIdMap;
+};
+
+class SliverListenerState
+{
+    [tag="regi"]
+    bool mIsRegistered;
+
+    [tag="info", allowref=true]
+    SliverPartitionInfo mSliverPartitionInfo;
+};
+
+[tdfid="hash"]
+class SliverNamespaceState
+{
+    [tag="ownr"]
+    SliverOwnerState mSliverOwnerState;
+
+    [tag="lstr"]
+    SliverListenerState mSliverListenerState;
+};
+typedef map<SliverNamespace, SliverNamespaceState> StateBySliverNamespaceMap;
+
+[tdfid="hash"]
+class SubmitSliverNamespaceStatesRequest
+{
+    [tag="inst"]
+    uint16_t mInstanceId;
+
+    [tag="snst"]
+    StateBySliverNamespaceMap mStateBySliverNamespaceMap;
+};
+
+[tdfid="hash"]
+class SliverState
+{
+    [tag="revn", default=INVALID_SLIVER_REVISION_ID]
+    SliverRevisionId mRevisionId;
+
+    [tag="ownr", default=INVALID_SLIVER_INSTANCE_ID]
+    uint16_t mSliverInstanceId;
+
+    [tag="resn", default=0]
+    uint32_t mReason;
+};
+
+[tdfid="hash"]
+class SliverInfo
+{
+    [tag="name"]
+    SliverNamespace mSliverNamespace;
+
+    [tag="sid"]
+    SliverId mSliverId;
+
+    [tag="stat"]
+    SliverState mState;
+};
+
+[tdfid="hash"]
+class SliverStateUpdateRequest
+{
+    [tag="info", allowref=true]
+    SliverInfo mSliverInfo;
+
+    [tag="conf"]
+    uint16_t mSendConfirmationToInstanceId;
+};
+
+[tdfid="hash"]
+class SliverStateUpdateConfirmation
+{
+    [tag="sorc"]
+    uint16_t mSourceInstanceId;
+
+    [tag="name"]
+    SliverNamespace mSliverNamespace;
+
+    [tag="sid"]
+    SliverId mSliverId;
+
+    [tag="revn"]
+    SliverRevisionId mRevisionId;
+};
+
+class EndpointDefinition
+{
+    [tag="chnl", description="The type of channel this endpoint runs on. Not reconfigurable - if this value is changed for an existing Endpoint type, config validation will fail on reconfigure."]
+    string(128) channel;
+
+    [tag="prot", description="The protocol used for the endpoint. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+    string(128) protocol;
+
+    [tag="enc", description="The name of the encoder used for the endpoint. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+    string(128) encoder;
+
+    [tag="dec", description="The name of the decoder used for the endpoint. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure."]
+    string(128) decoder;
+
+    [tag="bnd", description="What interfaces the endpoint binds to. Not reconfigurable - if this value is changed for an existing Endpoint type, the original value is preserved on reconfigure.", default=BIND_ALL]
+    BindType bind;
+
+    [tag="exip"]
+    IpAddress mExternalIpAddress;
+
+    [tag="inip"]
+    IpAddress mInternalIpAddress;
+};
+typedef list<EndpointDefinition> EndpointDefinitionList;
+
+[tdfid="hash"]
+class MigrateSliverRequest
+{
+    [tag="name"]
+    SliverNamespaceStr mSliverNamespaceStr;
+
+    [tag="id"]
+    SliverId mSliverId;
+
+    [tag="frid", default=INVALID_SLIVER_INSTANCE_ID]
+    uint16_t mFromInstanceId;
+
+    [tag="toid", default=INVALID_SLIVER_INSTANCE_ID]
+    uint16_t mToInstanceId;
+};
+
+[tdfid="hash"]
+class MigrateSliverResponse
+{
+};
+
+class EjectSliversRequest
+{
+    [tag="name"]
+    SliverNamespaceStr mSliverNamespace;
+
+    [tag="frid", default=INVALID_SLIVER_INSTANCE_ID]
+    uint16_t mFromInstanceId;
+};
+
+class RebalanceSliversRequest
+{
+    [tag="name"]
+    SliverNamespaceStr mSliverNamespace;
+};
+
+class GetSliversRequest
+{
+    [tag="name"]
+    string(128) mSliverNamespace;
+
+    [tag="frid", default=INVALID_SLIVER_INSTANCE_ID]
+    uint16_t mFromInstanceId;
+};
+
+class GetSliversResponse
+{
+    [tag="list"]
+    SliverIdList mSliverIdList;
+};
+
+[tdfid="hash"]
+class SliverEventInfo
+{
+    [tag="name"]
+    SliverNamespace mSliverNamespace;
+
+    [tag="sid"]
+    SliverId mSliverId;
+
+    [tag="inst"]
+    uint16_t mSourceInstanceId;
+};
+
+class GetSliverInfosRequest
+{
+    [tag="name"]
+    SliverNamespaceStr mSliverNamespace;
+
+    [tag="list", description="If empty, return sliver info for all slivers in the given namespace."]
+    SliverIdList mSliverIdList;
+};
+
+typedef map<SliverId, SliverInfo> SliverInfoMap;
+
+class GetSliverInfosResponse
+{
+    [tag="smap"]
+    SliverInfoMap mSliverInfoMap;
+};
+
+[tdfid="hash"]
+class SliverListenerPartitionSyncUpdate
+{
+    [tag="name"]
+    SliverNamespace mSliverNamespace;
+
+    [tag="spid"]
+    SliverPartitionInfo mSliverPartitionInfo;
+};
+
+[tdfid="hash"]
+class SliverListenerPartitionCountUpdate
+{
+    [tag="name"]
+    SliverNamespace mSliverNamespace;
+
+    [tag="part"]
+    uint16_t mPartitionCount;
+};
+
+class SliverNamespaceInfo
+{
+    [tag="cnfg"]
+    SliverNamespaceConfig mConfig;
+
+    [tag="spil"]
+    SliverPartitionInfoList mSliverPartitions;
+};
+
+// intentionally empty, retained for future expansion
+class CheckHealthRequest
+{
+};
+
+class CheckHealthResponse
+{
+    [tag="stat"]
+    string(-1) mStatus;
+};
+
+class SliverRepairParameters
+{
+    [tag="inst"]
+    uint16_t mInstanceId;
+
+    [tag="name"]
+    SliverNamespace mSliverNamespace;
+
+    [tag="list", description="If empty, return sliver info for all slivers in the given namespace."]
+    SliverIdList mSliverIdList;
+};
+
+}

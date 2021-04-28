@@ -1,0 +1,71 @@
+group errorsource : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+rootComponent(fileNode, node) ::= <<
+<standardFileHeader()>
+/*** Include Files ********************************************************************************/
+
+#include "framework/blaze.h"
+#include "blazerpcerrors.h"
+
+namespace Blaze
+{
+
+static const ::Blaze::ErrorInfo sSystemErrorInfo[] =
+{
+  {
+    ::Blaze::ERR_OK, //error id (global)
+    ::Blaze::Component::INVALID_COMPONENT_ID, 
+    0x0,    
+    "ERR_OK", //name
+    "No Error.", //description
+    200
+  },
+<node.Errors:{error|   {
+    <error.Name>, 
+    ::Blaze::Component::INVALID_COMPONENT_ID, //Component Id
+    <error.Value; format="hex">, //error id (within component)   
+    "<error.Name>", //name
+    "<error.description>", //description
+    <if(error.http_status_code)>    <error.http_status_code><else>    ::Blaze::DEFAULT_HTTP_STATUS_CODE<endif> //http status code
+  }}; separator=",\n"  >
+};
+
+struct SystemErrorBootStrap
+{
+    SystemErrorBootStrap(const ::Blaze::ErrorInfo _errors[], size_t errorCount)
+    {
+        for (size_t counter = 0; counter \< errorCount; ++counter)
+        {
+            ComponentBaseInfo::getErrorInfoMap().insert(::Blaze::ComponentBaseInfo::ErrorInfoMap::value_type(_errors[counter].id, &_errors[counter]));
+            ComponentBaseInfo::getErrorInfoByNameMap().insert(::Blaze::ComponentBaseInfo::ErrorInfoByNameMap::value_type(_errors[counter].name, &_errors[counter]));
+        }
+    }
+};
+
+static SystemErrorBootStrap systemErrorBootStrap(sSystemErrorInfo, EAArrayCount(sSystemErrorInfo));
+
+const char8_t* ErrorHelp::getErrorName(::Blaze::BlazeRpcError error)
+{
+    const ::Blaze::ErrorInfo* info = ::Blaze::ComponentBaseInfo::getErrorInfo(error);
+    return (info != nullptr) ? info->name : "UNKNOWN";
+}
+
+const char8_t* ErrorHelp::getErrorDescription(::Blaze::BlazeRpcError error)
+{
+    const ::Blaze::ErrorInfo* info = ::Blaze::ComponentBaseInfo::getErrorInfo(error);
+    return (info != nullptr) ? info->description : "UNKNOWN";
+}
+
+HttpStatusCode ErrorHelp::getHttpStatusCode(::Blaze::BlazeRpcError error)
+{
+    const ::Blaze::ErrorInfo* info = ::Blaze::ComponentBaseInfo::getErrorInfo(error);
+    return (info != nullptr) ? info->httpStatusCode : ::Blaze::DEFAULT_HTTP_STATUS_CODE;
+}
+
+} // Blaze
+
+<standardFileFooter()>
+>>
+

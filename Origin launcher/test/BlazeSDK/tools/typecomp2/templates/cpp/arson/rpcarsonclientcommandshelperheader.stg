@@ -1,0 +1,42 @@
+group rpcarsonclientcommandshelperheader : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+rootComponent(fileNode, node) ::= <<
+
+<standardFileHeader()>
+<openIncludeGuard()>
+
+#include "shared/Blaze/blazeclientstructures.h"
+
+// Workaround TDF Gen problem See Bug#1000
+#ifdef REGISTERED
+#undef REGISTERED
+#endif
+
+<fileNode.Includes:{<printInclude(it)>}; separator="\n">
+
+class CClientCommandsHelper_CG
+{
+    public:
+        CClientCommandsHelper_CG(void);
+        ~CClientCommandsHelper_CG(void);
+
+        <node.Subcomponents:declareHelpers(component=it); separator="\n\n">
+};
+
+<closeIncludeGuard()>
+<standardFileFooter()>
+
+>>
+
+declareHelpers(component) ::= <<
+<if(!component.IsMaster)>
+<component.Commands:helperDeclaration(command=it); separator="\n\n"><endif>
+>>
+
+helperDeclaration(command) ::= <<
+static long Send_<component.Name;format="pascal"><component.Type;format="pascal">_<command.Name;format="pascal">Command(int32_t consoleHandle, Arson::ClientStructures::ArsonMetaData* metadata<if(command.RequestType)>, <elseif(command.ResponseType)>, <elseif(command.errortype)>, <endif><commandSig(req={void* request}, resp={void* response}, err={void* error}, sep=", ")>);
+>>
+

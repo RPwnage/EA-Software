@@ -1,0 +1,106 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project xmlns="schemas/ea/framework3.xsd">
+
+	<!-- These properties were copied from mono package, the names were kept unchanged to maintain backward compatibility -->
+	<property name="package.mono.runtimeversion" value="4.70" unless="@{PropertyExists('package.mono.runtimeversion')}"/>
+	<property name="package.mono.tools.resgen.name" value="resgen"/>
+	<property name="package.mono.tools.compiler.name" value="csc"/>
+	<property name="package.mono.tools.compiler.fullname" value="Microsoft Visual C# Compiler"/>
+	<property name="package.mono.tools.compiler.version_check_arg" value="-version"/>
+	<property name="package.mono.tools.compiler.list" value="csc mcs"/>
+	<property name="package.mono.mono-executable.name" value="mono"/>
+
+	<property name="package.mono.mono-location" value="" local="true"/>
+	<choose>
+		<do if="@{PropertyExists('package.mono.mono-executable')}">
+			<!-- User may have specified this in their masterconfig and creating the project on PC.  So just use that path as is. -->
+			<property name="package.mono.mono-location" value="@{PathGetDirectoryName('${package.mono.mono-executable}')}"/>
+			<property name="package.mono.mono-location" value="@{PathToUnix('${property.value}')}"/>
+			<do unless="@{StrEndsWith('${package.mono.mono-location}','/')} or @{StrIsEmpty('${package.mono.mono-location}')}">
+				<property name="package.mono.mono-location" value="${property.value}/"/>
+			</do>
+		</do>
+		<do>
+			<!-- Using the same search path logics in CscTask.cs -->
+			<property name="paths_to_test" value="/usr/local/bin:/usr/bin" local="true"/>
+			<do if="${nant.platform_host}==osx">
+				<property name="paths_to_test" value="/Library/Frameworks/Mono.framework/Versions/Current/Commands:${property.value}:${sys.env.PATH}"/>
+			</do>
+			<do if="${nant.platform_host}==unix">
+				<property name="paths_to_test" value="${property.value}:/opt/novell"/>
+			</do>
+			<foreach item="String" in="${paths_to_test}" delim=":" property="syspath">
+				<do if="@{StrIsEmpty('${package.mono.mono-location}')}">
+					<foreach item="String" in="${package.mono.tools.compiler.list}" delim=" " property="cs-compiler">
+						<property name="mono-test-path" value="${syspath}/${package.mono.mono-executable.name}" local="true"/>
+						<property name="csc-test-path" value="${syspath}/${cs-compiler}" local="true"/>
+						<property name="resgen-test-path" value="${syspath}/${package.mono.tools.resgen.name}" local="true"/>
+						<do if="@{StrIsEmpty('${package.mono.mono-location}')} and @{FileExists('${mono-test-path}')} and @{FileExists('${csc-test-path}')} and @{FileExists('${resgen-test-path}')}">
+							<property name="package.mono.mono-location" value="${syspath}"/>
+							<property name="package.mono.tools.compiler.name" value="${cs-compiler}"/>
+							<choose>
+								<do if="'${cs-compiler}' == 'csc'">
+									<property name="package.mono.tools.compiler.fullname" value="Microsoft Visual C# Compiler"/>
+									<property name="package.mono.tools.compiler.version_check_arg" value="-version"/>
+								</do>
+								<do>
+									<property name="package.mono.tools.compiler.fullname" value="Mono C# Compiler"/>
+									<property name="package.mono.tools.compiler.version_check_arg" value="--version"/>
+								</do>
+							</choose>
+						</do>
+					</foreach>
+				</do>
+			</foreach>
+			<do unless="@{StrEndsWith('${package.mono.mono-location}','/')} or @{StrIsEmpty('${package.mono.mono-location}')}">
+				<property name="package.mono.mono-location" value="${property.value}/"/>
+			</do>
+			<property name="package.mono.mono-executable" value="${package.mono.mono-location}${package.mono.mono-executable.name}"/>
+		</do>
+	</choose>
+	<property name="package.mono.tools.resgen" value="${package.mono.mono-location}${package.mono.tools.resgen.name}"/>
+	<property name="package.mono.tools.compiler" value="${package.mono.mono-location}${package.mono.tools.compiler.name}"/>
+    <do.once key="ShowMonoToolsLocation">
+        <choose>
+			<do if="@{StrIsEmpty('${package.mono.mono-location}')}">
+				<echo loglevel="Minimal">Unable to locate mono location.</echo>
+			</do>
+			<do>
+				<echo loglevel="Minimal">Detected mono location: ${package.mono.mono-location}</echo>
+				<record property="mono_ver_log" silent="true">
+					<trycatch>
+						<try>
+							<exec program="${package.mono.mono-executable}" commandline="--version" message="Checking mono version ... "/>
+						</try>
+						<catch>
+						</catch>
+					</trycatch>
+				</record>
+				<RegexMatch
+					Input="${mono_ver_log}"
+					Pattern="Mono .+ version (\d+\.\d+\.\d+\.\d+)"
+					Properties="FullPatternMatchString;detected_mono_version"
+				/>
+				<record property="csc_ver_log" silent="true">
+					<trycatch>
+						<try>
+							<exec program="${package.mono.tools.compiler}" commandline="${package.mono.tools.compiler.version_check_arg}" message="Checking ${package.mono.tools.compiler.fullname} version ... "/>
+                        </try>
+						<catch>
+						</catch>
+					</trycatch>
+				</record>
+				<RegexMatch
+					Input="${csc_ver_log}"
+					Pattern="(\d+\.\d+\.\d+(\.\d+)?)"
+					Properties="FullPatternMatchString;detected_compiler_version"
+				/>
+				<echo loglevel="Minimal">Detected Mono version: ${detected_mono_version}</echo>
+				<echo loglevel="Minimal">Detected ${package.mono.tools.compiler.fullname} (${package.mono.tools.compiler.name}) version: ${detected_compiler_version}</echo>
+			</do>
+		</choose>
+	</do.once>
+
+</project>

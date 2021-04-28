@@ -1,0 +1,134 @@
+#!/bin/bash
+
+# fetch databases
+
+relative_path=$0
+let last_slash=-1
+for (( i=0;i<${#relative_path};i++ )) 
+do
+  if [ "${relative_path:i:1}" = "/" ]; then
+    let last_slash=i+1
+  fi
+done
+if [ $last_slash -gt -1 ]; then
+  relative_path=${relative_path:0:$last_slash}
+else
+  relative_path="./"
+fi
+
+source $relative_path/common
+
+function usage {
+  echo "Usage: $0 servicename environment platform instance [options]"
+  echo "options:"
+  echo "  --noheader     do not print headers "
+  echo "  --help         print help (this information) "
+  echo "argument values:"
+  echo "  environment: prod | test | dev"
+  echo "  platform: pc | xbl2 | ps3"
+}
+
+function headerborder {
+  if [ "$printheader" = "yes" ]; then
+    local i
+    let c=171
+    for (( i=0;i<c;i++ ))
+    do
+      printf "%c" $1
+    done
+    printf "\n"
+  fi
+}
+
+function infoheader {
+  if [ "$printheader" = "yes" ]; then
+    headerborder "-"
+    printf "%-30s %-50s %5s %10s %10s %-50s %10s\n" "component" "command" "sr[%]" "count" "fail cnt" "error" "rate [%]"
+    headerborder "-"
+  fi
+}
+
+param_service_name=$1
+param_env=$2
+param_plat=$3
+param_instance=$4
+args=("$@")
+
+if [ $# -lt 4 ]; then
+  usage
+  exit 1
+fi
+
+printheader="yes"
+
+if [ $# -gt 4 ]; then
+  for (( i=4;i<$#;i++ )) do
+    argval=${args[$i]} 
+    if [ "$argval" = "--noheader" ]; then
+      printheader="no" 
+      continue
+    elif [ "$argval" = "--help" ]; then
+      usage
+      exit 0
+    fi
+    
+    if [ "${argval:0:1}" = "-" ]; then
+      echo "Unkonw option: $argval" >&2
+      exit 1
+    fi
+
+  done
+fi
+
+redirector=$(getredirector $param_env)
+
+oldIFS=$IFS
+IFS=$'\n'
+
+servers=$(getservers $redirector $param_service_name $param_env $param_plat $param_instance "httpxml" 1)
+for server in ${servers[*]}
+do
+  servername=$(echo $server | awk '{ print $1 }')
+  addr=$(echo $server | awk '{ print $2 }')
+  curl ${curlOpts[*]} "http://$addr/blazecontroller/getStatus" | xsltproc $relative_path/getdbinfo.xslt - | grep -v xml >/tmp/dbinfo_"$servername"_$$.txt &
+done
+
+wait
+
+failed="no"
+
+echo "" >/tmp/dbinfoaggregate_$$.txt
+
+for server in $servers
+do
+  servername=$(echo $server | awk '{ print $1 }')
+  addr=$(echo $server | awk '{ print $2 }')
+  filename=/tmp/dbinfo_"$servername"_$$.txt
+  cat $filename >>/tmp/dbinfoaggregate_$$.txt
+  rm -r $filename
+done
+
+if [ "$printheader" == "yes" ]; then
+  hd=$(for (( i=0; i<117; i++ )); do echo -n "-"; done)
+  echo $hd
+  printf "%-20s %-10s %-10s %-50s %10s%1s %10s%1s\n" "Database" "Name" "Type" "Host" "Total SQL" " " "Total ERR" " "
+  echo $hd
+fi
+
+cat /tmp/dbinfoaggregate_$$.txt | sed -e 's/^[ \t]*//' | sed -e '/^$/d' | awk '{ str=$1" "$2" "$3" "$4; total[str]+=int($5); errors[str]+=int($6) } END { for (str in total) print str " " total[str] " " errors[str] }'| sort -uk1,4 | awk '{ printf "%-20s %-10s %-10s %-50s %10s%1s %10s%1s\n", $1, $2, $3, $4, $5, " ", $6, " " }'
+
+rm -f /tmp/dbinfoaggregate_$$.txt  
+
+if [ "$printheader" == "yes" ]; then
+  echo $hd
+fi
+
+
+
+IFS=$oldIFS
+
+if [ "$failed" = "yes" ]; then
+  echo "Error: Slow queries and/or database performance issues have been detected."
+  exit -1
+fi
+

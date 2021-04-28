@@ -1,0 +1,123 @@
+<project xmlns="schemas/ea/framework3.xsd">
+
+  <compiler
+    path="${package.nxsdk.compiler??${cc}}"
+    path-clanguage="${package.nxsdk.c-compiler??${cc-clanguage??${cc}}}"
+    version="${package.nxsdk.compiler.version??${package.nxsdk.InstalledVersion}}"
+    >
+    <common-defines>
+      ${nx.cc.defines.${config-processor}}
+    </common-defines>
+    <common-options>
+      -MMD
+    </common-options>
+    <system-includedirs>
+      ${package.nxsdk.appdir}\Common\Configs\Targets\${NintendoTargetFolder}\Include
+      ${package.nxsdk.appdir}\Include
+    </system-includedirs>
+    <template>
+      <commandline>
+        %defines%
+        %includedirs%
+        %system-includedirs%
+        %options%
+        -o "%objectfile%"
+        -c "%sourcefile%"
+      </commandline>
+      <pch.commandline>
+        %defines%
+        %includedirs%
+        %system-includedirs%
+        %options%
+        -o "%pchfile%"        <!-- pch file -->
+        -c "%sourcefile%"     <!-- source file -->
+      </pch.commandline>
+      <define>-D %define%</define>
+      <includedir>-I "%includedir%"</includedir>
+      <!-- Need to make sure %system-includedir% is in unix path format -->
+      <system-includedir>-isystem "%system-includedir%"</system-includedir>
+    </template>
+  </compiler>
+
+  <assembler 
+    path="${package.nxsdk.assembler??${as}}"
+    version="${package.nxsdk.assembler.version??${package.nxsdk.InstalledVersion}}"
+    >
+    <common-defines>
+    </common-defines>
+    <common-options>
+      --MD "%dependencyfile%"
+    </common-options>
+    <system-includedirs>
+      ${package.nxsdk.appdir}\Common\Configs\Targets\${NintendoTargetFolder}\Include
+      ${package.nxsdk.appdir}\Include
+    </system-includedirs>
+    <template>
+      <commandline>
+        %defines%
+        %options%
+        %includedirs%
+        %system-includedirs%
+        -o "%objectfile%"
+        "%sourcefile%"
+      </commandline>
+      <define>--defsym "%define%"</define>
+      <includedir>-I "%includedir%"</includedir>
+      <system-includedir>-I "%system-includedir%"</system-includedir>
+    </template>
+  </assembler>
+
+  <librarian
+    path="${package.nxsdk.archiver??${lib}}"
+    version="${package.nxsdk.archiver.version??${package.nxsdk.InstalledVersion}}"
+    >
+    <common-options>
+      -rs "%liboutputname%"
+    </common-options>
+    <template>
+      <commandline>
+        %options%
+        %objectfiles%
+      </commandline>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </librarian>
+
+  <linker
+    path="${package.nxsdk.linker??${link}}"
+    version="${package.nxsdk.linker.version??${package.nxsdk.InstalledVersion}}"
+    >
+    <common-options>
+    </common-options>
+    <system-librarydirs>
+      ${package.nxsdk.appdir}\Libraries\${NintendoTargetFolder}\${NintendoBuildType}
+      <do if="'${NintendoBuildType}'=='Debug'">
+        <!-- There are actually no 'Debug' folder.  The default Nintendo template Wizard generated project insert 'Develop' folder for debug config. -->
+        ${package.nxsdk.appdir}\Libraries\${NintendoTargetFolder}\Develop
+      </do>
+    </system-librarydirs>
+    <system-libs>
+    </system-libs>
+    <template>
+      <!--
+       Note:
+         The use of start-group/end-group may mean our linker performance is not as good as it could be.  It
+         may be possible to use package dependency information to reorder libs or group them into sets in such
+         a way that we could improve link times.
+      -->
+      <commandline>
+        %options%
+        %objectfiles%
+        %librarydirs%
+        -Wl,--start-group
+        %libraryfiles%
+        -Wl,--end-group
+        crtend.o
+      </commandline>
+      <librarydir>-L"%librarydir%"</librarydir>
+      <libraryfile>"%libraryfile%"</libraryfile>
+      <objectfile>"%objectfile%"</objectfile>
+    </template>
+  </linker>
+
+</project>

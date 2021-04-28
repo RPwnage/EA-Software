@@ -1,0 +1,54 @@
+group rootgrpcservice : servercommon;
+
+masterComponent(fileNode, component) ::= <<>>
+slaveComponent(fileNode, component) ::= <<>>
+
+rootComponent(fileNode, node) ::= <<
+<if(fileNode)><if(fileNode.IsRootComponentProto)>
+<fileNode.DefTable.Clear>
+syntax = "proto3";
+
+//rootcomponent
+package <fileNode.ProtoPackageName>;
+
+option csharp_namespace = "<fileNode.ProtoPackageName>";
+option go_package = "<fileNode.ProtoPackageName; format="goPackageImportPath">;<fileNode.ProtoPackageName; format="goPackage">";
+option java_package = "<fileNode.ProtoPackageName; format="javaPackage">";
+option objc_class_prefix = "<fileNode.ProtoPackageName; format="objcPrefix">";
+
+import "eadp/blaze/protobuf/commonincludes.proto";
+
+<if(node.Errors)>
+message ServiceError
+{
+    option (eadp.blaze.protobuf.msg_options) = { //rootcomponent Errors
+        generate_errors_block : true,
+        description: "ServiceError::Type enum can be used for easy error code comparison on the client for rpc specific errors.", 
+        message_is_response: true
+    };
+    enum Type
+    {
+        ERR_OK    = 0 [(eadp.blaze.protobuf.enum_value_options) = { description: "No error." }];
+        <node.Errors:{e|<e.Name>    = <e.FullValue; format="hex"> [(eadp.blaze.protobuf.enum_value_options) = {<if(e.description)> description: "<e.description; format="stripnl">" <endif>} ];}; separator="\n">
+    }
+}
+<endif>
+
+
+<if(node.SdkErrors)>
+message SdkError
+{
+    option (eadp.blaze.protobuf.msg_options) = { //rootcomponent SdkErrors
+        generate_sdkerrors_block : true,
+        description: "<node.Name><node.Type>SdkError::Type enum values correspond to SDK errors.",
+        message_is_response: true
+    };
+    enum Type
+    {
+        ERR_OK    = 0 [(eadp.blaze.protobuf.enum_value_options) = { description: "No error." }];
+        <node.SdkErrors:{e|<e.Name>    = <e.Value> [(eadp.blaze.protobuf.enum_value_options) = {<if(e.description)> description: "<e.description; format="stripnl">" <endif>} ];}; separator="\n">
+    }
+}
+<endif><endif><endif>
+
+>>

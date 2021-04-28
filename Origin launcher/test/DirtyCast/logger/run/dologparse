@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ ! $# == 1 ]; then
+  echo "usage: dologparse <logbasedir>"
+  exit
+fi
+
+echo "Using base dir $1"
+
+# clean existing data
+rm -f vsmerge.log.gz
+rm -fr vsmerge/
+
+# create merge directory
+mkdir vsmerge
+
+VSLOGDIRS=$(pushd "$1" > /dev/null; ls -d VS_Linux_*; popd > /dev/null)
+
+# merge vs logs
+for DIRNAME in ${VSLOGDIRS}; do
+     NUMFILES="$(ls $1/$DIRNAME | wc -l)"
+     echo "Processing $NUMFILES logs in $DIRNAME..."
+     ./logparsef -o ./vsmerge/vsmerge_$DIRNAME.log $1/$DIRNAME/*.log* > ./vsmerge/vsmerge_$DIRNAME.txt
+done
+
+# generate final merge
+echo "Processing final merge..."
+./logparsef -o ./vsmerge.log vsmerge/*.log > vsmerge.txt
+gzip ./vsmerge.log

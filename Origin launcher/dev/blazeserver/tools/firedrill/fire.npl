@@ -1,0 +1,113 @@
+//#  ** EA Fire Protocol Parser **
+//#  (c) 2013 Electronic Arts
+//#
+//#  Title: EA FIRE
+//#
+//#  Details: 
+//#
+//#  References:
+//#
+//#  Comments:
+//#
+//##
+
+[ RegisterAfter(TCPPayload.Ftp, Fire, 43729) ]
+Protocol Fire
+{
+    UINT16 size;
+    UINT16 component = FormatString("%s (%s)", ComponentType(this), this);
+    UINT16 command;
+    UINT16 errorCode;
+    UINT8  msgType:4 = FormatString("%s (%s)", FireMessageType(this), this);
+    UINT8  userIndex:4
+    UINT24 optionJumboFrame:1 = FormatString("%s (%s)", BoolBit(this), this);
+    UINT24 optionHasContext:1 = FormatString("%s (%s)", BoolBit(this), this);
+    UINT24 optionImmediate:1 = FormatString("%s (%s)", BoolBit(this), this);
+    UINT24 optionHasJumboContext:1 = FormatString("%s (%s)", BoolBit(this), this);
+    UINT24 msgNum:20;
+
+    switch optionJumboFrame
+    {
+        case 0x1:
+        UINT16 extraSize;
+    }
+
+    switch optionHasContext
+    {
+        case 0x1:
+        UINT32 context;
+    }
+
+    switch optionHasJumboContext
+    {
+        case 0x1:
+        UINT32 jumboContext;
+    }
+
+    switch
+    {
+        case component == 0x9 && command == 0x2:
+            FirePing ping;
+        case component == 0xF && command == 0x1 && msgType == 0x0:
+            FireChatSend send;
+        case component == 0xF && command == 0x1 && msgType == 0x2:
+            FireChatRecvNotif recv;
+        case component == 0xF && command == 0x5 && msgType == 0x1:
+            FireChatFetchMsg fetch;
+        default:
+            BLOB(size + (extraSize << 16)) FirePayload;
+    }
+
+}
+
+Protocol FirePing
+{
+    BLOB(Fire.size + (Fire.extraSize << 16)) Payload;
+}
+
+Protocol FireChatSend
+{
+    BLOB(Fire.size + (Fire.extraSize << 16)) Payload;
+}
+
+Protocol FireChatRecvNotif
+{
+    BLOB(Fire.size + (Fire.extraSize << 16)) Payload;
+}
+
+Protocol FireChatFetchMsg
+{
+    BLOB(Fire.size + (Fire.extraSize << 16)) Payload;
+}
+
+
+Table FireMessageType
+{
+    switch value
+    {
+        case 0x0: "Request";
+        case 0x1: "Reply";  
+        case 0x2: "Notification";
+        case 0x3: "Error Reply";
+        default: "Unknown";
+    }
+}
+
+Table BoolBit
+{
+    switch value
+    {
+        case 0x0: "False";
+        case 0x1: "True";
+    }
+}
+
+Table ComponentType
+{
+    switch value
+    {
+        case 0x9: "Util";
+        case 0xF: "Messaging";      
+        default: "Other";
+    }
+}

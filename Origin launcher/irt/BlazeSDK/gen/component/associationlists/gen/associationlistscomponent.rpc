@@ -1,0 +1,238 @@
+// We assume that all request and response types are valid and just use them
+// directly in the code generation.
+//
+// The compiler should ensure that all commands within a component have a unique ID.
+// The compiler should ensure that all components within a file have a unique ID.
+// Zero is not a valid component or command ID
+// Enforce that method names must start with lowercase letter.
+// Enforce C++ rules for method names and TDF type names.
+// Allow C++ style comments.
+
+
+[ headername="associationlists/tdf/associationlists.h" ]
+#include "associationlists/gen/associationlists.tdf"
+
+[ 
+   client_include = false,
+   headername="associationlists/tdf/associationlists_server.h" 
+]
+#include "associationlists/gen/associationlists_server.tdf"
+
+namespace Blaze
+{
+namespace Association
+{
+[
+  id = core/25,
+  description = "A component used to manage association lists.",
+  details = "Association list related component.",
+  configurationType = AssociationlistsConfig
+]
+component AssociationLists
+{   
+    permissions
+    {
+        PERMISSION_GET_USER_ASSOC_LIST = 1;
+        PERMISSION_ASSOCIATIONLIST_ANY_USER_EDIT = 2;
+    }
+    
+    errors
+    {
+        [ description = "The referenced user was not found." ]
+        ASSOCIATIONLIST_ERR_USER_NOT_FOUND                  = 1;
+        [ description = "Duplicate ListMemberIds were found from the UpdateListMembersRequest." ]
+        ASSOCIATIONLIST_ERR_DUPLICATE_USER_FOUND            = 2;
+        [ description = "User cannot include themselves in a UpdateListMembersRequest." ]
+        ASSOCIATIONLIST_ERR_CANNOT_INCLUDE_SELF             = 3;
+        [ description = "A ListMemberId in the request is invalid. The blaze id, external id, and persona are all invalid." ]
+        ASSOCIATIONLIST_ERR_INVALID_USER                    = 4;
+        [ description = "Some members in the UpdateListMembersRequest are already in the association list." ]
+        ASSOCIATIONLIST_ERR_MEMBER_ALREADY_IN_THE_LIST          = 5;
+        [ description = "Some members in the UpdateListMembersRequest were not found in the association list." ]
+        ASSOCIATIONLIST_ERR_MEMBER_NOT_FOUND_IN_THE_LIST        = 6;
+        [ description = "Specified list does not exist or no list is specified." ]
+        ASSOCIATIONLIST_ERR_LIST_NOT_FOUND                  = 10;
+        [ description = "List is already full, can't add other members, or members in the list to be added are too many for the list max size. Used when FIFO for list is false" ]
+        ASSOCIATIONLIST_ERR_LIST_IS_FULL_OR_TOO_MANY_USERS  = 11;
+        [ description = "User can not modify the Paired list(add/remove members) directly." ]
+        ASSOCIATIONLIST_ERR_PAIRED_LIST_MODIFICATION_NOT_SUPPORTED = 16;
+        [ description = "Paired list is already full." ]
+        ASSOCIATIONLIST_ERR_PAIRED_LIST_IS_FULL_OR_TOO_MANY_USERS  = 17;
+        [ description = "Requestor can not subscribe/unsubscribe another user's list." ]
+        ASSOCIATIONLIST_ERR_SUBSCRIBE_USER_LIST_NOT_SUPPORTED = 18;
+    }
+
+    slave
+    {           
+        methods
+        {
+            [
+              id = 1,
+              errors = {
+                    ASSOCIATIONLIST_ERR_USER_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_DUPLICATE_USER_FOUND,
+                    ASSOCIATIONLIST_ERR_INVALID_USER,
+                    ASSOCIATIONLIST_ERR_CANNOT_INCLUDE_SELF,
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_LIST_IS_FULL_OR_TOO_MANY_USERS,
+                    ASSOCIATIONLIST_ERR_MEMBER_ALREADY_IN_THE_LIST,
+                    ASSOCIATIONLIST_ERR_PAIRED_LIST_MODIFICATION_NOT_SUPPORTED,
+                    ASSOCIATIONLIST_ERR_PAIRED_LIST_IS_FULL_OR_TOO_MANY_USERS
+                } 
+            ]
+            UpdateListMembersResponse addUsersToList(UpdateListMembersRequest);
+            
+            [
+              id = 2,
+              errors = {
+                    ASSOCIATIONLIST_ERR_INVALID_USER,
+                    ASSOCIATIONLIST_ERR_DUPLICATE_USER_FOUND,
+                    ASSOCIATIONLIST_ERR_CANNOT_INCLUDE_SELF,
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_MEMBER_NOT_FOUND_IN_THE_LIST,
+                    ASSOCIATIONLIST_ERR_PAIRED_LIST_MODIFICATION_NOT_SUPPORTED
+                } 
+            ]
+            UpdateListMembersResponse removeUsersFromList(UpdateListMembersRequest);
+            
+            [
+              id = 3,
+              errors = {
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND,                     
+                    ASSOCIATIONLIST_ERR_PAIRED_LIST_MODIFICATION_NOT_SUPPORTED
+                } 
+            ]
+            void clearLists(UpdateListsRequest);
+            
+            [
+              id = 4,
+              errors = {
+                    ASSOCIATIONLIST_ERR_USER_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_DUPLICATE_USER_FOUND,
+                    ASSOCIATIONLIST_ERR_INVALID_USER,
+                    ASSOCIATIONLIST_ERR_CANNOT_INCLUDE_SELF,
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_LIST_IS_FULL_OR_TOO_MANY_USERS,
+                    ASSOCIATIONLIST_ERR_PAIRED_LIST_MODIFICATION_NOT_SUPPORTED,
+                    ASSOCIATIONLIST_ERR_PAIRED_LIST_IS_FULL_OR_TOO_MANY_USERS
+                } 
+            ]
+            UpdateListMembersResponse setUsersToList(UpdateListMembersRequest);
+            
+            [
+              id = 5,
+              errors = {
+                    ASSOCIATIONLIST_ERR_USER_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND
+                },
+                requiresUserSession = false
+            ]               
+            ListMembers getListForUser(GetListForUserRequest);
+            
+            [
+              id = 6,
+              errors = {
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND
+                } 
+            ]
+            Lists getLists(GetListsRequest);
+            
+            [
+              id = 7,
+              errors = {
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND
+                } 
+            ]
+            void subscribeToLists(UpdateListsRequest);
+            
+            [
+              id = 8,
+              errors = {
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND
+                } 
+            ]
+            void unsubscribeFromLists(UpdateListsRequest);
+
+            [
+              id = 9,
+              errors = { }, 
+              generate_command_class = false
+            ]
+            ConfigLists getConfigListsInfo();
+
+            [
+              id = 10,
+              errors = {
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND
+                }
+            ]
+            GetMemberHashResponse getMemberHash(GetMemberHashRequest);
+
+            [
+              id = 11,
+              errors = {
+                    ASSOCIATIONLIST_ERR_USER_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_CANNOT_INCLUDE_SELF,
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND
+                                        
+                },
+              client_export = false
+                          
+            ]
+            ListBlazeIds checkListMembership(CheckListMembershipRequest);
+              
+            [
+              id = 12,
+              errors = {
+                    ASSOCIATIONLIST_ERR_USER_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_CANNOT_INCLUDE_SELF,
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND
+                                        
+                },
+              client_export = false
+                          
+            ]
+            ListBlazeIds checkListContainsMembers(CheckListContainsMembersRequest);
+
+            [
+                id = 13,
+                errors = {
+                    ASSOCIATIONLIST_ERR_USER_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_DUPLICATE_USER_FOUND,
+                    ASSOCIATIONLIST_ERR_INVALID_USER,
+                    ASSOCIATIONLIST_ERR_CANNOT_INCLUDE_SELF,
+                    ASSOCIATIONLIST_ERR_LIST_NOT_FOUND,
+                    ASSOCIATIONLIST_ERR_PAIRED_LIST_MODIFICATION_NOT_SUPPORTED
+                } 
+            ]
+            UpdateListMembersResponse setUsersAttributesInList(UpdateListMembersRequest);
+
+        } // methods
+        
+        notifications
+        {
+            [
+              id = 100,
+              description = "Sent to client when list has been updated"
+            ]
+            NotifyUpdateListMembership(UpdateListMembersResponse);
+
+            [
+              id = 101,
+              description = "Sent to other slaves when list has been updated",
+              client_export = false
+            ]
+            NotifyUpdateListMembershipSlave(UpdateListMembersResponse);
+        }
+
+        events
+        {
+            [ id = 1000 ]
+            ListUpdatedEvent(ListUpdated);
+        }
+
+    } // slave
+}
+}
+
+}

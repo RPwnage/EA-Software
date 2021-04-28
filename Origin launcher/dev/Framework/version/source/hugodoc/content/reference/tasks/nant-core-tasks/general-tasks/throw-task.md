@@ -1,0 +1,213 @@
+---
+title: < throw > Task
+weight: 1132
+---
+## Syntax
+```xml
+<throw failonerror="" verbose="" if="" unless="" />
+```
+## Summary ##
+Rethrows a caught exception.**This task can appear only inside catch task.**
+
+### Example ###
+Examples of using try, catch, and finally.
+
+
+```xml
+
+<project default="simple">
+    <echo message="ver=${package.frameworkversion}"/>
+    <target name="simple">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <try>
+                <echo message='In try.'/>
+                <fail message='Tada!'/>
+            </try>
+            <catch>
+                <echo message='In catch.'/>
+                <echo message="Caught: ${trycatch.error}"/>
+            </catch>
+            <finally>
+                <echo message='In finally.'/>
+            </finally>
+        </trycatch>
+        <!-- And this won't echo since trycatch.error is removed when trycatch goes out of scope -->
+        <do if="@{PropertyExists('trycatch.error')}">
+            <echo message="Caugth: ${trycatch.error}"/>
+        </do>
+    </target>
+    
+    <target name="throw">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <try>
+                <echo message='In try.'/>
+                <fail message='Tada!'/>
+            </try>
+            <catch>
+                <echo message='In catch.'/>
+                <echo message="Caught: ${trycatch.error}"/>
+                <!-- trycatch will rethrow the exception at the end of execution -->
+                <throw/>
+                <!-- and ignore remaining tasks -->
+                <echo message="Caugth: ${trycatch.error}"/>
+            </catch>
+            <finally>
+                <echo message='In finally.'/>
+            </finally>
+        </trycatch>
+    </target>
+    
+    <target name="throwFalse">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <try>
+                <fail message="fail for throwFalse"/>
+            </try>
+            <catch>
+                <echo message="Caught: ${trycatch.error}"/>
+                <!-- trycatch won't rethrow the exception since throw's if attribute is false -->
+                <throw if="false"/>
+            </catch>
+        </trycatch>
+    </target>
+    
+    <target name="nested">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <try>
+                <echo message="In target ${target.name}"/>
+                <trycatch>
+                    <try>
+                        <fail message="Inner fail"/>
+                    </try>
+                    <catch>
+                        <echo message="Caugth: ${trycatch.error}"/>
+                    </catch>
+                </trycatch>
+                <fail message="Outer fail"/>
+            </try>
+            <catch>
+                <echo message="Caugth: ${trycatch.error}"/>
+            </catch>
+        </trycatch>
+    </target>
+    
+    <target name="moreThanOnes">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <try/>
+            <try/>
+            <catch/>
+            <catch/>
+            <finally/>
+            <finally/>
+            <echo message="Should not be here"/>
+        </trycatch>
+    </target>
+    
+    <target name="missing">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <try/>
+        </trycatch>
+    </target>
+    
+    <target name="aheads">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <finally/>
+            <catch/>
+            <try/>
+        </trycatch>
+    </target>
+    
+    <target name="throwInWrongPlaces">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <try>
+                <throw/>
+            </try>
+            <catch/>
+            <finally>
+                <throw/>
+            </finally>
+        </trycatch>
+    </target>
+    
+    <target name="bubbleUp">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+            <try>
+                <echo message="In target ${target.name}"/>
+                <trycatch>
+                    <try>
+                        <!-- This is a syntax error, bubbled up to the top for your correction -->
+                        <throw/>
+                    </try>
+                    <!-- This won't catch the bubbled exception -->
+                    <catch>
+                        <echo message="Caugth: ${trycatch.error}"/>
+                    </catch>
+                </trycatch>
+                <fail message="Outer fail"/>
+            </try>
+            <!-- Neither will this -->
+            <catch>
+                <echo message="Caugth: ${trycatch.error}"/>
+            </catch>
+        </trycatch>
+    </target>
+    
+    <target name="catchingExceptionTypes">
+        <echo message="In target ${target.name}"/>
+        <trycatch>
+          <try>
+            <fail type="Type1.Subtype1" message="Type1.Subtype1 exception thrown!"/>
+          </try>
+          <catch exception="Type1.*">
+            <echo message="Type1 or one of its subtypes exception catched"/>
+          </catch>
+        </trycatch>
+        <trycatch>
+          <try>
+            <fail type="UnknownTypeException" message="UnknownTypeException thrown!"/>
+          </try>
+          <catch exception="Type2">
+            <echo message="This won't catch the UnknownTypeException exception"/>
+          </catch>
+          <catch>
+            <echo message="But this will"/>
+            <echo message="Exception with message ${trycatch.error} caught."/>
+            <echo message="Exception of type ${trycatch.exceptiontype} caught."/>
+          </catch>
+        </trycatch>
+    </target>
+</project>
+
+```
+
+```xml
+
+<package>
+    <frameworkVersion>2</frameworkVersion>
+    <buildable>false</buildable>
+</package>
+
+```
+
+
+
+### Attributes
+| Attribute | Description | Type | Required |
+| --------- | ----------- | ---- | -------- |
+| failonerror | Determines if task failure stops the build, or is just reported. Default is &quot;true&quot;. | Boolean | False |
+| verbose | Task reports detailed build log messages.  Default is &quot;false&quot;. | Boolean | False |
+| if | If true then the task will be executed; otherwise skipped. Default is &quot;true&quot;. | Boolean | False |
+| unless | Opposite of if.  If false then the task will be executed; otherwise skipped. Default is &quot;false&quot;. | Boolean | False |
+
+## Full Syntax
+```xml
+<throw failonerror="" verbose="" if="" unless="" />
+```
