@@ -1,0 +1,133 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.helpers.TestScriptHelper;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.Waits;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.TakeOverPage;
+import com.ea.originx.automation.lib.pageobjects.store.BrowseGamesPage;
+import com.ea.originx.automation.lib.pageobjects.store.EULAsPage;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.PDPTermsAndConditions;
+import com.ea.originx.automation.lib.pageobjects.store.StoreGameTile;
+import com.ea.originx.automation.lib.resources.OriginClientData;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test PDP Page Legal Disclosures
+ *
+ * @author palui
+ */
+public class OAPDPLegalDisclosures extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12307)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testPDPLegalDisclosures(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        UserAccount userAccount = AccountManager.getUnentitledUserAccount();
+        String userName = userAccount.getUsername();
+        userAccount.cleanFriends(); // prevent chat window pop-ups from covering the store game tiles
+
+        boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        logFlowPoint("Launch Origin client and login as an untitled user."); //1
+        logFlowPoint("Navigate to 'Browse Games' page."); //2
+        logFlowPoint("Click on a game tile and verify the game's PDP page opens."); //3
+        logFlowPoint("Verify PDP Hero section has 'Terms and Conditions' and 'End User License Agreement' links."); //4
+        logFlowPoint("Click 'Terms And Conditions' link. Verify the 'Terms and Conditions' section is visible."); //5
+        if (isClient) {
+            logFlowPoint("Click 'End User License Agreement' link and verify the 'EULA' page opens in a browser."); //6a
+        } else {
+            logFlowPoint("Click 'End User License Agreement' link and verify the 'EULA' page opens in a new tab."); //6b
+        }
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Verified login successful as user: " + userName);
+        } else {
+            logFailExit("Failed: Cannot login as user: " + userName);
+        }
+
+        //2
+        NavigationSidebar navSideBar = new NavigationSidebar(driver);
+        BrowseGamesPage browseGamesPage = navSideBar.gotoBrowseGamesPage();
+        new TakeOverPage(driver).closeIfOpen();
+        browseGamesPage.waitForGamesToLoad();
+        if (browseGamesPage.verifyBrowseGamesPageReached()) {
+            logPass("Verified 'Browse Games' page opens successfully");
+        } else {
+            logFail("Failed: Cannot open 'Browse Games' page");
+        }
+
+        //3
+        StoreGameTile storeTile = browseGamesPage.getFirstNonFreeStandardGameTile();
+        String gameTitle = storeTile.getTitle();
+        storeTile.clickOnTile();
+        PDPHeroActionDescriptors pdpHeroDescriptors = new PDPHeroActionDescriptors(driver);
+        if (Waits.pollingWait(() -> pdpHeroDescriptors.verifyPDPHeroReached())) {
+            logPass("Verified PDP page opens successfully for: " + gameTitle);
+        } else {
+            logFailExit("Failed: Cannot open PDP page for: " + gameTitle);
+        }
+
+        //4
+        pdpHeroDescriptors.waitForPdpHeroToLoad();
+        boolean tacLinkTextOK = pdpHeroDescriptors.verifyTermsAndConditionsLinkText();
+        boolean eulaLinkTextOK = pdpHeroDescriptors.verifyEULALinkText();
+        if (tacLinkTextOK && eulaLinkTextOK) {
+            logPass("Verified PDP Hero section has 'Terms and Consitions' and 'End User License Agreement' links");
+        } else {
+            logFailExit("Failed: PDP Hero section does not have both 'Terms and Consitions' and 'End User License Agreement' links");
+        }
+
+        //5
+        pdpHeroDescriptors.clickTermsAndConditionsLink();
+        PDPTermsAndConditions pdpTac = new PDPTermsAndConditions(driver);
+        if (pdpTac.isVisible()) {
+            logPass("Verified 'Terms and Conditions' section is visible");
+        } else {
+            logFailExit("Failed: 'Terms and Conditions' section is not visible");
+        }
+
+        //6
+        pdpHeroDescriptors.scrollToPDPHero();
+        boolean eulaPageOpen;
+        if (isClient) {
+            //6a
+            TestScriptHelper.killBrowsers(client);
+            pdpHeroDescriptors.clickEULALink();
+            eulaPageOpen = Waits.pollingWaitEx(() -> TestScriptHelper.verifyBrowserOpen(client));
+            if (eulaPageOpen) {
+                logPass("Verified 'EULA' page opens in a browser");
+            } else {
+                logFailExit("Failed: 'EULA' page does not open in a browser");
+            }
+        } else {
+            //6b
+            int oldTabsCount = driver.getWindowHandles().size();
+            pdpHeroDescriptors.clickEULALink();
+            int newTabsCount = driver.getWindowHandles().size();
+            boolean newTabOpen = newTabsCount == oldTabsCount + 1;
+            Waits.waitForPageThatMatches(driver, OriginClientData.EULA_URL_REGX, 10);
+            eulaPageOpen = newTabOpen && new EULAsPage(driver).verifyEULAsPageReached();
+            if (eulaPageOpen) {
+                logPass("Verified the 'EULA' page opens in a new tab");
+            } else {
+                logFailExit("Failed: The 'EULA' page does not open in a new tab");
+            }
+        }
+        softAssertAll();
+    }
+}

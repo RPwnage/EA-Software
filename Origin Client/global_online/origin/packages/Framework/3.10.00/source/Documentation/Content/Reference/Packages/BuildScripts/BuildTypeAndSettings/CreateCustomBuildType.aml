@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="6df0f0a8-0c2f-404a-a658-7cf649ca8c48" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>Sections in this topic describe how to create and modufy custom buildtype</para>
+    </introduction>
+
+    <section address="CreateCustomBuildtype">
+      <title>Creating Custom Buildtype</title>
+      <content>
+        <para>
+          There are cases when an extra compiler flag needs to be set, and there is no helper eaconfig property to do so.
+          To create a custom build type in the package build file do it the same way eaconfig does it internally.
+        </para>
+        <para>
+          In your package build file define new option set derived from one of eaconfig standard sets, and add additional options.
+        </para>
+        <code language="xml" title=" ">
+          
+   .       &lt;optionset name="config-options-program-fi" fromoptionset="config-options-program"&gt;
+   .         &lt;option name="buildset.name"          value="Program_ForceInclude"/&gt;
+   .         &lt;option name="buildset.cc.options"&gt;
+   .           ${option.value}
+   .           /FI ${package.dir}\source\TestIncludes\Func2.cpp
+   .         &lt;/option&gt;
+   .       &lt;/optionset&gt;
+   .       &lt;task name="GenerateBuildOptionset" configsetname="config-options-program-fi"/&gt;
+
+   .       &lt;property name="runtime.buildtype" value="Program_ForceInclude"/&gt;
+          
+        </code>
+        <alert class="note">
+          <para>
+            To make sure that we do not loose options already defined in the option set use <legacyBold>${option.value}</legacyBold> which will add existing value for this option.
+          </para>
+        </alert>
+        <para>
+          There are number of options that affect generation of compiler or linker switches. These options can be changed in the custom build type. 
+          For example, to switch off link time code generation change option optimization.ltcg to off:
+        </para>
+        <code language="xml" title=" ">
+   .       &lt;optionset name="config-options-program-LTCG-off" fromoptionset="config-options-program"&gt;
+   .         &lt;option name="buildset.name" value="Program_LTCG_off"/&gt;
+   .         &lt;option name="optimization.ltcg"       value="off" /&gt;
+   .       &lt;/optionset&gt;
+   .       &lt;task name="GenerateBuildOptionset" configsetname="config-options-program-LTCG-off"/&gt;
+        </code>
+        <para>
+          It is also possible to remove or substitute existing flags using nant StrReplace() function. 
+          However, many options are generated in the GenerateBuildOptionset task, and thus can not be changed in the custom option set defintion. 
+          What to do in this case is described in the next section.
+        </para>
+        <alert class="note">
+          <para>For PS3 SPU modules use task <codeInline>GenerateBuildOptionsetSPU</codeInline>.
+        </para>
+        </alert>
+      </content>
+    </section>
+    <section address="BuildTypeTask">
+      <title>BuildType Task</title>
+      <content>
+        <para>
+          Defining custom buildtypes is cumbersome and verbose. Structured Xml layer introduces 
+          <link xlink:href="317b854a-a3c2-264d-1a8c-db676b20c40e">BuildType</link> task that makes custom buildtype definition simpler. 
+          It can be used in traditional, non structured Framework build scripts.
+        </para>
+        <para>Traditional custom buildtype definition above can be done using <codeInline>BuildType</codeInline> task:
+      </para>
+
+        <code language="xml" title=" ">
+   .       &lt;BuildType name ="Program_ForceInclude"  from="Program"&gt;
+   .         &lt;option name="buildset.cc.options"&gt;
+   .           ${option.value}
+   .           /FI ${package.dir}\source\TestIncludes\Func2.cpp
+   .         &lt;/option&gt;
+   .       &lt;/BuildType&gt;
+        </code>
+        <alert class="note">
+          <para>
+            <codeInline>BuildType</codeInline> task uses buildtype name for the base optionset, while <codeInline>GenerateBuildOptionset</codeInline> task uses
+            proto optionset name.
+          </para>
+        </alert>
+      </content>
+    </section>
+    <section address="RemovingChangingOptions">
+      <title>Removing or changing options in custom build type</title>
+      <content>
+        <para>
+          Many of the standard options are added to the optionset during execution of the task GenerateBuildOptionset.
+          To change or remove such options operation should be performed after GenerateBuildOptionset task is completed.
+          Here is an example. Removing standard '--fno-rtti" option in GCC configuration in a custom build type:
+        </para>
+        <code language="xml" title=" ">
+
+          .               &lt;!-- Create extra build types which simply removes some compiler arguments --&gt;
+          .               &lt;optionset name="config-options-library-extra" fromoptionset="config-options-library"&gt;
+          .                 &lt;option name="buildset.name"       value="LibraryExtra"/&gt;
+          .               &lt;/optionset&gt;
+          .               &lt;task name="GenerateBuildOptionset" configsetname="config-options-library-extra" /&gt;
+
+          .               &lt;optionset name="LibraryExtra"&gt;
+          .                 &lt;option name="cc.options" if="${config-compiler} == 'gcc'"&gt;
+          .                   @{StrReplace(${option.value}, '-fno-rtti', '')}
+          .                 &lt;/option&gt;
+          .               &lt;/optionset&gt;
+
+          .               &lt;property name="runtime.buildtype" value="LibraryExtra" /&gt;
+
+        </code>
+        <alert class="note">
+          <para>
+            The name of options changes in the generated Optionset. <legacyBold>buildset</legacyBold> prefix is removed from option name,
+            instead of using <legacyBold>buildset.cc.options</legacyBold> you need to use <legacyBold>cc.options</legacyBold>.
+          </para>
+        </alert>
+        <para>Framework 3 introduces new set of helper properties that can be used to remove options without introducing new custom buildtype in the build script:</para>
+        <list class="bullet">
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.remove.defines</codeInline>
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.remove.cc.options</codeInline>
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.remove.as.options</codeInline>
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token>
+              <codeInline>.remove.link.option</codeInline>
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.remove.lib.options</codeInline>
+            </para>
+          </listItem>
+        </list>
+        <para>Framework will search each define or option given in the above properties and remove it from the list of defines or options in the corresponding tool
+        (compiler, linker, or librarian).</para>
+        <alert class="note">
+          <para>Each define or option must be on a separate line</para>
+        </alert>
+      </content>
+    </section>
+    <relatedTopics>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

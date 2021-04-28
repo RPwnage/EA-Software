@@ -1,0 +1,165 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+  <dependent name="PlayStation2SN" />
+  <choose>
+    <!-- package.PlayStation2SN.useps2cc is defined in ps2-sn-cc configs -->
+    <do if="@{PropertyExists('package.PlayStation2SN.useps2cc')}">
+      <property name="nostartfiles" value=""/>
+      <!-- ps2ld expects -L first than -T -->
+      <property name="xlinker" value="%librarydirs% %options% %objectfiles% %libraryfiles%"/>
+    </do>
+    <do>
+      <property name="nostartfiles" value="-nostartfiles"/>
+      <property name="xlinker">
+        %objectfiles%
+        %options%
+        %librarydirs%
+        -Xlinker --start-group
+        %libraryfiles%
+        -Xlinker --end-group
+      </property>
+    </do>
+  </choose>
+
+  <property name="config-system"      value="ps2"/>
+  <property name="config-compiler"    value="sn"/>
+  <property name="config-platform"    value="ps2-sn"/>
+
+  <property name="lib-prefix"        value="lib"/>
+  <property name="lib-suffix"        value=".a"/>
+
+  <property name="exe-suffix"        value=".elf"/>
+  <!-- used to run test programs during build -->
+
+  <!-- Compile in parallel on multiple CPUs         -->
+  <property name="cc.parallelcompiler"    value="true"/>
+
+
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle"    value="Unix"/>
+
+  <!-- Auto-detect Visual Studio 2005 - this affects VCPROJ generation -->
+  <property name="package.VisualStudio.exportbuildsettings" value="false"/>
+  <property name="cc-before" value="${cc}"/>
+  <dependent name="VisualStudio"/>
+  <fail message="ERROR: eaconfig requires a VisualStudio package which supports the 'package.VisualStudio.exportbuildsettings' property.  Please update your masterconfig.xml."
+        unless="'${cc-before}' == '${cc}'"/>
+  
+  <do if="'${package.VisualStudio.version}' gte '8.0.0'">
+    <property name="config-vs-version" value="8.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '9.0.0'">
+    <property name="config-vs-version" value="9.0"/>
+  </do>
+    <do if="'${package.VisualStudio.version}' gte '10.0.0'">
+    <property name="config-vs-version" value="10.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '11.0.0'">
+    <property name="config-vs-version" value="11.0"/>
+  </do>
+
+  <optionset name="config-options-common">
+    <option name="buildset.cc.defines" >
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.defines')}
+    </option>
+    <option name="buildset.cc.includedirs" >
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.includedirs')}
+      ${package.PlayStation2SN.appdir}/sce/common/include
+      ${package.PlayStation2SN.appdir}/sce/ee/include <!-- sony headers -->
+      ${package.PlayStation2SN.appdir}/sce/ee/gcc/ee/include <!-- stdio.h etc -->
+      ${package.PlayStation2SN.appdir}/sce/ee/gcc/lib/gcc-lib/ee/2.95.3/include
+      ${package.PlayStation2SN.appdir}/sce/ee/gcc/include/g++-2
+    </option>
+    <option name="buildset.link.options" >
+      @{OptionSetGetValue('config-options-common', 'buildset.link.options')}
+      crt0.o
+      -T ${LCFILE}    <!-- Read linker script -->
+      ${nostartfiles}
+    </option>
+  </optionset>
+
+  <!-- <as> task properties.  See PlayStation2SN package -->
+
+  <!-- Add support for VUAssembler.  Please refer to tlconfig readme.htm for information on how
+       to use this option set -->
+  <optionset name="PS2_VUAssembler">
+    <option name="as"          value="${package.PlayStation2SN.appdir}/sce/ee/gcc/bin/ee-dvp-as.exe"/>
+    <option name="as.defines"      value=""/>
+    <option name="as.includedirs"    value=""/>
+    <option name="as.template.includedir" value="-I %includedir%"/>
+    <option name="as.options"      value='"%sourcefile%" -o "%objectfile%"'/>
+  </optionset>
+
+
+  <!-- <cc> task properties -->
+  <property name="cc.gccdefines">
+    ${property.value}
+    __R5900
+  </property>
+
+  <property name="cc.options">
+    <!-- clear the default options and start fresh with config supplied options -->
+  </property>
+
+  <property name="cc.template.commandline">
+    %defines%
+    %includedirs%
+    %options%
+    -o "%objectfile%"           <!-- object file -->
+    -c "%sourcefile%"           <!-- source file -->
+  </property>
+
+  <property name="cc.template.includedir"    value='-I "%includedir%"'/>
+  <property name="cc.template.define"        value='-D%define%'/>
+
+  <property name="lib.options">
+  </property>
+
+  <!-- <link> task properties -->
+  <property name="link.options">
+    ${property.value}
+    crt0.o
+    -T ${LCFILE}    <!-- Read linker script -->
+    ${nostartfiles}
+  </property>
+
+  <property name="link.libraries">
+  </property>
+
+  <property name='link.template.librarydir'  value='-L "%librarydir%"'/>
+  <property name='link.template.libraryfile' value='"%libraryfile%"'/>
+  <property name='link.template.objectfile'  value='"%objectfile%"'/>
+
+  <property name="link.template.commandline">
+    ${xlinker}
+
+    <!-- SN libraries. These have to be last -->
+    -lpc
+    -ldev
+    -lgraph
+    -ldma
+    -lcdvd
+    -lpad
+    -lvu0
+    -lmtap
+    -lpkt
+    -lstdc++
+    -lm
+  </property>
+
+  <property name="platform.sdklibs.regular">
+  </property>
+
+  <property name="platform.sdklibs.debug">
+  </property>
+
+  <!-- pointer size -->
+  <property name="platform-ptrsize" value="32bit"/>
+  <!-- registers size -->
+  <property name="platform-wordsize" value="64bit"/>
+
+
+</project>

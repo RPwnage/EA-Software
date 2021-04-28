@@ -1,0 +1,165 @@
+package com.ea.originx.automation.scripts.server;
+
+import com.ea.originx.automation.lib.helpers.StringHelper;
+import com.ea.originx.automation.lib.macroaction.DownloadOptions;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.CheckoutConfirmation;
+import com.ea.originx.automation.lib.pageobjects.login.CountryDoBRegisterPage;
+import com.ea.originx.automation.lib.pageobjects.login.LoginPage;
+import com.ea.originx.automation.lib.pageobjects.store.FreeGamesPage;
+import com.ea.originx.automation.lib.pageobjects.store.FreeGamePosterTile;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import java.util.List;
+
+/**
+ * Tests the free games page and checks that the games are directly entitle-able
+ * and downloads the game if stated.
+ *
+ * @author JMittertreiner
+ */
+public class OAFreeGamesInteractions extends EAXVxTestTemplate {
+
+    public void testFreeGamesInteractions(ITestContext context, boolean download) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        boolean isQt = ContextHelper.isOriginClientTesing(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        if (isQt) {
+            logFlowPoint("Launch Origin and login as a newly registered user"); // 1
+        }
+        logFlowPoint("Navigate to the 'Free Games' page"); // 2
+        logFlowPoint("Locate a 'Free' game"); // 3
+        logFlowPoint("Verify that the 'Free' text is displayed"); // 4
+        logFlowPoint("Verify the base price and savings strikethough does not appear"); //5
+        if (!isQt) {
+            logFlowPoint("Verify the user is prompted to log in"); // 6
+        }
+        logFlowPoint("Verify the user can directly entitle any 'Free' game"); // 7
+        if (!download) {
+            logFlowPoint("Verify the poster file switches from unowned to owned after acquiring the product"); // 8
+        }
+        if (download) {
+            logFlowPoint("Download the game."); // 9
+        }
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (isQt) {
+            if (MacroLogin.startLogin(driver, userAccount)) {
+                logPass("Verified login successful to user account: " + userAccount.getUsername());
+            } else {
+                logFailExit("Failed: Cannot login to user account: " + userAccount.getUsername());
+            }
+        }
+
+        // 2
+        FreeGamesPage freeGamesPage = new NavigationSidebar(driver).gotoFreeGamesPage();
+        if (freeGamesPage.verifyFreeGamesPageReached()) {
+            logPass("Verified 'Free Games' page");
+        } else {
+            logFailExit("Failed to reach 'Free Games' page");
+        }
+
+        // 3
+        List<FreeGamePosterTile> freeGames = freeGamesPage.getAllFreeGamesPosterTiles();
+        if (!freeGames.isEmpty()) {
+            logPass("Located a 'Free' game");
+        } else {
+            logFail("There were no 'Free' games");
+        }
+
+        // 4
+        FreeGamePosterTile freeGame = freeGames.get(0);
+        /*
+        We check if the game is DLC for another game. If it is, we take a detour
+        and purchase the base game first
+         */
+        if (freeGame.getDescription().contains("Requires base game")) {
+            // Go to the PDP to find out the base game
+            freeGame.clickLearnMore();
+            new PDPHeroActionDescriptors(driver).goToBaseGame();
+            new PDPHeroActionCTA(driver).clickBuyButton();
+            MacroPurchase.completePurchaseAndCloseThankYouPage(driver);
+            new NavigationSidebar(driver).gotoFreeGamesPage();
+            freeGame = freeGamesPage.getAllFreeGamesPosterTiles().get(0);
+        }
+        boolean isPriceFree = freeGame.verifyPriceIsFree();
+        if (isPriceFree) {
+            logPass("The 'Free' text is displayed");
+        } else {
+            logFail("The 'Free' text is not displayed");
+        }
+
+        // 5
+        String offerId = freeGame.getOfferId(); // for future use
+        String price = freeGame.getPrice();
+        if (!StringHelper.containsAnyIgnoreCase(price, ".|d+.")) {
+            logPass("The price doesn't contain a number");
+        } else {
+            logFail("The price contained a number ");
+        }
+
+        // 6
+        freeGame.clickPrimaryCTA();
+        if (!isQt) {
+            CountryDoBRegisterPage registerPage = new LoginPage(driver).clickRegistrationLink();
+            if (registerPage.verifyCountryInputVisible()) {
+                logPass("The user is prompted to log in");
+            } else {
+                logFail("The user is not prompted to log in");
+            }
+            MacroLogin.quickRegister(userAccount, driver);
+        }
+
+        // 7
+        CheckoutConfirmation confirmation = new CheckoutConfirmation(driver);
+        if (Waits.pollingWait(confirmation::isDialogVisible)) {
+            logPass("The user is able to directly entitle the game");
+        } else {
+            logFail("The confirmation dialog did not appear after entitling the game");
+        }
+
+        // 8
+        if (!download) {
+            // If we had to log in, the page reloads and makes our old reference
+            // to the free game stale. Re-find the game to get the new one.
+            confirmation.clickCloseCircle();
+            confirmation.waitForClose();
+            if (freeGame.isOwned()) {
+                logPass("The poster switches from unowned to owned");
+            } else {
+                logFail("The poster did not switch to owned");
+            }
+        }
+
+        // 9
+        if (download) {
+            confirmation.clickDownload();
+            DownloadOptions options = new DownloadOptions().setDesktopShortcut(false).setStartMenuShortcut(false).setUncheckExtraContent(false);
+            boolean downloadSuccessful = MacroGameLibrary.handleDialogs(driver, offerId, options);
+            if (downloadSuccessful) {
+                logPass("The user was able to download the entitled game.");
+            } else {
+                logFail("The user was not able to download the entitled game.");
+            }
+        }
+
+        client.stop();
+        softAssertAll();
+    }
+}

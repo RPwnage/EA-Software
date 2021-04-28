@@ -1,0 +1,119 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.TakeOverPage;
+import com.ea.originx.automation.lib.pageobjects.store.BrowseGamesPage;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.PDPNavBar;
+import com.ea.originx.automation.lib.pageobjects.store.PDPPage;
+import com.ea.originx.automation.lib.pageobjects.store.StoreGameTile;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Verifies various aspects of the PDP page navigation bar
+ *
+ * @author rmcneil
+ * @author palui
+ */
+public class OAPDPNavigationBar extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12286)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testPDPNavigationBar(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+        final String username = userAccount.getUsername();
+
+        final String linkLabel = "System Requirements"; // every PDP page should have this navigation bar link with matching section title
+
+        logFlowPoint("Launch Origin and login as user: " + username); //1
+        logFlowPoint("Navigate to 'Browse Games' Page"); //2
+        logFlowPoint("Click 'Learn More' on a game tile to navigate to its PDP page"); //3
+        logFlowPoint("Scroll past PDP Hero and verify PDP Navigation Bar pins to the top"); //4
+        logFlowPoint("Verify PDP Navigation Bar link labels map to corresponding section headers of the page"); //5
+        logFlowPoint(String.format("Click PDP Navigation link '%s'", linkLabel)); //6
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Verified login successful as user: " + username);
+        } else {
+            logFailExit("Failed: Cannot login as user: " + username);
+        }
+
+        //2
+        NavigationSidebar navSideBar = new NavigationSidebar(driver);
+        BrowseGamesPage browseGamesPage = navSideBar.gotoBrowseGamesPage();
+        new TakeOverPage(driver).closeIfOpen();
+        if (browseGamesPage.verifyBrowseGamesPageReached()) {
+            logPass("Verified 'Browse Games' page opens successfully");
+        } else {
+            logFail("Failed: Cannot open 'Browse Games' page");
+        }
+
+        //3
+        // THIS TEST SCRIPT NEEDS TO BE UPDATED FOR NEW TEST STEPS
+        // https://developer.origin.com/browse/EAKT-3075
+        // Pick first game tile and click the learn more button
+        //StoreHomeTile storeGameTile;
+        //browseGamesPage.getAllStoreGameTitles();
+        String gameTitle=null;
+        //storeGameTile.getTitle();
+        //storeGameTile.clickLearnMoreButton();
+
+        // Verify the PDP Page opened
+        PDPPage pdpPage = new PDPPage(driver);
+        PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+        boolean onPDPPage = Waits.pollingWait(pdpPage::verifyPDPPageReached);
+        pdpHeroDescription.waitForPdpHeroToLoad();
+        boolean gameTitleMatches = pdpHeroDescription.verifyGameTitle(gameTitle);
+        if (onPDPPage && gameTitleMatches) {
+            logPass(String.format("Verified clicking game tile '%s' successfully navigates to the PDP page", gameTitle));
+        } else {
+            logFailExit(String.format("Failed: Clicking game tile '%s' does not navigate to the PDP page", gameTitle));
+        }
+
+        //4
+        pdpPage.scrollToNavBar(); // Scroll to PDP navigation bar to pin it
+        PDPNavBar pdpNavBar = new PDPNavBar(driver);
+        boolean pdpNavBarPinned1 = pdpNavBar.isPinned() && pdpNavBar.verifyNavBarPackArtVisible(); //Pack art shows once the nav bar has pinned
+
+        pdpHeroDescription.scrollToBottom(); // Scroll to bottom of PDP page to verify navigation bar remains pinned
+        boolean pdpNavBarPinned2 = pdpNavBar.isPinned() && pdpNavBar.verifyNavBarPackArtVisible();
+        if (pdpNavBarPinned1 && pdpNavBarPinned2) {
+            logPass("Verified PDP Navigation Bar pins to the top after scrolling past PDP Hero");
+        } else {
+            logFailExit("Failed: Verified PDP Navigation Bar does not pin to the top after scrolling past PDP Hero");
+        }
+
+        //5
+        if (pdpPage.verifyPDPNavBarLabelsMatchSectionTitles()) {
+            logPass("Verified PDP Navigation Bar link labels map to corresponding section headers of the page");
+        } else {
+            logFail("Failed: PDP Navigation Bar link labels does not map to corresponding section headers of the page"); // Do not exit for now as section titles keeps changing
+        }
+
+        //6
+        pdpNavBar.clickNavLink(linkLabel); // All PDP page should have 'System requirements' section
+        if (new PDPPage(driver).verifySectionTitleVisible(linkLabel)) {
+            logPass(String.format("Verified clicking PDP Navigation link '%s' scrolls to the section", linkLabel));
+        } else {
+            logFailExit(String.format("Failed: Clicking PDP Navigation link '%s' does not scroll to the section", linkLabel));
+        }
+
+        softAssertAll();
+    }
+
+}

@@ -1,0 +1,115 @@
+OGLFN(void, glActiveTexture, (GLenum texture));
+OGLFN(void, glPixelStorei, (GLenum pname, GLint param));
+OGLFN(void, glColorMask, (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha));
+OGLFN(void, glPolygonMode, (GLenum face, GLenum mode));
+OGLFN(void, glBindBuffer, (GLenum target, GLuint buffer));
+OGLFN(void, glBindTexture, (GLenum target, GLuint texture));
+OGLFN(void, glBlendFunc, (GLenum sfactor, GLenum dfactor));
+OGLFN(void, glCullFace, (GLenum mode));
+OGLFN(void, glDeleteTextures, (GLsizei n, const GLuint *textures));
+OGLFN(void, glDepthFunc, (GLenum func));
+OGLFN(void, glDepthMask, (GLboolean flag));
+OGLFN(void, glDepthRange, (GLclampd zNear, GLclampd zFar));
+OGLFN(void, glDisable, (GLenum cap));
+
+// LEGACY - will have to go when we start getting games for core profile v3.2
+OGLFN(void, glPopAttrib, (void));
+OGLFN(void, glPopClientAttrib, (void));
+OGLFN(void, glPushAttrib, (GLbitfield mask));
+OGLFN(void, glPushClientAttrib, (GLbitfield mask));
+// LEGACY
+
+OGLFN(void, glDrawArrays, (GLenum mode, GLint first, GLsizei count));
+OGLFN(void, glEnable, (GLenum cap));
+OGLFN(void, glFinish, (void));
+OGLFN(void, glFlush, (void));
+OGLFN(void, glGenTextures, (GLsizei n, GLuint *textures));
+OGLFN(void, glGetBooleanv, (GLenum pname, GLboolean *params));
+OGLFN(GLenum, glGetError, (void));
+OGLFN(void, glGetIntegerv, (GLenum pname, GLint *params));
+OGLFN(const GLubyte *, glGetString, (GLenum name));
+OGLFN(void, glGetTexImage, (GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels));
+OGLFN(void, glGetTexLevelParameteriv, (GLenum target, GLint level, GLenum pname, GLint *params));
+OGLFN(GLboolean, glIsTexture, (GLuint texture));
+OGLFN(void, glTexImage2D, (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *pixels));
+OGLFN(void, glTexParameteri, (GLenum target, GLenum pname, GLint param));
+OGLFN(void, glTexSubImage2D, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels));
+OGLFN(void, glUseProgram, (GLuint program));
+OGLFN(void, glViewport, (GLint x, GLint y, GLsizei width, GLsizei height));
+
+OGLFN(GLuint, glCreateShader, (GLenum shaderType))
+OGLFN(void, glShaderSource, (GLuint shader, GLsizei count, const GLchar** string, const GLint* length));
+OGLFN(void, glCompileShader, (GLuint shader));
+OGLFN(void, glGetShaderInfoLog, (GLuint shader, GLsizei maxLength, GLsizei* length, GLchar* infoLog));
+OGLFN(GLuint, glCreateProgram, (void));
+OGLFN(void, glAttachShader, (GLuint program, GLuint shader));
+OGLFN(void, glLinkProgram, (GLuint program));
+OGLFN(void, glGetProgramiv, (GLuint program, GLenum pname, GLint* params));
+OGLFN(void, glGetProgramInfoLog, (GLuint program, GLsizei maxLength, GLsizei* length, GLchar* infoLog));
+OGLFN(void, glDetachShader, (GLuint program, GLuint shader));
+OGLFN(void, glDeleteProgram, (GLuint program));
+OGLFN(void, glDeleteShader, (GLuint shader));
+OGLFN(void, glValidateProgram, (GLuint program));
+OGLFN(GLint, glGetUniformLocation, (GLuint program, const GLchar* name));
+OGLFN(void, glUniform1f, (GLint location, GLfloat v0));
+OGLFN(void, glUniform4f, (GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3));
+OGLFN(void, glUniform1i, (GLint location, GLint v0));
+OGLFN(void, glUniformMatrix4fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+OGLFN(GLint, glGetAttribLocation, (GLuint program, const GLchar* name));
+OGLFN(void, glBindAttribLocation, (GLuint program, GLuint index, const GLchar* name));
+OGLFN(void, glVertexAttribPointer, (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* pointer));
+OGLFN(void, glGetVertexAttribiv, (GLuint index, GLenum pname, GLint* params));
+OGLFN(void, glGetVertexAttribPointerv, (GLuint index, GLenum panme, void** pointer));
+OGLFN(void, glEnableVertexAttribArray, (GLuint index));
+OGLFN(void, glDisableVertexAttribArray, (GLuint index));
+OGLFN(void, glGenBuffers, (GLsizei n, GLuint* buffers));
+OGLFN(void, glDeleteBuffers, (GLsizei n, const GLuint* buffers));
+OGLFN(void, glBufferData, (GLenum target, GLsizeiptr size, const GLvoid* data, GLenum usage));
+OGLFN(void, glBindFramebuffer, (GLenum target, GLuint framebuffer));
+OGLFN(void, glBlendEquation, (GLenum mode));
+OGLFN(void, glBlendFuncSeparate, (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha));
+OGLFN(void, glBlendEquationSeparate, (GLenum modeRGB, GLenum modeAlpha));
+
+// Optional extensions
+OGLFN_OPTIONAL(void, glVertexAttribDivisorARB, (GLuint index, GLuint divisor));
+
+//OGLFN(void, glTexParameteriv, (GLenum target, GLenum pname, const GLint* params));
+//OGLFN(void, glTextureRangeAPPLE, (GLenum target, GLsizei length, const GLvoid *pointer));
+//OGLFN(void, glGetTexParameterPointervAPPLE, (GLenum target, GLenum pname, GLvoid **params));
+//OGLFN(GLenum, glObjectPurgeableAPPLE, (GLenum objectType, GLuint name, GLenum option));
+//OGLFN(GLenum, glObjectUnpurgeableAPPLE, (GLenum objectType, GLuint name, GLenum option));
+//OGLFN(void, glGetObjectParameterivAPPLE, (GLenum objectType, GLuint name, GLenum pname, GLint *params));
+
+OGLFN(CGLError, CGLChoosePixelFormat, (const CGLPixelFormatAttribute* attribs, CGLPixelFormatObj* pix, GLint* npix));
+OGLFN(CGLError, CGLClearDrawable, (CGLContextObj ctx));
+OGLFN(CGLError, CGLCopyContext, (CGLContextObj src, CGLContextObj dst, GLbitfield mask));
+OGLFN(CGLError, CGLCreateContext, (CGLPixelFormatObj pix, CGLContextObj share, CGLContextObj* ctx));
+OGLFN(CGLError, CGLDescribePixelFormat, (CGLPixelFormatObj pix, GLint pix_num, CGLPixelFormatAttribute attrib, GLint* value));
+OGLFN(CGLError, CGLDescribeRenderer, (CGLRendererInfoObj rend, GLint rend_num, CGLRendererProperty prop, GLint *value));
+OGLFN(CGLError, CGLDestroyContext, (CGLContextObj ctx));
+OGLFN(CGLError, CGLDestroyPixelFormat, (CGLPixelFormatObj pix));
+OGLFN(CGLError, CGLDestroyRendererInfo, (CGLRendererInfoObj rend));
+OGLFN(CGLError, CGLDisable, (CGLContextObj ctx, CGLContextEnable pname));
+OGLFN(CGLError, CGLEnable, (CGLContextObj ctx, CGLContextEnable pname));
+OGLFN(const char*, CGLErrorString, (CGLError error));
+OGLFN(CGLError, CGLFlushDrawable, (CGLContextObj ctx));
+OGLFN(GLuint, CGLGetContextRetainCount, (CGLContextObj ctx));
+OGLFN(CGLContextObj, CGLGetCurrentContext, (void));
+OGLFN(CGLError, CGLGetGlobalOption, (CGLGlobalOption pname, GLint* params));
+OGLFN(CGLError, CGLGetParameter, (CGLContextObj ctx, CGLContextParameter pname, GLint* params));
+OGLFN(CGLPixelFormatObj, CGLGetPixelFormat, (CGLContextObj ctx));
+OGLFN(GLuint, CGLGetPixelFormatRetainCount, (CGLPixelFormatObj pix));
+OGLFN(void, CGLGetVersion, (GLint* majorvers, GLint* minorvers));
+OGLFN(CGLError, CGLGetVirtualScreen, (CGLContextObj ctx, GLint* screen));
+OGLFN(CGLError, CGLIsEnabled, (CGLContextObj ctx, CGLContextEnable pname, GLint* enable));
+OGLFN(CGLError, CGLLockContext, (CGLContextObj ctx));
+OGLFN(CGLError, CGLQueryRendererInfo, (GLuint display_mask, CGLRendererInfoObj* rend, GLint* nrend));
+OGLFN(void, CGLReleaseContext, (CGLContextObj ctx));
+OGLFN(void, CGLReleasePixelFormat, (CGLPixelFormatObj pix));
+OGLFN(CGLContextObj, CGLRetainContext, (CGLContextObj ctx));
+OGLFN(CGLPixelFormatObj, CGLRetainPixelFormat, (CGLPixelFormatObj pix));
+OGLFN(CGLError, CGLSetCurrentContext, (CGLContextObj ctx));
+OGLFN(CGLError, CGLSetGlobalOption, (CGLGlobalOption pname, const GLint* params));
+OGLFN(CGLError, CGLSetParameter, (CGLContextObj ctx, CGLContextParameter pname, const GLint* params));
+OGLFN(CGLError, CGLSetVirtualScreen, (CGLContextObj ctx, GLint screen));
+OGLFN(CGLError, CGLUnlockContext, (CGLContextObj ctx));

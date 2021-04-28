@@ -1,0 +1,204 @@
+This document is intended to aid the process of transitioning user code built against the DirtySock V7 series
+of SDKs to the DirtySock V8 series of SDKs.  If there are items that should be in this document but are not,
+please write the "GOS dirtysock support" mailing list so those items can be added to future revisions of this
+document.
+
+Supported Platforms
+
+    PSP and DS are no longer supported platforms.
+
+API renaming or behavioral changes
+
+    DirtySDK (All)
+        ConnApi
+            ConnApiControl(‘hsti’, ..) has been removed.
+            Apis that need the topologyHostIndex now accept the value in their function signature instead of using
+            this control call.
+
+            ConnApiControl(‘sesi’, ..) has been removed.
+            Apis that need the platformHostIndex now accept the value in their function signature instead of using
+            this control call.
+
+            ConnApiHost(..) and ConnApiConnect(..) merged into one method called ConnApiConnect(..):
+            void ConnApiConnect(ConnApiRefT *pConnApi, ConnApiUserInfoT *pClientList, int32_t iNumClients,
+            int32_t iTopologyHostIndex, int32_t iPlatformHostIndex, int32_t iSessId, uint32_t uGameFlags);
+            The new api takes a topologyHostId and platformHostId, these are the same id’s that would have been
+            used for ‘hsti’ and ‘sesi’ respectively.  This method should be called when either ConnApiHost or
+            ConnApiConnect were called in V7.
+
+            ConnApiMigrate(..) is replaced with ConnApiMigrateTopologyHost(..):
+            void ConnApiMigrateTopologyHost(ConnApiRefT *pConnApi, int32_t newTopologyHostIndex);
+            This new function takes a topologyHostId this is the same value that would have been used with ‘hsti’.
+
+            ConnApiControl(‘migr’, ..) is replaced with ConnApiMigratePlatformHost(..):
+            void ConnApiMigratePlatformHost(ConnApiRefT *pConnApi, int32_t newPlatformHostIndex, void *pPlatformData);
+            The same information that would have been passed to ConnApiConrol(‘migr’, ..) are instead passed to 
+            this new function.
+
+            Replaced ConnApiRemoveClient() with ConnApiRemoveClient2(). Previous uses of the replaced functions stay the same with
+            the new function, except that internally ConnApi is no more contracting the client list when a client is removed.
+
+            Change to ConnApi client's link/util reference destruction notification. In DirtySDK v7, ConnApi notifies the client
+            software of Link and Util refs destruction by invoking the callback (ConnApiCallbackT) registered by the client software
+            at initialization time. The callback is invoked with the second parameter (ConnApiCbInfoT structure pointer) filled with
+            the following information:  eType = CONNAPI_CBTYPE_GAMEEVENT; eOldStatus = CONNAPI_STATUS_DISC; eNewStatus = CONNAPI_STATUS_DEST.
+            In DirtySock v8, CONNAPI_STATUS_DEST is deprecated. CONNAPI_CBTYPE_DESTEVENT is a new event type. ConnApi now notifies the 
+            client software of Link and Util refs destruction by invoking the callback with the second parameter filled with the following
+            information: eType = CONNAPI_CBTYPE_DESTEVENT; eOldStatus = CONNAPI_STATUS_ACTV; eNewStatus = CONNAPI_STATUS_DISC.
+
+            The uConnFlags field of ConnApiClientT.GameInfo and ConnApiClientT.VoipInfo can now be inspected for
+            CONNAPI_CONNFLAG_DEMANGLED to see if the underlying connection is demangled or not. Note: CONNAPI_CONNFLAG_DEMANGLED
+            is deprecated for xenon as all connections are considered "demangled"
+
+        DirtyNet
+            Deprecated old version of SocketInAddrGetText(), replaced with a new thread-safe version. Your code should be updated for the
+            new function prototype which now takes a buffer pointer and a buffer size as inputs. This application-provided buffer is 
+            filled it by the new function with the IP address text string.. In cases where SocketInAddrGetText() was being called
+            in NetPrintf(), switched to use new custom address token %a.
+
+        HLBApi
+            Deprecated HLBApiCreate3(). Use HLBApiCreate2() instead.
+
+        LockerApi
+            LockerApiGetLastEvent() is deprecated. Your implemenation can no longer rely on LockerApiGetLastEvent() to get the most
+            recent LockerAPI event. It now needs to register a callback of type LockerApiCallbackT with LockerApiCreate() if it wants
+            to be notified of any LockerAPI events
+
+        NetConn
+            'ethr' and 'macx' selectors used with NetConnStatus() return 0 to signal a success and a negative value to signal
+            a failure. This change was done to enforce return code consistency across all NetConnStatus() selectors. In your
+            code, for all usages of NetConnStatus() with the 'ethr' and 'macx' selectors, make sure that you consider 0 and
+            any positive value as being a success code and any negative value as being an error code.
+
+        NetGameDist
+            NetGameDistStatus used to be just a normal function, not a status function. We changed it to fit the <name>Status format.
+            The core change here is that NetGameDistStatus now takes in the ref, the iselect param, ivalue, a void pointer, and ibufsize.
+            Instead of returning the NetGameLinkStatT pointer we store the data in the void pointer that gets passed in.
+
+            NetGameDistStatusMulti was removed and the same functionality is done using the ‘mult’ status selector when calling NetGameDistStatus.
+
+            NetGameDistControl was already a control format but we added the void pointer to the input parameters. Just pass NULL for existing selectors.
+
+        NetGameLink
+            Renamed NetGameLinkStatT.packsent to NetGameLinkStatT.lpacksent, renamed NetGameLinkStatT.packrcvd to NetGameLinkStatT.lpackrcvd,
+            and deprecated NetGameLinkStatT.packlost. Packets lost in transit from the remote peer to the local user can be calculated as
+            NetGameLinkStatT.lpacksent - NetGameLinkStatT.lpackrcvd and are accurate unlike the previously available packlost counter.
+
+            NetGameLinkStatus used to be just a normal function, not a status function. We changed it to fit the <name>Status format.
+            The core change here is that NetGameLinkStatus now takes in the ref, the iselect param, ivalue, a void pointer, and ibufsize.
+            Instead of returning the NetGameLinkStatT pointer we store the data in the void pointer that gets passed in.
+
+            NetGameDistControl was already a control format but we added the void pointer to the input parameters. Just pass NULL for existing selectors.
+
+        ProtoHttp
+            Changed ProtoHttpRecvAll() to return PROTOHTTP_RECVWAIT when the result is pending (which mirrors ProtoHttpRecv()'s response code).
+            This allows ProtoHttpRecvAll() to return zero to indicate that there was no data included in the response, which was 
+            previously not possible.
+
+            Deprecated ProtoHttpStatus('locn'). Replace with ProtoHttpGetHeaderValue(pProtoHttp, pHdrBuf, "location", ...).
+
+            Replaced ProtoHttpCustomHeaderCbT with ProtoHttpCustomHeaderCb2T. This callback should return a negative result if there is an error 
+            when formatting the custom header, otherwise it should return zero.
+
+            Replaced ProtoHttpReceiveHeaderCbT with ProtoHttpReceiveHeaderCb2T. This callback should return zero (reserved for future use).
+
+            Replaced ProtoHttpCallback() and ProtoHttpCallback2() with ProtoHttpCallback3(). Pass NULL in the pReceiveHeaderCb parameter if you
+            are not interested by the new functionality.
+
+        QosApi
+            Replaced QosApiServiceRequest() with QosApiServiceRequest2(). To replicate previous behavior pass zero for uProbePort.
+
+        Voip
+            Usage of client ids with Voip is no longer optional:
+               * Configuring a local client id with VoipControl('clid') selector is mandatory.
+               * The uClientId parameter (remote peer client id) of VoipConnect() is mandatory 
+
+        VoipGroup
+            VoipGroupStatus() now takes a pointer buffer and a buffer size as inputs. They shall now be used with the 'sock' selector,
+            which will now return the queried pointer in the application-provided buffer instead of the function return value.
+
+            Deprecated VoipGroupDisconnect2(). Always use VoipGroupDisconnect().
+
+            Deprecated VoipGroupRemove() and VoipGroupRemove2(). No replacement.
+
+            Deprecated VoipGroupClear(). No replacement.
+
+            Deprecated VoipGroupSpeaker() and VoipGroupMicrophone(). Which speakers to accept/send voice from/to should now be
+            configured with appropriate calls to VoipGroupMuteByClientId() or VoipGroupMuteByConnID(). If you want to
+            configure muting for several clients, you need to call one of the two new functions for each client.
+
+            Deprecated 'umic' and 'uspk' selectors with VoipGroupStatus(). To obtain currently enforced
+            muting flags, use VoipGroupIsMutedByClientId() or VoipGroupIsMutedByConnId(). If you want to
+            obtain muting config for several clients, you need to call one of the two new functions for each client.
+
+            Introduced new "voip channel" concept. A channel is a mean to partition the players in subsets
+            that have voip between themselves. If Alice is on channel 42 and Bob on channel 57 they will not
+            hear each other. If they both are on channel 13, they will hear each other.
+                * With VoipGroupSelectChannel(), user can select up to four channels on which he can 
+                  be sending-only, receiving-only or both sending&receiving voice data. Each channel
+                  registration requires a call to VoipGroupSelectChannel(). The fifth call fails, if 
+                  none of the previously selected channels has been unselected with a call to 
+                  VoipGroupSelectChannel(..., VOIPGROUP_CHANNONE).
+                * Channel numbers range from 1 to 63, inclusively. 0 is reserved, do not use it.
+                * VoipGroupResetChannel() can be used at any time to go back in the state where 
+                  channels are disabled. With channels disabled (default), you hear and receive
+                  on every channel. This is not the same as being on no channel. In this case,
+                  you would have voip with no one.
+
+            Usage of client ids with VoipGroup is no longer optional:
+               * Configuring a local client id with VoipGroupControl('clid') selector is mandatory.
+               * The uClientId parameter (remote peer client id) of VoipGroupConnect() is mandatory 
+            If you use ConnApi, ConnApi does those two for you.
+
+    DirtySDK (PS3)
+        NetConnPs3
+            Added new PS3 function NetConnRequestTicket() which allows an external user to request an NP ticket,
+            and provides a callback to indicate when the ticket request is complete. Because the PS3 ticketing
+            system only allows one ticket request at a time, NetConnRequestTicket() will return a "busy" result
+            if there is a request currently in progress, and it is up to the caller to retry. Note that code
+            wanting to refresh the NetConn "internal" ticket blob should use the NetConnControl('tick') selector
+            instead.
+
+    DirtySDK (Xenon)
+        DirtySessionManager
+            Renamed header file: ...\core\include\dirtysessionmanager.h is renamed to ...\core\include\xenon\dirtysessionmanagerxenon.h
+
+            Deprecated header file: ...\core\include\xbox\xbfriends.h
+
+        NetConn
+            NetConnShutdown() can now return a "try again" (-1) error code. When NetConnShutdown() returns -1, the game code shall
+            poll NetConnShutdown() until it succeeds. This new error code was introduced to avoid complete shutdown of the network
+            stack while xsessions deletions are in progress (XSessionDelete is known to take up to 2 minutes upon
+            upstream network disconnection).
+
+            In DirtySock v7, NetConnConnect() returns 1 to signal a success and a negative value to signal a failure. In DirtySock v8,
+            NetConnConnect() returns 0 to signal a success and a negative value to signal a failure. This change was done for
+            consistency with other platforms. NetConnConnect() returns 0 to signal a success on all other platforms. In your code,
+            for all usages of NetConnConnect(), make sure that you consider 0 and any positive value as being a success code and any
+            negative value as being an error code.
+
+            'gtag' selector used with NetConnStatus() return 0 to signal a success and a negative value to signal 
+            a failure. This change was done to enforce return code consistency across all NetConnStatus() selectors. In your
+            code, for all usages of NetConnStatus() with the 'gtag' selector, make sure that you consider 0 and 
+            any positive value as being a success code and any negative value as being an error code.
+
+            User can no longer register an asynchronous pending callback with NetConnControl('rapc', ...). This functionality was replaced
+            with the new asynchronous behavior of ConnApiDestroy(), QosApiDestroy() and DirtySessionManagerDestroy().
+
+            Change to behavior of 'invt' selector with NetConnStatus():
+                v7 behavior:
+                    * NetConnStatus('invt') takes a controller index (0-3) in the iData parameter 
+                    * NetConnStatus('invt') returns 
+                        * positive for success (invite session info copied in pBuf) 
+                        * 0 if no invite accept notification pending 
+                        * negative if error 
+                v8 behavior:
+                    * NetConnStatus('invt') takes a controller index (0-3) in the iData parameter, or -1 if querying for a notification 
+                      on any controller
+                    * NetConnStatus('invt') returns 
+                        * controller index (0-3) on which the invite accept was notified (invite session info copied in pBuf)
+                        * negative if no invite accept notification pending, or error
+                reasons for change: 
+                    * simplifies internals of DirtySock as this function now aligns nicely with the behavior of 
+                      XNotifyGetNext(hListener, XN_LIVE_INVITE_ACCEPTED, &dwNotify, &ulControllerIndex) 
+                    * Now provides the user with a way of querying for a notification on any controller (iData=-1)

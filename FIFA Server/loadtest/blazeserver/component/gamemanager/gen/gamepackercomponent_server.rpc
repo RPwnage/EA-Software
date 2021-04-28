@@ -1,0 +1,306 @@
+/*****************************************************************************************
+    (c) Electronic Arts. All Rights Reserved.
+*****************************************************************************************/
+
+[
+  client_include = false,
+  headername="gamemanager/tdf/gamepacker_internal_config_server.h" 
+]
+#include "gamemanager/gen/gamepacker_internal_config_server.tdf"
+
+[
+  client_include = false,
+  headername="gamemanager/tdf/gamepacker_server.h" 
+]
+#include "gamemanager/gen/gamepacker_server.tdf"
+
+namespace Blaze
+{
+
+namespace GamePacker
+{
+
+[ 
+  id = core/500,
+  configurationType = GamePackerConfig
+]
+component GamePacker
+{
+    errors 
+    {
+        [ description = "Session does not exist." ]
+        GAMEPACKER_ERR_SESSION_NOT_FOUND                    = 100;
+        [ description = "Session is not assigned to the instance trying to perform the operation." ]
+        GAMEPACKER_ERR_SESSION_NOT_ASSIGNED                 = 101;
+        [ description = "Scenario id has not found." ]
+        GAMEPACKER_ERR_SCENARIO_NOT_FOUND                   = 102;
+        [ description = "Scenario has already been locked for finalization by a sibling sub-session." ]
+        GAMEPACKER_ERR_SCENARIO_ALREADY_FINALIZING          = 103;
+        [ description = "Problem parsing your matchmaking criteria. See StartMatchmakingError's err msg for details." ]
+        GAMEPACKER_ERR_INVALID_MATCHMAKING_CRITERIA         = 200;
+        [ description = "Finalization job invalidated due to participant logout." ]
+        GAMEPACKER_ERR_FINALIZATION_JOB_INVALIDATED         = 201;
+        [ description = "Finalization job failed to join found game." ]
+        GAMEPACKER_ERR_FINALIZATION_JOB_JOIN_GAME_FAILED    = 202;
+        [ description = "The requested external session template name is not supported by the server." ]
+        GAMEPACKER_ERR_SESSION_TEMPLATE_NOT_SUPPORTED       = 274;
+        [ description = "General error returned when the external session service returns an unhandled error."]
+        GAMEPACKER_ERR_EXTERNAL_SESSION_ERROR               = 275;
+        [ description = "Failed to convert attribute or caller property to from value for filter."]
+        GAMEPACKER_ERR_FILTER_FROMVALUE_CONVERSION_FAILED   = 276;
+        [ description = "Invalid value specified in the filter."]
+        GAMEPACKER_ERR_FILTER_INVALID_VALUE                 = 277;
+    }
+    
+    [setCurrentUserSession=false, requiresMaster=false]
+    slave
+    {
+        methods
+        {
+            [
+                id = 5,
+                description = "Get detailed packer metrics - these metrics will be in a histogram format.",
+                ignoreShardingKey = true,
+                client_export = false,
+                generate_command_class = false,
+                internal = true,
+                requires_authentication = false,
+                http = {
+                    resource = "getDetailedMetrics",
+                    method = "GET",
+                    encodeEnumsAsStrings = true
+                }
+            ]
+            Blaze::GameManager::GetDetailedPackerMetricsResponse getDetailedMetrics();
+        } // methods
+               
+        notifications
+        { 
+        } // notifications
+
+    } // slave
+    
+    [isSharded=true, shardingKey="packerSessionId", useSlivers=true, setCurrentUserSession=false]
+    master
+    {
+        methods
+        {
+            // PACKER_TODO: Rename to startPackingScenario, and only call once per scenario rather than once per session
+            [
+                id = 1,
+                blocking = true,
+                description = "Start a new packer session. Needs to be blocking because it calls external game session service. Wish it didn't have to...",
+                errors = {
+                    GAMEPACKER_ERR_INVALID_MATCHMAKING_CRITERIA,
+                    GAMEPACKER_ERR_FILTER_FROMVALUE_CONVERSION_FAILED,
+                    GAMEPACKER_ERR_FILTER_INVALID_VALUE
+                },
+                errortype = Blaze::GameManager::StartPackerSessionError,
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            Blaze::GameManager::StartPackerSessionResponse startPackerSession(Blaze::GameManager::StartPackerSessionRequest);
+            
+            // PACKER_TODO: Rename to cancelPackingScenario, and only call once per scenario rather than once per session
+            [
+                id = 2,
+                description = "Called by the core slave to cancel an outstanding packer session owned by this master.",
+                errors = {
+                    GAMEPACKER_ERR_SCENARIO_NOT_FOUND,
+                    GAMEPACKER_ERR_SCENARIO_ALREADY_FINALIZING
+                },
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void cancelPackerSession(Blaze::GameManager::CancelPackerSessionRequest);
+            
+            [
+                id = 3,
+                description = "Called by slave to obtain a session to pack.",
+                requires_authentication = false,
+                requiresUserSession = false,
+                ignoreShardingKey = true
+            ]
+            Blaze::GameManager::WorkerObtainPackerSessionResponse workerObtainPackerSession(Blaze::GameManager::WorkerObtainPackerSessionRequest);
+            
+            [
+                id = 4,
+                description = "Called by packer slave to release obtained session due to inability to find a match of sufficient quality/viability.",
+                errors = {
+                    GAMEPACKER_ERR_SESSION_NOT_FOUND,
+                    GAMEPACKER_ERR_SESSION_NOT_ASSIGNED
+                },
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void workerMigratePackerSession(Blaze::GameManager::WorkerMigratePackerSessionRequest); 
+            
+            [
+                id = 5,
+                description = "Called by packer slave to relinquish acquired session due to session state update.",
+                errors = {
+                    GAMEPACKER_ERR_SESSION_NOT_FOUND,
+                    GAMEPACKER_ERR_SESSION_NOT_ASSIGNED
+                },
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void workerRelinquishPackerSession(Blaze::GameManager::WorkerRelinquishPackerSessionRequest); 
+
+            [
+                id = 6,
+                description = "Called by packer slave to successfully complete a packer session previously locked by this instance.",
+                errors = {
+                    GAMEPACKER_ERR_SESSION_NOT_FOUND,
+                    GAMEPACKER_ERR_SESSION_NOT_ASSIGNED
+                },
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void workerCompletePackerSession(Blaze::GameManager::WorkerCompletePackerSessionRequest);
+
+            [
+                id = 7,
+                description = "Called by packer slave to abort a packer session(due to error) previously obtained by this instance.",
+                errors = {
+                    GAMEPACKER_ERR_SESSION_NOT_FOUND,
+                    GAMEPACKER_ERR_SESSION_NOT_ASSIGNED
+                },
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void workerAbortPackerSession(Blaze::GameManager::WorkerAbortPackerSessionRequest);
+
+            [
+                id = 8,
+                description = "Called by the packer slave to lock the packer session's scenario for finalization.",
+                errors = {
+                    GAMEPACKER_ERR_SESSION_NOT_FOUND,
+                    GAMEPACKER_ERR_SESSION_NOT_ASSIGNED,
+                    GAMEPACKER_ERR_SCENARIO_ALREADY_FINALIZING
+                },
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void workerLockPackerSession(Blaze::GameManager::WorkerLockPackerSessionRequest);
+
+            [
+                id = 9,
+                description = "Called by the packer slave that has locked the packer session's scenario for finalization if finalization was unsuccessful. NOTE: Successful finalizations call completePackerSession() instead of unlockPackerSession().",
+                errors = {
+                    GAMEPACKER_ERR_SESSION_NOT_FOUND,
+                    GAMEPACKER_ERR_SESSION_NOT_ASSIGNED
+                },
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void workerUnlockPackerSession(Blaze::GameManager::WorkerUnlockPackerSessionRequest);
+
+            [
+                id = 10,
+                description = "Called by packer slave to send a session status update to the packer master.",
+                errors = {
+                    GAMEPACKER_ERR_SESSION_NOT_FOUND,
+                    GAMEPACKER_ERR_SESSION_NOT_ASSIGNED
+                },
+                requires_authentication = false,
+                requiresUserSession = false
+            ]
+            void workerUpdatePackerSessionStatus(Blaze::GameManager::WorkerUpdatePackerSessionStatusRequest);
+
+            [
+                id = 11,
+                description = "Called by the mmSlave to notify the master of which layer it is on.",
+                requires_authentication = false,
+                requiresUserSession = false,
+                ignoreShardingKey = true
+            ]
+            Blaze::GameManager::WorkerLayerAssignmentResponse workerClaimLayerAssignment(Blaze::GameManager::WorkerLayerAssignmentRequest); // called by the matchmaking slave to inform master of the slave's layer index topology assignment
+            
+            [
+                id = 12,
+                description = "Obtain packer metrics.",
+                requires_authentication = false,
+                requiresUserSession = false,
+                ignoreShardingKey = true
+            ]
+            Blaze::GameManager::GetPackerMetricsResponse getPackerMetrics(Blaze::GameManager::GetPackerMetricsRequest);
+
+        } // master methods
+
+        notifications
+        {
+            [
+              id = 1000, 
+              description = "Sent to a specific packer slave",
+              client_export = false
+            ]
+            NotifyWorkerPackerSessionAvailable(Blaze::GameManager::NotifyWorkerPackerSessionAvailable);
+            
+            [
+              id = 1001, 
+              description = "Sent to a specific packer slave",
+              client_export = false
+            ]
+            NotifyWorkerPackerSessionRelinquish(Blaze::GameManager::NotifyWorkerPackerSessionRelinquish); // e.g.: session had its members updated...
+
+            [
+              id = 1002, 
+              description = "Sent to a specific packer slave",
+              client_export = false
+            ]
+            NotifyWorkerPackerSessionTerminated(Blaze::GameManager::NotifyWorkerPackerSessionTerminated); // e.g.: when session timed out on the master
+
+            // PACKER_TODO: These notifications are currently sent to the GM slaves in order to mimic a the MM slave API, hopefully we can get rid of them eventually
+            [
+              id = 1,
+              description = "Sent when a matchmaking session ends (either successfully or due to cancel/timeout/error).",
+              details = "Note: if startMatchmaking failed, no session was created, so there's no finished notification.",
+              client_export = false
+            ]
+            NotifyMatchmakingFailed(Blaze::GameManager::NotifyMatchmakingFinished);
+            
+            [
+              id = 2,
+              description = "Sent when a matchmaking session status changed or time due( when session started/rule decay/timeout/period set in config.)",
+              details = "Player who start matchmaking session should listen to the notification and update it's local cached satus data.",
+              client_export = false
+            ]
+            NotifyMatchmakingAsyncStatus(Blaze::GameManager::NotifyMatchmakingAsyncStatus);
+
+            [
+              id = 3,
+              description = "Sent when a matchmaking session ends successfully.",
+              details = "Note: we always send this, even if the matchmaking failed.",
+              client_export = false
+            ]
+            NotifyMatchmakingFinished(Blaze::GameManager::NotifyMatchmakingFinished);
+            
+            [
+              id = 4,
+              description = "Sent when a matchmaking session has completed connection validation (either success or failure).",
+              details = "This notification goes to the GameManager slave, which forwards it on as a GameManager notification",
+              client_export = false
+            ]
+            NotifyMatchmakingSessionConnectionValidated(Blaze::GameManager::NotifyMatchmakingSessionConnectionValidated);
+
+            [
+              id = 5,
+              description = "Sent after gamemanager has added a matchmaking session's reserved external players to the matched game.",
+              details = "This notification is sent by matchmaking slaves to gamemanager slaves. Sends the list of players from the original matchmaking request's reserved external players list, who were reserved into the game. This notification is received after all players in the matchmup have issued their join to the external session.",
+              client_export = false
+            ]
+            NotifyServerMatchmakingReservedExternalPlayers(Blaze::GameManager::NotifyServerMatchmakingReservedExternalPlayers);
+
+        } // master notifications
+
+        events
+        {
+            // TBD
+        } // master events
+        
+     } // master
+
+} // Component
+} // GamePacker
+} // Blaze

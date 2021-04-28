@@ -1,0 +1,273 @@
+<project>
+
+    <target name="dirtysdk-get-date-and-version" description="Get the release version from changelog.txt" hidden="true">
+        <script language="C#">
+            <code> <![CDATA[
+                public static void ScriptMain(Project project)
+                {
+                    GetDate   (project, project.Properties["dirtysdk-release-clientdir"] + "/changelog.txt");
+                    GetVersion(project, project.Properties["dirtysdk-release-clientdir"] + "/changelog.txt");
+                }
+
+                static void GetDate(Project project, string filename)
+                {
+                    try
+                    {
+                        project.Properties.Add("dirtysdk-date", "");
+
+                        StreamReader SR = new StreamReader(filename);
+
+                        String line = SR.ReadLine();
+                        String date = line.Substring(line.IndexOf("-"));
+
+                        SR.Close();
+
+                        // Get month
+                        int monthBefore = date.IndexOf(' ');
+
+                        if (monthBefore < 0)
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID DATE ***");
+                            return;
+                        }
+
+                        int monthAfter = date.IndexOf(' ', monthBefore + 1);
+
+                        if (monthAfter < 0)
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID DATE ***");
+                            return;
+                        }
+
+                        String month = date.Substring(monthBefore + 1, monthAfter - monthBefore - 1);
+
+                        int monthValue;
+
+                        switch (month)
+                        {
+                            case "January":
+                                monthValue = 1;
+                                break;
+
+                            case "February":
+                                monthValue = 2;
+                                break;
+
+                            case "March":
+                                monthValue = 3;
+                                break;
+
+                            case "April":
+                                monthValue = 4;
+                                break;
+
+                            case "May":
+                                monthValue = 5;
+                                break;
+
+                            case "June":
+                                monthValue = 6;
+                                break;
+
+                            case "July":
+                                monthValue = 7;
+                                break;
+
+                            case "August":
+                                monthValue = 8;
+                                break;
+
+                            case "September":
+                                monthValue = 9;
+                                break;
+
+                            case "October":
+                                monthValue = 10;
+                                break;
+
+                            case "November":
+                                monthValue = 11;
+                                break;
+
+                            case "December":
+                                monthValue = 12;
+                                break;
+
+                            default:
+                                Console.WriteLine("changelog.txt: *** INVALID DATE ***");
+                                return;
+                        }
+
+                        // Get day
+                        int dayBefore = monthAfter;
+                        int dayAfter = date.IndexOf(',');
+
+                        if (dayAfter < 0)
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID DATE ***");
+                            return;
+                        }
+
+                        String day = date.Substring(dayBefore + 1, dayAfter - dayBefore - 1);
+
+                        int dayValue;
+
+                        try
+                        {
+                            dayValue = Convert.ToInt32(day);
+                        }
+                        catch (FormatException)
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID DATE ***");
+                            return;
+                        }
+
+                        // Get year
+                        int yearBefore = dayAfter;
+
+                        String year = date.Substring(yearBefore + 2);
+
+                        int yearValue;
+
+                        try
+                        {
+                            yearValue = Convert.ToInt32(year);
+                        }
+                        catch (FormatException)
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID DATE ***");
+                            return;
+                        }
+
+                        // Verify day
+                        if ((dayValue < 1) || (dayValue > DateTime.DaysInMonth(yearValue, monthValue)))
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID DATE ***");
+                            return;
+                        }
+
+                        project.Properties.Add("dirtysdk-date", month + " " + dayValue + ", " + yearValue);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("target-get-date Error: \"{0}\"", e.Message);
+                    }
+                }
+
+                static void GetVersion(Project project, string filename)
+                {
+                    project.Properties.Add("dirtysdk-version", "");
+
+                    StreamReader SR = new StreamReader(filename);
+
+                    String line = SR.ReadLine();
+                    String version = line.Substring(line.IndexOf("20"), line.Substring(line.IndexOf("20")).IndexOf("-") - 1);
+
+                    SR.Close();
+
+                    uint year;
+
+                    try
+                    {
+                        year = Convert.ToUInt32(version.Split()[0]);
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine("changelog.txt: *** INVALID VERSION ***");
+                        return;
+                    }
+
+                    if (year >= 2100)
+                    {
+                        Console.WriteLine("changelog.txt: *** INVALID VERSION ***");
+                        return;
+                    }
+
+                    uint season;
+
+                    switch (version.Split()[1])
+                    {
+                        case "Winter":
+                            season = 1;
+                            break;
+
+                        case "Spring":
+                            season = 2;
+                            break;
+
+                        case "Summer":
+                            season = 3;
+                            break;
+
+                        case "Fall":
+                            season = 4;
+                            break;
+
+                        default:
+                            Console.WriteLine("changelog.txt: *** INVALID VERSION ***");
+                            return;
+                    }
+
+                    uint major;
+
+                    try
+                    {
+                        major = Convert.ToUInt32(version.Split()[2].Split('.')[0]);
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine("changelog.txt: *** INVALID VERSION ***");
+                        return;
+                    }
+
+                    uint minor;
+                    uint patch;
+
+                    if (major == 0) // Preview release
+                    {
+                        try
+                        {
+                            minor = Convert.ToUInt32(version.Split()[2].Split('.')[1]);
+                        }
+                        catch (Exception)
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID VERSION ***");
+                            return;
+                        }
+
+                        try
+                        {
+                            patch = Convert.ToUInt32(version.Split()[2].Split('.')[2]);
+                        }
+                        catch (Exception)
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID VERSION ***");
+                            return;
+                        }
+
+                        version = year - 2000 + "." + season + "." + major + "." + minor + "." + patch;
+                    }
+                    else // Production release
+                    {
+                        minor = 0;
+
+                        try
+                        {
+                            patch = Convert.ToUInt32(version.Split()[2].Split('.')[1]);
+                        }
+                        catch (Exception)
+                        {
+                            Console.WriteLine("changelog.txt: *** INVALID VERSION ***");
+                            return;
+                        }
+
+                        version = year - 2000 + "." + season + "." + major + "." + patch;
+                    }
+
+                    project.Properties.Add("dirtysdk-version", version);
+                }
+            ]]> </code>
+        </script>
+    </target>
+
+</project>

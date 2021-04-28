@@ -1,0 +1,389 @@
+#!/usr/bin/python
+
+"""Update components fixture file with new strings
+
+This script will take the current components fixture data file and replace its
+strings with those found in a collection of Origin X strings spreadsheets
+(which must be converted to CSV).  The script will output several files 
+(outlined below).
+
+BEFORE RUNNING THE SCRIPT
+
+By default, the update script lives in tools/scripts/fixture-update.  We'll 
+refer to this as script_dir.  
+
+By default, the script will use the components fixture file that is part of
+the normal SPA repository (app/test/fixtures/components.dict.json) as the 
+input file.  It will NOT be changed by running this script.
+
+Before running the script, you will need to put all updates CSV files in the 
+updates folder inside the script_dir folder.  These CSV files should be 
+directly converted from the localization spreadsheets provided by production.
+
+The script will search through the components fixture data for the old strings
+and replace them with the new strings.
+
+RUNNING THE SCRIPT
+
+Running this script will not change any critical files.  Instead, a new folder
+will be created - script_dir/output - which will contain the following files:
+
+  - full-components.dict.json - This is the updated components fixture
+    file.  It should be manually reviewed and, if all appears well, copied
+    over the input components fixture file.
+
+  - only-updated-components.dict.json - This is a list of only the changed
+    components/attributes, in the same format as the original fixture file.
+
+  - in-strings-not-fixture.csv - This file contains only the strings that
+    existed in the update CSV file but not in the components fixture JSON
+    file.
+
+  - in-fixture-not-strings.json - This file conains only the strings that
+    existed in the fixture JSON file but not in the update CSV file.
+
+The last two files should be examined to determine if further work needs to
+be done to arrive at our final set of strings.
+"""
+
+import collections
+import csv
+import json
+import os
+import re
+import sys
+import traceback
+
+
+reload(sys)
+sys.setdefaultencoding('utf8')
+
+# script folder - assume it is somewhere under tools path
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+
+# derive Origin X root from script folder
+ORIGINX_ROOT_DIR = SCRIPT_DIR[0:SCRIPT_DIR.find('/tools/')]
+
+# location of app's components dictionary fixture file
+FIXTURE_JSON_FILE = '%(ORIGINX_ROOT_DIR)s/app/test/fixtures/components.dict.json' % locals()
+
+# Location of update csv files - each should have two columns - old string, new
+# string.  All csv update files should be in this folder.
+UPDATE_CSV_DIR = '%(SCRIPT_DIR)s/updates' % locals()
+
+# eventual location of updated components dictionary fixture file
+OUTPUT_FIXTURE_JSON_FILE = '%(SCRIPT_DIR)s/output/full-components.dict.json' % locals()
+
+# eventual location of delta file - these strings were not found in the
+# fixture json file
+OUTPUT_DELTA_CSV_FILE = '%(SCRIPT_DIR)s/output/in-strings-not-fixture.csv' % locals()
+
+# eventual location of delta for updates to components fixture - only those
+# components and attributes that were changed
+OUTPUT_UPDATE_DELTA_JSON_FILE = '%(SCRIPT_DIR)s/output/only-updated-components.dict.json' % locals()
+
+# eventual location of delta components dictionary fixture file
+OUTPUT_DELTA_JSON_FILE = '%(SCRIPT_DIR)s/output/in-fixture-not-strings.json' % locals()
+
+# constant for use in delta builder
+SHOW_MATCHES_ONLY = True
+
+
+def ensure_path_exists(path):
+    """Ensure critical path exists
+    
+    Check if critical file or dir exists, and exit with an error if it doesn't.
+    
+    Arguments:
+        path {string} -- path of directory or file
+    """
+    if not os.path.exists(path):
+        print '! error, cannot find path:\n! %(filename)s\n' % locals()
+        exit(0)
+
+
+def ensure_file_dir_exists(filename):
+    """Given a full file path, ensure its directory exists
+
+    Check if directory exists, and create it if it doesn't.  Should be used
+    before writing any files.
+
+    Arguments:
+        filename {string} -- path and name of file
+    """
+    directory = os.path.dirname(os.path.realpath(filename))
+
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+
+
+def get_update_dict(update_filename):
+    """Get update CSV file as dict object
+
+    Get the update CSV file, externally referred to as UPDATE_CSV_FILE, and 
+    load it into a dict object. The format of this CSV should be two columns,
+    the first column being old strings, and the second being new strings which
+    will replace old strings.
+
+    Arguments:
+        update_filename {string} -- full filename to update file
+
+    Returns:
+        dict -- updates data
+    """
+    ensure_path_exists(update_filename)
+
+    data = {}
+    with open(update_filename, 'rb') as csvfile:
+        csv_data = csv.reader(csvfile)
+
+        for row in csv_data:
+            placeholder = row[1].strip()
+            replacement = row[2].strip()
+            string_type = row[6].lower().strip()
+
+            ignore = False
+            try:
+                ignore = row[7].lower().strip()
+            except:
+                pass
+
+            if placeholder != '' and string_type == 'system' and ignore not in ['ignore', 'merch']:
+                data[placeholder] = replacement
+
+    return data
+
+
+def get_all_updates_dict(updates_dir):
+    """Compile all input CSVs into one updates data object
+
+    This will compile all CSV files in the updates_dir into one data object
+    with all strings.  In addition, a string_map will be created and returned
+    that will allow strings to be associated with their originating file later
+    on.
+
+    Arguments:
+        updates_dir {string} -- dfull path to CSV updates dir
+
+    Returns:
+        dict -- data - the updates data object
+        dict[] -- string_map - a list of objects that associate the strings
+                  with their originating file
+    """
+    ensure_path_exists(updates_dir)
+
+    data = {}
+    string_map = []
+
+    csv_files = []
+    for file in os.listdir(updates_dir):
+        if file.endswith(".csv"):
+            csv_files.append(file)
+
+    for file in csv_files:
+        updates_csv_file = '%(updates_dir)s/%(file)s' % locals()
+        csv_data = get_update_dict(updates_csv_file)
+        
+        data.update(csv_data)
+
+        for string in csv_data.keys():
+            string_map.append({"old_string": string, "new_string": csv_data[string], "file": file})
+
+    return data, string_map
+
+
+def get_fixture_json(fixture_filename):
+    """Get fixture JSON file as dict object
+    
+    Get the JSON fixture file, externally referred to as FIXTURE_JSON_FILE,
+    and load it into a dict object.  By default, FIXTURE_JSON_FILE will point
+    to the app/test/fixtures/components.dict.json file.
+    
+    Arguments:
+        fixture_filename {string} -- full filename to fixture file
+    
+    Returns:
+        dict -- components fixture data
+    """
+    ensure_path_exists(fixture_filename)
+
+    with open(fixture_filename, 'r') as jsonfile:
+        json_string = jsonfile.read()
+
+    fixture = json.JSONDecoder(object_pairs_hook=collections.OrderedDict).decode(json_string)
+
+    return fixture
+
+
+def build_fixture_delta(fixture, updates, matches=False, before_update=False):
+    """Build fixture delta dictionary object
+    
+    Builds a dictionary object that is a delta of the strings in the original
+    fixture file and the strings in the update file.  The returned dictionary
+    object contains the strings from the fixture that were not present in the
+    update file.
+    
+    Arguments:
+        fixture {dict} -- components fixture data
+        updates {dict} -- updates data
+        matches {boolean} -- if true, put only matching strings in the delta
+        before_update {boolean} -- set to true if running on the original data
+    
+    Returns:
+        dict -- fixture delta data
+    """
+    delta = {}
+    strings = updates.keys() if before_update else updates.values()
+    components = fixture.keys()
+
+    for component in components:
+        attr = {}
+        attributes = fixture[component]
+
+        for attribute in attributes:
+            if (
+                (matches is SHOW_MATCHES_ONLY and attributes[attribute] in strings) or 
+                (matches is not SHOW_MATCHES_ONLY and attributes[attribute] not in strings)
+            ):
+                attr[attribute] = attributes[attribute]
+
+        if len(attr.keys()) > 0 or (matches is not SHOW_MATCHES_ONLY and len(attributes.keys()) == 0):
+            delta[component] = attr
+
+    return delta
+
+
+def update_string_in_fixture(fixture, old_string, new_string):
+    """Update string in fixture dictionary object
+
+    Given a fixture dictionary, search through all component dictionary data
+    for old_string and, where found, change it to new_string.  Returns an dict
+    object with success state, updated fixture
+
+    Arguments:
+        fixture {dict} -- components fixture data
+        old_string {string} -- original string to look for
+        new_string {string} -- replacement string
+
+    Returns:
+        dict -- combo object that contains a match_found boolean as well as
+                the resulting fixture dict object
+    """
+    fixture_components = fixture.keys()
+    match_found = False
+
+    for component in fixture_components:
+        component_attributes = fixture[component].keys()
+
+        for attribute in component_attributes:
+            value = fixture[component][attribute].encode('utf-8')
+
+            if value == old_string:
+                fixture[component][attribute] = new_string
+                match_found = True
+
+    return match_found, fixture
+
+
+def write_json_file(fixture, fixture_filename):
+    """Write out json file
+    
+    Takes a fixture data object and writes it out to a file.
+    
+    Arguments:
+        fixture {dict} -- components fixture data
+        fixture_filename {string} -- full filename of json file
+    """
+    ensure_file_dir_exists(fixture_filename)
+
+    json_string = json.dumps(fixture, indent=4, ensure_ascii=False, sort_keys=False).encode('utf-8')
+
+    # strip space at end of line
+    json_string = re.sub(re.compile(ur' $', re.MULTILINE), '', json_string)
+
+    with open(fixture_filename, 'w') as fp:
+        fp.write(json_string)
+
+
+def write_delta_update_csv_file(delta, string_map, delta_filename):
+    """Write out CSV delta file
+    
+    Write delta CSV file that includes strings from the update CSV that were
+    not found in the fixture file.
+
+    Arguments:
+        delta {dict} -- delta string data, a simple string map that maps old
+                        strings to new strings
+        string_map {dict[]} -- list of objects containing information about
+                               each string
+        delta_filename {string} -- full filename to delta file
+    """
+    ensure_file_dir_exists(delta_filename)
+
+    with open(delta_filename, 'w') as fp:
+        csvw = csv.writer(fp)
+        csvw.writerow(['The following strings were not found in the fixture file.'])
+        csvw.writerow([])
+        csvw.writerow(['Old String', 'New String', "Originating File"])
+
+        for old_string in delta.keys():
+
+            files = []
+            for data in string_map:
+                if data["old_string"] == old_string:
+                    files.append(data["file"])
+
+            csvw.writerow([old_string.encode('utf-8'), delta[old_string].encode('utf-8'), ', '.join(files)])
+
+
+def main():
+    """Main functionality
+    
+    Gets files, does transformations, and then writes out updated and delta
+    files for use as needed.
+    """
+
+    # setup initial data objects
+    updates, string_map = get_all_updates_dict(UPDATE_CSV_DIR)
+    fixture = get_fixture_json(FIXTURE_JSON_FILE)
+    update_delta = {}
+
+    # run through all update strings
+    for old_string in updates.keys():
+        match_found, data = update_string_in_fixture(fixture, old_string, updates[old_string])
+
+        if match_found is True:
+            # update fixture object
+            fixture = data
+        else:
+            # update delta object
+            update_delta[old_string] = updates[old_string]
+
+    # build dict of just changed data
+    fixture_update_delta = build_fixture_delta(fixture, updates, SHOW_MATCHES_ONLY)
+    write_json_file(fixture_update_delta, OUTPUT_UPDATE_DELTA_JSON_FILE)
+
+    # write fixture JSON file - a copy of the fixture file with the old strings
+    # replaced with the updated strings
+    write_json_file(fixture, OUTPUT_FIXTURE_JSON_FILE)
+
+    # write delta JSON file - a copy of the fixture json that includes only the
+    # strings that appear in the fixture but not in the update file
+    fixture_delta = build_fixture_delta(fixture, updates)
+    write_json_file(fixture_delta, OUTPUT_DELTA_JSON_FILE)
+
+    # write delta CSV file - a csv of the old and new strings that do not
+    # appear in the fixture file
+    write_delta_update_csv_file(update_delta, string_map, OUTPUT_DELTA_CSV_FILE)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if '%s' % exc_value not in ['0', '', None]:
+            print 'An exception occurred. (%(exc_value)s)\n' % locals()
+            print traceback.format_exc()
+        else:
+            pass

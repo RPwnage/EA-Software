@@ -1,0 +1,139 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+    <title>EAExceptionHandler</title>    
+<link type="text/css" rel="stylesheet" href="UTFDoc.css">
+    <meta name="author" content="Paul Pedriana">
+    <style type="text/css">
+<!--
+.style1 {color: #0033CC}
+-->
+    </style>
+</head>
+<body bgcolor="#FFFFFF">
+<h1>EAExceptionHandler</h1>
+<h2>Introduction</h2>
+<p>EAExceptionHandler is a runtime library for handling exceptions and generating exception reports. This is very useful for deciphering the cause of application crashes after they occur. It is designed to work on all relevant platforms to the extent possible. </p>
+<p>There is another task related to exception handling but which is separate from EAExceptionHandler: the storing of reports in a centralized database for the purpose of assigning programmers to fix the bugs that caused those exceptions. This task is handled by a separate module that sits on top of EAExceptionHandler.</p>
+<h2>Requirements</h2>
+<p>The following requirements were taken in account during design and development of the exception handling support.</p>
+<blockquote>
+  <table border="1">
+    <tr>
+      <td><strong>Requirement</strong></td>
+      <td><strong>Rationale</strong></td>
+    </tr>
+    <tr valign="top">
+      <td>It should be easy to integrate</td>
+      <td>The setup should be as easy and transparent as possible. However, the user should be able to control things such as memory allocation, output location, and other things if desired. </td>
+    </tr>
+    <tr valign="top">
+      <td>The implementation should be reliable.</td>
+      <td>The exception handler itself should not cause unexpected behavior in the app nor should it crash during reporting an exception.</td>
+    </tr>
+    <tr valign="top">
+      <td>It should have text file output</td>
+      <td>Instead of in-app fancy reporting back-ends the exception handler should save as much information as possible to a human readable yet easily computer readable text file.</td>
+    </tr>
+    <tr valign="top">
+      <td>The exception handler should do no primary heap allocations. </td>
+      <td>A lot of exceptions/crashes are caused by memory corruption. The application heap may be corrupted beyond repair so it should not be used during exception reporting.</td>
+    </tr>
+    <tr valign="top">
+      <td>The report should include as much information as possible about the exception. </td>
+      <td>There is no such thing as too much information about a bug.</td>
+    </tr>
+    <tr valign="top">
+      <td>The report should at least include a callstack trace when other information isn't available. </td>
+      <td>There should be enough information to identify where the app had crashed and how did it get there.</td>
+    </tr>
+    <tr valign="top">
+      <td>The report should ideally have information about application memory in the vicinity of the exception. </td>
+      <td>There should be as much information as possible about memory accessed or possibly accessed at the time exception occurred.</td>
+    </tr>
+    <tr valign="top">
+      <td>The exception handler should provide for user extension.</td>
+      <td>The app should be able to install exception handler plug-ins and provide extra data in the report.</td>
+    </tr>
+  </table>
+  </blockquote>
+<h2>Non-Requirements  </h2>
+<p>A few items were discounted as requirements:</p>
+<blockquote>
+  <table border="1">
+    <tr valign="top">
+      <td><strong>Non-requirement</strong></td>
+      <td><strong>Rationale</strong></td>
+    </tr>
+    <tr valign="top">
+      <td>Portability</td>
+      <td>Only some minor parts of exception handling can be done in portable way. Instead it is much easier to create a platform-independent facade and provide completely separated platform-specific implementations.</td>
+    </tr>
+    <tr valign="top">
+      <td>Performance</td>
+      <td>We don&rsquo;t expect EAExceptionHandler to process thousands of exceptions per second. In most cases the application is terminated after the first exception. It is normal for exception handler to spend a couple of seconds preparing the report.</td>
+    </tr>
+    <tr valign="top">
+      <td>Fancy presentation</td>
+      <td>The more work that is done in the exception handler the more chances that something will go wrong. The handler should report all information as fast as possible without using other modules which may prevent the safe execution of the handler.</td>
+    </tr>
+  </table>
+  </blockquote>
+<h2>Setup</h2>
+<p>The only header that has to be included is ExceptionHandler.h. At least two implementation files have to be implemented for each platform: ExceptionHandler.cpp and &lt;platform&gt;/ExceptionHandler_&lt;platform&gt;.cpp; some platforms may need additional source files. </p>
+<p>To enable exception handling you only need to create an instance of EAExceptionHandler. This will work on Win32 and likely to work on some other platforms as well. However, on some platforms it may be not sufficient. In that case it is recommended to use RunTrapped API. See ExceptionHandler.h comments for more details. RunTrapped is significantly more flexible (at the cost of slightly more expensive setup) so it is recommended even on platforms that don&rsquo;t need it. Note that RunTrapped does not work across threads so each thread needs to use it separately.</p>
+<p>By default the application will be terminated after the first exception. This behavior can be changed by calling SetTerminateOnException(false). In this case RunTrapped will actually return. The bool return value will be true if there was an exception.</p>
+<h2>Reports</h2>
+<p>Currently all reports are written at &ldquo;current&rdquo; location. This is temporary implementation and it will be changed soon. There is always some text report (format to be documented here) and extra platform-specific files.</p>
+<p>Current location for Win32 is defined as current working directory, current location for Xenon is the root of development volume.</p>
+<h2>Platform Notes</h2>
+<blockquote>
+  <table border="1">
+    <tr>
+      <td><strong>Platform</strong></td>
+      <td><strong>Note</strong></td>
+    </tr>
+    <tr valign="top">
+      <td>Win32 / Win64 </td>
+      <td><p>These platforms are well-supported. </p>
+        </td>
+    </tr>
+    <tr valign="top">
+      <td>XBox / XBox 360 </td>
+      <td><p>The XBox 360 is well-supported. </p>
+        <p>The XBox 360  platform  is somewhat more fragile than the Windows platform, as it isn't protected operating system. It is recommended that you reboot the system after exceptions, especially when running outside of a debugger.</p></td>
+    </tr>
+    <tr valign="top">
+      <td>PS3</td>
+      <td><p>The PS3 is supported.</p>
+      <p>The PS3 has basic runtime exception handling support. It is different from Microsoft exception handling in that once an exception is encountered the application cannot resume beyond the handling of the exception. On Microsoft-based systems the execution can resume after handling the exception, though the system may of course be in a state that for all practical purposes doesn't allow for safe resumption. </p></td>
+    </tr>
+    <tr valign="top">
+      <td>Wii</td>
+      <td>The Wii is supported </td>
+    </tr>
+    <tr valign="top">
+      <td>Mac OS X</td>
+      <td>We don't currently have support for this platform. Feel free to contribute.</td>
+    </tr>
+    <tr valign="top">
+      <td> Linux </td>
+      <td>We don't currently have support for these platforms. Feel free to contribute.</td>
+    </tr>
+  </table>
+</blockquote>
+<hr>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p></p>
+</body>
+</html>
+
+
+

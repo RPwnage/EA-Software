@@ -1,0 +1,26 @@
+var structProtoAriesRefT =
+[
+    [ "aBufferData", "d9/dd8/structProtoAriesRefT.html#a89728a30d21571155f6c7c083c391a83", null ],
+    [ "aInpHead", "d9/dd8/structProtoAriesRefT.html#a95e2cc111b47dab8d4bc1fe5560fd1ae", null ],
+    [ "bHaveWallet", "d9/dd8/structProtoAriesRefT.html#a28ce930c3a1f6216407deaba0c828d66", null ],
+    [ "bUseSSL", "d9/dd8/structProtoAriesRefT.html#aaf2ffba85f0d1e178bb7c4b441719dbe", null ],
+    [ "DestAddr", "d9/dd8/structProtoAriesRefT.html#a27cc0dc831e950a55d75c45cbfd8b2d1", null ],
+    [ "eState", "d9/dd8/structProtoAriesRefT.html#a26be295ed2d84bb01df4240b6b6807d9", null ],
+    [ "iBufSize", "d9/dd8/structProtoAriesRefT.html#ad7f52c4196e749e0d5ebac3138570aaf", null ],
+    [ "iInpProg", "d9/dd8/structProtoAriesRefT.html#ac0b65d6b1d050ee36d2d659ab3df30f4", null ],
+    [ "iInpSize", "d9/dd8/structProtoAriesRefT.html#a9f29df0e31910e3b317764c4280097c9", null ],
+    [ "iMemGroup", "d9/dd8/structProtoAriesRefT.html#ace91f384ab2f3329999ea6a4cb761034", null ],
+    [ "iOutMaxm", "d9/dd8/structProtoAriesRefT.html#ad5b0a1a08360ee5d3e982cdf6bb2a7c3", null ],
+    [ "iOutProg", "d9/dd8/structProtoAriesRefT.html#a957630d383dac8f38a2199d79ced2b4a", null ],
+    [ "iOutSize", "d9/dd8/structProtoAriesRefT.html#ae7011552c53b5e980f3409c5ea17376f", null ],
+    [ "pInpData", "d9/dd8/structProtoAriesRefT.html#a15f453d6ee8d909d7453d88e6b3a5c0a", null ],
+    [ "pMemGroupUserData", "d9/dd8/structProtoAriesRefT.html#adfefb22bc400a5408d7f5304a720fefc", null ],
+    [ "pOutData", "d9/dd8/structProtoAriesRefT.html#a4b3617ef076dbb4cfa2f9ef031cfb347", null ],
+    [ "pProtoSsl", "d9/dd8/structProtoAriesRefT.html#a11eed382d986d11c30781194a6c4ff62", null ],
+    [ "Stream", "d9/dd8/structProtoAriesRefT.html#a737155fce6720c2f89f0065bf9360537", null ],
+    [ "strServerName", "d9/dd8/structProtoAriesRefT.html#a6607f5da3aa59a3d05be79b9815cc4e2", null ],
+    [ "uLocalAddr", "d9/dd8/structProtoAriesRefT.html#a4c9e800115c3bee7ef1a16f79c5a6de2", null ],
+    [ "uLocalPort", "d9/dd8/structProtoAriesRefT.html#a8e0d6a8d16a97cf816c1b0064d0d8bf5", null ],
+    [ "uTimeout", "d9/dd8/structProtoAriesRefT.html#a348cb720834935f54b903c5f9fc463b8", null ],
+    [ "Wallet", "d9/dd8/structProtoAriesRefT.html#a83d0db32b7341475fcd0be9995e55c74", null ]
+];

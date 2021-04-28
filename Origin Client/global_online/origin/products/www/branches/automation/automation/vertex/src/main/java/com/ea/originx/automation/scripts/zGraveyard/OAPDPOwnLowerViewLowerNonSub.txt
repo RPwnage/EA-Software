@@ -1,0 +1,183 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.macroaction.MacroStore;
+import com.ea.originx.automation.lib.pageobjects.chrome.ChromeSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.dialog.DownloadDialog;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test PDP Hero for a non-subscriber viewing the lower edition when owning lower edition
+ *
+ * @author cbalea
+ */
+public class OAPDPOwnLowerViewLowerNonSub extends EAXVxTestTemplate{
+
+    @TestRail(caseId = 1771799)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testPDPOwnLowerViewLowerNonSub(ITestContext context) throws Exception{
+
+        final OriginClient client = OriginClientFactory.create(context);
+        boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        EntitlementId lesserEntitlementID = EntitlementId.DA_INQUISITION;
+        EntitlementInfo entitlementInfo = EntitlementInfoHelper.getEntitlementInfoForId(lesserEntitlementID);
+
+        final UserAccount userAccount = AccountManager.getEntitledUserAccount(entitlementInfo);
+
+        logFlowPoint("Log into the Origin Client with an account that owns a lower edition of a game offered in the vault"); // 1
+        logFlowPoint("Navigate to the PDP of the game that is owned"); // 2
+        logFlowPoint("Verify there is a message indicating that the user owns the lesser edition"); // 3
+        logFlowPoint("Verify there is a hyperlink to the edition in your game library"); // 4
+        logFlowPoint("Verify that the CTA 'Play Game/Download' is visible"); // 5
+        logFlowPoint("Verify that the CTA 'Play Game/Download' colour is 'orange'"); // 6
+        logFlowPoint("Verify there is a discount percentage with striked out full price, if store discount is provided for the product"); // 7
+        logFlowPoint("Verify there is a 'Purchase as gift' CTA with price (discounted price if applicable)"); // 8
+        logFlowPoint("Verify 'EULA' and 'Terms and Conditions' hyperlinks are visible"); // 9
+        logFlowPoint("Verify that information about vault edition being available appears"); // 10
+        logFlowPoint("Verify that information about Subscription offers is available"); // 11
+        logFlowPoint("Verify that there is a link to learn more about Origin Access"); // 12
+        if(isClient){
+            logFlowPoint("Verify that clicking CTA starts the download game flow"); // 13a
+        } else {
+            logFlowPoint("Verify that clicking CTA starts downloading origin setup"); // 13b
+        }
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with entitled account " + userAccount.getUsername());
+        } else {
+            logFailExit("Could not log into Origin with the user " + userAccount.getUsername());
+        }
+
+        // 2
+        if (MacroPDP.loadPdpPage(driver, entitlementInfo)) {
+            logPass("Successfully navigated to the PDP for " + entitlementInfo.getName());
+        } else {
+            logFailExit("Could not navigate to the PDP for " + entitlementInfo.getName());
+        }
+
+        // 3
+        PDPHeroActionDescriptors pdpHeroActionDescriptors = new PDPHeroActionDescriptors(driver);
+        if (pdpHeroActionDescriptors.verifyOwnedProductStatusMessage()) {
+            logPass("Verified that there's a message regarding edition ownership");
+        } else {
+            logFailExit("Failed to verify edition ownership message");
+        }
+
+        // 4
+        if (pdpHeroActionDescriptors.verifyOGDLinkVisible()) {
+            logPass("Verified hyperlink 'View in Library' is visible");
+        } else {
+            logFailExit("Failed to verify hyperlink 'View in Library' is visible");
+        }
+
+        // 5
+        PDPHeroActionCTA pdpHeroActionCTA = new PDPHeroActionCTA(driver);
+        boolean visibleCTA  = pdpHeroActionCTA.verifyDirectAcquisitionButtonVisible();
+        String textCTA = pdpHeroActionCTA.getDirectAcquisitionButtonText();
+        if(visibleCTA){
+            logPass("Verified CTA with message " + textCTA + " is displayed ");
+        } else {
+            logFailExit("Failed to verify " + textCTA + " CTA");
+        }
+
+        // 6
+        if(pdpHeroActionCTA.verifyDirectAcquisitionButtonColor()){
+            logPass("Verified orange colour of " + textCTA + " CTA");
+        } else {
+            logFailExit("Failed to verify color of " + textCTA + " CTA");
+        }
+
+        // 7
+        boolean isPriceDiscounted = false;
+        double priceOriginal = 0.0;
+        if (pdpHeroActionDescriptors.verifyOriginAccessSavingsPercent()) {
+            isPriceDiscounted = true;
+            priceOriginal = pdpHeroActionDescriptors.getStrikedThroughPrice(); // needed for step 8
+        }
+        if (isPriceDiscounted) {
+            if (pdpHeroActionDescriptors.verifyOriginalPriceIsStrikedThrough()) {
+                logPass("Verified discount percentage is visible and that the original price is striked through ");
+            } else {
+                logFailExit("Failed to verify percentage is visible or that the original price is striked through");
+            }
+        }
+
+        // 8
+        boolean isGiftButtonVisible = pdpHeroActionCTA.verifyBuyAsGiftButtonVisible();
+        double buyAsGiftPrice = pdpHeroActionCTA.getBuyAsGiftButtonPrice();
+        boolean verifyDiscount = (isPriceDiscounted && priceOriginal != buyAsGiftPrice) || (!isPriceDiscounted);
+        if (isGiftButtonVisible && verifyDiscount) {
+            logPass("Verified that the CTA 'Purchase as Gift' is visible and if a discount exists then it is visible");
+        } else {
+            logFailExit("Failed to verify that the CTA 'Purchase as Gift' is visible or that if a discount exists that it is visible");
+        }
+
+        // 9
+        boolean isEULALinkVisible = pdpHeroActionDescriptors.verifyEULALinkText();
+        boolean isTOSLinkVisible = pdpHeroActionDescriptors.verifyTermsAndConditionsLinkText();
+        if (isEULALinkVisible && isTOSLinkVisible) {
+            logPass("Verified that EULA and TOS links are visible");
+        } else {
+            logFailExit("Failed to verify that EULA and TOS links are visible");
+        }
+
+        // 10
+        if (pdpHeroActionDescriptors.verifyProductPartOfOriginAccessVisible()) {
+            logPass("Verified message regarding a different edition being available in the vault is visible");
+        } else {
+            logFailExit("Failed to verify different edition available in vault message is visible");
+        }
+
+        // 11
+        if (pdpHeroActionDescriptors.verifyOriginAccessBriefDescription()) {
+            logPass("Verified that the Origin Access brief description is visible");
+        } else {
+            logFailExit("Failed to verify that the Origin Access brief description is visible");
+        }
+
+        // 12
+        if (pdpHeroActionDescriptors.verifyOriginAccessLearnMoreLinkVisible()) {
+            logPass("Verified that the 'Learn More' link is visible");
+        } else {
+            logFailExit("Failed to verify that the 'Learn More' link is visible");
+        }
+
+        // 13a
+        if(isClient){
+            pdpHeroActionCTA.clickDirectAcquisitionButton();
+            if (new DownloadDialog(driver).isDialogVisible()) {
+                logPass("On Clicking 'Donwload' button, verified download dialog is displayed");
+            } else {
+                logFailExit("Failed to verify download dialog");
+            }
+        // 13b
+        } else {
+            MacroStore.downloadOriginSetup(driver);
+            if (new ChromeSettingsPage(driver).verifyOriginSetupDownload()) {
+                logPass("On clicking 'Download Origin' button, verified origin setup has been successfully downloaded");
+            } else {
+                logFailExit("Failed to download origin setup");
+            }
+        }
+
+        softAssertAll();
+    }
+}

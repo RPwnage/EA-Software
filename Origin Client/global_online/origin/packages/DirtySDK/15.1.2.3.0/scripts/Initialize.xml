@@ -1,0 +1,101 @@
+<project>
+    <!-- determine which samples/contribs are enabled
+         if dirtysdk-samples == false then an empty property is created -->
+    <include file="${package.DirtySDK.dir}/scripts/select-contribs.xml"/>
+    <include file="${package.DirtySDK.dir}/scripts/select-samples.xml"/>
+
+    <!-- now specify include directories and library directory -->
+    <publicdata packagename="DirtySDK">
+        <module name="dirtysock">
+            <includedirs>
+                ${package.DirtySDK.dir}/include
+
+                <!-- non-namespaced includes -->
+                ${package.DirtySDK.dir}/include/DirtySDK
+                ${package.DirtySDK.dir}/include/DirtySDK/comm
+                ${package.DirtySDK.dir}/include/DirtySDK/crypt
+                ${package.DirtySDK.dir}/include/DirtySDK/dirtysock
+                ${package.DirtySDK.dir}/include/DirtySDK/game
+                ${package.DirtySDK.dir}/include/DirtySDK/graph
+                ${package.DirtySDK.dir}/include/DirtySDK/misc
+                ${package.DirtySDK.dir}/include/DirtySDK/proto
+                ${package.DirtySDK.dir}/include/DirtySDK/util
+                ${package.DirtySDK.dir}/include/DirtySDK/voip
+                ${package.DirtySDK.dir}/include/DirtySDK/xml
+                ${package.DirtySDK.dir}/include/DirtySDK/web
+
+                <do if="${config-system} == 'pc64'">
+                    ${package.DirtySDK.dir}/include/DirtySDK/dirtysock/pc
+                </do>
+                <do unless="${config-system} == 'pc64'">
+                    ${package.DirtySDK.dir}/include/DirtySDK/dirtysock/${config-system}
+                </do>
+            </includedirs>
+            <libs/> <!-- use default lib path using module name -->
+
+            <!-- Add the external libs if we are not building as a DLL
+                 In the case we are building as a DLL the library will link the required libraries itself -->
+            <libs-external unless="${Dll??false}">
+                <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                    <includes name="iphlpapi.lib" asis="true"/>
+                    <includes name="ws2_32.lib" asis="true"/>
+                </do>
+
+                <do if="${config-system} == 'capilano'">
+                    <includes name="bcrypt.lib" asis="true"/>
+                </do>
+
+                <do if="${config-system} == 'kettle'">
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAjm_stub_weak.a"            asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAudioIn_stub_weak.a"        asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAppContent_stub_weak.a"     asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceCommonDialog_stub_weak.a"   asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceHttp_stub_weak.a"           asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceInvitationDialog_stub_weak.a" asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceMsgDialog_stub_weak.a"      asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNetCtl_stub_weak.a"         asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNet_stub_weak.a"            asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpAuth_stub_weak.a"         asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpCommerce_stub_weak.a"     asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpCommon_stub_weak.a"       asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpManager_stub_weak.a"      asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpWebApi_stub_weak.a"       asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceSsl_stub_weak.a"            asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceSysmodule_stub_weak.a"      asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceUserService_stub_weak.a"    asis="true"/>
+                    <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceVoice_stub_weak.a"          asis="true"/>
+                </do>
+            </libs-external>
+
+            <!-- exported defines -->
+            <defines>
+                <do if="${dirtysdk_debug_enable??false}">
+                    DIRTYCODE_LOGGING=1
+                </do>
+                <do if="${dirtysdk_debug_disable??false}">
+                    DIRTYCODE_LOGGING=0
+                </do>
+            </defines>
+
+            <publicdependencies>
+                EABase
+            </publicdependencies>
+        </module>
+
+        <!-- Export the includes/libs for the contribs -->
+        <foreach property="contrib" item="String" in="${package.DirtySDK.contribs.available}">
+            <module name="${contrib}">
+                <!-- If a contrib needs to export headers, it needs to put those in the respective include directory -->
+                <includedirs>
+                    ${package.DirtySDK.dir}/contrib/${contrib}/include
+                </includedirs>
+                <libs/> <!-- use default lib path using module name -->
+            </module>
+        </foreach>
+    </publicdata>
+
+    <property name="package.DirtySDK.networking-manifest-files" value="${package.DirtySDK.dir}/scripts/dirtysock-networkmanifest.xml"/>
+
+    <!-- bring in DirtySDK.warningsuppression and AddDirtySDKNetworkManifest -->
+    <include file="dirtysock-external.xml" />
+</project>

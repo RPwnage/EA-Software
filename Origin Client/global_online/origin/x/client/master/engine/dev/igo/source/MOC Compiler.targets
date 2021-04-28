@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <PropertyPageSchema
+      Include="$(MSBuildThisFileDirectory)$(MSBuildThisFileName).xml" />
+    <AvailableItemName
+      Include="MOC_Compiler">
+      <Targets>_MOC_Compiler</Targets>
+    </AvailableItemName>
+  </ItemGroup>
+  <UsingTask
+    TaskName="MOC_Compiler"
+    TaskFactory="XamlTaskFactory"
+    AssemblyName="Microsoft.Build.Tasks.v4.0">
+    <Task>$(MSBuildThisFileDirectory)$(MSBuildThisFileName).xml</Task>
+  </UsingTask>
+  <Target
+    Name="_MOC_Compiler"
+    BeforeTargets="$(MOC_CompilerBeforeTargets)"
+    AfterTargets="$(MOC_CompilerAfterTargets)"
+    Condition="'@(MOC_Compiler)' != ''"
+    DependsOnTargets="$(MOC_CompilerDependsOn);ComputeMOC_CompilerOutput"
+    Outputs="%(MOC_Compiler.Outputs)"
+    Inputs="%(MOC_Compiler.Identity);%(MOC_Compiler.AdditionalDependencies);$(MSBuildProjectFile)">
+    <ItemGroup
+      Condition="'@(SelectedFiles)' != ''">
+      <MOC_Compiler
+        Remove="@(MOC_Compiler)"
+        Condition="'%(Identity)' != '@(SelectedFiles)'" />
+    </ItemGroup>
+    <ItemGroup>
+      <MOC_Compiler_tlog
+        Include="%(MOC_Compiler.Outputs)"
+        Condition="'%(MOC_Compiler.Outputs)' != '' and '%(MOC_Compiler.ExcludedFromBuild)' != 'true'">
+        <Source>@(MOC_Compiler, '|')</Source>
+      </MOC_Compiler_tlog>
+    </ItemGroup>
+    <Message
+      Importance="High"
+      Text="%(MOC_Compiler.ExecutionDescription)" />
+    <WriteLinesToFile
+      Condition="'@(MOC_Compiler_tlog)' != '' and '%(MOC_Compiler_tlog.ExcludedFromBuild)' != 'true'"
+      File="$(IntDir)$(ProjectName).write.1.tlog"
+      Lines="^%(MOC_Compiler_tlog.Source);@(MOC_Compiler_tlog-&gt;'%(Fullpath)')" />
+    <MOC_Compiler
+      Condition="'@(MOC_Compiler)' != '' and '%(MOC_Compiler.ExcludedFromBuild)' != 'true'"
+      CommandLineTemplate="%(MOC_Compiler.CommandLineTemplate)"
+      defines="%(MOC_Compiler.defines)"
+      includes="%(MOC_Compiler.includes)"
+      AdditionalOptions="%(MOC_Compiler.AdditionalOptions)"
+      Inputs="%(MOC_Compiler.Identity)" />
+  </Target>
+  <PropertyGroup>
+    <ComputeLinkInputsTargets>
+            $(ComputeLinkInputsTargets);
+            ComputeMOC_CompilerOutput;
+          </ComputeLinkInputsTargets>
+    <ComputeLibInputsTargets>
+            $(ComputeLibInputsTargets);
+            ComputeMOC_CompilerOutput;
+          </ComputeLibInputsTargets>
+  </PropertyGroup>
+  <Target
+    Name="ComputeMOC_CompilerOutput"
+    Condition="'@(MOC_Compiler)' != ''">
+    <ItemGroup>
+      <MOC_CompilerDirsToMake
+        Condition="'@(MOC_Compiler)' != '' and '%(MOC_Compiler.ExcludedFromBuild)' != 'true'"
+        Include="%(MOC_Compiler.Outputs)" />
+      <Link
+        Include="%(MOC_CompilerDirsToMake.Identity)"
+        Condition="'%(Extension)'=='.obj' or '%(Extension)'=='.res' or '%(Extension)'=='.rsc' or '%(Extension)'=='.lib'" />
+      <Lib
+        Include="%(MOC_CompilerDirsToMake.Identity)"
+        Condition="'%(Extension)'=='.obj' or '%(Extension)'=='.res' or '%(Extension)'=='.rsc' or '%(Extension)'=='.lib'" />
+      <ImpLib
+        Include="%(MOC_CompilerDirsToMake.Identity)"
+        Condition="'%(Extension)'=='.obj' or '%(Extension)'=='.res' or '%(Extension)'=='.rsc' or '%(Extension)'=='.lib'" />
+    </ItemGroup>
+    <MakeDir
+      Directories="@(MOC_CompilerDirsToMake-&gt;'%(RootDir)%(Directory)')" />
+  </Target>
+</Project>

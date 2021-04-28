@@ -1,0 +1,768 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <dependent name="VisualStudio" />
+
+  <!-- Define this property if we are using vc8 
+       To test if we are using vc8, use @{PropertyExists('package.eaconfig.isusingvc8')}
+  -->
+  <property name="package.eaconfig.isusingvc8" value="true" if="'${package.VisualStudio.version}' gte '8.0.0'"/>
+  <property name="package.eaconfig.isusingvc9" value="true" if="'${package.VisualStudio.version}' gte '9.0.0'"/>
+  <property name="package.eaconfig.isusingvc10" value="true" if="'${package.VisualStudio.version}' gte '10.0.0'"/>
+  <property name="package.eaconfig.isusingvc11" value="true" if="'${package.VisualStudio.version}' gte '11.0.0'"/>
+
+  <property name="package.eaconfig.isusingvc8" value="true" if="@{StrStartsWith('${package.VisualStudio.version}', 'dev')}"/>
+  <do if="@{StrStartsWith('${package.VisualStudio.version}', 'dev2008')}">
+    <property name="package.eaconfig.isusingvc8" value="true" />
+    <property name="package.eaconfig.isusingvc9" value="true" />
+  </do>
+  <do if="@{StrStartsWith('${package.VisualStudio.version}', 'dev2010')}">
+    <property name="package.eaconfig.isusingvc8" value="true" />
+    <property name="package.eaconfig.isusingvc9" value="true" />
+    <property name="package.eaconfig.isusingvc10" value="true" />
+  </do>
+  
+  <do if="@{StrStartsWith('${package.VisualStudio.version}', 'dev2011')}">
+    <property name="package.eaconfig.isusingvc8" value="true" />
+    <property name="package.eaconfig.isusingvc9" value="true" />
+    <property name="package.eaconfig.isusingvc10" value="true" />
+	<property name="package.eaconfig.isusingvc11" value="true" />
+  </do>
+
+    <!-- Auto-detect Visual Studio 2005 - this affects VCPROJ generation -->
+  <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+    <property name="config-vs-version" value="8.0"/>
+  </do>
+  <do if="@{PropertyExists('package.eaconfig.isusingvc9')}">
+    <property name="config-vs-version" value="9.0"/>
+  </do>
+  <do if="@{PropertyExists('package.eaconfig.isusingvc10')}">
+    <property name="config-vs-version" value="10.0"/>
+  </do>
+  <do if="@{PropertyExists('package.eaconfig.isusingvc11')}">
+    <property name="config-vs-version" value="11.0"/>
+  </do>
+
+  <do if="@{PropertyExists('package.eaconfig.isusingvc9')}">
+    <dependent name="WindowsSDK" />
+  </do>
+
+  <property name="config-system" value="pc" />
+  <property name="config-compiler" value="vc" />
+  <property name="config-platform" value="pc-vc" />
+
+  <property name="lib-prefix" value="" />
+  <property name="lib-suffix" value=".lib" />
+  <property name="dll-suffix" value=".dll" readonly="true"/>
+  <property name="exe-suffix" value=".exe"/>
+  
+  <fail message="dll-suffix can not be changed on PC." if="'${dll-suffix}' != '.dll'"/>
+  <!-- used to run test programs during build -->
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle" value="Windows" />
+
+  <!-- <cc> task properties -->
+  <property name="cc.defines">
+    <!--
+    ${property.value}
+-->
+    WIN32
+  </property>
+
+  <property name="cc.gccdefines">
+    <!--
+    ${property.value}    
+-->
+    _WIN32
+  </property>
+
+  <property name="cc.options">
+    <!-- clear the default options and start fresh with config supplied options -->
+ </property>
+
+  <!-- This template is only used for NAnt builds. -->
+  <property name="cc.template.commandline">
+    %defines%
+    %includedirs%
+    %usingdirs%
+    %options%
+    -Fo"%objectfile%"
+    "%sourcefile%"
+  </property>
+
+  <property name="cc.template.includedir" value='-I "%includedir%"' />
+  <property name="cc.template.define" value='-D "%define%"' />
+  <property name="cc.template.usingdir" value='-AI "%usingdir%"' />
+  <!-- using dir template for managed C++ -->
+
+  <property name="package.eaconfig.clrFlag" value="-clr"/>
+  <property name="package.eaconfig.vc8Defines"/>
+  <property name="package.eaconfig.vc7LinkOptions"/>
+
+  <!-- 
+  Pre-define ${package.name}.vc8transition because nant has problem evaluating expression
+  For <option>, you can't use an expression like "PropertyExists('a') and ${a}", because nant always eval 
+  the latter part regardless the former being true or not. It's known issue, so we have to use this
+  workaround.
+  -->
+  <property name="${package.name}.vc8transition" value="false" unless="@{PropertyExists('${package.name}.vc8transition')}"/>
+  <choose>
+    <do unless="@{PropertyExists('package.eaconfig.isusingvc8')}">
+      <property name="package.eaconfig.vcdir" value="${package.VisualStudio.appdir}\VC7"/>
+      <property name="package.eaconfig.sdkdir" value="${package.VisualStudio.appdir}\SDK\v1.1\include"/>
+      <property name="package.eaconfig.vc7LinkOptions">
+        -noentry                                <!-- needed for Assembly generation -->
+        <!-- 
+        Excluding nochkclr.obj also requires this, which doesn't clutter build scripts.
+        Assumption: MC++ is used to build assemblies that wrap around C++ DLLs.
+        -->
+        -INCLUDE:__DllMainCRTStartup@12
+      </property>
+    </do>
+    <do>
+      <property name="package.eaconfig.vcdir" value="${package.VisualStudio.appdir}\VC"/>
+      <property name="package.eaconfig.sdkdir">
+        ${package.VisualStudio.appdir}\SDK\v2.0\include
+        ${package.VisualStudio.appdir}\INCLUDE
+      </property>
+      <do if="${${package.name}.vc8transition}">
+        <property name="package.eaconfig.clrFlag" value="-clr:oldSyntax"/>
+        <property name="package.eaconfig.vc8Defines">
+          _CRT_SECURE_NO_DEPRECATE
+        </property>
+      </do>
+    </do>
+  </choose>
+
+  <!-- define platform SDK directory -->
+  <choose>
+	<do if="@{PropertyExists('package.eaconfig.isusingvc11')}">
+		<property name="eaconfig.PlatformSDK.dir" value="${package.WindowsSDK.kitdir}"/>		
+	</do>
+	<do if="@{PropertyExists('package.eaconfig.isusingvc9')}">
+      <property name="eaconfig.PlatformSDK.dir" value="${package.WindowsSDK.appdir}"/>	  
+    </do>
+    <do>
+      <property name="eaconfig.PlatformSDK.dir" value="${package.VisualStudio.PlatformSDKdir}"
+                   if="@{PropertyExists('package.VisualStudio.PlatformSDKdir')}"/>
+      <property name="eaconfig.PlatformSDK.dir" value="${package.eaconfig.vcdir}/PlatformSDK"
+                    unless="@{PropertyExists('package.VisualStudio.PlatformSDKdir')}"/>
+    </do>
+  </choose>
+  
+	<!-- define include directory for Windows 8 SDK -->
+	<property name="eaconfig.PlatformSDK.um.dir" value="${eaconfig.PlatformSDK.dir}\lib\win8\um\"/>
+	<choose>
+		<do if="@{PropertyExists('package.eaconfig.isusingvc11')}">					
+			<property name="eaconfig.PlatformSDK.dir.lib" value="${eaconfig.PlatformSDK.um.dir}\x86"/>
+		</do>	
+		<do>
+			<property name="eaconfig.PlatformSDK.dir.lib" value="${eaconfig.PlatformSDK.dir}/lib\"/>
+		</do>		
+	</choose>
+
+  <optionset name="config-options-common">
+    <option name="buildset.link.options">
+      @{OptionSetGetValue('config-options-common', 'buildset.link.options')}
+      -machine:x86    <!-- specify target platform to x86 -->
+    </option>
+  </optionset>
+
+  <optionset name="config-options-common">
+    <option name="buildset.cc.options">
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.options')}
+      /Zc:wchar_t-
+    </option>
+    <option name="buildset.cc.defines">
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.defines')}
+      WIN32
+      ${package.eaconfig.vc8Defines}
+    </option>
+    <option name="buildset.cc.includedirs">
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.includedirs')}
+      ${package.eaconfig.vcdir}\ATLMFC\INCLUDE
+      ${package.eaconfig.vcdir}\INCLUDE
+      ${eaconfig.PlatformSDK.dir}\include
+      ${package.eaconfig.sdkdir}
+    </option>
+				
+	<option name="buildset.cc.includedirs" if="@{PropertyExists('package.eaconfig.isusingvc11')}">
+		${option.value}
+		${eaconfig.PlatformSDK.dir}\Include\shared
+		${eaconfig.PlatformSDK.dir}\Include\um
+	</option>
+	
+    <option name="buildset.link.options" if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+      @{OptionSetGetValue('config-options-common', 'buildset.link.options')}
+      -manifest  <!-- Create Side-by-Side Assembly Manifest for VS2005 builds. -->
+    </option>
+	
+	<option name="buildset.link.libraries">	
+		@{OptionSetGetValue('config-options-common', 'buildset.link.libraries')}    
+		${eaconfig.PlatformSDK.dir.lib}/WinMM.lib
+		${eaconfig.PlatformSDK.dir.lib}/Gdi32.lib
+		${eaconfig.PlatformSDK.dir.lib}/User32.lib
+		${eaconfig.PlatformSDK.dir.lib}/advapi32.lib
+    </option>	
+  </optionset>
+  
+  
+  <optionset name="config-options-dynamiclibrary" >
+      <option name="generatedll"              value="on" />
+      <option name="multithreadeddynamiclib"        value="on" />
+      <option name="buildset.name"                        value="DynamicLibrary" />
+    <option name="buildset.tasks"                       value="asm cc link" />
+    <option name="buildset.cc.defines"                  value="EA_DLL" />
+    <option name="impliboutputname" value="%outputdir%/%outputname%.lib"/>
+    <!-- name of import library -->
+  </optionset>
+
+  <optionset name="config-options-windowsprogram">
+    <option name="pcconsole"              value="off" />
+    <option name="buildset.name"            value="WindowsProgram" />
+    <option name="buildset.tasks"            value="asm cc link" />
+    <option name="buildset.cc.defines"          value="_WINDOWS" />
+    <option name="buildset.cc.options"          value="/EHsc" />
+    <option name="linkoutputname" value="%outputdir%/%outputname%${exe-suffix}" />
+  </optionset>
+
+  <optionset name="config-options-csharplibrary">
+    <option name="buildset.name"            value="CSharpLibrary" />
+    <option name="buildset.tasks"            value="csc" />
+    <option name="buildset.csc.target"          value="library" />
+    <option name="delayedinit" value="eaconfig-init-csharpcommon" />
+  </optionset>
+
+  <optionset name="config-options-csharpprogram">
+    <option name="buildset.name"            value="CSharpProgram" />
+    <option name="buildset.tasks"            value="csc" />
+    <option name="buildset.csc.target"          value="exe" />
+    <option name="delayedinit" value="eaconfig-init-csharpcommon" />
+  </optionset>
+
+  <optionset name="config-options-csharpwindowsprogram">
+    <option name="buildset.name"            value="CSharpWindowsProgram" />
+    <option name="buildset.tasks"            value="csc" />
+    <option name="buildset.csc.target"          value="winexe" />
+    <option name="delayedinit" value="eaconfig-init-csharpcommon" />
+  </optionset>
+
+  <optionset name="config-options-fsharplibrary">
+    <option name="buildset.name"            value="FSharpLibrary" />
+    <option name="buildset.tasks"            value="fsc" />
+    <option name="buildset.fsc.target"          value="library" />
+    <option name="delayedinit" value="eaconfig-init-fsharpcommon" />
+  </optionset>
+
+  <optionset name="config-options-fsharpprogram">
+    <option name="buildset.name"            value="FSharpProgram" />
+    <option name="buildset.tasks"            value="fsc" />
+    <option name="buildset.fsc.target"          value="exe" />
+    <option name="delayedinit" value="eaconfig-init-fsharpcommon" />
+  </optionset>
+
+  <optionset name="config-options-fsharpwindowsprogram">
+    <option name="buildset.name"            value="FSharpWindowsProgram" />
+    <option name="buildset.tasks"            value="fsc" />
+    <option name="buildset.fsc.target"          value="winexe" />
+    <option name="delayedinit" value="eaconfig-init-fsharpcommon" />
+  </optionset>
+
+  <target name="eaconfig-init-csharpcommon" hidden="true">
+    <dependent name="DotNet" />
+    <property name="build.env.PATH" value="${property.value};${package.DotNet.appdir}"/>
+    <!-- Assembly signing tool may need this environment variable -->
+    <sysinfo />
+    <property name="build.env.SystemDrive" value="${sys.env.SYSTEMDRIVE}" />
+    
+    <do unless="@{PropertyExists('package.eaconfig.isusingvc9')}">
+      <dependent name="DotNetSDK" />
+    </do>
+
+    <choose>
+      <do if="@{PropertyExists('package.eaconfig.isusingvc9')}">
+        <!-- In VC 9 we use WindowsSDK instead of .NetSDK -->
+        <!-- But we still need to define some of the DotNetSDK properties, otherwise, when using with vc9, 
+             many places in games/BuildworksScripts would report unable to find property package.DotNetSDK.version. 
+             this would especially break all the JUICE client side apps.
+        -->
+        <do unless="@{PropertyExists('package.DotNetSDK.version')}">
+          <property name="package.DotNetSDK.version" value="${package.WindowsSDK.version}"/>
+          <property name="package.DotNetSDK.support64bit" value="true"/>
+          <property  name="package.DotNetSDK.appdir"  value="${package.WindowsSDK.appdir}"/>
+          <property name="package.DotNetSDK.libdir" value="${package.DotNetSDK.libdir}"
+                    if="@{PropertyExists('package.DotNetSDK.libdir')}"/>
+          <property name="package.DotNetSDK.libdir" value="${package.DotNetSDK.appdir}/lib"
+                    unless="@{PropertyExists('package.DotNetSDK.libdir')}"/>
+          <property name="package.DotNetSDK.includedirs" value="${package.DotNetSDK.includedirs}"
+                    if="@{PropertyExists('package.DotNetSDK.includedirs')}"/>
+          <property name="package.DotNetSDK.includedirs" value="${package.DotNetSDK.appdir}/include"
+                    unless="@{PropertyExists('package.DotNetSDK.includedirs')}"/>
+
+        </do>
+      </do>
+      <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+        <fail message="ERROR: Microsoft .NET 1.1 is not compatible with Visual Studio 2005.  Please update your masterconfig.xml to use Microsoft .NET 2.0." unless="${package.DotNet.version} gte '2.0'"/>
+        <fail message="ERROR: Microsoft .NET 1.1 SDK is not compatible with Visual Studio 2005.  Please update your masterconfig.xml to use Microsoft .NET 2.0 SDK." unless="${package.DotNetSDK.version} gte '2.0'"/>
+      </do>
+      <do>
+        <fail message="ERROR: Microsoft .NET 2.0 is not compatible with Visual Studio .NET 2003.  Please update your masterconfig.xml to use Microsoft .NET 1.1." if="${package.DotNet.version} gte '2.0'"/>
+        <fail message="ERROR: Microsoft .NET 2.0 SDK is not compatible with Visual Studio .NET 2003.  Please update your masterconfig.xml to use Microsoft .NET 1.1 SDK." if="${package.DotNetSDK.version} gte '2.0'"/>
+      </do>
+    </choose>
+    <choose>
+      <do if="@{PropertyExists('package.eaconfig.isusingvc9')}">
+        <!-- define DotNet SDK lib directory -->
+        <property name="eaconfig.DotNetSDK.libdir" value="${package.WindowsSDK.libdir}"
+                  if="@{PropertyExists('package.WindowsSDK.libdir')}"/>
+        <property name="eaconfig.DotNetSDK.libdir" value="${package.WindowsSDK.appdir}/lib"
+                  unless="@{PropertyExists('package.WindowsSDK.libdir')}"/>
+
+        <property name="eaconfig.DotNetSDK.includedirs" value="${package.WindowsSDK.includedirs}"
+                  if="@{PropertyExists('package.WindowsSDK.includedirs')}"/>
+
+        <property name="eaconfig.DotNetSDK.includedirs" value="${package.WindowsSDK.appdir}/include"
+                  unless="@{PropertyExists('package.WindowsSDK.includedirs')}"/>
+
+      </do>
+      <do>
+        <!-- define DotNet SDK lib directory -->
+        <property name="eaconfig.DotNetSDK.libdir" value="${package.DotNetSDK.libdir}"
+                  if="@{PropertyExists('package.DotNetSDK.libdir')}"/>
+
+        <property name="eaconfig.DotNetSDK.libdir" value="${package.DotNetSDK.appdir}/lib"
+                  unless="@{PropertyExists('package.DotNetSDK.libdir')}"/>
+
+        <property name="eaconfig.DotNetSDK.includedirs" value="${package.DotNetSDK.includedirs}"
+                  if="@{PropertyExists('package.DotNetSDK.includedirs')}"/>
+
+        <property name="eaconfig.DotNetSDK.includedirs" value="${package.DotNetSDK.appdir}/include"
+                  unless="@{PropertyExists('package.DotNetSDK.includedirs')}"/>
+
+      </do>
+    </choose>
+
+  </target>
+
+  <target name="eaconfig-init-fsharpcommon" hidden="true">
+    <dependent name="DotNet" />
+    <dependent name="FSharp" />
+    <property name="build.env.PATH" value="${property.value};${package.DotNet.appdir}"/>
+    <!-- Asembly signing tool may need this environment variable -->
+    <sysinfo />
+    <property name="build.env.SystemDrive" value="${sys.env.SYSTEMDRIVE}" />
+    
+    <do unless="@{PropertyExists('package.eaconfig.isusingvc9')}">
+      <dependent name="DotNetSDK" />
+    </do>
+
+    <choose>
+      <do if="@{PropertyExists('package.eaconfig.isusingvc9')}">
+        <!-- In VC 9 we use WindowsSDK instead of .NetSDK -->
+        <!-- But we still need to define some of the DotNetSDK properties, otherwise, when using with vc9, 
+             many places in games/BuildworksScripts would report unable to find property package.DotNetSDK.version. 
+             this would especially break all the JUICE client side apps.
+        -->
+        <do unless="@{PropertyExists('package.DotNetSDK.version')}">
+          <property name="package.DotNetSDK.version" value="${package.WindowsSDK.version}"/>
+          <property name="package.DotNetSDK.support64bit" value="true"/>
+          <property  name="package.DotNetSDK.appdir"  value="${package.WindowsSDK.appdir}"/>
+          <property name="package.DotNetSDK.libdir" value="${package.DotNetSDK.libdir}"
+                    if="@{PropertyExists('package.DotNetSDK.libdir')}"/>
+          <property name="package.DotNetSDK.libdir" value="${package.DotNetSDK.appdir}/lib"
+                    unless="@{PropertyExists('package.DotNetSDK.libdir')}"/>
+          <property name="package.DotNetSDK.includedirs" value="${package.DotNetSDK.includedirs}"
+                    if="@{PropertyExists('package.DotNetSDK.includedirs')}"/>
+          <property name="package.DotNetSDK.includedirs" value="${package.DotNetSDK.appdir}/include"
+                    unless="@{PropertyExists('package.DotNetSDK.includedirs')}"/>
+
+        </do>
+      </do>
+      <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+        <fail message="ERROR: Microsoft .NET 1.1 is not compatible with Visual Studio 2005.  Please update your masterconfig.xml to use Microsoft .NET 2.0." unless="${package.DotNet.version} gte '2.0'"/>
+        <fail message="ERROR: Microsoft .NET 1.1 SDK is not compatible with Visual Studio 2005.  Please update your masterconfig.xml to use Microsoft .NET 2.0 SDK." unless="${package.DotNetSDK.version} gte '2.0'"/>
+      </do>
+      <do>
+        <fail message="ERROR: Microsoft .NET 2.0 is not compatible with Visual Studio .NET 2003.  Please update your masterconfig.xml to use Microsoft .NET 1.1." if="${package.DotNet.version} gte '2.0'"/>
+        <fail message="ERROR: Microsoft .NET 2.0 SDK is not compatible with Visual Studio .NET 2003.  Please update your masterconfig.xml to use Microsoft .NET 1.1 SDK." if="${package.DotNetSDK.version} gte '2.0'"/>
+      </do>
+    </choose>
+    <choose>
+      <do if="@{PropertyExists('package.eaconfig.isusingvc9')}">
+        <!-- define DotNet SDK lib directory -->
+        <property name="eaconfig.DotNetSDK.libdir" value="${package.WindowsSDK.libdir}"
+                  if="@{PropertyExists('package.WindowsSDK.libdir')}"/>
+        <property name="eaconfig.DotNetSDK.libdir" value="${package.WindowsSDK.appdir}/lib"
+                  unless="@{PropertyExists('package.WindowsSDK.libdir')}"/>
+
+        <property name="eaconfig.DotNetSDK.includedirs" value="${package.WindowsSDK.includedirs}"
+                  if="@{PropertyExists('package.WindowsSDK.includedirs')}"/>
+
+        <property name="eaconfig.DotNetSDK.includedirs" value="${package.WindowsSDK.appdir}/include"
+                  unless="@{PropertyExists('package.WindowsSDK.includedirs')}"/>
+
+      </do>
+      <do>
+        <!-- define DotNet SDK lib directory -->
+        <property name="eaconfig.DotNetSDK.libdir" value="${package.DotNetSDK.libdir}"
+                  if="@{PropertyExists('package.DotNetSDK.libdir')}"/>
+
+        <property name="eaconfig.DotNetSDK.libdir" value="${package.DotNetSDK.appdir}/lib"
+                  unless="@{PropertyExists('package.DotNetSDK.libdir')}"/>
+
+        <property name="eaconfig.DotNetSDK.includedirs" value="${package.DotNetSDK.includedirs}"
+                  if="@{PropertyExists('package.DotNetSDK.includedirs')}"/>
+
+        <property name="eaconfig.DotNetSDK.includedirs" value="${package.DotNetSDK.appdir}/include"
+                  unless="@{PropertyExists('package.DotNetSDK.includedirs')}"/>
+
+      </do>
+    </choose>
+
+  </target>
+
+  <target name="eaconfig-init-managedcppcommon" hidden="true" depends="eaconfig-init-csharpcommon">
+
+    <property name="cc.includedirs">
+      ${property.value}
+      ${eaconfig.DotNetSDK.includedirs}
+    </property>
+    <property name="link.librarydirs" unless="@{PropertyExists('package.VisualStudio.64bit')}">
+      ${property.value}
+      ${eaconfig.DotNetSDK.libdir}
+    </property>
+
+    <MergeOption Optionset="${managedcppcommon.optionset}" OptionName="cc.includedirs">
+      <OptionValue>
+        ${package.DotNetSDK.appdir}/include    <!-- C++ .Net SDK includes -->
+      </OptionValue>
+    </MergeOption>
+    <MergeOption Optionset="${managedcppcommon.optionset}" OptionName="cc.usingdirs">
+      <OptionValue>
+        ${package.DotNet.appdir}                <!-- .Net assembly dirs -->
+        ${package.configbindir}
+      </OptionValue>
+    </MergeOption>
+
+    <property name="skip_defaultassemblies" value="false"/>
+    <do if="@{PropertyExists('groupname')}">
+      <do if="@{PropertyExists('${groupname}.usedefaultassemblies')}">
+        <do if="'${${groupname}.usedefaultassemblies}'=='false'">
+          <property name="skip_defaultassemblies" value="true"/>
+        </do>
+      </do>
+    </do>
+
+    <do unless="${skip_defaultassemblies}">
+      <!-- Dot Net frameworks version 3.0 and higher do not contain macorlib.dll, System.dll-->
+      <!--
+          <property name="__assembly_folder" value="${package.DotNet.appdir}\"/>          
+          <property name="__assembly_folder" value="" if="@{PropertyExists('package.DotNet.referencedir')}" />
+          -->
+      <property name="__assembly_folder" value=""/>
+
+      <MergeOption Optionset="${managedcppcommon.optionset}" OptionName="cc.options">
+        <OptionValue>
+          <!-- minimal .net dll to compile with, other ones are added by #using <...> -->
+          -FU "${__assembly_folder}mscorlib.dll"
+          -FU "${__assembly_folder}System.dll"
+          -FU "${__assembly_folder}System.Data.dll"
+        </OptionValue>
+      </MergeOption>
+    </do>
+  </target>
+
+  <target name="eaconfig-init-managedcppprogram" hidden="true">
+    <!-- This target is also used by build type customized from ManagedCppProgram -->
+    <property name="managedcppcommon.optionset" value="${build.buildtype}" />
+    <call target="eaconfig-init-managedcppcommon" />
+    <MergeOption Optionset="${build.buildtype}" OptionName="link.libraries">
+      <OptionValue>
+        ${eaconfig.DotNetSDK.libdir}/mscoree.lib
+      </OptionValue>
+    </MergeOption>
+  </target>
+
+  <target name="eaconfig-init-managedcppwindowsprogram" hidden="true">
+    <!-- This target is also used by build type customized from ManagedCppWindowsProgram -->
+    <property name="managedcppcommon.optionset" value="${build.buildtype}" />
+    <call target="eaconfig-init-managedcppcommon" />
+
+    <property name="skip_defaultassemblies" value="false"/>
+    <do if="@{PropertyExists('groupname')}">
+      <do if="@{PropertyExists('${groupname}.usedefaultassemblies')}">
+        <do if="'${${groupname}.usedefaultassemblies}'=='false'">
+          <property name="skip_defaultassemblies" value="true"/>
+        </do>
+      </do>
+    </do>
+
+    <do unless="${skip_defaultassemblies}">
+      <!-- Dot Net frameworks version 3.0 and higher do not contain macorlib.dll, System.dll-->
+      <!--
+          <property name="__assembly_folder" value="${package.DotNet.appdir}\"/>
+          <property name="__assembly_folder" value="" if="@{PropertyExists('package.DotNet.referencedir')}" />
+          -->
+      <property name="__assembly_folder" value=""/>
+
+      <MergeOption Optionset="${managedcppcommon.optionset}" OptionName="cc.options">
+        <OptionValue>
+          -FU "${__assembly_folder}System.Drawing.dll"
+          -FU "${__assembly_folder}System.Drawing.Design.dll"
+          -FU "${__assembly_folder}System.Windows.Forms.dll"
+          -FU "${__assembly_folder}System.XML.dll"
+        </OptionValue>
+      </MergeOption>
+    </do>
+    <MergeOption Optionset="${build.buildtype}" OptionName="link.libraries">
+      <OptionValue>
+        ${eaconfig.DotNetSDK.libdir}/mscoree.lib
+      </OptionValue>
+    </MergeOption>
+  </target>
+
+  <target name="eaconfig-init-managedcppassembly" hidden="true">
+    <!-- This target is also used by build type customized from ManagedCppAssembly -->
+    <property name="managedcppcommon.optionset" value="${build.buildtype}" />
+    <call target="eaconfig-init-managedcppcommon" />
+  </target>
+
+  <!-- ===================================================================
+        Visual Studio managed C++ program optionset
+    ==================================================================== -->
+  <optionset name="config-options-managedcppprogram">
+    <option name="exceptions"                           value="on" />
+    <option name="managedcpp"                           value="on" />
+    <option name="multithreadeddynamiclib"              value="on" />
+    <option name="rtti"                                 value="on" />
+    <option name="runtimeerrorchecking"                 value="off" />
+    <!-- RTC is incompatible with Managed C++ -->
+    <option name="buildset.name" value="ManagedCppProgram" />
+    <option name="buildset.tasks" value="cc link" />
+    <option name="buildset.cc.options">
+      ${package.eaconfig.clrFlag}    <!-- enable CLR for managed code -->
+    </option>
+    <!-- link options -->
+    <option name="buildset.link.libraries">
+      <!-- minimal libraries needed to link with -->
+      ${eaconfig.PlatformSDK.dir.lib}/kernel32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/User32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/Gdi32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/winspool.lib
+      ${eaconfig.PlatformSDK.dir.lib}/comdlg32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/advapi32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/shell32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/ole32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/oleaut32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/uuid.lib
+      ${eaconfig.PlatformSDK.dir.lib}/odbccp32.lib
+    </option>
+    <option name="buildset.link.options">
+      -FIXED:No                               <!-- Fixed Base Address: Generate a relocation section -->
+    </option>
+    <option name="linkoutputname" value="%outputdir%/%outputname%${exe-suffix}" />
+    <option name="delayedinit" value="eaconfig-init-managedcppprogram" />
+  </optionset>
+
+
+  <!-- ===================================================================
+        Visual Studio managed C++ program optionset - but for a Windows app.
+    ==================================================================== -->
+  <optionset name="config-options-managedcppwindowsprogram">
+    <option name="exceptions"                           value="on" />
+    <option name="managedcpp"                           value="on" />
+    <option name="multithreadeddynamiclib"              value="on" />
+    <option name="pcconsole"                            value="off" />
+    <option name="rtti"                                 value="on" />
+    <option name="runtimeerrorchecking"                 value="off" />
+    <!-- RTC is incompatible with Managed C++ -->
+    <option name="buildset.name" value="ManagedCppWindowsProgram" />
+    <option name="buildset.tasks" value="cc link" />
+    <option name="buildset.cc.options">
+      ${package.eaconfig.clrFlag}    <!-- enable CLR for managed code -->
+    </option>
+    <!-- link options -->
+    <option name="buildset.link.libraries">
+      <!-- minimal libraries needed to link with -->
+      ${eaconfig.PlatformSDK.dir.lib}/kernel32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/User32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/Gdi32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/winspool.lib
+      ${eaconfig.PlatformSDK.dir.lib}/comdlg32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/advapi32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/shell32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/ole32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/oleaut32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/uuid.lib
+      ${eaconfig.PlatformSDK.dir.lib}/odbccp32.lib
+    </option>
+    <option name="buildset.link.options">
+      -FIXED:No                               <!-- Fixed Base Address: Generate a relocation section -->
+    </option>
+    <option name="linkoutputname" value="%outputdir%/%outputname%${exe-suffix}" />
+    <option name="delayedinit" value="eaconfig-init-managedcppwindowsprogram" />
+  </optionset>
+
+  <!-- ===================================================================
+        Visual Studio managed C++ assembly optionset
+    ==================================================================== -->
+  <optionset name="config-options-managedcppassembly">
+      <option name="exceptions"                           value="on" />
+      <option name="generatedll"                          value="on" />
+      <option name="managedcpp"                           value="on" />
+      <option name="runtimeerrorchecking"                 value="off" />
+      <!-- RTC is incompatible with Managed C++ -->
+      <option name="multithreadeddynamiclib"              value="on" />
+      <option name="rtti"                                 value="on" />
+      <option name="buildset.name" value="ManagedCppAssembly" />
+    <option name="buildset.tasks" value="cc link" />
+    <!-- cc options -->
+    <option name="buildset.cc.defines">
+      _WINDLL
+    </option>
+    <option name="buildset.cc.options">
+      ${package.eaconfig.clrFlag}    <!-- enable CLR for managed code -->
+    </option>
+    <!-- link options -->
+    <option name="buildset.link.libraries">
+      <!-- minimal libraries needed to link with -->
+      <!-- 
+            If nochkclr.obj is included, it'll cause linker warning LNK4099. Microsoft says it's ok to 
+            live with, but our game teams don't want any warning. So I exclude it.
+            -->
+      <!--${package.eaconfig.vcdir}/lib/nochkclr.obj-->
+      ${eaconfig.PlatformSDK.dir.lib}/kernel32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/User32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/Gdi32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/winspool.lib
+      ${eaconfig.PlatformSDK.dir.lib}/comdlg32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/advapi32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/shell32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/ole32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/oleaut32.lib
+      ${eaconfig.PlatformSDK.dir.lib}/uuid.lib
+      ${eaconfig.PlatformSDK.dir.lib}/odbccp32.lib
+    </option>
+    <option name="buildset.link.options">
+      -FIXED:No                               <!-- Fixed Base Address: Generate a relocation section -->
+      ${package.eaconfig.vc7LinkOptions}
+    </option>
+    <option name="linkoutputname" value="%outputdir%/%outputname%.dll" />
+    <option name="delayedinit" value="eaconfig-init-managedcppassembly" />
+  </optionset>
+
+  <property name="cc.includedirs">
+    ${property.value}
+    ${eaconfig.PlatformSDK.dir}\include
+  </property>
+
+  <property name="link.librarydirs">
+    ${property.value}
+    ${eaconfig.PlatformSDK.dir.lib}
+  </property>
+
+
+  <!-- <link> task properties -->
+  <property name="link.options">
+    <!--
+    ${property.value}    
+-->
+    -machine:x86    <!-- specify target platform to x86 -->
+  </property>
+
+  <property name="link.libraries">
+    ${eaconfig.PlatformSDK.dir.lib}/WinMM.lib
+    ${eaconfig.PlatformSDK.dir.lib}/Gdi32.lib
+    ${eaconfig.PlatformSDK.dir.lib}/User32.lib
+    ${eaconfig.PlatformSDK.dir.lib}/advapi32.lib
+  </property>
+
+  <property name="link.librarydirs">
+    ${property.value}
+    ${eaconfig.PlatformSDK.dir.lib}/prerelease
+    ${eaconfig.PlatformSDK.dir.lib}
+  </property>
+
+  <property name='link.template.librarydir' value='-libpath:"%librarydir%"' />
+  <property name='link.template.libraryfile' value='"%libraryfile%"' />
+  <property name='link.template.objectfile' value='"%objectfile%"' />
+
+  <property name="link.template.commandline">
+    %options%
+    %librarydirs%
+    %objectfiles%
+    %libraryfiles%
+  </property>
+
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="link.useresponsefile" value="true"/>
+  <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+	<property name="link.postlink.program" value="${package.WindowsSDK.appdir}\BIN\mt.exe" if="@{PropertyExists('package.eaconfig.isusingvc9')}" />
+	<property name="link.postlink.program" value="${package.WindowsSDK.kitbin.dir}\x86\mt.exe" if="@{PropertyExists('package.eaconfig.isusingvc11')}" />
+    <property name="link.postlink.program" value="${package.VisualStudio.appdir}\VC\BIN\mt.exe" unless="@{PropertyExists('package.eaconfig.isusingvc9')}" />
+    <property name="link.postlink.commandline" >
+      -nologo
+      -manifest "@{PathToWindows('%outputdir%\%outputname%.exe.manifest')}"
+      -outputresource:"@{PathToWindows('%outputdir%\%outputname%.exe;1')}"
+    </property>
+  </do>
+
+  <property name="lib.options"></property>
+
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="lib.useresponsefile" value="true"/>
+
+  <property name="platform.sdklibs.regular"></property>
+  <property name="platform.sdklibs.debug"></property>
+
+  <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+The "Dll" optionset is deprecated.  Please do not start using it for new
+code - you should use the DynamicLibrary optionset instead.  A Job Manager
+1.0 dependency on this optionset is preventing this change from being made:
+
+BUG#17826
+* "Removed the 'Dll' optionset"
+* Removed the "Dll" optionset, which was present on PC and XBOX 360
+platforms.  This was cut-and-paste legacy from tlconfig, and doesn't
+appear to be used by anybody.   DLLs should use the "DynamicLibrary"
+buildtype.
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+
+  <optionset name="Dll">
+    <option name="build.tasks" value="cc link" />
+    <option name="cc.options">
+      -WX          <!-- treat all warnings as errors -->
+      -nologo       <!-- suppress copyright message -->
+      -c          <!-- compile only, no link -->
+      -Zc:forScope    <!-- enforce Standard C++ for scoping rules -->
+      -GB         <!-- optimize for blended model -->
+      -GF         <!-- enable read-only string pooling -->
+      -Zi          <!-- Debug Information Format -->
+      -MD
+      <!--
+        link with LIBCMD.LIB (multithreaded static C runtime library).
+        We are intentionally using this option even in debug builds
+        because the debug version of the CRT doesn't really add any
+        value and mixing the debug and non-debug versions will cause
+        link errors.  If you want to use the Debug version of the CRT,
+        pass -nodefaultlibrary:libcmt.lib on the linker command line.
+      -->
+    </option>
+    <!-- All options except link.options are the same -->
+    <option name="link.options">
+      -nologo        <!-- suppress copyright message -->
+      -dll        <!-- Make a DLL, not an exe. -->
+      -incremental:no    <!-- disable incremental compilation -->
+      -machine:x86    <!-- specify target platform to x86 -->
+      -ignore:4089    <!-- disable warning: dll discarded by OPT:ref option -->
+      -out:"%outputdir%/%outputname%.dll"    <!-- set output file name -->
+      -implib:"%outputdir%/%outputname%.lib"  <!-- name of import library -->
+      -map:"%outputdir%/%outputname%.map"    <!-- generate mapfile -->
+      -opt:ref
+      -debug
+    </option>
+  </optionset>
+</project>

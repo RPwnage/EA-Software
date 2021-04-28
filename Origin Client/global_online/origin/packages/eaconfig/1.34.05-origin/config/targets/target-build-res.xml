@@ -1,0 +1,41 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-res')}' == 'exclude'">
+    <target name="build-res" hidden="true">
+      <property name="res.outputfile" value="${res.outputdir}/${res.name}" />
+      <depends property="needrebuild">
+        <inputs>
+          <includes fromfileset="res.sourcefiles" />
+        </inputs>
+        <outputs>
+          <includes name="${res.outputfile}" />
+        </outputs>
+      </depends>
+
+      <do if="${needrebuild}">
+        <mkdir dir="${res.outputdir}" unless="@{DirectoryExists('${res.outputdir}')}" />
+        <!-- rc.exe may need cvtres.exe program. In some configurations  (DotNet.3.5, 64 bit) it may not be in the same folder-->
+        <exec program="${build.rc.program}">
+          <args>
+            <arg value='/d _DEBUG' />
+            <arg value='/l 0x409' />
+            <!-- Specify the English codepage -->
+            <arg value='/i "${package.eaconfig.vcdir}\atlmfc\include"' />
+            <arg value='/i "${eaconfig.PlatformSDK.dir}\Include"' />
+            <arg value='/i "${package.eaconfig.vcdir}\Include"' />
+            <arg value='/i "${eaconfig.PlatformSDK.dir}\Include\um"' if="${package.WindowsSDK.MajorVersion??0} gte 8"/>
+            <arg value='/i "${eaconfig.PlatformSDK.dir}\Include\shared"' if="${package.WindowsSDK.MajorVersion??0} gte 8"/>
+            <arg value='${res.includedirs}' if='@{PropertyExists("res.includedirs")}'/>
+            <arg value='/fo"${res.outputfile}"' />
+            <arg value='"${res.resourcefile}"' />
+          </args>
+        </exec>
+      </do>
+      <property name="build-res-done" value="true"/>
+    </target>
+  </do>
+
+</project>

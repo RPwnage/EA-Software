@@ -1,0 +1,544 @@
+package com.ea.originx.automation.lib.pageobjects.store;
+
+import com.ea.originx.automation.lib.helpers.I18NUtil;
+import com.ea.originx.automation.lib.helpers.StringHelper;
+import static com.ea.originx.automation.lib.resources.OriginClientData.ORIGINAL_PRICE_STRIKETHROUGH_COLOUR;
+import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.support.Color;
+
+/**
+ * Object representing the descriptors on the PDP Hero. Includes everything in
+ * the action section that is not related to a CTA, an element to reveal a CTA,
+ * and the price. Includes all other descriptions and links.
+ *
+ * @author glivingstone
+ */
+public class PDPHeroActionDescriptors extends PDPHero {
+
+    // Product status
+    protected static final String PDP_PRODUCT_STATUS_TEXT_CSS = PDP_HERO_ACTION_CSS + " .origin-pdp-productstatus-container";
+    protected static final By PDP_PRODUCT_STATUS_MESSAGE_LOCATOR = By.cssSelector(PDP_PRODUCT_STATUS_TEXT_CSS);
+    protected static final By PDP_PRODUCT_STATUS_LINK_LOCATOR = By.cssSelector(PDP_PRODUCT_STATUS_TEXT_CSS + " > p > a");
+    protected static final String EXPECTED_OGD_LINK_LABEL = "View in library";
+    protected static final By ON_THE_HOUSE_DETAILS_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-store-pdp-sections-offerdetails .origin-pdp-hero-othdetails");
+
+    // Must own Base Game
+    protected static final By BASE_GAME_LINK_LOCATOR = By.cssSelector("origin-store-pdp-basegamerequired > div > p > a");
+    protected static final By BUY_BASE_GAME_MESSAGE_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-store-pdp-basegamerequired .origin-pdp-productstatus-text");
+
+    // Wishlist
+    protected static final By WISHLIST_HEART_ICON_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-wishlist-on-wishlist .otkicon-heart");
+    protected static final By WISHLIST_MESSAGE_TEXT_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-wishlist-on-wishlist .origin-wishlist-on-wishlist-message > .origin-wishlist-on-wishlist-text");
+    protected static final By VIEW_WISHLIST_LINK_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-wishlist-on-wishlist .origin-wishlist-on-wishlist-message > a");
+    private final String EXPECTED_ON_WISHLIST_TEXT = "on your wishlist";
+    private final String EXPECTED_VIEW_WISHLIST_LINK_TEXT = "View full wishlist";
+
+    // Origin Access Upsell Info
+    protected static final String ORIGIN_ACCESS_UPSELL_CSS = PDP_HERO_ACTION_CSS + " .origin-store-pdp-access-nonvaultupsell";
+    protected static final By ORIGIN_ACCESS_UPSELL_HEADER_LOCATOR = By.cssSelector(ORIGIN_ACCESS_UPSELL_CSS + " h6.origin-store-pdp-access-nonvaultupsell-header");
+    protected static final By ORIGIN_ACCESS_UPSELL_BRIEFING_LOCATOR = By.cssSelector(ORIGIN_ACCESS_UPSELL_CSS + " p.otkc");
+    protected static final By ORIGIN_ACCESS_LEARN_MORE_LINK_LOCATOR = By.cssSelector(ORIGIN_ACCESS_UPSELL_CSS + " a.otka.otkc");
+    protected static final String ORIGIN_ACCESS_LEARN_MORE_LINK_TEXT = "Learn More";
+    protected static final By ORIGIN_ACCESS_UPGRADE_NOW_LINK_LOCATOR = By.cssSelector(ORIGIN_ACCESS_UPSELL_CSS + " a.otka.origin-telemetry-otka");
+    protected static final String ORIGIN_ACCESS_UPGRADE_NOW_LINK_TEXT = "Upgrade Now";
+    protected static final By ORIGIN_ACCESS_GET_IT_NOW_LINK_LOCATOR = By.cssSelector(ORIGIN_ACCESS_UPSELL_CSS + " a.otka origin-store-pdp-access-nonvaultupsell-get");
+    protected static final String ORIGIN_ACCESS_GET_IT_NOW_LINK_TEXT = "Get It Now";
+    protected static final String[] PRODUCT_PART_OF_ORIGIN_ACCESS_KEYWORDS = {"available", "Origin Access"};
+    protected static final String[] ORIGIN_ACCESS_UPSELL_BRIEFING_KEYWORDS = {"Download", "play", "collection", "great", "games", "member"};
+
+    // Savings and Discount
+    protected static final String STORE_PDP_SAVINGS_CSS = "origin-store-pdp-savings .origin-pdp-savings";
+    protected static final By ACCESS_DISCOUNT_LOCATOR = By.cssSelector(STORE_PDP_SAVINGS_CSS + " .otkprice-sale.origin-pdp-savings-accessdiscount");
+    protected static final String[] ACCESS_DISCOUNT_KEYWORDS = {"origin", "access", "discount"};
+    protected static final By ACCESS_SAVINGS_PERCENT_LOCATOR = By.cssSelector(STORE_PDP_SAVINGS_CSS + " .otkprice-sale:not(.origin-pdp-savings-accessdiscount)");
+    protected static final By ORIGINAL_PRICE_STRIKETHROUGH = By.cssSelector(STORE_PDP_SAVINGS_CSS + " .otkprice-original:not(.origin-pdp-savings-accessdiscount)");
+    private final String PRICE_STRIKETHROUGH_TEXT_DECORATION = "line-through";
+
+    // Legal
+    protected static final By TERMS_AND_CONDITIONS_LINK_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-storegamelegal-terms > a");
+    protected static final By EULA_LINK_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-storegamelegal-eula > a");
+    protected static final String TERMS_AND_CONDITIONS_LINK_TEXT = "Terms and Conditions";
+    protected static final String EULA_LINK_TEXT = "EA User Agreement";
+
+    /**
+     * Constructor
+     *
+     * @param driver Selenium WebDriver
+     */
+    public PDPHeroActionDescriptors(WebDriver driver) {
+        super(driver);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // PRODUCT STATUS
+    // Current status of the product related to the user, like if they have
+    // the game in their library already.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Get product status information from the PDP page.
+     *
+     * @return Product status message
+     */
+    public String getProductStatusMessage() {
+        try {
+            return waitForElementVisible(PDP_PRODUCT_STATUS_MESSAGE_LOCATOR, 30).getText();
+        } catch (TimeoutException e) {
+            return "";
+        }
+    }
+
+    /**
+     * Verify product status message of an owned game.
+     *
+     * @return true if message contains keywords indicating the product is
+     * owned, false otherwise
+     */
+    public boolean verifyOwnedProductStatusMessage() {
+        return StringHelper.containsIgnoreCase(getProductStatusMessage(), I18NUtil.getMessage("ownMessage"));
+    }
+
+    /**
+     * Verify OGD (Origin Game Details) link of an owned game.
+     *
+     * @return true if library link is present with the expected text, false
+     * otherwise
+     */
+    public boolean verifyOGDLinkVisible() {
+        if (waitIsElementVisible(PDP_PRODUCT_STATUS_LINK_LOCATOR)) {
+            String linkLabel = waitForElementVisible(PDP_PRODUCT_STATUS_LINK_LOCATOR, 1).getText();
+            return StringHelper.containsIgnoreCase(linkLabel, EXPECTED_OGD_LINK_LABEL);
+        }
+        return false;
+    }
+
+    /**
+     * Click OGD (Origin Game Details) link of an owned game.
+     */
+    public void clickOGDLink() {
+        waitForElementClickable(PDP_PRODUCT_STATUS_LINK_LOCATOR).click();
+    }
+
+    /**
+     * Verify there is a text to indicate the entitlement is 'On The House' and
+     * is only 'Available for Limited Time Only'
+     *
+     * @return true if the text exists and matches
+     */
+    public boolean verifyOTHDetailsVisible() {
+        return StringHelper.containsIgnoreCase(waitForElementVisible(ON_THE_HOUSE_DETAILS_LOCATOR).getText(), I18NUtil.getMessage("onTheHouseMessage"));
+    }
+
+    /**
+     * Verify the entitlement is 'On The House' by checking there is message
+     * indicating and the product has '100%' off
+     *
+     * @return true if there is message indicating and the product has '100%'
+     * off
+     */
+    public boolean verifyEntitlementIsOTH() {
+        return getOriginAccessSavingsPercent() == 100.0 && verifyOTHDetailsVisible();
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // BASE GAME MESSAGE
+    // Message indicating the base game is required to play this entitlement.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify 'Must have the game' message is visible.
+     *
+     * @return true if visible else, false otherwise
+     */
+    public boolean verifyBaseGameRequiredMessageVisible() {
+        try {
+            return StringHelper.containsAnyIgnoreCase(waitForElementVisible(BUY_BASE_GAME_MESSAGE_LOCATOR).getText(), I18NUtil.getMessage("baseGameWarningMessage"));
+        } catch (NoSuchElementException | TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Follows the link to go to a DLC's base game.
+     *
+     * @return This instance of PDPHero
+     */
+    public PDPHero goToBaseGame() {
+        waitForElementClickable(BASE_GAME_LINK_LOCATOR).click();
+        waitForPdpHeroToLoad();
+        return this;
+    }
+
+    /**
+     * Verify the 'Required Base Game' link exists.
+     *
+     * @return true if exists, false otherwise
+     */
+    public boolean verifyBaseGameRequiredLinkExist() {
+        return waitIsElementVisible(BASE_GAME_LINK_LOCATOR, 5);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // WISHLIST
+    // Wishlist information related to the product, like if it is on the
+    // user's wishlist.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify the wishlist heart icon is visible.
+     *
+     * @return true if wishlist heart icon is visible, false otherwise
+     */
+    public boolean verifyWishlistHeartIconVisible() {
+        try {
+            scrollToElement(waitForElementVisible(WISHLIST_HEART_ICON_LOCATOR, 30));
+        } catch (NoSuchElementException | TimeoutException te) {
+            //To do nothing
+        }
+        return waitIsElementVisible(WISHLIST_HEART_ICON_LOCATOR, 1);
+    }
+
+    /**
+     * Verify 'On Wishlist' message for an entitlement that the user already has
+     * on their wishlist.
+     *
+     * @param entitlementName Entitlement name String to match
+     * @param waitSeconds Number of seconds to wait for the 'wishlist message'
+     * element to be visible
+     * @return true if the 'On Your Wishlist' message text contains the
+     * entitlement name, false otherwise
+     */
+    public boolean verifyOnWishlistMessageForEntitlement(String entitlementName, int waitSeconds) {
+        try {
+            String message = waitForElementVisible(WISHLIST_MESSAGE_TEXT_LOCATOR, waitSeconds).getText();
+            boolean result = StringHelper.containsIgnoreCase(message, entitlementName);
+            if (!result) {
+                throw new RuntimeException(String.format("PDP Wishlist message '%s' does not contain entitlement name '%s'",
+                        message, entitlementName));
+            }
+            return result;
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify 'On Your Wishlist' message for an entitlement that the user
+     * already has on their wishlist.
+     *
+     * @param entitlementName Entitlement name String to match
+     * @return true if 'On Your Wishlist' message text contains the entitlement
+     * name, false otherwise
+     */
+    public boolean verifyOnWishlistMessageForEntitlement(String entitlementName) {
+        return verifyOnWishlistMessageForEntitlement(entitlementName, 30);
+    }
+
+    /**
+     * Verify 'On Your Wishlist' message.
+     *
+     * @param waitSeconds Number of seconds to wait for 'Wishlist message'
+     * element to be visible
+     * @return true if 'On Your Wishlist' message text matches, false otherwise
+     */
+    public boolean verifyOnWishlistMessageText(int waitSeconds) {
+        try {
+            String message = waitForElementVisible(WISHLIST_MESSAGE_TEXT_LOCATOR, waitSeconds).getText();
+            boolean result = StringHelper.containsIgnoreCase(message, EXPECTED_ON_WISHLIST_TEXT);
+            if (!result) {
+                throw new RuntimeException(String.format("PDP wishlist message '%s' does not contain expected text '%s'",
+                        message, EXPECTED_ON_WISHLIST_TEXT));
+            }
+            return result;
+        } catch (TimeoutException | StaleElementReferenceException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify 'On Your Wishlist' message is as expected.
+     *
+     * @return true if 'On Your Wishlist' message text matches, false otherwise
+     */
+    public boolean verifyOnWishlistMessageText() {
+        return verifyOnWishlistMessageText(30);
+    }
+
+    /**
+     * Verify 'View Wishlist' link text is as expected.
+     *
+     * @param waitSeconds The number of seconds to wait for the 'Wishlist
+     * message'
+     * @return true if the 'View Wishlist' link text matches, false otherwise
+     */
+    public boolean verifyViewWishlistLinkText(int waitSeconds) {
+        try {
+            String text = waitForElementVisible(VIEW_WISHLIST_LINK_LOCATOR, waitSeconds).getText();
+            boolean result = StringHelper.containsIgnoreCase(text, EXPECTED_VIEW_WISHLIST_LINK_TEXT);
+            if (!result) {
+                throw new RuntimeException(String.format("PDP view wishlist link label '%s' does not contain expected text '%s'",
+                        text, EXPECTED_VIEW_WISHLIST_LINK_TEXT));
+            }
+            return result;
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify 'View Wishlist' link text is as expected.
+     *
+     * @return true if 'View Wishlist' link text matches, false otherwise
+     */
+    public boolean verifyViewWishlistLinkText() {
+        return verifyViewWishlistLinkText(30);
+    }
+
+    /**
+     * Verify a given entitlement is on the wishlist.
+     *
+     * @param entitlementName Name of the entitlement to check the wishlist for
+     * @return true if wishlist heart icon, 'On wish list' message with
+     * entitlementName, and 'View Wishlist' link text are all visible, false
+     * otherwise
+     */
+    public boolean verifyOnWishlist(String entitlementName) {
+        return verifyWishlistHeartIconVisible()
+                && verifyOnWishlistMessageForEntitlement(entitlementName)
+                && verifyOnWishlistMessageText()
+                && verifyViewWishlistLinkText();
+    }
+
+    /**
+     * Verify a given entitlement is on the wishlist (includes waits).
+     *
+     * @param entitlementName Name of the entitlement to check the wishlist for
+     * @return true if wishlist heart icon, 'On wish list' message with
+     * entitlementName, and 'View Wishlist' link text are all visible. This
+     * check is for when all the elements are already loaded in PDPHero - No
+     * waits provided
+     */
+    public boolean isOnWishlist(String entitlementName) {
+        return verifyWishlistHeartIconVisible()
+                && verifyOnWishlistMessageForEntitlement(entitlementName, 2)
+                && verifyOnWishlistMessageText(2)
+                && verifyViewWishlistLinkText(2);
+    }
+
+    /**
+     * Click 'View Wishlist' link.
+     */
+    public void clickViewWishlistLink() {
+        waitForElementClickable(VIEW_WISHLIST_LINK_LOCATOR).click();
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // ORIGIN ACCESS
+    // Related to Origin Access in the description of the product.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify that the 'Origin Access Upsell Header' indicates that the named
+     * entitlement is part of Origin Access.
+     *
+     * @param entitlementName Entitlement name to match
+     * @return true if the named entitlement is indicated to be part of Origin
+     * Access, false otherwise
+     */
+    public boolean verifyProductPartOfOriginAccess(String entitlementName) {
+        String header = waitForElementVisible(ORIGIN_ACCESS_UPSELL_HEADER_LOCATOR, 10).getText();
+        return StringHelper.containsIgnoreCase(header, PRODUCT_PART_OF_ORIGIN_ACCESS_KEYWORDS)
+                && StringHelper.containsIgnoreCase(header, entitlementName);
+    }
+
+    /**
+     * Verify the 'Origin Access Upsell Header' is visible.
+     *
+     * @return true if visible, false otherwise
+     */
+    public boolean verifyProductPartOfOriginAccessVisible() {
+        return waitIsElementVisible(ORIGIN_ACCESS_UPSELL_HEADER_LOCATOR, 1);
+    }
+
+    /**
+     * Verify the 'Origin Access Upsell Description' is visible.
+     *
+     * @return true if visible, false otherwise
+     */
+    public boolean verifyProductDescriptionOfOriginAccessVisible() {
+        return waitIsElementVisible(ORIGIN_ACCESS_UPSELL_BRIEFING_LOCATOR, 1);
+    }
+
+    /**
+     * Verify that the 'Origin Access Upsell Message' (below the header) has a
+     * brief description of the Origin Access program.
+     *
+     * @return true if the expected keywords are found in the message, false
+     * otherwise
+     */
+    public boolean verifyOriginAccessBriefDescription() {
+        String header = waitForElementVisible(ORIGIN_ACCESS_UPSELL_BRIEFING_LOCATOR, 10).getText();
+        return StringHelper.containsIgnoreCase(header, ORIGIN_ACCESS_UPSELL_BRIEFING_KEYWORDS);
+    }
+
+    /**
+     * Verify Origin Access 'Learn More' link is visible and has the expected
+     * text.
+     *
+     * @return true if link is visible and text matches the expected, false
+     * otherwise
+     */
+    public boolean verifyOriginAccessLearnMoreLinkVisible() {
+        try {
+            return waitForElementVisible(ORIGIN_ACCESS_LEARN_MORE_LINK_LOCATOR, 2).getText().equalsIgnoreCase(ORIGIN_ACCESS_LEARN_MORE_LINK_TEXT);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify Origin Access 'Upgrade Now' link is visible and has the expected
+     * text.
+     *
+     * @return true if link is visible and text matches the expected, false
+     * otherwise
+     */
+    public boolean verifyOriginAccessUpgradeNowLinkVisible() {
+        try {
+            return waitForElementVisible(ORIGIN_ACCESS_UPGRADE_NOW_LINK_LOCATOR, 2).getText().equalsIgnoreCase(ORIGIN_ACCESS_UPGRADE_NOW_LINK_TEXT);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify Origin Access 'Get It Now' link is visible and has the expected
+     * text.
+     *
+     * @return true if link is visible and text matches the expected, false
+     * otherwise
+     */
+    public boolean verifyOriginAccessGetItNowLinkVisible() {
+        try {
+            return waitForElementVisible(ORIGIN_ACCESS_GET_IT_NOW_LINK_LOCATOR, 2).getText().equalsIgnoreCase(ORIGIN_ACCESS_GET_IT_NOW_LINK_TEXT);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Click Origin Access 'Learn More' link.
+     */
+    public void clickOriginAccessLearnMoreLink() {
+        waitForElementClickable(ORIGIN_ACCESS_LEARN_MORE_LINK_LOCATOR).click();
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // SAVINGS AND DISCOUNT
+    // Displays the savings or discount associated with the entitlement.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify that the 'Origin Access Discount Applied' is provided for a origin
+     * access user.
+     *
+     * @return true if the expected keywords are found in the message, false
+     * otherwise
+     */
+    public boolean verifyOriginAccessDiscountIsVisible() {
+        try {
+            String header = waitForElementVisible(ACCESS_DISCOUNT_LOCATOR, 10).getText();
+            return StringHelper.containsIgnoreCase(header, ACCESS_DISCOUNT_KEYWORDS);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * To get the Origin Access discount percent for subscribers.
+     *
+     * @return The discounted amount
+     */
+    public double getOriginAccessSavingsPercent() {
+        return StringHelper.extractNumberFromText(waitForElementVisible(ACCESS_SAVINGS_PERCENT_LOCATOR).getText());
+    }
+
+    /**
+     * Verify that the original price is striked through and colour is gray
+     *
+     * @return true if the original price is striked through and colour is gray,
+     * false otherwise
+     */
+    public boolean verifyOriginalPriceIsStrikedThrough() {
+        try {
+            boolean textDecoration = StringHelper.containsIgnoreCase(waitForElementVisible(ORIGINAL_PRICE_STRIKETHROUGH).getCssValue("text-decoration"), PRICE_STRIKETHROUGH_TEXT_DECORATION);
+            boolean text = Color.fromString(waitForElementVisible(ORIGINAL_PRICE_STRIKETHROUGH).getCssValue("color")).asHex().equals(ORIGINAL_PRICE_STRIKETHROUGH_COLOUR);
+            return textDecoration && text;
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get discounted price
+     *
+     * @return striked through price
+     */
+    public double getStrikedThroughPrice() {
+        return StringHelper.extractNumberFromText(waitForElementVisible(ORIGINAL_PRICE_STRIKETHROUGH).getText());
+    }
+
+    /**
+     * Verify there is percentage for discount.
+     *
+     * @return true if percentage for discount is found, false otherwise.
+     */
+    public boolean verifyOriginAccessSavingsPercent() {
+        return waitIsElementVisible(ACCESS_SAVINGS_PERCENT_LOCATOR);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // LEGAL - TERMS AND CONDTIONS + END USER LICENSE AGREEMENT
+    // The links to legal things.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify 'Terms and Conditions' link text.
+     *
+     * @return true if link is visible and text matches the expected, false
+     * otherwise
+     */
+    public boolean verifyTermsAndConditionsLinkText() {
+        try {
+            return StringHelper.containsIgnoreCase(waitForElementVisible(TERMS_AND_CONDITIONS_LINK_LOCATOR, 2).getText(), TERMS_AND_CONDITIONS_LINK_TEXT);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Click the 'Terms and Conditions' link.
+     */
+    public void clickTermsAndConditionsLink() {
+        waitForElementClickable(TERMS_AND_CONDITIONS_LINK_LOCATOR).click();
+    }
+
+    /**
+     * Verify 'EULA' link text.
+     *
+     * @return true if link is visible and text matches the expected, false
+     * otherwise
+     */
+    public boolean verifyEULALinkText() {
+        try {
+            return waitForElementVisible(EULA_LINK_LOCATOR, 2).getText().equalsIgnoreCase(EULA_LINK_TEXT);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Click the 'EULA' link.
+     */
+    public void clickEULALink() {
+        waitForElementClickable(EULA_LINK_LOCATOR).click();
+    }
+}

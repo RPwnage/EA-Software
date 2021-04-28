@@ -1,0 +1,134 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+    <property name="ps3.useincredibuild" value="false"  unless="@{PropertyExists('ps3.useincredibuild')}"/>
+    <!-- setup common directory properties -->
+    <property name="script-dir" value="${package.dir}/scripts"/>
+    <property name="source-dir" value="${package.dir}/source"/>
+
+    <!--
+  Assume that we're using Visual Studio 2008 until we discover otherwise.
+  We're stomping on any 'config-vs-version' property being passed on the command-line,
+  because we're now able to auto-detect VS version on PS3 and XBOX360 too, which
+  means there's no longer any valid use-case for explicit passing of 'config-vs-version'
+  on the command-line.  Until we re-add the 'version' attribute to the nantToVSTools
+  task, we're going to need to continue to use this global property to pass VS version
+  information into nantToVSTools.
+  -->
+    <fail message="Please don't set 'config-vs-version' on the command-line.  We can auto-detect the Visual Studio version for all platforms now." if="@{PropertyExists('config-vs-version')}"/>
+    <property name="config-vs-version" value="9.0"/>
+
+    <!-- Create default bulkbuild property -->
+    <property name="bulkbuild" value="true" unless="@{PropertyExists('bulkbuild')}"/>
+
+    <!-- Create the config optionsets to use for creating build optionsets -->
+    <optionset name="config-options-common">
+        <option name="buildset.protobuildtype"              value="true" />
+        <option name="debugflags"                           value="off" />
+        <option name="debugsymbols"                         value="on" />
+        <option name="optimization"                         value="on" />
+        <option name="usedebuglibs"                         value="off" />
+
+        <option name="warnings"                             value="on" />
+        <option name="misc"                                 value="on" />
+
+        <option name="warningsaserrors"                     value="on" />
+        <option name="rtti"                                 value="off" />
+        <option name="exceptions"                           value="off" />
+        <option name="toolconfig"                           value="off" />
+        <option name="incrementallinking"                   value="off" />
+        <option name="generatemapfile"                      value="on" />
+        <option name="generatedll"                          value="off" />
+        <option name="multithreadeddynamiclib"        value="off" />
+        <option name="managedcpp"                           value="off" />
+        <!-- turn on/off managed C++ optionset -->
+        <option name="banner"                               value="off" />
+        <option name="editandcontinue"                      value="off" />
+        <option name="c7debugsymbols"                       value="off" />
+        <option name="standardsdklibs"                      value="on" />
+        <option name="runtimeerrorchecking"          value="off" />
+        <option name="pcconsole"              value="on" />
+        <option name="profile"                value="off" />
+        <option name="clanguage"                            value="off" />
+        <option name="uselibrarydependencyinputs"           value="off" />
+
+        <!--
+        turn on/off bounds-checking for STL iterators. Performance testing with
+        Conditioning benchmarks suggests that the release builds are around 20-30%
+        slower when built with Visual Studio 2005 than with VS.NET 2003.
+        Investigation shows that around half of the slowdown can be recovered by
+        defining _SECURE_SCL=0, which turns off bounds-checking for STL iterators
+        that is turned on by default in vs2005 even for release builds. We now
+        change it to "off" by default-->
+        <option name="iteratorboundschecking"               value="off" />
+
+        <option name="debugflags.custom.cc"                 value="" />
+        <option name="debugsymbols.custom.cc"               value="" />
+        <option name="debugsymbols.custom.link"             value="" />
+        <option name="misc.custom.cc"                       value="" />
+        <option name="usedebuglibs.custom.cc"               value="" />
+        <option name="standardsdklibs.custom.link"          value="" />
+        <option name="warnings.custom.cc"                   value="" />
+        <option name="warnings.custom.link"                 value="" />
+        <option name="enable.strict.aliasing"               value="off" />
+    </optionset>
+
+    <!-- generate the build settings with the specified config options -->
+    <optionset name="config-options-program" >
+        <option name="buildset.name"                        value="StdProgram" />
+        <option name="buildset.tasks"                       value="asm cc link" />
+    </optionset>
+
+    <optionset name="config-options-library" >
+        <option name="buildset.name"                        value="StdLibrary" />
+        <option name="buildset.tasks"                       value="asm cc lib" />
+    </optionset>
+
+    <!-- Provide a do-nothing Utility project, so that builds using the
+       Utility project support in nantToVSTools don't fall over horribly
+       during NAnt builds.  They should just do nothing.  Using this optionset
+       requires Framework-2.11.00 or newer, because there was a bug in the
+       string-splitting of the <build> task in earlier Framework versions,
+       which led to <build> looking for a task called "". -->
+    <optionset name="Utility">
+        <option name="build.tasks" value=""/>
+    </optionset>
+
+    <optionset name="MakeStyle">
+        <option name="build.tasks" value="makestyle"/>
+    </optionset>
+
+    <include file="../tasks/task-scriptinit.xml" />
+    <taskdef assembly="../../bin/eaconfig.dll"/>
+
+    <include file="../tasks/task-excludedir.xml" />
+    <include file="../tasks/task-others.xml" />
+    <include file="../global/easharp.xml" />
+    <include file="../tasks/task-generatewebreferences.xml" />
+    <include file="../tasks/task-generateslninteropassemblies.xml" />
+
+    <!-- Common Properties -->
+    <property name="config-isDll" value="false"/>
+    <!-- pointer size -->
+    <property name="platform-ptrsize" value="32bit"/>
+    <!-- registers size -->
+    <property name="platform-wordsize" value="32bit"/>
+
+    <script language="C#">
+        <code>
+            <![CDATA[
+            public static void ScriptMain(Project project) {
+                string minreqversion="2.15.9.00";
+                Version nantv = project.GetType().Assembly.GetName().Version;
+
+                if ((nantv.CompareTo(new Version(minreqversion)) < 0))
+                {
+                    throw new Exception(String.Format("Current Framework version '{0}' does not meet minimum required version: '{1}'", nantv, minreqversion));
+                }
+            }
+          ]]>
+        </code>
+    </script>
+</project>

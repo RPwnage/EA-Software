@@ -1,0 +1,250 @@
+<project name="OriginVersion" default="build">
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+		<option name="build" value="exclude"/>
+	</optionset>
+	
+	
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.OriginVersion.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.OriginVersion.version"  value="@{PathGetFileName('${package.OriginVersion.dir}')}"/>
+    <package name="OriginVersion" targetversion="${package.OriginVersion.version}"/>
+
+	<dependent name="ActivePython" />
+	<dependent name="OriginUtils" />
+	<dependent name="OriginConfig" />
+	<dependent name="wget" />
+	
+  <include file="${package.OriginVersion.dir}/scripts/initialize.xml" />
+  
+	<property name="package.OriginVersion.builddir" value="${package.OriginVersion.dir}/build" />
+  <property name="python.exe" value="Python.exe" unless="${config-system} == 'osx'" />
+  <property name="python.exe" value="python" if="${config-system} == 'osx'" />
+  
+  <property name="origin.branch.local" value="${origin.branch}" />
+  <!-- Override for sandbox builds so that all sandbox builds use the sandbox.version number -->
+  <property name="origin.branch.local" value="sandboxes" if="sandboxes == @{PathGetFileName( @{PathGetFullPath('${package.OriginVersion.dir}/../../..')} )} || ${origin.branch} == 'subscriptions' || ${origin.branch} == 'socialrefactor' || ${sandbox??false}" />
+  
+  <target name="update">
+    <property name="p4.clientspec" value="${sys.env.P4CLIENT}" if="@{PropertyExists('jenkins')}"/>
+    <fail message="p4.clientspec not defined. Use -D:p4.clientspec=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('p4.clientspec')}" />
+    <mkdir dir="${package.OriginVersion.builddir}" unless="@{DirectoryExists(${package.OriginVersion.builddir})}" />
+
+    <p4counter counter="${origin.branch.local}.version" property="version" />
+        
+    <property name="count" value="1" />
+
+    <property name="incrementBy" value="0" unless="@{PropertyExists('incrementBy')}" />
+
+    <foreach property="version.part" item="String" delim="." in="${version}" >
+      <property name="version.part.${count}" value="${version.part}" />
+      <property name="count" value="@{MathAdd(${property.value},1)}" />
+    </foreach>
+    
+    <property name="major" value="${version.part.1}" />
+    <property name="minor" value="${version.part.2}" />
+    <property name="patch" value="${version.part.3}" />
+    
+		<task name="get-low-word" property="revision" value="${sys.env.P4_CHANGELIST}"/>
+
+    <echo message="Updating ${origin.branch.local}.version counter to ${major}.${minor}.${patch}.${revision}" />
+    <p4counter counter="${origin.branch.local}.version" value="${major}.${minor}.${patch}.${revision}" />
+
+    <p4counter counter="${origin.branch.local}.plugin.version" property="plugin.version" />
+        
+    <property name="count" value="1" />
+
+    <property name="incrementBy" value="0" unless="@{PropertyExists('incrementBy')}" />
+
+    <foreach property="plugin.version.part" item="String" delim="." in="${plugin.version}" >
+      <property name="plugin.version.part.${count}" value="${plugin.version.part}" />
+      <property name="count" value="@{MathAdd(${property.value},1)}" />
+    </foreach>
+    
+    <property name="major" value="${plugin.version.part.1}" />
+    <property name="minor" value="${plugin.version.part.2}" />
+    <property name="patch" value="${plugin.version.part.3}" />
+    <property name="revision" value="${revision}" />
+
+    <echo message="Updating ${origin.branch.local}.plugin.version counter to ${major}.${minor}.${patch}.${revision}" />
+    <p4counter counter="${origin.branch.local}.plugin.version" value="${major}.${minor}.${patch}.${revision}" />
+  </target>
+
+  <target name="build-version-file" >
+    <property name="p4.clientspec" value="${sys.env.P4CLIENT}" if="@{PropertyExists('jenkins')}"/>
+    
+	<fail message="p4.clientspec not defined. Use -D:p4.clientspec=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('p4.clientspec')}" />
+	
+	<!-- Check to see if the user has defined forceversion on the cmd line. -->
+	<property name="forceversion" value="none" unless="@{PropertyExists('forceversion')}" />
+	<property name="plugin.forceversion" value="none" unless="@{PropertyExists('plugin.forceversion')}" />
+
+	<property name="p4.client" value="${p4.clientspec}" />
+	<mkdir dir="${package.OriginVersion.builddir}" unless="@{DirectoryExists(${package.OriginVersion.builddir})}" />
+	<p4counter counter="${origin.branch.local}.cl" property="changelist" />
+	
+	<!-- If/else for forceversion. Get it from the counter if user hasn't provided a version to force. -->
+	<p4counter counter="${origin.branch.local}.version" property="version" if="${forceversion} == 'none'" />
+	<property name="version" value="${forceversion}" unless="${forceversion} == 'none'" />
+
+	<p4counter counter="${origin.branch.local}.plugin.version" property="plugin.version" if="${plugin.forceversion} == 'none'" />
+	<property name="plugin.version" value="${plugin.forceversion}" unless="${plugin.forceversion} == 'none'" />
+
+	<property name="date.file" value="${package.OriginVersion.dir}/date.txt" />
+	
+	<do if="${config-system} == 'osx'" >
+		<property name="date.format" value="+%m/%d/%y %H:%M:%S" />
+		
+		<exec program="date" output="${date.file}" >
+		  <args>
+			<arg value="&quot;${date.format}&quot;" />
+		  </args>
+		</exec>
+	</do>
+    
+	<!-- get the date from the PC. For some reason echo %time% doesn't work using exec so I have to use a batch file -->
+	<do if="${config-system} == 'pc'" >
+		<echo file="${package.OriginVersion.builddir}/time.bat">
+			@set month=%date:~4,2%
+			@set day=%date:~7,2%
+			@set year=%date:~-4%
+			@set hour=%time:~,2%
+			@set min=%time:~3,2%
+			@set sec=%time:~6,2%
+			@echo %month%/%day%/%year% %hour%:%min%:%sec% &gt; ${date.file}
+		</echo>
+		<exec program="${package.OriginVersion.builddir}/time.bat" />
+	</do>
+
+    <property name="date" fromfile="${date.file}" />
+    
+    <property name="version.h.in" fromfile="${package.OriginVersion.dir}/include/version/version.h.in" />
+
+    <echo message="-- Writing ${package.OriginVersion.dir}/include/version/version.h --" />
+    <echo message="Current Date: ${date}" />
+    <echo message="Current changelist: ${changelist}" />
+    <echo message="Version ${version}" />
+    <echo message="Plugin Version ${plugin.version}" />
+
+    <!-- split up the version number -->
+    <property name="count" value="1" />
+
+    <foreach property="version.part" item="String" delim="." in="${version}" >
+      <property name="version.part.${count}" value="${version.part}" />
+      <property name="count" value="@{MathAdd(${property.value},1)}" />
+    </foreach>
+
+	<foreach property="count" item="String" in="1 2 3 4">
+		<fail message="Malformed version number. Must be in the form of n.n.n.nnnn" unless="@{PropertyExists('version.part.${count}')}" />
+	</foreach>
+    
+    <property name="major" value="${version.part.1}" />
+    <property name="minor" value="${version.part.2}" />
+    <property name="patch" value="${version.part.3}" />
+    <property name="revision" value="${version.part.4}" />
+	
+    <!-- split up the plugin.version number -->
+    <property name="count" value="1" />
+
+    <foreach property="version.part" item="String" delim="." in="${plugin.version}" >
+      <property name="plugin.version.part.${count}" value="${version.part}" />
+      <property name="count" value="@{MathAdd(${property.value},1)}" />
+    </foreach>
+
+	<foreach property="count" item="String" in="1 2 3 4">
+		<fail message="Malformed version number. Must be in the form of n.n.n.nnnn" unless="@{PropertyExists('plugin.version.part.${count}')}" />
+	</foreach>
+    
+    <property name="plugin.major" value="${plugin.version.part.1}" />
+    <property name="plugin.minor" value="${plugin.version.part.2}" />
+    <property name="plugin.patch" value="${plugin.version.part.3}" />
+
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(time)',${date})}" />
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(major)',${major})}" />
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(minor)',${minor})}" />
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(patch)',${patch})}" />
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(plugin.major)',${plugin.major})}" />
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(plugin.minor)',${plugin.minor})}" />
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(plugin.patch)',${plugin.patch})}" />
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(revision)',${revision})}" />
+    <property name="version.h.in" value="@{StrReplace(${property.value},'$(changelist)',${changelist})}" />
+
+    <delete file="${package.OriginVersion.dir}/include/version/version.h" />
+    <echo message="${version.h.in}" file="${package.OriginVersion.dir}/include/version/version.h" />
+	
+	<do unless="@{PropertyExists('disable.p4')} || ${origin.branch.local} == sandboxes" >
+		<!-- P4 stuff -->
+    <task name="get-p4-path" property="p4.version.file" p4.clientspec="${p4.clientspec}" p4.port="${p4.port}" p4.user="${p4.user}" p4.passwd="${p4.passwd}" file="${package.OriginVersion.dir}/include/version/version.h"/>
+		<!-- revert any open files and set up the changelist -->
+		<p4revert files="${p4.version.file}" change="default"/>
+		<p4change desc="Jenkins version.h Update - ${version}" />
+		<p4edit files="${p4.version.file}" change="${p4.change}" />
+		<echo message="${p4.change}"/>
+		<!-- submit the file -->
+		<p4submit change="${p4.change}" unless="@{StrIsEmpty('${p4.change}')}" failonerror="false"/>
+	</do>
+  </target>
+	
+  <target name="getversion">
+    <delete dir="${package.OriginVersion.version.file}" />
+    <mkdir dir="${package.OriginVersion.targetdir}" unless="@{DirectoryExists(${package.OriginVersion.targetdir})}" />
+    <property name="version.h" value="${package.OriginVersion.dir}/include/version/version.h" />
+    <property name="version.string" value="EBISU_PRODUCT_VERSION_P_DELIMITED" />
+    <foreach property="line" item="Line" in="${version.h}" >
+      <property name="version.line" value="${line}" if="@{StrIndexOf(${line}, ${version.string})} != -1" />
+    </foreach>
+    <property name="version.start" value="@{StrIndexOf(${version.line},'&quot;')}" />
+    <property name="version.start" value="@{MathAdd(${version.start},1)}" />
+    <property name="version.end" value="@{StrLastIndexOf(${version.line},'&quot;')}" />
+    <property name="version.len" value="@{MathSub(${version.end},${version.start})}" />
+    <property name="version" value="@{StrSubstring(${version.line},${version.start},${version.len})}" />
+    <echo message="${version}" file="${package.OriginVersion.version.file}"/>
+    <echo message="Current version from version.h is ${version}. It has been exported to ${package.OriginVersion.version.file}." />
+  </target>
+	
+  <target name="getpluginversion">
+    <delete dir="${package.OriginVersion.plugin.version.file}" />
+    <mkdir dir="${package.OriginVersion.targetdir}" unless="@{DirectoryExists(${package.OriginVersion.targetdir})}" />
+    <property name="version.h" value="${package.OriginVersion.dir}/include/version/version.h" />
+    <property name="plugin.version.string" value="PLUGIN_VERSION_P_DELIMITED" />
+    <foreach property="line" item="Line" in="${version.h}" >
+      <property name="plugin.version.line" value="${line}" if="@{StrIndexOf(${line}, ${plugin.version.string})} != -1" />
+    </foreach>
+    <property name="plugin.version.start" value="@{StrIndexOf(${plugin.version.line},'&quot;')}" />
+    <property name="plugin.version.start" value="@{MathAdd(${plugin.version.start},1)}" />
+    <property name="plugin.version.end" value="@{StrLastIndexOf(${plugin.version.line},'&quot;')}" />
+    <property name="plugin.version.len" value="@{MathSub(${plugin.version.end},${plugin.version.start})}" />
+    <property name="plugin.version" value="@{StrSubstring(${plugin.version.line},${plugin.version.start},${plugin.version.len})}" />
+    <echo message="${plugin.version}" file="${package.OriginVersion.plugin.version.file}"/>
+    <echo message="Current plugin version from version.h is ${plugin.version}. It has been exported to ${package.OriginVersion.plugin.version.file}." />
+  </target>
+
+	<!-- Uses the counter property to define what to change the counter to. Use -D:version=n.n.n.nnnn. -->
+	<target name="edit-version-counter">
+		<fail message="property 'version' is not defined. Please define the new counter property via -D:version=n.n.n.nnnn" unless="@{PropertyExists('version')}" />
+		<p4counter counter="${origin.branch.local}.version" property="old.version" />
+		<p4counter counter="${origin.branch.local}.version" value="${version}" />
+		<echo message="Counter ${origin.branch.local}.version changed from ${old.version} to ${version}." />
+	</target>
+	
+	<target name="custom-clean">
+		<delete dir="${package.OriginVersion.builddir}" />
+		<delete file="${date.file}" />
+	</target>
+	
+	<target name="test">
+		<task name="get-low-word" property="result" value="372318"/>
+    <echo message="Result: ${result}"/>
+    <task name="get-p4-path" property="p4.path" p4.clientspec="dgog_main_PC" p4.port="${p4.port}" p4.user="${p4.user}" p4.passwd="${p4.passwd}" file="${package.OriginVersion.dir}/include/version/version.h"/>
+    <echo message="${p4.path}"/>
+	</target>
+	</project>
+
+
+
+

@@ -1,0 +1,27 @@
+var structProtoHttpServRefT =
+[
+    [ "iClientCertLvl", "d9/d21/structProtoHttpServRefT.html#a95bf72d05a170b778f9a7b22aa08a0ac", null ],
+    [ "iIdleTimeout", "d9/d21/structProtoHttpServRefT.html#afc600c1ae536f7e79c61659d24cf5110", null ],
+    [ "iMemGroup", "d9/d21/structProtoHttpServRefT.html#aef59fa8b3b880f510503254d46c60a7b", null ],
+    [ "iRequestTimeout", "d9/d21/structProtoHttpServRefT.html#a3137c4afb14be5f9979a2493dd534783", null ],
+    [ "iSecure", "d9/d21/structProtoHttpServRefT.html#aea45e08c29c5102ad72600ded396a731", null ],
+    [ "iServerCertLen", "d9/d21/structProtoHttpServRefT.html#a63fa7e90607453036b83547ef6e66240", null ],
+    [ "iServerKeyLen", "d9/d21/structProtoHttpServRefT.html#a068650da7a6124a8f894ec7ebb01d772", null ],
+    [ "pHeaderCb", "d9/d21/structProtoHttpServRefT.html#a2306866c5558b0614033cc7a0a79cf91", null ],
+    [ "pListenSSL", "d9/d21/structProtoHttpServRefT.html#a464b2b1a7b4e83f9eff4743fa79c0bd3", null ],
+    [ "pLogCb", "d9/d21/structProtoHttpServRefT.html#a1565d5ecc0a161c4d68d5dd9fe8c81dd", null ],
+    [ "pMemGroupUserData", "d9/d21/structProtoHttpServRefT.html#a2e1de472511aabe7e6b3aad4ba6f1f04", null ],
+    [ "pReceiveCb", "d9/d21/structProtoHttpServRefT.html#a6356a8d8d7593d99d4cab0ce763b88d0", null ],
+    [ "pRequestCb", "d9/d21/structProtoHttpServRefT.html#ae652c52689b8085af8cb01f335ed8fac", null ],
+    [ "pSendCb", "d9/d21/structProtoHttpServRefT.html#a7b98b609770c962534468b4b6addbec9", null ],
+    [ "pServerCert", "d9/d21/structProtoHttpServRefT.html#a9c93aa5a084dd1236cc749d00472b320", null ],
+    [ "pServerKey", "d9/d21/structProtoHttpServRefT.html#a2e334344390bc5ee20538309ad2342e3", null ],
+    [ "pThreadList", "d9/d21/structProtoHttpServRefT.html#af07cf1b372e8bc76ee5ebca34229d250", null ],
+    [ "pUserData", "d9/d21/structProtoHttpServRefT.html#a9b26a93b67017fa327f928a3593867b9", null ],
+    [ "strServerName", "d9/d21/structProtoHttpServRefT.html#a4ce2f3d1afb779913cca93efeaa5dbb4", null ],
+    [ "uCurrThreadId", "d9/d21/structProtoHttpServRefT.html#ad58c1ed3bd1946edf05666f7a32b7560", null ],
+    [ "uDebugLevel", "d9/d21/structProtoHttpServRefT.html#ae699073345939c868b46c22dee646c5b", null ],
+    [ "uSslCiphers", "d9/d21/structProtoHttpServRefT.html#a1830f202035876459fc7bb815f1a59b5", null ],
+    [ "uSslVersion", "d9/d21/structProtoHttpServRefT.html#acc7d90e608237af5c55ed6f4ca4da2c4", null ],
+    [ "uSslVersionMin", "d9/d21/structProtoHttpServRefT.html#aa54bf80e99eb925955e75910a4691064", null ]
+];

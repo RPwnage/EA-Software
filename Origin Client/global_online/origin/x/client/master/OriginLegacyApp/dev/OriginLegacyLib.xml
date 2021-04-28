@@ -1,0 +1,242 @@
+<project>
+
+  <dependent name="Qt" />
+  <dependent name="OriginConfig" />
+  <dependent name="openSSL" />
+  
+  <property name="dirtysdk-samples" value="false" />
+  <property name="eaconfig.rtti" value="on" />
+  
+  <!-- ********************* -->
+  <!-- Hack for accessing engine, originClient, sdk packages -->
+  <!-- ********************* -->
+  
+  <dependent name="engine" />
+  
+  <property name="package.engine.dir" value="@{PathGetFullPath('.')}/../../engine/dev"/>
+  
+	<property name="package.engine.includedirs">
+		${package.engine.dir}/include
+        ${package.engine.dir}/igo/source
+	</property>
+  
+  <dependent name="originClient" />
+  
+  <property name="package.originClient.dir" value="@{PathGetFullPath('.')}/../../originClient/dev"/>
+  
+	<property name="package.originClient.includedirs">
+		${package.originClient.dir}
+		${package.originClient.dir}/common/source
+		${package.originClient.dir}/store/source
+		${package.originClient.dir}/widgets/client/source
+		${package.originClient.dir}/widgets/logoutExit/source
+		${package.originClient.dir}/websupport/source
+	</property>  
+	
+  <dependent name="sdkService" />
+  
+  <property name="package.sdkService.dir" value="@{PathGetFullPath('.')}/../../sdkService/dev"/>
+  
+	<property name="package.sdkService.includedirs">
+		${package.sdkService.dir}/include
+	</property>
+  
+  <!-- ********************* -->
+  <!-- Runtime configuration -->
+  <!-- ********************* -->
+  
+  <property name="runtime.buildmodules" value="OriginLegacyApp" />
+  
+	<!-- uitoolkit-specific build flags -->
+  <BuildType name="${package.name}.buildtype" from="OriginLibrary">
+    <option name="buildset.cc.options" if="${config-system} == pc">
+      ${option.value}
+      /FI ${package.OriginLegacyApp.dir}/source/ui/OriginCommon.h
+    </option>
+  </BuildType>
+  
+  <property name="runtime.OriginLegacyApp.buildtype" value="${package.name}.buildtype" />
+  <property name="runtime.OriginLegacyApp.outputdir" value="${package.OriginLegacyApp.dir}/lib" />
+  <property name="runtime.OriginLegacyApp.outputname" value="${package.name}${debug-suffix}" />
+  
+  <property name="runtime.OriginLegacyApp.builddependencies">
+      LSXWrapper
+  </property>
+  
+  <property name="runtime.OriginLegacyApp.usedependencies">
+    OriginVersion
+    BugSentry
+    coreallocator
+    DirtySDK
+    EAAssert
+    EABase
+    EACallstack
+    EAIO
+    EAStdC
+    EASTL
+    EAThread
+    EATrace
+    ExceptionHandler
+    openSSL
+    PPMalloc
+    Qt
+    services
+    TelemetryAPI
+    uitoolkit
+    webWidget
+    libjingle
+    ChatModel
+  </property>
+
+  <property name="runtime.OriginLegacyApp.usedependencies" if="${config-system} == 'osx'" >
+		${property.value}
+    zlib
+  </property>
+
+
+  <property name="runtime.OriginLegacyApp.interfacedependencies" if="${config-system} == 'pc'" >
+    zlib
+  </property>
+
+    <property name="runtime.OriginLegacyApp.includedirs" >
+    ${package.Qt.includedirs}
+    ${package.engine.includedirs}
+    ${package.originClient.includedirs}
+	${package.sdkService.includedirs}
+    ${package.dir}/
+    ${package.dir}/source
+    ${package.dir}/source/ui
+    ${moc.output.dir}
+    ${ui.output.dir}
+    ${package.Qt.includedirs}
+	</property>
+
+    <property name="runtime.OriginLegacyApp.includedirs" if="${config-system} == 'pc'" >
+		${property.value}
+	</property>
+  
+    <property name="runtime.OriginLegacyApp.libs" if="${config-system} == 'pc'" >
+		${property.value}
+	</property>
+  
+  
+  <fileset name="runtime.OriginLegacyApp.headerfiles" basedir="${package.dir}">
+    <includes name="**/*.h" />
+  </fileset>
+  
+  <fileset name="runtime.OriginLegacyApp.sourcefiles" >
+    <includes name="${package.dir}/source/ui/*.cpp" />
+  </fileset>
+  
+  <fileset name="runtime.OriginLegacyApp.resourcefiles">
+  </fileset>
+  
+  <fileset name="runtime.OriginLegacyApp.ui_sourcefiles" basedir="${package.dir}" >
+    <includes name="${package.dir}/source/ui/**/*.ui" />
+  </fileset>
+  
+  <!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+  <fileset name="runtime.OriginLegacyApp.moc_sourcefiles" basedir="${package.dir}">
+    <includes name="${package.dir}/source/ui/AboutEbisuDialog.h" />
+    <includes name="${package.dir}/source/ui/CustomerSupportDialog.h" />
+    <includes name="${package.dir}/source/ui/RedeemBrowser.h" />
+  </fileset>
+  
+  <!-- construct the paths to include the moc files into the build after generating. -->
+  <foreach property="fname" item="FileSet" in="runtime.OriginLegacyApp.moc_sourcefiles">
+    <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+    <fileset name="runtime.OriginLegacyApp.sourcefiles" append="true">
+      <includes name="${sourcefile}" asis="true"/>
+    </fileset>
+  </foreach>
+  
+	<!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+	<fileset name="runtime.OriginLegacyApp.qrc_sourcefiles" basedir="${package.OriginLegacyApp.dir}">
+	</fileset>
+  
+	<!-- construct the paths to include the qrc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.OriginLegacyApp.qrc_sourcefiles">
+		<property name="sourcefile" value="${rc.output.dir}/qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.OriginLegacyApp.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+	
+  
+  <target name="OriginLegacyApp-generate-code" >
+    <!-- get the options from the current config -->
+    <property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.OriginLegacyApp.buildtype}','cc.defines')}"/>
+    <property name="runtime.moc_includedirs" value="${runtime.${package.name}.includedirs}"/>
+    <fileset name="runtime.moc_sourcefiles" fromfileset="runtime.OriginLegacyApp.moc_sourcefiles" />
+    <fileset name="runtime.ui_sourcefiles" fromfileset="runtime.OriginLegacyApp.ui_sourcefiles" />
+    <fileset name="runtime.qrc_sourcefiles" fromfileset="runtime.OriginLegacyApp.qrc_sourcefiles" />
+    <call target="moc-compile" if="@{FileSetExists('runtime.moc_sourcefiles')}" />
+    <call target="ui-compile" if="@{FileSetExists('runtime.ui_sourcefiles')}" />
+    <call target="qt-rc-compile" if="@{FileSetExists('runtime.qrc_sourcefiles')}" />
+  </target>
+  
+  <!-- ************************** -->
+  <!-- Prebuild property targets  -->
+  <!-- ************************** -->
+  
+  <property name="OriginLegacyApp.prebuild.target.list">
+    OriginLegacyApp-create-dirs
+    OriginLegacyApp-generate-code
+  </property>
+  
+  <target name="OriginLegacyApp-prebuild-tasks">
+    <foreach property="runtarget" item="String" in="${OriginLegacyApp.prebuild.target.list}">
+      <call target="${runtarget}" />
+    </foreach>
+  </target>
+  
+  <!-- NANT prebuild target. Will execute this after compiling happens. -->
+  <property name="runtime.OriginLegacyApp.prebuildtarget" value="OriginLegacyApp-prebuild-tasks" />
+  
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.OriginLegacyApp.vcproj.pre-build-step" if="${config-system} == 'pc'">
+		${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.OriginLegacyApp.prebuildtarget}
+	</property>
+    
+  
+  <!-- ************************** -->
+  <!-- postbuild property targets -->
+  <!-- ************************** -->
+  
+  <property name="OriginLegacyApp.postbuild.target.list">
+  </property>
+  
+  <target name="OriginLegacyApp-postbuild-tasks">
+    <foreach property="runtarget" item="String" in="${OriginLegacyApp.postbuild.target.list}">
+      <call target="${runtarget}" />
+    </foreach>
+  </target>
+  
+  <!-- NANT postbuild target. Will execute this after compiling happens. -->
+  <property name="runtime.OriginLegacyApp.postbuildtarget" value="OriginLegacyApp-postbuild-tasks" />
+  
+  <target name="OriginLegacyApp-create-dirs">
+    <mkdir dir="${runtime.OriginLegacyApp.outputdir}" unless="@{DirectoryExists(${runtime.OriginLegacyApp.outputdir})}" />
+  </target>
+  
+  <target name="clean-custom" >
+    <delete dir="${runtime.OriginLegacyApp.outputdir}" />
+    <delete>
+		<fileset basedir="${package.dir}/source">
+			<includes name="**/moc_*.cpp" />
+			<includes name="**/ui_*.h" />
+		</fileset>
+	</delete>
+  </target>
+  
+  <target name="dump">
+    <foreach property="file" in="runtime.moc_sourcefiles" item="FileSet">
+      <echo message="File: ${file}" />
+    </foreach>
+  </target>
+  
+</project>
+
+
+
+

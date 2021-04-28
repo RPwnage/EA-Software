@@ -1,0 +1,294 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <dependent name="${PlayStation3Package}" />
+
+  <fail message="ERROR: This version of eaconfig requires a ps3sdk 217.004-1 or later.  Please update your masterconfig.xml."
+        if="'${PlayStation3Package}'=='ps3sdk'" unless="@{StrCompareVersions('${package.${PlayStation3Package}.version}', '217.004-1')} gte 0"/>
+
+  <property name="lib-prefix"        value="lib"/>
+  <property name="lib-suffix"        value=".a"/>
+  <!-- <property name="exe-suffix"        value=".elf"/> -->
+  <!-- used to run test programs during build -->
+
+  <property name="exe-suffix"        value=".elf"/>
+  <!-- used to run test programs during build -->
+  <property name="secured-exe-suffix"    value=".self"/>
+
+  <property name="dll-suffix"            value=".prx" unless="@{PropertyExists('dll-suffix')}"/>
+  <property name="secured-dll-suffix"    value=".sprx" unless="@{PropertyExists('secured-dll-suffix')}"/>
+
+  <property name="dll-suffix"          value="${dll-suffix.${config-system}}" if="@{PropertyExists('dll-suffix.${config-system}')}"/>
+  <property name="secured-dll-suffix"  value="${secured-dll-suffix.${config-system}}" if="@{PropertyExists('secured-dll-suffix.${config-system}')}"/>
+
+  <!-- Compile in parallel on multiple CPUs         -->
+  <property name="cc.parallelcompiler"    value="true"/>
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle"    value="Unix"/>
+
+  <!-- Auto-detect Visual Studio 2005 - this affects VCPROJ generation -->
+  <property name="package.VisualStudio.exportbuildsettings" value="false"/>
+  <property name="cc-before" value="${cc}"/>
+  <dependent name="VisualStudio"/>
+  <fail message="ERROR: eaconfig requires a VisualStudio package which supports the 'package.VisualStudio.exportbuildsettings' property.  Please update your masterconfig.xml."
+        unless="'${cc-before}' == '${cc}'"/>
+  
+  <do if="'${package.VisualStudio.version}' gte '8.0.0'">
+    <property name="config-vs-version" value="8.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '9.0.0'">
+    <property name="config-vs-version" value="9.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '10.0.0'">
+    <property name="config-vs-version" value="10.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '11.0.0'">
+    <property name="config-vs-version" value="11.0"/>
+  </do>
+
+  <fail unless="@{PropertyExists('cc.includedirs')}"
+    message="Property cc.includedirs is required by this release of eaconfig. Please use a release of ${PlayStation3Package} that defines this property."/>
+
+  <optionset name="config-options-common">
+    <option name="buildset.cc.includedirs">
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.includedirs')}
+      ${cc.includedirs}
+    </option>
+    <option name="embedguid" value="on"/>
+  </optionset>
+
+  <!-- These are "mixin" OptionSets, for settings and overrides which are PPU/SPU specific -->
+
+  <optionset name="config-options-ps3-ppu">
+    <option name="cc.compilerinternaldefines" value="__PPU__"/>
+  </optionset>
+
+  <optionset name="config-options-ps3-spu">
+    <option name="ps3-spu" value=""/>
+    <option name="cc.compilerinternaldefines" value="__SPU__"/>
+  </optionset>
+
+  <!-- Copy link.librarydirs from ps3 proxy/non-proxy, so that GeneateBuildOptionSet will copy it to 
+  created build optionset -->
+  <optionset name="config-options-program">
+    <option name="buildset.link.librarydirs">
+      ${link.librarydirs}
+    </option>
+    <option name="buildset.link.options">
+      -Wl,--oformat=fself
+    </option>
+  </optionset>
+
+  <optionset name="config-options-dynamiclibrary" >
+      <option name="generatedll"              value="on" />
+    <option name="buildset.name"                        value="DynamicLibrary" />
+    <option name="buildset.tasks"                       value="asm cc link" />
+    <option name="buildset.cc.defines"                  value="EA_DLL" />
+    <option name="buildset.link.librarydirs">
+      ${link.librarydirs}
+    </option>
+    <option name="buildset.link.options" if="${config-compiler} == 'sn'">
+      -Wl,--oformat=fsprx
+    </option>
+
+    <option name="buildset.link.libraries">
+      ${package.${PlayStation3Package}.appdir}\target\ppu\lib\libsn.a
+      ${package.${PlayStation3Package}.appdir}\target\ppu\lib\fno-exceptions\fno-rtti\libm.a
+      ${package.${PlayStation3Package}.appdir}\target\ppu\lib\libio_stub.a
+      ${package.${PlayStation3Package}.appdir}\target\ppu\lib\fno-exceptions\fno-rtti\libc_stub.a
+      ${package.${PlayStation3Package}.appdir}\target\ppu\lib\liblv2_stub.a
+      ${package.${PlayStation3Package}.appdir}\target\ppu\lib\fno-exceptions\fno-rtti\libstdc++_stub.a
+    </option>
+  </optionset>
+
+  <property name="as.options">
+    <!-- clear the default options and start fresh with config supplied options -->
+  </property>
+
+  <property name="cc.options">
+    <!-- clear the default options and start fresh with config supplied options -->
+  </property>
+
+  <!-- Swapped options and includedirs so that -nostdinc can be specified in cc.options in general.xml -->
+  <property name="cc.template.commandline">
+    %defines%
+    %options%
+    %includedirs%
+    -o "%objectfile%"           <!-- object file -->
+    "%sourcefile%"             <!-- source file -->
+  </property>
+
+  <do if="@{PropertyExists('${PlayStation3Package}.as.template.commandline')}">
+    <property name="as.template.commandline" value="${${PlayStation3Package}.as.template.commandline}"/>
+  </do>
+
+  <property name="cc.template.includedir"    value='-I "%includedir%"'/>
+  <property name="cc.template.define"        value='-D %define%'/>
+
+  <!-- <link> task properties -->
+  <property name="link.options">
+    ${property.value}
+  </property>
+
+  <property name="link.libraries">
+  </property>
+
+  <property name='link.template.librarydir'  value='-L "%librarydir%"'/>
+  <property name='link.template.libraryfile' value='"%libraryfile%"'/>
+  <property name='link.template.objectfile'  value='"%objectfile%"'/>
+
+  <property name="link.template.commandline">
+    %options%
+    %objectfiles%
+    %librarydirs%
+    -Xlinker --start-group
+    %libraryfiles%
+    -Xlinker --end-group
+  </property>
+
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="link.useresponsefile" value="true"/>
+
+
+  <!-- NOTE. whenever link options contain -oformat=fself or fsprx build target dismisses this postlink step -->
+  <property name="link.postlink.program" value="${package.${PlayStation3Package}.appdir}\host-win32\bin\make_fself" />
+
+  <property name="link.postlink.commandline" >
+    %outputdir%\%outputname%${exe-suffix}
+    %outputdir%\%outputname%${secured-exe-suffix}
+  </property>
+
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="lib.useresponsefile" value="true"/>
+
+  <!-- 
+    Set version specific libraries
+  If you need to use the dpm libs of TypeB/TypeC, do these if you're using FW2/eaconfig:
+  1. Derive your build type (optionset) from appropriate optionset, says config-options-library.
+  2. Set standardsdklibs to custom in your optionset
+  3. In its standardsdklibs.custom.link option, include those dpm libs
+  -->
+  <fail unless="@{PropertyExists('package.${PlayStation3Package}.regularlib')}"
+    message="Property package.${PlayStation3Package}.regularlib is required by this release of eaconfig. Please use a release of ${PlayStation3Package} that defines this property."/>
+  <property name="platform.sdklibs.regular">
+    ${package.${PlayStation3Package}.regularlib}
+  </property>
+  <property name="platform.sdklibs.debug">
+    ${package.${PlayStation3Package}.debuglib}
+  </property>
+  <property name="platform.sdklibs.regular-spu">
+    @{OptionSetGetValue('ps3spu', 'regularlib')}
+  </property>
+  <property name="platform.sdklibs.debug-spu">
+    @{OptionSetGetValue('ps3spu', 'debuglib')}
+  </property>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  Task to store the 'cc.options', 'cc.includedirs' and 'build.includedirs.all'
+  properties which get overridden for PS3 to implement the -isystem support
+  and PS3 include directory ordering workaround.  We need to cache these
+  values so they can be restored later.
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <createtask name="__private_SaveIncludesPathsAndCCOptions">
+    <parameters>
+      <option name="buildtype" value="Required"/>
+    </parameters>
+    <code>
+      <property name="__private_temp_ccoptions"             value="@{OptionSetGetValue('${__private_SaveIncludesPathsAndCCOptions.buildtype}', 'cc.options')}"/>
+      <property name="__private_temp_ccincludedirs"         value="@{OptionSetGetValue('${__private_SaveIncludesPathsAndCCOptions.buildtype}', 'cc.includedirs')}"/>
+      <property name="__private_temp_build_includedirs_all" value="${build.includedirs.all}"/>
+    </code>
+  </createtask>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  Task to restore include paths and 'cc.options' back to their original
+  setting following calls to either '__private_ConvertSystemIncludesToCCOptions'.  The
+  previous values were stored in 'private' global properties.
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <createtask name="__private_RestoreIncludesPathsAndCCOptions">
+    <parameters>
+      <option name="buildtype" value="Required"/>
+    </parameters>
+    <code>
+      <!-- We should really throw an exception if the OptionSet doesn't exist, but that would
+               break existing 'Utility' behaviour, so we just silently ignore that case. -->
+      <do if="@{OptionSetExists('${__private_RestoreIncludesPathsAndCCOptions.buildtype}')}">
+        <optionset name="${__private_RestoreIncludesPathsAndCCOptions.buildtype}">
+          <option name="cc.options"     value="${__private_temp_ccoptions}"/>
+          <option name="cc.includedirs" value="${__private_temp_ccincludedirs}"/>
+        </optionset>
+        <property name="build.includedirs.all" value="${__private_temp_build_includedirs_all}"/>
+        <eval code="@{PropertyUndefine('__private_temp_ccoptions')}" type="Function"/>
+        <eval code="@{PropertyUndefine('__private_temp_ccincludedirs')}" type="Function"/>
+        <eval code="@{PropertyUndefine('__private_temp_build_includedirs_all')}" type="Function"/>
+      </do>
+    </code>
+  </createtask>
+
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  Task to convert PS3 system include paths from -I to -isystem.  This
+  tells the compiler that they are system headers (and to ignore warnings
+  in them).
+  
+  When using -isystem we have to move them from cc.includedirs to
+  cc.options.  We use this task for both PPU and SPU builds, so that
+  we can have warnings-as-errors enabled even though Sony-supplied system
+  headers often have warnings in them.
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <createtask name="__private_ConvertSystemIncludesToCCOptions">
+    <parameters>
+      <option name="buildtype" value="Required"/>
+    </parameters>
+    <code>
+
+      <property name="build-compiler" value ="${config-compiler}"/>
+      <property name="build-compiler" value ="gcc" if="@{OptionSetOptionExists('${__private_ConvertSystemIncludesToCCOptions.buildtype}', 'ps3-spu')}"/>
+
+      <do if="${build-compiler}==gcc">
+        <!-- We should really throw an exception if the OptionSet doesn't exist, but that would
+                 break existing 'Utility' behaviour, so we just silently ignore that case. -->
+        <do if="@{OptionSetExists('${__private_ConvertSystemIncludesToCCOptions.buildtype}')}">
+          <task name="__private_SaveIncludesPathsAndCCOptions" buildtype="${__private_ConvertSystemIncludesToCCOptions.buildtype}"/>
+
+          <foreach item="String" in="@{OptionSetGetValue('${__private_ConvertSystemIncludesToCCOptions.buildtype}', 'cc.includedirs')}" property="includedir">
+            <optionset name="${__private_ConvertSystemIncludesToCCOptions.buildtype}">              
+              <option name="cc.options" if="${build-compiler}==gcc">
+                @{OptionSetGetValue('${__private_ConvertSystemIncludesToCCOptions.buildtype}', 'cc.options')}
+                -isystem "${includedir}"
+              </option>
+            </optionset>
+          </foreach>
+          <eval code="@{PropertyUndefine('includedir')}" type="Function"/>
+
+          <!-- Clear out the cc.includedirs.  The -isystem calls are all we need. -->
+          <optionset name="${__private_ConvertSystemIncludesToCCOptions.buildtype}">
+            <option name="cc.includedirs" value=""/>
+          </optionset>
+        </do>
+      </do>
+    </code>
+  </createtask>
+
+  <createtask name="GenerateBuildOptionsetSPU">
+    <parameters>
+      <option name="configsetname" />
+    </parameters>
+    <code>
+      <GenerateBuildOptionsetSPU configsetname="${GenerateBuildOptionsetSPU.configsetname}"/>
+    </code>
+  </createtask>
+
+
+  <!-- pointer size -->
+  <property name="platform-ptrsize" value="32bit"/>
+  <!-- registers size -->
+  <property name="platform-wordsize" value="64bit"/>
+
+</project>

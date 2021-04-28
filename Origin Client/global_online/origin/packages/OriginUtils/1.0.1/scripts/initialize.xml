@@ -1,0 +1,61 @@
+<project>
+  <include file="targets.xml"/>
+
+	<!-- OriginUtils source files location. -->
+	<property name="package.OriginUtils.sourcedir" value="${package.OriginUtils.dir}/source" />
+
+	<property name="package.OriginUtils.python.sourcedir" value="${package.OriginUtils.dir}/source/python" />
+    
+	<property name="package.OriginUtils.python.widgetcompiler.sourcedir" value="${package.OriginUtils.dir}/source/python/WidgetCompiler" />
+
+	<property name="package.OriginUtils.python.widgetcompiler" value="${package.OriginUtils.dir}/source/python/WidgetCompiler/build-widget.py" />
+
+	<property name="package.OriginUtils.ShiftSubmit" value="${package.OriginUtils.dir}/bin/ShiftSubmit_2_2.exe" />
+
+	<!-- Builds the environment that a visual studio command prompt uses-->
+    <createtask name="BuildVSVars">
+        <parameters>
+            <option name="optionsetname" value="vs.console.env"/>
+            <option name="arch" value="32"/>
+            <option name="Path" value=""/>
+            <option name="Lib" value=""/>
+            <option name="Include" value=""/>
+            <option name="LibPath" value=""/>
+        </parameters>
+        <code>
+            <dependent name="VisualStudio"/>
+            <property name="setvs.bat" value="${package.OriginUtils.dir}/setvs.bat" />
+            <property name="vsvars.txt" value="${package.OriginUtils.dir}/vsvars.txt" />
+            <echo file="${setvs.bat}"  if="${BuildVSVars.arch} == '32'">
+                call "${package.VisualStudio.appdir}\VC\bin\vcvars32.bat" x86
+                set
+            </echo>
+            <echo file="${setvs.bat}"  if="${BuildVSVars.arch} == '64'">
+                call "${package.VisualStudio.appdir}\VC\vcvarsall.bat" amd64
+                set
+            </echo>
+            <exec program="${setvs.bat}" output="${vsvars.txt}" stdout="false" />
+            <foreach item="Line" in="${vsvars.txt}" property="line">
+                <do unless="'@{StrIndexOf('${line}','=')}' == '-1'" >
+                    <optionset name="${BuildVSVars.optionsetname}">
+                        <option name="@{StrSubstring('${line}','0',@{StrIndexOf('${line}','=')})}" value="@{StrSubstring('${line}',@{MathAdd(@{StrIndexOf('${line}','=')},'1')})}"/>
+                    </optionset>
+                </do>
+            </foreach>
+            <!-- The following appends to the end of Path, other variables rather than replacing -->
+            <optionset name="${BuildVSVars.optionsetname}" unless="'${BuildVSVars.Path}' == ''">
+                <option name="Path" value="${BuildVSVars.Path};@{OptionSetGetValue('${BuildVSVars.optionsetname}','Path')}"/>
+            </optionset>
+            <optionset name="${BuildVSVars.optionsetname}" unless="'${BuildVSVars.Lib}' == ''">
+                <option name="LIB" value="${BuildVSVars.Lib};@{OptionSetGetValue('${BuildVSVars.optionsetname}','LIB')}"/>
+            </optionset>
+            <optionset name="${BuildVSVars.optionsetname}" unless="'${BuildVSVars.Include}' == ''">
+                <option name="INCLUDE" value="${BuildVSVars.Include};@{OptionSetGetValue('${BuildVSVars.optionsetname}','INCLUDE')}"/>
+            </optionset>
+            <optionset name="${BuildVSVars.optionsetname}" unless="'${BuildVSVars.LibPath}' == ''">
+                <option name="LIBPATH" value="@{OptionSetGetValue('${BuildVSVars.optionsetname}','LIBPATH')};${BuildVSVars.LibPath}"/>
+            </optionset>
+
+        </code>
+    </createtask>
+</project>

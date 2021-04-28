@@ -1,0 +1,26 @@
+var structNetGameDistServT =
+[
+    [ "aEscalate", "d7/dcc/structNetGameDistServT.html#a2f314f74997f37745807e8264a8a7285", null ],
+    [ "aInKeepAlive", "d7/dcc/structNetGameDistServT.html#a1605fc4bd2e58326e0edef9fd7cebc97", null ],
+    [ "aOutKeepAlive", "d7/dcc/structNetGameDistServT.html#ae319301016fec0f6a3d3ba62c134dd25", null ],
+    [ "aPeekTimes", "d7/dcc/structNetGameDistServT.html#a9d9c146813b7a1355a1fe867db7bc04d", null ],
+    [ "aRecvTimes", "d7/dcc/structNetGameDistServT.html#a880d5c4a370516fbddbf1c75a1b1dacd", null ],
+    [ "aSendTimes", "d7/dcc/structNetGameDistServT.html#a335f4ac6e5c54bb802d13abfad43b15b", null ],
+    [ "bFlowEnabled", "d7/dcc/structNetGameDistServT.html#acdd8aa5a27455918f7cff4c98e985281", null ],
+    [ "bGameStarted", "d7/dcc/structNetGameDistServT.html#ae5be975ffd87d05406aafae03a722ec6", null ],
+    [ "bNoInputMode", "d7/dcc/structNetGameDistServT.html#a744cff068920497c42624e604c3c74bd", null ],
+    [ "ClientList", "d7/dcc/structNetGameDistServT.html#ab4632da896f209b1bd7910327aaa80ef", null ],
+    [ "iFirstClient", "d7/dcc/structNetGameDistServT.html#a4965b46e6d26a6372c36efad37ddc2cc", null ],
+    [ "iMemGroup", "d7/dcc/structNetGameDistServT.html#aa0aeae6bf5cc33a8d817d985bf057c71", null ],
+    [ "iVerbosity", "d7/dcc/structNetGameDistServT.html#ac887cd1f58769c0cbd9a33aca2cc2c12", null ],
+    [ "pMemGroupUserData", "d7/dcc/structNetGameDistServT.html#a7208fcdcd09013d85903cf8c3b404d4a", null ],
+    [ "uCRCRate", "d7/dcc/structNetGameDistServT.html#a91e4d7b9f5308f1e9785a10f5366a8e7", null ],
+    [ "uCRCRemainingFrames", "d7/dcc/structNetGameDistServT.html#afdd4495ca55c2bdd62d9fcc0018eebae", null ],
+    [ "uCRCResponseCountdown", "d7/dcc/structNetGameDistServT.html#a858e83987313e67d39910017b470f4a5", null ],
+    [ "uCRCResponseLimit", "d7/dcc/structNetGameDistServT.html#af16426e9e63f6572cb9e4f0b6538874a", null ],
+    [ "uLastFlowUpdateTime", "d7/dcc/structNetGameDistServT.html#a5c75a8b15e78dd5308be0abe21219712", null ],
+    [ "uLastStatsUpdate", "d7/dcc/structNetGameDistServT.html#aa4095cb4882910dea548970313d28e8a", null ],
+    [ "uMultiPacketVersion", "d7/dcc/structNetGameDistServT.html#a766a18e74718e63403005848532bafae", null ],
+    [ "uNbFramesNoData", "d7/dcc/structNetGameDistServT.html#a127f16c57d866e57138e6a33e0f328e4", null ],
+    [ "uSendThreshold", "d7/dcc/structNetGameDistServT.html#a4da64d4120bdf0c284056ae154378f80", null ]
+];

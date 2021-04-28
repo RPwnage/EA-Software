@@ -1,0 +1,123 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Exception Database Requirements </title>
+</head>
+
+<body>
+<h1>Exception Database Requirements </h1>
+<h2>Introduction</h2>
+<p>This document discusses the requirements for a system which allows users to store game crash reports on a server. This system has been referred to as Crash Manager, Exception Database, and Crashboard (to parallel a similar system called Dashboard). This document discusses the user-side requirements for such a system and touches on server side requirements as they are relate to user requirements. The more advanced the implementation of the server side, the more it will require a specialized set of requirements of its own. </p>
+<p>We have made systems like this before, and this system is a refactoring of previous thinking as it applies to the current situation with next generation gaming machines and the advent of a formalized CM (configuration management) team within our studio which can manage builds and databases such as the one we talk about here. </p>
+<h2>Use cases</h2>
+<ul>
+  <li>A tester is testing a game and the game crashes. We want to know how the game crashed so a programmer can look at it later. The programmer should be able to acquire a report crash and the game debug files necessary to diagnose the crash.</li>
+  <li>A game scripting programmer (who writes scripts for in-game AI) is developing some script and the scripting engine detects some kind of scripting system failure, though not a game crash. As with game crash reports, we want to be able to log a report which helps diagnose the scripting failure. </li>
+  <li>A user is running a debug build of a game and an assertion fails and displays an on-screen dialog box. It would be nice if the user could press a button on that on-screen box and log a report describing the application state at the time of the assertion failure.</li>
+  <li>A user is running the game and some event occurs which is not an exception or assertion failure of some sort, but is merely something that constitutes a hang, deadlock, or bug of some sort. Unless the game has crashed, the user should be able to take a snapshot of the game state so that it can be later diagnosed by a programmer.</li>
+  <li>A user is running the game and some event occurs which the user would like to take a screen capture of and save as a report which can be looked at at some later time by another development team member. The user should be able to take a graphical snapshot of the game screen which can be saved somewhere.</li>
+  <li>A user has a report file of some arbitrary sort which needs to be looked at by a development team member in the context of a specific build. The user should be able to manually add such a report to the report database. Similarly, as user who needs to find or read existing reports should be able to do so manually with minimal complexity. Minimal complexity means it can be done with something as simple as a web browser or a file system.</li>
+</ul>
+<p>There are other use cases related to the desire to produce statistics on crash reports. These use cases are driven by CM and individual teams and aren't addressed here. The do however affect the design of the server side of the system. </p>
+<h2>General approach</h2>
+<p>The proposed general approach is to have a central network-accessible database of exception reports and associated build information. Game applications can update the database when exceptions occur, and users can  get and add the database themselves outside of game applications. The requirements will be drawn from the primary use case and this general approach.</p>
+<h2>Requirements</h2>
+<ul>
+  <li>Reports are publishable via a simple mechanism, possibly FTP or HTTP or another TCP/IP-based mechanism. Dropping files onto a file server would be simple as well. </li>
+  <li> The primary storage format for the database is individual files, such as exception report files and build .map files. This doesn't necessarily mean the database is implemented merely by a file server. </li>
+  <li>The database is accessible via a simple mechanism such as a web browser or simply a file server.</li>
+  <li> Implementing and maintaining the  database server should require minimal expertise.
+    <ul>
+      <li>The more the server resembles nothing more than directories of files, the more this will be so. </li>
+      <li>This means that to the extent possible, as low a tech as required should be used. We can scale this up if the system requires it. </li>
+      <li>Additionally, history has shown that it's not easy to have designate an individual to have this responsibility.</li>
+    </ul>
+  </li>
+  <li>The database is the same for all target application platforms and SKUs.
+    <ul>
+      <li>The database should work for PS3 game apps, XBox 360 game apps, Windows game apps, Windows tools, Linux/Windows server apps, etc. </li>
+        <li>The database would however have a mechanism whereby the application platform/SKU can be identified. </li>
+    </ul>
+  </li>
+  <li>The design should allow for the server to produce database statistics if such things are found to be useful.</li>
+  <li> When builds are done, their relevant debug information (e.g. .map file, possibly source.zip) should be automatically copied by the build system to the server database. This is generally something done by the CM department.</li>
+  <li>Any individual user should be able to add to the server database easily, possibly via a file copy to a server folder.</li>
+  <li>Build debug files and exception report files should have unique names which identify them.</li>
+  <li>A report submitted to the database need not necessarily be an exception report; it can possibly be any capture of appplication state which a user might want to save so that another user (e.g. programmer) can retrieve it. An application heap dump at a certain point might be an example of such a case. </li>
+  <li>The report generation mechanism should thus be flexible enough to be reusable for purposes other than uploading to a server database. </li>
+  <li>The generated reports should be able to include custom information placed in them by the runtime code, such as text describing the application state in a way other than a processor call stack. </li>
+  <li>The server database location should be dynamically configurable for a given project or even user. The system should not hard-code a specific server or location in its implementation.</li>
+  <li>Given that some users are running apps without debug information, reports will be generated that don't include debug information. However, a tool (ExceptionDecoder) can be written which takes a report without debug information and translates it into one that does, given the debug information that is available on the server.</li>
+  <li>The mechanism (both client and server side) should be as portable as possible and have as few dependendencies as possible. </li>
+</ul>
+<h2>Example of a  simple implementation </h2>
+<p>We provide an example of a simple implementation of our system here. This can serve to help understand the requirements better and could serve as an initial implementation. </p>
+<p>The server database is primarily implemented as a file server directory of files. A future more comprehensive or more intelligent server can be built upon this if desired.</p>
+<ul>
+  <li>There is a directory per project.</li>
+  <li>Within the project diretories are build directories, one for each build. </li>
+  <li>Within the  build subdirectories are build debug files and exception report files. </li>
+</ul>
+<p>Every application build has an identifying name and version number.</p>
+<ul>
+  <li>The name is unique and without predefined format</li>
+  <li>The version number follows our convention of: <em>major.minor.patch.build</em>.</li>
+</ul>
+<p>Each top level directory is named after a corresponding project.</p>
+<ul>
+  <li>Example: <em>SuperBaseball</em></li>
+</ul>
+<p>The build subdirectories are named after the identifying application name and version number.</p>
+<ul>
+  <li>Example: <em>1.2.0.328</em></li>
+</ul>
+<p>The build debug files are similarly named after the identifying application name and version number. These include the full name and version number because they need to be copied around as files and not have their identifying information lost. </p>
+<ul>
+  <li>Example: <em>SuperBaseball 1.2.0.328.map</em></li>
+  <li>Example:<em> <em>SuperBaseball 1.2.0.329.elf</em></em></li>
+</ul>
+<p>The  report files are similarly named but also have information in the name which uniquely identifies the report.</p>
+<ul>
+  <li>Example: <em>SuperBaseball 1.2.0.328 QAMachine#37 5/25/2006 13:24 exception.txt</em></li>
+  <li>Example: <em>SuperBaseball 1.2.0.328 QAMachine#37 5/25/2006 15:07 heap.txt</em></li>
+</ul>
+<p>The in-game upload is implemented via HTTP POST, FTP send, or file system copy. Not sure which is best just yet. Notifying the server of the presence of a new report may involve no more than simply copying the report to the given file server.</p>
+<p>Given the simplicity of the server database proposal, this can get off the ground without much CM or Web department involvement.</p>
+<p>An ExceptionDecoder C++ class and associated wrapper executable will be implemented to translate reports lacking debug information.</p>
+<p>Here's a depiction of what an server database repository might look like:</p>
+<blockquote>
+  <pre>Server/
+   SuperBaseball/
+&nbsp;&nbsp;    1.2.0.329/
+&nbsp;&nbsp; &nbsp;     SuperBaseball 1.2.0.329.map
+ &nbsp;&nbsp;      SuperBaseball 1.2.0.329 qa3 5/25/2006 13:24 exception.txt
+ &nbsp;&nbsp;&nbsp;&nbsp;    SuperBaseball 1.2.0.329 qa4 5/25/2006 08:15 exception.txt
+ &nbsp;&nbsp;&nbsp;  1.2.0.330/
+&nbsp;&nbsp; &nbsp;     SuperBaseball 1.2.0.330.map
+ &nbsp;&nbsp;      SuperBaseball 1.2.0.330 qa1 5/28/2006 04:15 exception.txt
+&nbsp;&nbsp;&nbsp;&nbsp;  1.3.0.331/
+&nbsp;&nbsp; &nbsp;     SuperBaseball 1.2.0.331.map
+   SuperBroomball/
+ &nbsp;&nbsp;&nbsp;&nbsp; 3.1.2.2103/
+      3.2.0.2104/
+      3.2.0.2105/
+   SuperTetherball/
+      2.1.1.87/
+      2.1.1.88/
+&nbsp;&nbsp; &nbsp;     SuperTetherball 2.1.1.87.map
+ &nbsp;&nbsp;      SuperTetherball 2.1.1.87 qa7 6/15/2006 02:35 exception.txt
+      2.1.1.89/</pre>
+</blockquote>
+<p>&nbsp;</p>
+<hr>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+</body>
+</html>

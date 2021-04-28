@@ -1,0 +1,83 @@
+package com.ea.originx.automation.scripts.feature.store;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroStore;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.store.BrowseGamesPage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+
+/**
+ * Tests that all store tiles from browse games page have title, packart and price even after scrolling down a bit
+ *
+ * @author rocky
+ */
+public class OAStoreLazyLoading extends EAXVxTestTemplate {
+
+    @Test(groups = {"store", "store_smoke", "allfeaturesmoke"})
+    public void testOAStoreLazyLoading(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        logFlowPoint("Log into Origin"); //1
+        logFlowPoint("Navigate to Browse Games Page"); //2
+        logFlowPoint("Verify that all store tiles have title, parkart and price"); //3
+        logFlowPoint("Scroll to the bottom of the page and verify more entitlement tiles are loaded"); //4
+        logFlowPoint("Verify that all store tiles have title, parkart and price"); //5
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with the user" + userAccount.getEmail());
+        } else {
+            logFailExit("Failed to log into Origin with the user");
+        }
+
+        //2
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        BrowseGamesPage browseGamesPage = navBar.gotoBrowseGamesPage();
+        if (browseGamesPage.verifyBrowseGamesPageReached()) {
+            logPass("Successfully navigated to the Browse Games Page");
+        } else {
+            logFailExit("Failed to navigate to the Browse Games Page");
+        }
+
+        //3
+        int defaultNumberOfGames = browseGamesPage.getNumberOfGameTilesLoaded();
+        if (MacroStore.checkStoreTilesTitlePackartPriceVisible(driver).size() == 0) {
+            logPass("Verifed all store files have title, packart and price");
+        } else {
+            logFailExit("Not all store files have title, packart and price ");
+        }
+
+        //4
+        browseGamesPage.scrollToBottom();
+        browseGamesPage.waitForGamesToLoad();
+        //sleep for a bit to give the game tiles a chance to appear after the
+        //loading indicator has gone away
+        sleep(1000);
+        int numberOfGamesAfterScrolling = browseGamesPage.getNumberOfGameTilesLoaded();
+        if (numberOfGamesAfterScrolling > defaultNumberOfGames) {
+            logPass("Scrolling to the bottom of the page loaded more game tiles");
+        } else {
+            logFail("Scrolling to the bottom of the page did not load more game tiles");
+        }
+
+        //5
+        if (MacroStore.checkStoreTilesTitlePackartPriceVisible(driver).size() == 0) {
+            logPass("Verifed all store files have title, packart and price");
+        } else {
+            logFailExit("Not all store files have title, packart and price ");
+        }
+
+        softAssertAll();
+    }
+}

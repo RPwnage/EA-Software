@@ -1,0 +1,81 @@
+<div class="origin-social-hub-roster-item origin-social-hub-roster-friend" keytarget="contextmenu" tabindex="-1">
+    <div ng-class="{'origin-social-hub-roster-friend-offline': presence.show === 'UNAVAILABLE' }">
+        <a href="javascript:void(0)" class="otkavatar origin-social-hub-roster-friend-link" ng-class="{
+            'otkavatar-isonline': presence.show === 'ONLINE',
+            'otkavatar-isjoinable': presence.isJoinable && presence.isCompatiblePlatform,
+            'otkavatar-isingame': presence.show === 'INGAME',
+            'otkavatar-isbroadcasting': presence.isBroadcasting,
+            'otkavatar-isaway': presence.show === 'AWAY',
+            'otkavatar-isoffline': presence.show === 'UNAVAILABLE'}">
+            <img ng-src="{{friend.avatarImgSrc}}" alt="{{friend.originId}}" class="otkavatar-img">
+        </a>
+    	<div class="origin-social-hub-roster-friend-inner-wrapper" ng-class="{'has-icon': presence.isBroadcasting || presence.isJoinable, 'has-realname': (friend.firstName && friend.firstName.length > 0) || (friend.lastName && friend.lastName.length > 0)}">
+            <h3 class="origin-social-hub-roster-friend-originId otktitle-4"><strong>{{friend.originId}}</strong></h3>
+            <h3 ng-if="(friend.firstName && friend.firstName.length > 0) || (friend.lastName && friend.lastName.length > 0)" class="origin-social-hub-roster-friend-realname otktitle-4"><strong>{{friend.firstName}}&nbsp;{{friend.lastName}}</strong></h3>
+            <h4 ng-if="presence.gameActivity.gameTitle.length > 0" class="origin-social-hub-roster-friend-activity otktitle-4">{{presence.gameActivity.gameTitle}} {{presence.gameActivity.richPresence}}</h4>
+            <h4 ng-if="presence.groupActivity.groupId.length > 0" class="origin-social-hub-roster-friend-groupactivity otktitle-4">{{(presence.groupActivity.groupName.length>0 ? playingInGroupWithNameLoc.replace('%group%', presence.groupActivity.groupName) : playingInGroupLoc)}}</h4>
+            <h4 ng-if="presence.groupActivity.groupId.length === 0 && presence.gameActivity.gameTitle.length > 0" class="origin-social-hub-roster-friend-groupactivity otktitle-4">{{presence.gameActivity.gameTitle}} {{presence.gameActivity.richPresence}}</h4>
+			<h4 ng-if="presence.show === 'ONLINE'" class="origin-social-hub-roster-friend-activity otktitle-4" ng-bind-html="::trustAsHtml(onlineLoc)"></h4>
+			<h4 ng-if="presence.show === 'AWAY'" class="origin-social-hub-roster-friend-activity otktitle-4" ng-bind-html="::trustAsHtml(awayLoc)"></h4>
+			<h4 ng-if="presence.show === 'UNAVAILABLE'" class="origin-social-hub-roster-friend-activity otktitle-4" ng-bind-html="::trustAsHtml(offlineLoc)"></h4>
+        </div>
+        <div ng-show="presence.isBroadcasting" class="origin-social-hub-roster-friend-watchbroadcast-icon" origin-tooltip={{broadcastingLoc}}>
+            <a><i class="otkicon otkicon-broadcasting"></i></a>
+        </div>
+        <div ng-show="presence.show === 'INGAME' && selfPresence.show !== 'UNAVAILABLE' && presence.isJoinable && !presence.isGroupJoinable && !presence.isBroadcasting && presence.isCompatiblePlatform" class="origin-social-hub-roster-friend-joingame-icon" origin-tooltip={{joinGameLoc}}>
+            <a><i class="otkicon otkicon-join"></i></a>
+        </div>
+        <div ng-show="presence.show === 'INGAME' && selfPresence.show !== 'UNAVAILABLE' && !presence.isJoinable && presence.isGroupJoinable && !presence.isBroadcasting && presence.isCompatiblePlatform" class="origin-social-hub-roster-friend-joingame-icon" origin-tooltip={{joinGroupLoc}}>
+            <a><i class="otkicon otkicon-join"></i></a>
+        </div>
+        <div ng-show="presence.show === 'INGAME' && selfPresence.show !== 'UNAVAILABLE' && presence.isJoinable && presence.isGroupJoinable && !presence.isBroadcasting && presence.isCompatiblePlatform" class="origin-social-hub-roster-friend-joingame-icon" origin-tooltip={{joinGameAndGroupLoc}}>
+            <a><i class="otkicon otkicon-join"></i></a>
+        </div>
+
+        <div class="origin-social-hub-roster-friend-menu-icon" ng-class="{ 'icon-visible' : isContextmenuVisible }">
+            <i class="otkicon otkicon-downarrow origin-social-hub-roster-contextmenu-otkicon-downarrow"></i>
+        </div>
+    </div>
+
+    <!-- context menu -->
+    <div class="otkcontextmenu-wrap origin-social-hub-roster-contextmenu" ng-class="{ 'otkcontextmenu-isvisible' : isContextmenuVisible, 'otkcontextmenu-displayup' : displayContextmenuUp }">
+        <ul class="otkmenu otkmenu-context" role="menu" arialabelledby="contextmenu">
+            <li role="presentation">
+                <a  ng-click="contextmenuCallbacks.sendMessage()" role="menuitem" keytarget="contextmenuitem" tabindex="-1" href="javascript:void(0)">{{sendMessageLoc}}</a>
+            </li>
+            <li ng-if="isVoiceSupported" ng-class="{ 'otkmenu-item-disabled': (presence.show === 'UNAVAILABLE') || !friend.isVoiceSupported }" role="presentation">
+                <a keytarget="contextmenuitem"  ng-click="presence.show === 'UNAVAILABLE' || contextmenuCallbacks.startVoiceChat()" role="menuitem" tabindex="-1" href="javascript:void(0)">{{startVoiceChatLoc}}</a>
+            </li>
+
+            <li role="presentation">
+                <a keytarget="contextmenuitem" ng-click="contextmenuCallbacks.viewProfile()" role="menuitem" tabindex="-1" href="javascript:void(0)">{{viewProfileLoc}}</a>
+            </li>
+            <li class="otkmenu-context-divider"></li>
+
+            <!-- Join other user's game requires THEM to be joinable -->
+            <li ng-class="{ 'otkmenu-item-disabled' : presence.show !== 'INGAME' || selfPresence.show === 'UNAVAILABLE' || !(presence.isJoinable || presence.isGroupJoinable) || !presence.isCompatiblePlatform}" role="presentation">
+                <a keytarget="contextmenuitem"  ng-if='presence.isJoinable && !presence.isGroupJoinable || !presence.isJoinable && !presence.isGroupJoinable' ng-click="(!presence.isJoinable && !presence.isGroupJoinable) || contextmenuCallbacks.joinGame()"
+                  role="menuitem" tabindex="-1" href="javascript:void(0)">{{joinGameLoc}}</a>
+                <a keytarget="contextmenuitem"  ng-if='!presence.isJoinable && presence.isGroupJoinable' ng-click="contextmenuCallbacks.joinGame()" role="menuitem"
+                  tabindex="-1" href="javascript:void(0)">{{joinGroupLoc}}</a>
+                <a keytarget="contextmenuitem" ng-if='presence.isJoinable && presence.isGroupJoinable' ng-click="contextmenuCallbacks.joinGame()" role="menuitem"
+                  tabindex="-1" href="javascript:void(0)">{{joinGameAndGroupLoc}}</a>
+            </li>
+
+            <li ng-class="{ 'otkmenu-item-disabled' : !presence.isBroadcasting }" role="presentation">
+                <a keytarget="contextmenuitem" ng-click="!presence.isBroadcasting || contextmenuCallbacks.watchBroadcast()" role="menuitem" tabindex="-1" href="javascript:void(0)">{{watchBroadcastLoc}}</a>
+            </li>
+            <li ng-class="{ 'otkmenu-item-disabled' : !(selfPresence.gameActivity.joinable || selfPresence.gameActivity.joinableInviteOnly) || !presence.isCompatiblePlatform }" role="presentation">
+                <a keytarget="contextmenuitem" ng-click="!(selfPresence.gameActivity.joinable || selfPresence.gameActivity.joinableInviteOnly) || !presence.isCompatiblePlatform || contextmenuCallbacks.inviteToGame()" role="menuitem" tabindex="-1" href="javascript:void(0)">{{inviteToGameLoc}}</a>
+            </li>
+            <li class="otkmenu-context-divider"></li>
+            <li role="presentation">
+                <a keytarget="contextmenuitem" ng-click="contextmenuCallbacks.removeFriendAndBlock()" role="menuitem" tabindex="-1" href="javascript:void(0)">{{unfriendAndBlockLoc}}</a>
+            </li>
+            <li role="presentation">
+                <a keytarget="contextmenuitem" ng-click="contextmenuCallbacks.removeFriend()" role="menuitem" tabindex="-1" href="javascript:void(0)">{{unfriendLoc}}</a>
+            </li>
+
+        </ul>
+    </div><!-- /context menu -->
+</div>

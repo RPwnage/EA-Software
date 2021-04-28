@@ -1,0 +1,27 @@
+var voipcelpps3_8c =
+[
+    [ "VoipCelpCodecConfigT", "d7/d90/structVoipCelpCodecConfigT.html", "d7/d90/structVoipCelpCodecConfigT" ],
+    [ "VoipChannelToCelpDecoderT", "d6/da1/structVoipChannelToCelpDecoderT.html", "d6/da1/structVoipChannelToCelpDecoderT" ],
+    [ "VoipCelpDecoderT", "dc/dae/structVoipCelpDecoderT.html", "dc/dae/structVoipCelpDecoderT" ],
+    [ "VoipCelpStateT", "d3/d6b/structVoipCelpStateT.html", "d3/d6b/structVoipCelpStateT" ],
+    [ "VOIP_CODEC_ADEC_PPU_THREAD_PRIORITY", "dc/d68/voipcelpps3_8c.html#abe435b33332204493a3d7a66557faec2", null ],
+    [ "VOIP_CODEC_ADEC_SPU_THREAD_PRIORITY", "dc/d68/voipcelpps3_8c.html#a7923b086d100951a6119714b87d7d935", null ],
+    [ "VOIP_CODEC_ADEC_THREAD_STACK_SIZE", "dc/d68/voipcelpps3_8c.html#a9b786ad7a7fbb33d82dceda75ed9307d", null ],
+    [ "VOIP_CODEC_CELP_MAXAUSIZE", "dc/d68/voipcelpps3_8c.html#a8d774a43d2241197c31596a5f6f7a23f", null ],
+    [ "VOIP_CODEC_CELP_MAXFRAMENUM", "dc/d68/voipcelpps3_8c.html#a7a7397b3601134115e6c33955956adfb", null ],
+    [ "VOIP_CODEC_CELP_MAXFRAMESAMPLES", "dc/d68/voipcelpps3_8c.html#ae898910e06b408298e86008eb09b8c16", null ],
+    [ "VOIP_CODEC_CELP_PPU_STACK_SIZE", "dc/d68/voipcelpps3_8c.html#aca743b342847337c47a7c5ab0b80e386", null ],
+    [ "VOIP_CODEC_CELP_PPU_THREAD_PRIORITY", "dc/d68/voipcelpps3_8c.html#ab8dbee9ed76b0a375ef481dc27fedd8f", null ],
+    [ "VOIP_CODEC_CELP_SPU_THREAD_PRIORITY", "dc/d68/voipcelpps3_8c.html#ad2653553c0a1ea23efbc1568bf96df73", null ],
+    [ "VOIP_CODEC_CONFIGNAME", "dc/d68/voipcelpps3_8c.html#a66aa9bfcc4e820f36980394545e85e6d", null ],
+    [ "VOIP_CODEC_MPE_DEFAULT_CONFIG", "dc/d68/voipcelpps3_8c.html#ad05f6ec88a1135c8e2fe8fe3a9f7906b", null ],
+    [ "VOIP_CODEC_RPE_DEFAULT_CONFIG", "dc/d68/voipcelpps3_8c.html#aced6543855feafdd197548686bd15593", null ],
+    [ "VoipCelpCodecConfigT", "dc/d68/voipcelpps3_8c.html#ab4ed46e8c14635fd75392be5bdd901b8", null ],
+    [ "VoipCelpDecoderT", "dc/d68/voipcelpps3_8c.html#a00722b06b46ea1c8a6ec0fc6c6b9b31e", null ],
+    [ "VoipCelpStateT", "dc/d68/voipcelpps3_8c.html#ad6a612f8aea0b85e1f92f3c9512ec191", null ],
+    [ "VoipChannelToCelpDecoderT", "dc/d68/voipcelpps3_8c.html#a94c6e2bd616368a788b3c01bf89fc932", null ],
+    [ "Encode8ResEx", "dc/d68/voipcelpps3_8c.html#aaf187e027f746185ada2eff301c3b65c", null ],
+    [ "EncodeResEx", "dc/d68/voipcelpps3_8c.html#ada9eb7e19671b39b38d747f72a89fc45", null ],
+    [ "VoipCelp8_CodecDef", "dc/d68/voipcelpps3_8c.html#a1967bc545ca2f1a9113371431632493a", null ],
+    [ "VoipCelp_CodecDef", "dc/d68/voipcelpps3_8c.html#abbf64e76259e1503ac282df027b1eae6", null ]
+];

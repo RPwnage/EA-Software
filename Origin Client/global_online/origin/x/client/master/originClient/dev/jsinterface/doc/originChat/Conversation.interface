@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<interface inherits="ConversationRecord">
+	<description>Represents an active conversation with zero or more other users</description>
+	
+	<property name="id" type="String" readonly="true">
+		<description>Unique ID for the conversation</description>
+	</property>
+	
+	<method name="sendMessage">
+		<param name="body" type="String">
+			<description>Plain text body of the message</description>
+		</param>
+		<param name="threadId" type="String" optional="true">
+			<description>Thread ID for the message. If none is provided a new thread ID will be generated. See XEP-0201 for threading best practices.</description>
+		</param>
+
+		<description>Sends a message with the given body and thread ID to the conversation</description>
+	</method>
+
+	<method name="generateUniqueThreadId" return="String">
+		<description>Generates a new thread ID. This is a convienence method that has no effect on the current conversation.</description> 
+	</method>
+
+	<signal name="eventAdded">
+		<param name="event" type="ConversationEvent"/>
+		<description>Emitted when a new event has occured in the conversation</description>
+	</signal>
+	
+	<property name="previousConversations" type="ConversationRecord[]" readonly="true">
+		<description>Records for previous conversations in chronological order</description>
+	</property>
+
+	<property name="participants" type="RemoteUser[]" readonly="true">
+		<description>All remote participants in the conversation. The current user is implicitly a participant in all conversations</description>
+	</property>
+
+	<method name="finish">
+		<description>Finishes the conversation. Any further communication with the users in this conversation will require a new conversation to be created. The finishReason property will be set to USER_FINISHED</description>
+	</method>
+
+	<property name="finishOnClose" type="Boolean">
+		<description>If true the conversation will automatically be finished an arbitrary time after the last reference to this object has been released. If the containing JavaScript context is destroyed the conversation will be finished immediately. This is useful for associating the lifetime of a conversation with a given window or frame. This property defaults to false.</description>
+	</property>
+
+	<method name="inviteRemoteUser">
+		<param name="invitee" type="RemoteUser">
+			<description>Remote user to invite</description>
+		</param>
+		<description>Invites a remote user to join this conversation</description>
+	</method>
+
+	<property name="state" type="ConversationState" readonly="true">
+		<description>State of the conversation. This can be used to distinguish one-to-one chats from multi-user chats</description>
+	</property>
+
+	<signal name="stateChanged">
+		<description>Emitted when whenever the state property changes</description>
+	</signal>
+
+	<method name="acceptMucRoomInvite">
+		<description>Accepts the multi-user chat room associated with the conversation. If the room no longer exists a dialog will be presented to the user and the conversation will immediately finish. stateChanged() will be emitted once the current user has successfully entered the room</description>
+	</method>
+
+	<method name="declineMucRoomInvite">
+		<description>Declines the multi-user chat room invite. This immediately finishes the conversation.</description>
+	</method>
+
+	<property name="multiUserChatSequenceNumber" type="Integer?" readonly="true">
+		<description>Multi-user chat sequence number. A new sequence number is allocated for every conversation created in or entering the MULTI_USER state. For all other conversations this property will be null</description>
+	</property>
+
+	<property name="finishReason" type="ConversationFinishReason?" readonly="true">
+		<description>Reason the conversation was finished or null if it hasn't been finished</description>
+	</property>
+
+	<property name="active" type="Boolean" readonly="true">
+		<description>Indicates if this is an active conversation. Only active conversations can send or receive messages or send multi-user chat room invitations. This property may change whenever stateChanged() is emitted.</description>
+	</property>
+</interface>

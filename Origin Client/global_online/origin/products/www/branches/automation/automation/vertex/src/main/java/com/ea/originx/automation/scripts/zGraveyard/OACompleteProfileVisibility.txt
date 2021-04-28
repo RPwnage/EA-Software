@@ -1,0 +1,97 @@
+package com.ea.originx.automation.scripts.myhome;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.utils.MiscUtilities;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.TakeOverPage;
+import com.ea.originx.automation.lib.pageobjects.discover.CompleteProfile;
+import com.ea.originx.automation.lib.pageobjects.discover.DiscoverPage;
+import com.ea.originx.automation.lib.pageobjects.login.LoginPage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the Profile Visibility Task in Complete profile section
+ *
+ * @author mkalaivanan
+ */
+public class OACompleteProfileVisibility extends EAXVxTestTemplate {
+
+    @Test(groups = {"client", "discover", "browser"})
+    public void testCompleteProfile(ITestContext context) throws Exception {
+        UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        logFlowPoint("Create a new user with no first name and last name and unchecking 'Allow Gamers to find me by email' : " + userAccount.getUsername()); //1
+        logFlowPoint("Navigate to discover page and scroll to Complete Profile Section");//2
+        logFlowPoint("Verify 'Set Profile Visibility' tile exists in the 'Complete Your Profile' section"); //3
+        logFlowPoint("Verify Profile Visibility tile has link to dismiss it"); //4
+        logFlowPoint("Verify Profile visibility tile has CTA button to edit your settings"); //5
+        logFlowPoint("Click on CTa button and verify browser opens up"); //6
+
+        //1 Create user
+        OriginClient client = startClientObject(context);
+        WebDriver driver = client.getWebDriver();
+
+        userAccount.setFirstName("");
+        userAccount.setLastName("");
+        new LoginPage(driver).clickRegistrationLink();
+        MacroLogin.quickRegister(userAccount, driver, true);
+        if (MacroLogin.verifyMiniProfileUsername(driver, userAccount.getUsername())) {
+            logPass("User created and logged in successfully");
+        } else {
+            logFailExit("User not logged in successfully");
+        }
+
+        //2
+        DiscoverPage discoverPage = new NavigationSidebar(driver).gotoDiscoverPage();
+        new TakeOverPage(driver).closeIfOpen();
+        discoverPage.waitForPage();
+        boolean isDiscoverPageReached = discoverPage.verifyDiscoverPageReached();
+        CompleteProfile completeProfileSection = new CompleteProfile(driver);
+        completeProfileSection.waitForPageToLoad();
+        completeProfileSection.waitForPageScroll(15);
+        completeProfileSection.scrollToCompleteYourAccountSection();
+        if (isDiscoverPageReached && completeProfileSection.getVisibleTasksCount() > 0) {
+            logPass("Navigated to discover page and scrolled to Complete Profile section");
+        } else {
+            logFailExit("No tasks are visible to complete the profile");
+        }
+
+        //3
+        completeProfileSection.clickViewMoreButton();
+        if (completeProfileSection.verifyProfileVisibilityTaskVisible()) {
+            logPass("Profile Visibility tile exists on the Complete Profile Section");
+        } else {
+            logFailExit("Profile visibility tile is not visible");
+        }
+
+        //4
+        if (completeProfileSection.verifyRemindMeLaterButtonOnProfileVisibilityTask()) {
+            logPass("Profile visibility tile has a link to dismiss it");
+        } else {
+            logFail("Profile visibility tile does not have a link to dismiss it");
+        }
+
+        //5
+        if (completeProfileSection.verifyCtaButtonOnProfileVisibilityTask()) {
+            logPass("Tile has CTA button to edit settings");
+        } else {
+            logFail("Tile has no CTA button to edit settings");
+        }
+
+        //6
+        completeProfileSection.clickCtaButtonOnProfileVisibility();
+        boolean browserOpened = MiscUtilities.pollingWaitEx(() -> MiscUtilities.verifyBrowserOpen(client));
+        if (browserOpened) {
+            logPass("Clicked on Cta Button on Profile Visibility task and browser opened successfully");
+        } else {
+            logFail("Browser did not open after clicking on CTA button on the Profile Visiblity task");
+        }
+        softAssertAll();
+    }
+}

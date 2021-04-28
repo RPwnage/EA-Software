@@ -1,0 +1,240 @@
+package com.ea.originx.automation.scripts.zGraveyard.oig;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.vx.originclient.utils.SystemUtilities;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroSocial;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.UnfriendAndBlockDialog;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.DownloadManager;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.DownloadQueue;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.oig.OigNavigationPage;
+import com.ea.originx.automation.lib.pageobjects.social.SocialHub;
+import com.ea.originx.automation.lib.resources.games.OADipSmallGame;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the friends list in OIG
+ *
+ * @author lscholte
+ */
+public class OAFriendsDisplayOIG extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 11146)
+    @Test(groups = {"oig", "client_only", "full_regression"})
+    public void testFriendsDisplayOIG(ITestContext context) throws Exception {
+
+        final OriginClient clientA = OriginClientFactory.create(context);
+        final OriginClient clientB = OriginClientFactory.create(context);
+        final OriginClient clientC = OriginClientFactory.create(context);
+        final OriginClient clientD = OriginClientFactory.create(context);
+
+        OADipSmallGame entitlement = new OADipSmallGame();
+        final String entitlementOfferId = entitlement.getOfferId();
+        final String entitlementProcessName = entitlement.getProcessName();
+
+        UserAccount userA = AccountManager.getEntitledUserAccount(entitlement);
+        UserAccount userB = AccountManager.getEntitledUserAccount(entitlement);
+        UserAccount userC = AccountManager.getRandomAccount();
+        UserAccount userD = AccountManager.getRandomAccount();
+        UserAccount userE = AccountManager.getRandomAccount();
+
+        userA.cleanFriends();
+        userB.cleanFriends();
+        userC.cleanFriends();
+        userD.cleanFriends();
+        userE.cleanFriends();
+
+        userA.addFriend(userB);
+        userA.addFriend(userC);
+        userA.addFriend(userD);
+        userA.addFriend(userE);
+
+        logFlowPoint("Log into Origin with " + userA.getUsername() + " as User A"); //1
+        logFlowPoint("Unfriend and block User E"); //2
+        logFlowPoint("Navigate user A to the 'Game Library' page"); //3
+        logFlowPoint("Download DiP Small"); //4
+        logFlowPoint("Launch DiP Small"); //5
+        logFlowPoint("Open the friends list from the OIG menu"); //6
+        logFlowPoint("Verify that the users are sorted alphabetically in OIG"); //7
+        logFlowPoint("Verify that User E does not appear in the friends list"); //8
+        logFlowPoint("Log into Origin with " + userB.getUsername() + " as User B"); //9
+        logFlowPoint("Log into Origin with " + userC.getUsername() + " as User C"); //10
+        logFlowPoint("Set User C's status to away"); //11
+        logFlowPoint("Verify that the users in OIG are ordered Online, Away, Offline"); //12
+        logFlowPoint("Log into Origin with " + userD.getUsername() + " as User D"); //13
+        logFlowPoint("Verify the online users in OIG are shown in alphabetical order"); //14
+        logFlowPoint("Navigate user B to the 'Game Library' page"); //15
+        logFlowPoint("Launch DiP Small"); //16
+        logFlowPoint("Verify that the users in OIG are order In Game, Online, Away"); //17
+
+        // 1
+        WebDriver driverA = startClientObject(context, clientA);
+        if (MacroLogin.startLogin(driverA, userA)) {
+            logPass("Successfully logged into Origin as User A");
+        } else {
+            logFailExit("Could not log into Origin as User A");
+        }
+
+        //2
+        MacroSocial.restoreAndExpandFriends(driverA);
+        SocialHub socialHubA = new SocialHub(driverA);
+        socialHubA.getFriend(userE.getUsername()).unfriendAndBlock();
+        sleep(3000); //Let Unfriend and Block dialog stabilize
+        new UnfriendAndBlockDialog(driverA).clickUnfriendAndBlock();
+        sleep(3000); //Let social hub stabilize
+        if (!socialHubA.verifyFriendVisible(userE.getUsername())) {
+            logPass("User E does not appear in the friends list");
+        } else {
+            logFailExit("User E appears in the friends list");
+        }
+        socialHubA.minimizeSocialHub();
+
+        //3
+        NavigationSidebar navBarA = new NavigationSidebar(driverA);
+        GameLibrary gameLibraryA = navBarA.gotoGameLibrary();
+        if (gameLibraryA.verifyGameLibraryPageReached()) {
+            logPass("Successfully navigated User A to the 'Game Library' page");
+        } else {
+            logFailExit("Failed to navigate User A to the 'Game Library' page");
+        }
+
+        //4
+        if (MacroGameLibrary.downloadFullEntitlement(driverA, entitlementOfferId)) {
+            logPass("Successfully downloaded Small DiP game");
+        } else {
+            logFailExit("Failed to download Small DiP game");
+        }
+
+        //5
+        // Close download queue flyout which may interfere with game library operations
+        Waits.pollingWait(new DownloadQueue(driverA)::isOpen); // Wait for Download Queue Flyout to open before closing it
+        new DownloadManager(driverA).closeDownloadQueueFlyout();
+        new GameTile(driverA, entitlementOfferId).play();
+        if (Waits.pollingWaitEx(() -> entitlement.isLaunched(clientA))) {
+            logPass("Successfully launched DiP Small");
+        } else {
+            logFailExit("Failed to launch DiP Small");
+        }
+
+        //6
+        OigNavigationPage oigNavigationPage = new OigNavigationPage(driverA);
+        oigNavigationPage.switchToOIG();
+        oigNavigationPage.clickFriendsList();
+        sleep(5000);
+        SocialHub socialHubOig = new SocialHub(driverA);
+        socialHubOig.waitForPageToLoad();
+        if (Waits.pollingWait(socialHubOig::verifySocialHubVisible, 4000, 700, 3000)) {
+            logPass("Successfully opened the friends list");
+        } else {
+            logFailExit("Failed to open the friends list");
+        }
+
+        //7
+        if (socialHubOig.verifyFriendsAlphabeticalOrder(SocialHub.PresenceType.OFFLINE)) {
+            logPass("The offline friends are listed in alphabetical order");
+        } else {
+            logFail("The offline friends are not listed in alphabetical order");
+        }
+
+        //8
+        if (!socialHubOig.verifyFriendVisible(userE.getUsername())) {
+            logPass("User E does not appear in the friends list");
+        } else {
+            logFailExit("User E appears in the friends list");
+        }
+
+        //9
+        WebDriver driverB = startClientObject(context, clientB);
+        if (MacroLogin.startLogin(driverB, userB)) {
+            logPass("Successfully logged into Origin as User B");
+        } else {
+            logFailExit("Could not log into Origin as User B");
+        }
+
+        //10
+        WebDriver driverC = startClientObject(context, clientC);
+        if (MacroLogin.startLogin(driverC, userC)) {
+            logPass("Successfully logged into Origin as User C");
+        } else {
+            logFailExit("Could not log into Origin as User C");
+        }
+
+        //11
+        MacroSocial.restoreAndExpandFriends(driverC);
+        SocialHub socialHubC = new SocialHub(driverC);
+        socialHubC.setUserStatusAway();
+        if (socialHubC.verifyUserAway()) {
+            logPass("Successfully set User C's status to away");
+        } else {
+            logFailExit("Failed to set User C's status to away");
+        }
+
+        //12
+        if (socialHubOig.verifyFriendsPresenceOrder()) {
+            logPass("The friends correctly appear in order of Online, Away, then Offline");
+        } else {
+            logFail("The friends do not appear in the correct order of Online, Away, then Offline");
+        }
+
+        //13
+        WebDriver driverD = startClientObject(context, clientD);
+        if (MacroLogin.startLogin(driverD, userD)) {
+            logPass("Successfully logged into Origin as User D");
+        } else {
+            logFailExit("Could not log into Origin as User D");
+        }
+
+        //14
+        if (socialHubOig.verifyFriendsAlphabeticalOrder(SocialHub.PresenceType.ONLINE)) {
+            logPass("The online friends are listed in alphabetical order");
+        } else {
+            logFail("The online friends are not listed in alphabetical order");
+        }
+
+        //15
+        NavigationSidebar navBarB = new NavigationSidebar(driverB);
+        navBarB.gotoGameLibrary();
+        GameLibrary gameLibraryB = new GameLibrary(driverB);
+        if (gameLibraryB.verifyGameLibraryPageReached()) {
+            logPass("Successfully navigated User B to the 'Game Library' page");
+        } else {
+            logFailExit("Failed to navigate User B to the 'Game Library' page");
+        }
+
+        //16
+        GameTile gameTile = new GameTile(driverB, entitlementOfferId);
+        gameTile.waitForReadyToPlay();
+        gameTile.play();
+        final boolean waitForGameLaunch = new OADipSmallGame().waitForGameLaunch(clientB);
+        // waitForGameLaunch may return with old Dip Small running, so wait for number of processes as well
+        final boolean numProcs = Waits.pollingWaitEx(
+                () -> ProcessUtil.getNumberOfProcessInstances(clientB, entitlementProcessName) == 2);
+        if (waitForGameLaunch && numProcs) {
+            logPass("Successfully launched a second instance of DiP Small");
+        } else {
+            logFailExit("Failed to launch a second instance of DiP Small");
+        }
+
+        //17
+        if (socialHubOig.verifyFriendsPresenceOrder()) {
+            logPass("The friends correctly appear in order of In Game, Online, then Away");
+        } else {
+            logFail("The friends do not appear in the correct order of In Game, Online, then Away");
+        }
+
+        softAssertAll();
+    }
+}

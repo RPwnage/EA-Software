@@ -1,0 +1,28 @@
+var netgameerr_8h =
+[
+    [ "GMDIST_BADSETUP", "d2/d9a/netgameerr_8h.html#ga06111e51bcc2d899d04e799f7e041ffc", null ],
+    [ "GMDIST_DELETED", "d2/d9a/netgameerr_8h.html#ga06573fdf28d18ca7013a20900f585307", null ],
+    [ "GMDIST_DESYNCED", "d2/d9a/netgameerr_8h.html#gaf55bf8f3ed19bbfc11760ae69e813a2e", null ],
+    [ "GMDIST_DESYNCED_ALL_PLAYERS", "d2/d9a/netgameerr_8h.html#ga2aee4e76b2d9bd76a7444329511922b5", null ],
+    [ "GMDIST_DISCONNECTED", "d2/d9a/netgameerr_8h.html#ga0358b493c5df34f140cef1ec8cac9b6d", null ],
+    [ "GMDIST_INPUTLOCAL_FAILED", "d2/d9a/netgameerr_8h.html#ga3e77ae2b0b266822e98931d02ab73df8", null ],
+    [ "GMDIST_INPUTLOCAL_FAILED_INVALID", "d2/d9a/netgameerr_8h.html#ga64d054e150a822782c04b11a08d56a54", null ],
+    [ "GMDIST_INPUTLOCAL_FAILED_MULTI", "d2/d9a/netgameerr_8h.html#ga76d5afa787dcc61c4a90d02fb6ba1a99", null ],
+    [ "GMDIST_INPUTLOCAL_FAILED_WINDOW", "d2/d9a/netgameerr_8h.html#ga141742c29814872faa105b6941fdd420", null ],
+    [ "GMDIST_INPUTQUERY_FAILED", "d2/d9a/netgameerr_8h.html#gaf95780856d0c26e687ea8e00917a6288", null ],
+    [ "GMDIST_INVALID", "d2/d9a/netgameerr_8h.html#ga58c8a84b733847294482bf33b034fc41", null ],
+    [ "GMDIST_NO_STREAM", "d2/d9a/netgameerr_8h.html#ga3acf5aa8bf9b953e96f6c264f3f0a971", null ],
+    [ "GMDIST_ORPHAN", "d2/d9a/netgameerr_8h.html#ga51967a7894442ca385787479335e0ab2", null ],
+    [ "GMDIST_OVERFLOW", "d2/d9a/netgameerr_8h.html#gacba4a143ea9eec34338283235959309d", null ],
+    [ "GMDIST_OVERFLOW_MULTI", "d2/d9a/netgameerr_8h.html#ga619654be57e798cd1bd0d7b8f7a7c537", null ],
+    [ "GMDIST_OVERFLOW_WINDOW", "d2/d9a/netgameerr_8h.html#ga4fd9ad060a75fb5690dd09dd7667b697", null ],
+    [ "GMDIST_PEEK_ERROR", "d2/d9a/netgameerr_8h.html#gab52e7cb532a6c9a34d663e153e9c67ca", null ],
+    [ "GMDIST_QUEUE_FULL", "d2/d9a/netgameerr_8h.html#gaec839d0d735407bbce57f0d08d5d7a64", null ],
+    [ "GMDIST_QUEUE_MEMORY", "d2/d9a/netgameerr_8h.html#ga7dc16fcef2ff7f8a4a6f61590577e66a", null ],
+    [ "GMDIST_SENDPROC_FAILED", "d2/d9a/netgameerr_8h.html#ga485c4b8c6439065eb5d0cb0a401a6744", null ],
+    [ "GMDIST_STREAM_FAILURE", "d2/d9a/netgameerr_8h.html#ga02b3baaa9090f4cee451e93b292eefa6", null ],
+    [ "GMLINK_DIRTYCAST_CONNECTION_FAILURE", "d2/d9a/netgameerr_8h.html#gabd1b91c5cf56be0c75f2a00bd8766268", null ],
+    [ "GMLINK_DIRTYCAST_CONNECTION_TIMEDOUT", "d2/d9a/netgameerr_8h.html#ga887d0fac4819233f7504cec8445113ae", null ],
+    [ "GMLINK_DIRTYCAST_DELETED", "d2/d9a/netgameerr_8h.html#ga33b822cf3899e70721e894ea4cb1f210", null ],
+    [ "GMLINK_DIRTYCAST_PEER_DISCONNECT", "d2/d9a/netgameerr_8h.html#gacb815607864e2cdd8ae6826ab262cf6f", null ]
+];

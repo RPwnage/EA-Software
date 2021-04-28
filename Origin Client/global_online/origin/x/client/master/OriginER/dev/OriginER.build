@@ -1,0 +1,429 @@
+<project default="build">
+
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="clean" value="exclude"/>
+    </optionset>
+    
+    <!-- Define package name and version. -->
+    <package name="OriginER" targetversion="1.00.00" />
+    
+    <dependent name="OriginConfig" />
+    <dependent name="OriginBootstrap" />
+    <dependent name="OriginCrashReporter" />
+    <dependent name="OriginLegacyApp" />
+    <dependent name="originClient" />
+    <dependent name="OriginVersion" />
+    <dependent name="services" />
+    <dependent name="EABase" />
+    <dependent name="EASTL" />
+    <dependent name="EAIO" />
+    <dependent name="TelemetryAPI" />
+    <dependent name="openSSL" />
+    <dependent name="Qt" />
+    <dependent name="OriginUtils" />
+    <dependent name="uitoolkit" />
+    <dependent name="ICU" />
+    <property name="runtime.buildmodules" value="OriginER" />
+    <property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+      
+    <BuildType name="OriginER.buildtype" from="OriginProgram">
+        <option name="buildset.cc.defines">
+            ${option.value}
+            NOMINMAX
+            _CHAR16T
+        </option>
+        <option name="buildset.cc.options" if="${config-system} == pc">
+          ${option.value}
+          /FI ${package.dir}/source/OriginCommon.h
+        </option>
+	</BuildType>    
+    
+    <property name="runtime.OriginER.buildtype" value="OriginER.buildtype" />
+    <property name="runtime.OriginER.outputdir" value="${package.originClient.dir}/runtime"/>
+    <property name="runtime.OriginER.tempdir" value="${package.OriginER.dir}/temp" />
+    <property name="runtime.OriginER.targetdir" value="${package.dir}/target"/>
+    <property name="runtime.OriginER.outputname" value="OriginER"/>
+    <property name="qt.platforms.dir" value="${runtime.OriginER.outputdir}/platforms" />
+    <property name="dirtysdk-samples" value="false" />
+    
+    <property name="qtlibs">
+        Qt5Core
+        Qt5Gui
+        Qt5Widgets
+        Qt5Network
+        Qt5WebKit
+        QtWebKitWidgets
+        Qt5Xml
+        Qt5XmlPatterns
+    </property>
+	
+    <!-- ********************************************************** -->
+    <!-- Package USE dependencies 									-->
+    <!-- inclusion into the project but does not affect build order -->
+    <!-- ********************************************************** -->
+	<property name="runtime.OriginER.usedependencies" >
+        coreallocator
+        EABase
+        openSSL
+		Qt
+        OriginCrashReporter
+        ICU
+        OriginVersion
+	</property>
+  
+    <!-- ********************************************************** -->
+    <!-- Package BUILD dependencies 								-->
+    <!-- inclusion into the project, affects build order 			-->
+    <!-- ********************************************************** -->
+    <property name="runtime.OriginER.builddependencies">
+        OriginConfig
+        OriginLegacyApp
+		EAStdC
+        EAAssert
+        EASTL
+        EATrace
+        EAIO
+        zlib
+        BugSentry
+        DirtySDK
+        EACallstack
+        TelemetryAPI
+		services
+		uitoolkit
+        TelemetrySDK
+    </property>
+    
+    <!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+
+    <!-- to let compiler know where include files are -->
+    <property name="runtime.OriginER.includedirs" >
+        ${package.dir}
+        ${package.dir}/source
+        ${ui.output.dir}
+        ${package.OriginLegacyApp.dir}/source
+        ${package.OriginLegacyApp.dir}/source/ui
+        ${package.OriginLegacyApp.dir}/source/EbisuCommon
+        ${package.OriginCrashReporter.dir}/source
+        ${package.VisualStudio.appdir}\VC\INCLUDE
+        ${package.OriginBootstrap.dir}
+        ${package.OriginBootstrap.dir}/source
+        ${package.OriginBootstrap.dir}/source/wtl
+        ${package.services.dir}/include/services/compression
+        ${package.TelemetryAPI.dir}/include
+        ${package.TelemetryAPI.dir}/source
+        ${package.EABase.dir}/include/Common
+        ${package.EASTL.dir}/include
+        ${package.EAIO.dir}/include/EAIO
+    </property>
+
+    <!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+    
+    <fileset name="runtime.OriginER.sourcefiles" >
+        <includes name="${package.dir}/source/*.cpp" />
+        <includes name="${package.OriginCrashReporter.dir}/source/EbisuTranslator.cpp" />
+        <includes name="${package.OriginBootstrap.dir}/source/AppRunDetector.cpp" />
+    </fileset>
+    
+    <!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+	<fileset name="runtime.moc_sourcefiles" basedir="${package.OriginER.dir}/source">
+        <includes name="DataCollector.h" />
+        <includes name="DiagnosticApplication.h" />
+        <includes name="ReportErrorView.h" />
+        <includes name="Network.h" />
+        <includes name="ProgressView.h" />
+        <includes name="${package.OriginCrashReporter.dir}/source/EbisuTranslator.h" />
+    </fileset>
+    
+    <!-- UI files -->
+    <fileset name="runtime.ui_sourcefiles" basedir="${package.OriginER.dir}/source">
+		<includes name="*.ui" />
+	</fileset>
+    
+    <property name="runtime.OriginER.res.includedirs">
+        ${package.OriginVersion.dir}/include
+    </property>
+
+    <do if="${config-system} == 'pc'">      
+        <fileset name="runtime.OriginER.resourcefiles">
+            <includes name="${package.OriginER.dir}/source/OriginER.rc" />
+        </fileset>
+    </do>
+    
+    <!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+	<fileset name="runtime.qrc_sourcefiles" basedir="${package.OriginER.dir}/source">
+		<includes name="resources.qrc" />
+	</fileset>
+ 
+    <!-- get the options from the current config -->
+	<property name="runtime.moc_defines" value="@{OptionSetGetValue('origin-config-options-program-${config-type}','buildset.cc.defines')}"/>
+	<property name="runtime.moc_includedirs" value="${runtime.OriginER.includedirs}"/>
+    
+    <!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<target name="generate-code" depends="moc-compile ui-compile qt-rc-compile" />
+	
+	<property name="subpackage.list" >
+		uitoolkit
+		webWidget
+	</property>
+	
+	<property name="runtime.OriginER.prebuildtarget" value="generate-code" />
+	
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.OriginER.vcproj.pre-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.OriginER.prebuildtarget}
+	</property>
+    
+    <!-- ************************** -->
+    <!-- Postbuild property targets -->
+    <!-- ************************** -->
+	
+	<property name="postbuild.target.list">
+	</property>
+	
+	<property name="postbuild.target.list" if="${runtime.OriginER.buildtype} eq 'origin-opt'">
+		${property.value}
+		sign-exe
+	</property>
+	
+	<target name="post-build-tasks">
+		<foreach property="runtarget" item="String" in="${postbuild.target.list}">
+			<call target="${runtarget}" />
+		</foreach>
+	</target>
+	
+	<!-- NANT Postbuild target. Will execute this after compiling happens. -->
+	<property name="runtime.OriginER.postbuildtarget" value="post-build-tasks" />
+  
+	<!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+	<property name="runtime.OriginER.vcproj.post-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:codesign.timestamp=${codesign.timestamp} ${runtime.OriginER.postbuildtarget}
+	</property>
+
+	<!-- construct the paths to include the qrc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.qrc_sourcefiles">
+		<property name="sourcefile" value="${rc.output.dir}\qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.OriginER.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+	
+	<!-- construct the paths to include the moc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+		<property name="sourcefile" value="${moc.output.dir}\moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.OriginER.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+    
+    <fileset name="runtime.OriginER.libs" >
+        <!-- SSL Libs -->
+        <includes name="${package.openSSL.libdir}/libeay32${debug-suffix}.lib"/>
+        <includes name="${package.openSSL.libdir}/ssleay32${debug-suffix}.lib"/>
+        
+        <!-- Qt Libs -->
+        <includes name="${package.Qt.libdir}\qtmain${debug-suffix}.lib"/>
+        <includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.lib"/>
+        <includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.lib"/>
+        <includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.lib"/>
+        <includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.lib"/>
+        <includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.lib"/>
+        <includes name="${package.Qt.libdir}/Qt5WebKit${debug-suffix}.lib"/>
+        <includes name="${package.Qt.libdir}/Qt5WebKitwidgets${debug-suffix}.lib"/>
+
+        <group if="${config-system} =='pc'" >
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/userenv.lib" />
+        </group>
+    </fileset>
+    
+    <target name="copy-to-runtime">
+
+        <copy todir="${runtime.OriginER.outputdir}" flatten="true">
+            <fileset>
+                <includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.dll"/>
+                <includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.dll"/>
+                <includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.dll"/>
+                <includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.dll"/>
+                <includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.dll"/>
+                <includes name="${package.Qt.libdir}\Qt5WebKit${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5WebKitWidgets${debug-suffix}.dll"/>
+                <includes name="${package.openSSL.bindir}\libeay32${debug-suffix}.dll"/>
+                <includes name="${package.openSSL.bindir}\ssleay32${debug-suffix}.dll"/>
+                <includes name="${package.ICU.bindir}/icuin51.dll"/>
+                <includes name="${package.ICU.bindir}/icuuc51.dll"/>
+                <includes name="${package.ICU.bindir}/icudt51.dll"/>
+
+                <includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.pdb"/>
+                <includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.pdb"/>
+                <includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.pdb"/>
+                <includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.pdb"/>
+                <includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.pdb"/>
+                <includes name="${package.Qt.libdir}\Qt5WebKit${debug-suffix}.pdb"/>
+                <includes name="${package.Qt.libdir}\Qt5WebKitWidgets${debug-suffix}.pdb"/>
+
+            </fileset>
+        </copy>  
+        
+        <mkdir dir="${runtime.OriginER.outputdir}" unless="@{DirectoryExists(${runtime.OriginER.outputdir})}" />
+        
+        <mkdir dir="${qt.platforms.dir}" unless="@{DirectoryExists(${qt.platforms.dir})}" />
+        <copy todir="${qt.platforms.dir}" flatten="true">
+          <fileset>
+              <includes name="${package.Qt.libdir}/../plugins/platforms/qwindows${debug-suffix}.dll"/>
+              <includes name="${package.Qt.libdir}/../plugins/platforms/qminimal${debug-suffix}.dll"/>
+              <includes name="${package.Qt.libdir}/../plugins/platforms/qwindows${debug-suffix}.pdb"/>
+              <includes name="${package.Qt.libdir}/../plugins/platforms/qminimal${debug-suffix}.pdb"/>
+        </fileset>
+        </copy>
+
+        
+    </target>
+    
+  	<target name="zip">
+		<property name="zip.name" value="${package.dir}/zip/${runtime.OriginER.outputname}" />
+		<zip zipfile="${zip.name}.zip">
+			<fileset basedir="${package.dir}/runtime">
+				<includes name="OriginER.exe" />
+				<includes name="icudt51.dll" />
+				<includes name="icuin51.dll" />
+				<includes name="icuuc51.dll" />
+				<includes name="libeay32.dll" />
+				<includes name="ssleay32.dll" />
+				<includes name="Qt5Core.dll" />
+				<includes name="Qt5Gui.dll" />
+                <includes name="Qt5Widgets.dll" />
+				<includes name="Qt5Network.dll" />
+				<includes name="Qt5Xml.dll" />
+				<includes name="platforms/*.dll" />
+			</fileset>
+		</zip>
+	</target>
+	
+    <target name="sign-exe">
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="${runtime.outputname}" in="${runtime.OriginER.outputdir}/${runtime.outputname}.exe" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+	</target>
+    
+    <target name="installer">
+		<dependent name="ActivePython" />
+
+		<fail message="Cannot build an installer in debug config. Specify &quot;-D:config=pc-vc-dev-opt&quot; on the command line to use optimized config." unless="${config-type} == 'opt'" />
+		<delete>
+			<fileset basedir="${runtime.OriginER.tempdir}">
+				<includes name="**/*"/>
+			</fileset>
+		</delete>
+		<mkdir dir="${runtime.OriginER.tempdir}" unless="@{DirectoryExists(${runtime.OriginER.tempdir})}" />
+
+		<copy todir="${runtime.OriginER.tempdir}">
+			<fileset basedir="${runtime.OriginER.outputdir}">
+				<includes name="OriginER.exe" />
+			</fileset>
+		</copy>
+		
+		<mkdir dir="${runtime.OriginER.targetdir}" unless="@{DirectoryExists(${runtime.OriginER.targetdir})}" />
+		<delete>
+			<fileset basedir="${runtime.OriginER.targetdir}">
+				<includes name="**/*" />
+			</fileset>
+		</delete>
+        
+        <property name="origin.version.file" value="originVersion.txt" />
+        <exec program="${package.ActivePython.exe}" >
+			<args>
+				<arg value="${package.OriginUtils.sourcedir}\python\getVersionString.py" />
+				<arg value="-f${package.originClient.dir}/runtime/Origin.exe" />
+				<arg value="-o${origin.version.file}" />
+				<arg value="-d_" />
+			</args>
+		</exec>
+		<property name="origin.version" fromfile="${origin.version.file}" />
+        
+		<property name="zip.name" value="${runtime.OriginER.targetdir}\OriginER_${origin.version}.zip" />
+		<zip zipfile="${zip.name}">
+			<fileset basedir="${runtime.OriginER.tempdir}">
+				<includes name="**/*.*" />
+			</fileset>
+		</zip>
+	</target>
+    
+    <!-- ************************* -->
+    <!-- Installer Language exporter target -->
+    <!-- You MUST specify the ${p4.clientspec} property on the command-line -->
+    <!-- ************************* -->
+    <target name="lang-export-OriginER">
+        <fail message="p4.clientspec not defined. Use -D:p4.clientspec=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('p4.clientspec')}" />
+        
+        <dependent name="OriginUtils" />
+        <dependent name="LanguageDatabaseExporter" />
+        <property name="p4.client" value="${p4.clientspec}"/>
+        
+        <property name="package.OriginER.lang.res.dir" value="${package.OriginER.dir}/Resources/lang" />
+        <property name="lang.export.tempdir" value="${package.dir}/temp/lang" />
+
+        <delete>
+            <fileset basedir="${package.OriginER.dir}/temp">
+                <includes name="lang/**"/>
+            </fileset>
+        </delete>
+        <mkdir dir="${lang.export.tempdir}" unless="@{DirectoryExists(${lang.export.tempdir})}" />
+        
+        <!-- Command line to export languages -->
+        <exec program="${package.LanguageDatabaseExporter.dir}/Deployment/LanguageDatabaseExporter.exe" workingdir="${lang.export.tempdir}">
+            <args>
+                <arg value="${package.OriginER.dir}/language/hudson_lde_export.config" />
+                <arg value="--u EA_Access_Installer" />
+                <arg value="--p EA_Access_InstallerPassword" />
+            </args>
+        </exec>
+        
+		<!-- This is a bit of a hack to weed out some duplicate String names with the leading space -->
+        <delete>
+            <fileset basedir="${package.OriginER.dir}/temp">
+                <includes name="lang/ *.*"/>
+            </fileset>
+        </delete>
+		
+        <do unless="@{PropertyExists('disable.p4')}">
+            <!-- revert any open files and set up the changelist -->
+            <p4revert files="//global_online/origin/tools/OriginER/..." change="default"/>
+            <p4change desc="Jenkins Language file Update" />
+            
+            <!-- Ebisu ${origin.branch} Strings -->
+            <property name="dest.dir" value="${package.OriginER.lang.res.dir}" />
+            <property name="dest.p4.dir" value="//global_online/origin/tools/OriginER/${package.OriginER.version}/Resources/lang" />
+            <property name="dest.patterns" value="OriginERStrings" />
+            
+            <eval code="@{DirectoryGetFiles('${lang.export.tempdir}\XML','*.xml',' ')}" property="export.files" type="Function" />
+            <foreach property="file" item="String" in="${export.files}">
+                <property name="filename" value="@{PathGetFileName('${file}')}" />
+                <property name="filePath" value="@{StrConcat('${dest.dir}/','${filename}')}" />
+                <property name="p4.filePath" value="@{StrConcat('${dest.p4.dir}/','${filename}')}" />
+                <foreach property="searchString" item="String" in="${dest.patterns}">
+                    <echo message="File: ${filename} StrIndexOf:@{StrIndexOf('${filename}','${searchString}')}" if="@{PropertyExists('origindebug')}"/>
+                    <do if="@{StrIndexOf('${filename}','${searchString}')} == 0">
+                        <p4edit files="${p4.filePath}" change="${p4.change}" if="@{FileExists('${filePath}')}" />
+                        <p4add files="${p4.filePath}" type="binary" change="${p4.change}" unless="@{FileExists('${filePath}')}" />
+                        <copy file="${file}" tofile="${filePath}" overwrite="true" clobber="true" />
+                    </do>
+                </foreach>
+            </foreach>
+            
+            <!-- revert any unchanged files and submit -->
+            <p4revert files="//global_online/origin/tools/OriginER/..." change="${p4.change}" onlyUnchanged="true"/>
+            <echo message="Changelist: ${p4.change}" if="@{PropertyExists('origindebug')}"/>
+            <p4submit change="${p4.change}" unless="@{StrIsEmpty('${p4.change}')}" failonerror="false"/>
+            <echo message="Changelist: ${p4.change}" if="@{PropertyExists('origindebug')}"/>
+            <p4change change="${p4.change}" delete="true" unless="@{StrIsEmpty('${p4.change}')}" failonerror="false"/>
+        </do>
+    </target>
+</project>

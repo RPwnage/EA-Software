@@ -1,0 +1,38 @@
+void exampleCommerceConsumeEntitlements()
+{
+	uint32_t total;
+	OriginHandleT entitlementHandle;
+
+	OriginCharT Group[] = "EASPORTS";
+
+	// Query the user's entitlements.
+	OriginErrorT err = OriginQueryEntitlementsSync(OriginGetDefaultUser(), NULL, 0, NULL, 0, NULL, 0, Group, &total, 10000, &entitlementHandle);
+			
+	if(err == ORIGIN_SUCCESS)
+	{
+		OriginItemT *pEntitlements = new OriginItemT[total];
+		uint32_t read = 0;
+
+		// Read the list of entitlements.
+		err = OriginReadEnumerationSync(entitlementHandle, pEntitlements, sizeof(OriginItemT) * total, 0, total, &read);
+
+		if(err == ORIGIN_SUCCESS && read)
+		{
+			OriginHandleT consumeHandle;
+			const bool NO_OVERUSE = false;
+			const uint32_t USES = 1;
+
+			// Consume an entitlement.
+			err = OriginConsumeEntitlementSync(OriginGetDefaultUser(), USES, NO_OVERUSE, &pEntitlements[0], 10000, &consumeHandle);
+
+			if(err == ORIGIN_SUCCESS)
+			{
+				// Check how many entitlements are left.
+				printf("Number of entitlements left: %s", pEntitlements[0].QuantityLeft);
+			}
+			OriginDestroyHandle(consumeHandle);
+		}
+		delete[] pEntitlements;
+	}
+	OriginDestroyHandle(entitlementHandle);
+}

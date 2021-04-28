@@ -1,0 +1,85 @@
+var netconnxboxone_8cpp =
+[
+    [ "NetConnTokenT", "de/d21/structNetConnTokenT.html", "de/d21/structNetConnTokenT" ],
+    [ "NetConnUserT", "d7/d46/structNetConnUserT.html", "d7/d46/structNetConnUserT" ],
+    [ "NetConnExternalCleanupEntryT", "da/dbd/structNetConnExternalCleanupEntryT.html", "da/dbd/structNetConnExternalCleanupEntryT" ],
+    [ "NetConnRefT", "d9/d2d/structNetConnRefT.html", "d9/d2d/structNetConnRefT" ],
+    [ "LOCALE_SNAME", "d9/d68/netconnxboxone_8cpp.html#a56e638a88c9de7e18a67257555033ac0", null ],
+    [ "NETCONN_EXTERNAL_CLEANUP_LIST_INITIAL_CAPACITY", "d9/d68/netconnxboxone_8cpp.html#acf992d7a46c242895abc749c12af2c80", null ],
+    [ "NETCONN_MAX_NETWORK_STATUS_RETRIES", "d9/d68/netconnxboxone_8cpp.html#a68f8b92199b35ed47c4cbd69074a22d6", null ],
+    [ "NETCONN_MAX_WAIT_TIME_FOR_XBLWAIT", "d9/d68/netconnxboxone_8cpp.html#a6f3b7bf6dd0eb2939f9f2f4b6b7e81a8", null ],
+    [ "NETCONN_NETWORK_STATUS_RETRY_TIME_MS", "d9/d68/netconnxboxone_8cpp.html#aae44c21960273c2d86bb63d3f6404566", null ],
+    [ "NETCONNXBOXONE_CERT_SANDBOX", "d9/d68/netconnxboxone_8cpp.html#ad37487e94f332517234fce8eaf7840bc", null ],
+    [ "NETCONNXBOXONE_DEFAULT_SANDBOX", "d9/d68/netconnxboxone_8cpp.html#a8aa7a55c1abad16036859fc695b1028f", null ],
+    [ "NETCONNXBOXONE_EAACCESS_SANDBOX", "d9/d68/netconnxboxone_8cpp.html#a57487e23a68bc9cea240ac6f5fd19735", null ],
+    [ "NETCONNXBOXONE_ENV_TIMEOUT", "d9/d68/netconnxboxone_8cpp.html#a9ad32c33cee26b690f42ad6aae748224", null ],
+    [ "NETCONNXBOXONE_GLOBAL_EA_ENV_FILE", "d9/d68/netconnxboxone_8cpp.html#ababfd071cf8ad501b0517315088a7e37", null ],
+    [ "NETCONNXBOXONE_GLOBAL_EA_TMS_SCID", "d9/d68/netconnxboxone_8cpp.html#a377f581db81446c810fcbc2ff157cb13", null ],
+    [ "NETCONNXBOXONE_INTERNAL_CERT_SANDBOX", "d9/d68/netconnxboxone_8cpp.html#a6879725385b0f1993162759949d96551", null ],
+    [ "NETCONNXBOXONE_RETAIL_SANDBOX", "d9/d68/netconnxboxone_8cpp.html#aafa9a8f0f53dacceee3a1b3bdb527fac", null ],
+    [ "NETCONNXBOXONE_STR_COUNTRY_LANG_CODE_LENGTH", "d9/d68/netconnxboxone_8cpp.html#ad1c13cc069f3b4c28a6fc12a2bee8d59", null ],
+    [ "NETCONNXBOXONE_STR_SANDBOX_LENGTH", "d9/d68/netconnxboxone_8cpp.html#a099fd590813483464724fbc43b9f3133", null ],
+    [ "NETCONNXBOXONE_TEST_SANDBOX", "d9/d68/netconnxboxone_8cpp.html#a8a4801ed94bf559253ba730e5516b9e9", null ],
+    [ "NETCONNXBOXONE_TOKEN_TIMEOUT", "d9/d68/netconnxboxone_8cpp.html#a8983d5080248b1a50691cc0a2e61b779", null ],
+    [ "WIN32_LEAN_AND_MEAN", "d9/d68/netconnxboxone_8cpp.html#ac7bef5d85e3dcd73eef56ad39ffc84a9", null ],
+    [ "NetConnAccountPickerStateE", "d9/d68/netconnxboxone_8cpp.html#aa5bd0ade82048de0f22b7088824a1f11", null ],
+    [ "NetConnEvnStateE", "d9/d68/netconnxboxone_8cpp.html#a08dd465bdd59155aae2992d089c47fe6", null ],
+    [ "NetConnExternalCleanupCallbackT", "d9/d68/netconnxboxone_8cpp.html#adc04f40cb348737740abe40eeac48def", null ],
+    [ "NetConnExternalCleanupEntryT", "d9/d68/netconnxboxone_8cpp.html#a3d539594e1a0bf42c681702ce16eb796", null ],
+    [ "NetConnRefT", "d9/d68/netconnxboxone_8cpp.html#a6e698f2d3042b95f7e02a1d8044d0c5a", null ],
+    [ "NetConnRunStateE", "d9/d68/netconnxboxone_8cpp.html#acaf2ca76092eaadbb8d835fe6fe999b1", null ],
+    [ "NetConnStateE", "d9/d68/netconnxboxone_8cpp.html#a671fc14c61b62b4f6701391d0198fa36", null ],
+    [ "NetConnStatusStateE", "d9/d68/netconnxboxone_8cpp.html#a23f72e6192f1b84c8f76beed72ee0ea3", null ],
+    [ "NetConnTokenStateE", "d9/d68/netconnxboxone_8cpp.html#aabc18a0d9b249c08966d88c85b723b1b", null ],
+    [ "NetConnTokenT", "d9/d68/netconnxboxone_8cpp.html#add7d01e00e4d48c492c9cde04555f88a", null ],
+    [ "NetConnUserT", "d9/d68/netconnxboxone_8cpp.html#a0a1ea82411404a9d4dc399168aba17e8", null ],
+    [ "NetConnAccountPickerStateE", "d9/d68/netconnxboxone_8cpp.html#a2d4a8bc726718ea442c269def82f6d69", [
+      [ "ST_ACTPICK_IDLE", "d9/d68/netconnxboxone_8cpp.html#a2d4a8bc726718ea442c269def82f6d69a4debd6254e70b2ca1be7847ce4798467", null ],
+      [ "ST_ACTPICK_OPEN", "d9/d68/netconnxboxone_8cpp.html#a2d4a8bc726718ea442c269def82f6d69a1a1602ab2faac258c0be3bc1a640b2ab", null ],
+      [ "ST_ACTPICK_CLOSE", "d9/d68/netconnxboxone_8cpp.html#a2d4a8bc726718ea442c269def82f6d69abec0633f6c3905a73c61d8d3b9c3e616", null ]
+    ] ],
+    [ "NetConnEvnStateE", "d9/d68/netconnxboxone_8cpp.html#a74f7eb257fa3426d1b0e3cc3ee02e109", [
+      [ "ST_ENV_INVALID", "d9/d68/netconnxboxone_8cpp.html#a74f7eb257fa3426d1b0e3cc3ee02e109aaff6500221aa8abff40970d118e9da96", null ],
+      [ "ST_ENV_INPROGRESS", "d9/d68/netconnxboxone_8cpp.html#a74f7eb257fa3426d1b0e3cc3ee02e109a5a4102c02bedf9b0abf5b9e44f930d14", null ],
+      [ "ST_ENV_COMPLETED", "d9/d68/netconnxboxone_8cpp.html#a74f7eb257fa3426d1b0e3cc3ee02e109a1cbf8fdc440e118a5866f5dcd9012d9d", null ]
+    ] ],
+    [ "NetConnNetworkStatusStateE", "d9/d68/netconnxboxone_8cpp.html#ad330319332ba44b1f24fd1451989388f", [
+      [ "ST_STATUS_INVALID", "d9/d68/netconnxboxone_8cpp.html#ad330319332ba44b1f24fd1451989388fa4a8e9885c18342d485be7fa0ed22c30b", null ],
+      [ "ST_STATUS_VALID", "d9/d68/netconnxboxone_8cpp.html#ad330319332ba44b1f24fd1451989388fac36ae537ecc85cb86da1b1e36c59a037", null ],
+      [ "ST_STATUS_INPROGRESS", "d9/d68/netconnxboxone_8cpp.html#ad330319332ba44b1f24fd1451989388fab66226ec800ee832594b77e36750f9fc", null ],
+      [ "ST_STATUS_RETRY", "d9/d68/netconnxboxone_8cpp.html#ad330319332ba44b1f24fd1451989388fad1cf19f58d03695842ccea0ebea02d0c", null ],
+      [ "ST_STATUS_EXIT", "d9/d68/netconnxboxone_8cpp.html#ad330319332ba44b1f24fd1451989388fa07c8eff8a40451a7bbdef269ee15c27e", null ]
+    ] ],
+    [ "NetConnRunStateE", "d9/d68/netconnxboxone_8cpp.html#a120458251beb265dac586895d705e468", [
+      [ "ST_RUN_INIT", "d9/d68/netconnxboxone_8cpp.html#a120458251beb265dac586895d705e468a548a2b490bb5237e0e4aa310a1615e90", null ],
+      [ "ST_RUN_LOGIN", "d9/d68/netconnxboxone_8cpp.html#a120458251beb265dac586895d705e468a0082f913607f23400f015c06c3a1863e", null ],
+      [ "ST_RUN_TOKEN", "d9/d68/netconnxboxone_8cpp.html#a120458251beb265dac586895d705e468a6b770afa9fe2e65c17db91da2d4ef3d2", null ],
+      [ "ST_RUN_ENV", "d9/d68/netconnxboxone_8cpp.html#a120458251beb265dac586895d705e468a526d724e3aba351194077620cb1f9349", null ],
+      [ "ST_RUN_ONLINE", "d9/d68/netconnxboxone_8cpp.html#a120458251beb265dac586895d705e468a45da68e30f73e39c09857b2de6bcf8a7", null ]
+    ] ],
+    [ "NetConnStateE", "d9/d68/netconnxboxone_8cpp.html#aee282b212ecf823227cf954b570ff45b", [
+      [ "ST_IDLE", "d9/d68/netconnxboxone_8cpp.html#aee282b212ecf823227cf954b570ff45bac32b2b265eef91b3005187d235c2cfd6", null ],
+      [ "ST_RUNNING", "d9/d68/netconnxboxone_8cpp.html#aee282b212ecf823227cf954b570ff45baa797c2ff9ec3dc32ab813313a91cd59f", null ],
+      [ "ST_SUSPEND", "d9/d68/netconnxboxone_8cpp.html#aee282b212ecf823227cf954b570ff45baf5520d7cd3d83b0fff2e7e1bdd3604ea", null ],
+      [ "ST_RESUME", "d9/d68/netconnxboxone_8cpp.html#aee282b212ecf823227cf954b570ff45babfc388f0615735307cbe6ada84ebf966", null ],
+      [ "ST_FAILED", "d9/d68/netconnxboxone_8cpp.html#aee282b212ecf823227cf954b570ff45ba71f25f1cad8c0757c99a8ca009b22421", null ],
+      [ "ST_CLEANUP", "d9/d68/netconnxboxone_8cpp.html#aee282b212ecf823227cf954b570ff45ba2920310a4384a66db1087b33d51d4d9d", null ],
+      [ "ST_XBLWAIT", "d9/d68/netconnxboxone_8cpp.html#aee282b212ecf823227cf954b570ff45ba226cee66859a55cacccc8d78cd429e46", null ]
+    ] ],
+    [ "NetConnTokenStateE", "d9/d68/netconnxboxone_8cpp.html#a711034c1e90fbd4a17860ad7da951ab7", [
+      [ "ST_TOKEN_INVALID", "d9/d68/netconnxboxone_8cpp.html#a711034c1e90fbd4a17860ad7da951ab7a352c7158a7f2730c9f4448a6906df1fe", null ],
+      [ "ST_TOKEN_FAILED", "d9/d68/netconnxboxone_8cpp.html#a711034c1e90fbd4a17860ad7da951ab7ae6eb6f5d1406bcc3d40e33b5d2a086cd", null ],
+      [ "ST_TOKEN_INPROG", "d9/d68/netconnxboxone_8cpp.html#a711034c1e90fbd4a17860ad7da951ab7a7c5f1d58440c62159564bdfec9938db1", null ],
+      [ "ST_TOKEN_VALID", "d9/d68/netconnxboxone_8cpp.html#a711034c1e90fbd4a17860ad7da951ab7a347f2e8ccccbbd87d586e7b7792c6b72", null ]
+    ] ],
+    [ "NetConnAddLocalUser", "d9/d68/netconnxboxone_8cpp.html#a5ed37a38efdb1a0949096d0203dc7fe0", null ],
+    [ "NetConnConnect", "d9/d68/netconnxboxone_8cpp.html#ga2e5a63b58dd74ff061cd1496e5df602a", null ],
+    [ "NetConnControl", "d9/d68/netconnxboxone_8cpp.html#ga15c5d1762c54616d672c4e2816b76e3e", null ],
+    [ "NetConnDisconnect", "d9/d68/netconnxboxone_8cpp.html#ga82fc7c76dc3d2ac20ece6aa8a9def613", null ],
+    [ "NetConnQuery", "d9/d68/netconnxboxone_8cpp.html#ga774017c0896bec140d4f701978b42397", null ],
+    [ "NetConnRemoveLocalUser", "d9/d68/netconnxboxone_8cpp.html#a0cec3811e1af747d31fa4464a267ba78", null ],
+    [ "NetConnShutdown", "d9/d68/netconnxboxone_8cpp.html#ga7712a80e1e3ea988989acbf746376850", null ],
+    [ "NetConnSleep", "d9/d68/netconnxboxone_8cpp.html#ga836b8de6c8c12a6a83f03e60c8bec638", null ],
+    [ "NetConnStartup", "d9/d68/netconnxboxone_8cpp.html#ga02de80461dec4adcc2a6a3236a238fdb", null ],
+    [ "NetConnStatus", "d9/d68/netconnxboxone_8cpp.html#ga185a58405ad89808ae25a3ef0337a288", null ]
+];

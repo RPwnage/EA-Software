@@ -1,0 +1,256 @@
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- This simple inline task does nothing. -->
+  <UsingTask
+    TaskName="CopyWithAttributes"
+    TaskFactory="CodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll" >
+    <ParameterGroup>
+      <SourceFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <DestinationFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <OverwriteReadOnlyFiles ParameterType="System.Boolean" Output="true" />
+      <SkipUnchangedFiles ParameterType="System.Boolean" Output="true" />
+      <UseHardlinksIfPossible ParameterType="System.Boolean" Output="true" />
+      <ProjectPath ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Reference Include="$(MSBuildBinPath)\Microsoft.Build.Framework.dll"/>
+      <Reference Include="$(MSBuildBinPath)\Microsoft.Build.Utilities.v4.0.dll"/>
+      <Using Namespace="Microsoft.Build.Framework" />
+      <Using Namespace="Microsoft.Build.Utilities" />
+      <Using Namespace="System"/>
+      <Using Namespace="System.IO"/>
+      <Using Namespace="System.Runtime.InteropServices"/>
+      <Code Type="Class" Language="cs">
+       <![CDATA[ 
+       
+    public class CopyWithAttributes : Microsoft.Build.Utilities.Task
+    {
+        [Microsoft.Build.Framework.Required]
+        public Microsoft.Build.Framework.ITaskItem[] SourceFiles { get; set; }
+
+        [Microsoft.Build.Framework.Required]
+        public Microsoft.Build.Framework.ITaskItem[] DestinationFiles { get; set; }
+
+        public System.Boolean OverwriteReadOnlyFiles 
+        {
+            get { return _overwriteReadOnlyFiles; }
+            set { _overwriteReadOnlyFiles = value; }
+        } bool _overwriteReadOnlyFiles = true;
+
+        public System.Boolean SkipUnchangedFiles
+        {
+            get { return _skipUnchangedFiles; }
+            set { _skipUnchangedFiles = value; }
+        } bool _skipUnchangedFiles = true;
+
+
+        public System.Boolean UseHardlinksIfPossible
+        {
+            get { return _useHardlinksIfPossible; }
+            set { _useHardlinksIfPossible = value; }
+        } bool _useHardlinksIfPossible = false;
+        
+        public System.String ProjectPath
+        {
+            get { return _projectPath; }
+            set { _projectPath = value; }
+        } System.String _projectPath;
+
+        public override bool Execute()
+        {
+            if (SourceFiles.Length != DestinationFiles.Length)
+            {
+                Log.LogError("Lengths of SourceFiles [{0}] and DestinationFiles [{1}] arrays do not match", SourceFiles.Length, DestinationFiles.Length);
+
+                return false;
+            }
+         
+            for (int i = 0; i < SourceFiles.Length; i++)
+            {
+                if (!CopyFile(SourceFiles[i].ItemSpec, DestinationFiles[i].ItemSpec))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool CopyFile(string src, string dst)
+        {
+            bool res = false;
+            
+            if(!System.String.IsNullOrEmpty(ProjectPath))
+            {
+              // Evaluate full path if input is relative to project path.
+              src = System.IO.Path.Combine(ProjectPath, src);
+              dst = System.IO.Path.Combine(ProjectPath, dst);
+            }
+
+            if (System.IO.File.Exists(src))
+            {
+                if (UseHardlinksIfPossible)
+                {
+                    res = CreateHardLink(dst, src);
+
+                    if (!res)
+                    {
+                        var win32Exception = new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+                        Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High, "Hardlinking had a problem {0}, will retry copying. {1}", win32Exception.Message, win32Exception );
+                    }
+                }
+
+                if (!res)
+                {
+                    var srcAttrib = System.IO.File.GetAttributes(src);
+
+                    if (NeedCopy(src, dst))
+                    {
+                        if (OverwriteReadOnlyFiles && System.IO.File.Exists(dst))
+                        {
+                            // must set file attribute to normal in order to clobber hidden/readonly attributes
+                            System.IO.File.SetAttributes(dst, System.IO.FileAttributes.Normal);
+                        }
+
+
+                        Log.LogCommandLine(Microsoft.Build.Framework.MessageImportance.Low, "copy /y \"" + src + "\" \"" + dst + "\"");
+                        System.IO.File.Copy(src, dst, true);
+                    }
+
+                    System.IO.File.SetAttributes(dst, srcAttrib);                    
+                }
+                res = true;
+            }
+            else
+            {
+                Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High, "Source File {0} does not exist. ",  src );
+                res = true;
+            }
+
+            return res;
+        }
+
+        private bool NeedCopy(string src, string dst)
+        {
+            if (!System.IO.File.Exists(dst)) 
+            {
+                return true;
+            } 
+            else if (System.IO.File.GetLastWriteTime(src) > System.IO.File.GetLastWriteTime(dst)) 
+            {                
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool CreateHardLink(string dst, string src)
+        {
+            if(GetDriveLetter(src) != GetDriveLetter(dst))
+            {
+                return false;
+            }
+            var srcAttrib = System.IO.File.GetAttributes(src);
+            if (System.IO.File.Exists(dst)) 
+            {
+                try
+                {
+                    System.IO.File.SetAttributes(dst, System.IO.FileAttributes.Normal);
+                    System.IO.File.Delete(dst);
+                }
+                catch (System.Exception)
+                {
+                }
+            } 
+            bool res = true;
+            // Sometimes VisualStudio locks files. Since we use hard links, the file must be already liked.
+            // Can be done better with detecting hard link
+            if (!System.IO.File.Exists(dst)) 
+            {            
+                 res = CreateHardLink(dst, src, System.IntPtr.Zero);
+            }
+            if(res)
+            {
+                try
+                {            
+                    System.IO.File.SetAttributes(dst, srcAttrib);
+                }
+                catch(System.Exception)
+                {
+                  res = false;
+                }
+            }
+            try
+            {
+              System.IO.File.SetAttributes(src, srcAttrib);
+            }
+            catch(System.Exception)
+            {
+                  res = false;
+            }
+
+            return res;
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        internal static extern bool CreateHardLink(string newFileName, string exitingFileName, System.IntPtr securityAttributes);
+
+
+        private string GetDriveLetter(string path)
+        {
+            if (System.String.IsNullOrEmpty(path))
+            {
+                return null;
+            }
+
+            // Some versions of Runtime do not have MacOSX definition. Use integer value 6
+            if (System.Environment.OSVersion.Platform == System.PlatformID.Unix ||
+               (int)System.Environment.OSVersion.Platform == 6)
+            {
+                if (path[0] == System.IO.Path.DirectorySeparatorChar)
+                {
+                    int i = path.IndexOf(System.IO.Path.DirectorySeparatorChar, 1);
+                    if (i != -1)
+                    {
+                        return path.Substring(0, i);
+                    }
+                }
+                return System.String.Empty;
+            }
+
+            int ind = path.IndexOf(':');
+
+            if (ind < 0) // It must be a network path. return host name as a drive letter
+            {
+                char[] PATH_SEPARATOR_CHARS_ALT = new char[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar };
+                
+                path = path.TrimStart(PATH_SEPARATOR_CHARS_ALT);
+                ind = path.IndexOfAny(PATH_SEPARATOR_CHARS_ALT);
+            }
+            if (ind < 0)
+            {
+                return null;
+            }
+            return path.Substring(0, ind);
+        }
+
+        private static bool NotExpectedException(System.Exception e)     
+        {
+            return (((!(e is System.UnauthorizedAccessException) 
+                && !(e is System.ArgumentNullException)) 
+                && (!(e is System.IO.PathTooLongException) 
+                && !(e is System.IO.DirectoryNotFoundException))) 
+                && ((!(e is System.NotSupportedException) 
+                && !(e is System.ArgumentException)) 
+                && (!(e is System.Security.SecurityException) 
+                && !(e is System.IO.IOException))));
+        }      
+    }
+        
+      ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+  <!-- To avoid intellisence warnings -->
+  <Target Name="FrameWorkMSBuildTasks_DummyTarget"/>
+</Project>

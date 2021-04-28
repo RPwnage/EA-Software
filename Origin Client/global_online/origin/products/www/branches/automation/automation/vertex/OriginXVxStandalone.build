@@ -1,0 +1,98 @@
+<project name="OriginXVxStandalone" default="build">
+  <optionset name="config.targetoverrides">
+    <option name="build" value="exclude"/>
+  </optionset>
+
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+  <property name="package.OriginXVxStandalone.dir"  value="@{PathGetFullPath('.')}"/>
+  <property name="package.OriginXVxStandalone.version"  value="@{PathGetFileName('${package.OriginXVxStandalone.dir}')}"/>
+
+  <dependent name="s3" />
+  <package name="OriginXVxStandalone" targetversion="${package.OriginXVxStandalone.version}"/>
+
+  <property name="version.file" value="${package.OriginXVxStandalone.dir}/version.txt"/>
+
+  <target name="update-version-file">
+    <fail message="p4.changelist not defined. Use -D:p4.changelist=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('p4.changelist')}" />
+
+    <property name="version" fromfile="${version.file}"/>
+    <property name="count" value="1" />
+
+    <property name="incrementBy" value="0" unless="@{PropertyExists('incrementBy')}" />
+
+    <foreach property="version.part" item="String" delim="." in="${version}" >
+      <property name="version.part.${count}" value="${version.part}" />
+      <property name="count" value="@{MathAdd(${property.value},1)}" />
+    </foreach>
+
+    <property name="nextBuildNum" value="@{MathAdd('${p4.changelist}',${incrementBy})}" />
+
+    <property name="major" value="${version.part.1}" />
+    <property name="minor" value="${version.part.2}" />
+    <property name="patch" value="${version.part.3}" />
+    <property name="revision" value="${nextBuildNum}" />
+
+    <echo message="Updating version.txt counter to ${major}.${minor}.${patch}.${revision}" />
+    <attrib file="${version.file}" readonly="false"/>
+    <trycatch>
+      <try>
+        <echo message="${major}.${minor}.${patch}.${revision}" file="${version.file}"/>
+      </try>
+      <catch>
+        <fail message="Error:${trycatch.error}"/>
+      </catch>
+      <finally>
+        <attrib file="${version.file}" readonly="true"/>
+      </finally>
+    </trycatch>
+  </target>
+
+  <target name="update-pom-file">
+    <property name="dollar" value="$"/>
+    <property name="propstart" value="{"/>
+    <property name="propend" value="}"/>
+    <property name="version" fromfile="${version.file}"/>
+
+    <trycatch>
+      <try>
+        <property name="pom-temp.contents" fromfile="${package.OriginXVxStandalone.dir}/pom-standalone-temp.xml" />
+        <property name="pom-temp.contents" value="@{StrReplace(${property.value},'__APP_VERSION__',${version})}" />
+        <property name="pom.file" value="${package.OriginXVxStandalone.dir}/pom-standalone.xml" />
+        <echo message="${pom-temp.contents}" file="${pom.file}"/>
+
+        <property name="batch-temp.contents" fromfile="${package.OriginXVxStandalone.dir}/run.temp" />
+        <property name="batch-temp.contents" value="@{StrReplace(${property.value},'__APP_VERSION__',${version})}" />
+        <property name="batch.file" value="${package.OriginXVxStandalone.dir}/run.bat" />
+        <echo message="${batch-temp.contents}" file="${batch.file}"/>
+      </try>
+      <catch>
+        <fail message="Error:${trycatch.error}"/>
+      </catch>
+    </trycatch>
+  </target>
+
+  <target name="download-vxwebui">
+    <!-- Check if we want to use a version of the VxWebUI that is not standard -->
+    <property name="vxwebui.file" value="VxWebUI-grid" />
+    <do if="@{PropertyExists('vxwebui.version')}">
+      <property name="vxwebui.file" value="VxWebUI-${vxwebui.version}" />
+    </do>
+    
+    <!-- Download and unzip the VxWebUI file to the master folder -->
+    <do if="@{DirectoryExists('@{PathGetFullPath('.')}\VxWebUI')}" >
+      <echo message="VxWebUI package already exists. Skipping download." />
+    </do>
+    <do unless="@{DirectoryExists('@{PathGetFullPath('.')}\VxWebUI')}">
+      <optionset name="s3.vxwebui" >
+        <option name="get.file" value="/packages/VertexTool/${vxwebui.file}.zip"/>
+        <option name="get.dest" value="@{PathGetFullPath('.')}\VxWebUI.zip"/>
+        <option name="config-system" value="pc" />
+      </optionset>
+      <nant buildfile="${package.s3.dir}/s3.build" target="get" optionset="s3.vxwebui" />
+      <unzip zipfile="@{PathGetFullPath('.')}\VxWebUI.zip" outdir="@{PathGetFullPath('.')}\" failonerror="true" />
+      <delete dir="@{PathGetFullPath('.')}\VxWebUI.zip" />
+    </do>
+  </target>
+</project>

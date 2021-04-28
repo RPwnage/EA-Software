@@ -1,0 +1,283 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <dependent name="xenonsdk" />
+
+  <property name="config-system"      value="xenon"/>
+  <property name="config-compiler"    value="vc"/>
+  <property name="config-platform"    value="xenon-vc"/>
+
+  <!-- Auto-detect Visual Studio 2005 - this affects EXE vs XEX suffix -->
+  <property name="package.VisualStudio.exportbuildsettings" value="false"/>
+  <property name="cc-before" value="${cc}"/>
+  <dependent name="VisualStudio"/>
+  <fail message="ERROR: eaconfig requires a VisualStudio package which supports the 'package.VisualStudio.exportbuildsettings' property.  Please update your masterconfig.xml."
+        unless="'${cc-before}' == '${cc}'"/>
+
+  <!-- For visual studio 2005, use .exe as the extension of linkoutputname-->
+  <do if="'${package.VisualStudio.version}' gte '8.0.0'">
+    <optionset name="config-options-program">
+      <option name="linkoutputname" value="%outputdir%/%outputname%.exe" />
+    </optionset>
+  </do>
+
+  <property name="exe-suffix"        value=".xex"/>
+  <property name="lib-prefix"        value=""/>
+  <property name="lib-suffix"        value=".lib"/>
+
+  <property name="temp-dll-suffix"   value=".dll" unless="@{PropertyExists('temp-dll-suffix')}"/>
+  <property name="dll-suffix"        value=".xex.dll" unless="@{PropertyExists('dll-suffix')}"/>
+  <property name="temp-dll-suffix"   value="${temp-dll-suffix.${config-system}}" if="@{PropertyExists('temp-dll-suffix.${config-system}')}"/>
+  <property name="dll-suffix"        value="${dll-suffix.${config-system}}" if="@{PropertyExists('dll-suffix.${config-system}')}"/>
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle"    value="Windows"/>
+
+
+  <!-- Auto-detect Visual Studio 2005 - this affects VCPROJ generation -->
+  <property name="package.VisualStudio.exportbuildsettings" value="false"/>
+  <property name="cc-before" value="${cc}"/>
+  <dependent name="VisualStudio"/>
+  <fail message="ERROR: eaconfig requires a VisualStudio package which supports the 'package.VisualStudio.exportbuildsettings' property.  Please update your masterconfig.xml."
+        unless="'${cc-before}' == '${cc}'"/>
+  
+  <do if="'${package.VisualStudio.version}' gte '8.0.0'">
+    <property name="config-vs-version" value="8.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '9.0.0'">
+    <property name="config-vs-version" value="9.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '10.0.0'">
+    <property name="config-vs-version" value="10.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '11.0.0'">
+    <property name="config-vs-version" value="11.0"/>
+  </do>
+
+  <!-- <cc> task properties -->
+  <property name="cc.defines">
+    _XBOX
+  </property>
+
+  <property name="cc.gccdefines">
+    _M_PPC
+  </property>
+
+  <property name="cc.options">
+    <!-- clear the default options and start fresh with config supplied options -->
+  </property>
+
+  <!-- TODO: This is provided for transition.  Please remove this later.  We want to take the include dirs recommended
+       from the sdk package -->
+  <property name="cc.includedirs">
+    ${package.xenonsdk.appdir}\include\xbox
+  </property>
+
+  <do if="@{PropertyExists('package.xenonsdk.includedirs')}">
+    <property name="cc.includedirs">
+      ${package.xenonsdk.includedirs}
+    </property>
+  </do>
+
+  <property name="__private_xenonsdk_define" value=""/>
+  <property name="__private_xenonsdk_define" value="${package.xenonsdk.defines}" if="@{PropertyExists('package.xenonsdk.defines')}"/>
+
+  <optionset name="config-options-common">
+    <option name="buildset.cc.defines" >
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.defines')}
+      _XBOX
+      ${__private_xenonsdk_define}
+    </option>
+    <option name="buildset.cc.includedirs" >
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.includedirs')}
+      ${cc.includedirs}
+    </option>
+    <option name="buildset.link.options" >
+      @{OptionSetGetValue('config-options-common', 'buildset.link.options')}
+      -subsystem:xbox    <!-- specify subsystem to xbox -->
+      -stack:262144,262144  <!-- Set a default stack size -->
+    </option>
+    <!-- options for LTCG optimizations, will take effect only if global setting for optimization is 'on' -->
+    <option name="optimization.ltcg"   value="on" />
+    <option name="optimization.ltcg.mode"   value="normal"/>
+  </optionset>
+  <optionset name="config-options-dynamiclibrary" >
+      <option name="generatedll"              value="on" />
+    <option name="buildset.name"                        value="DynamicLibrary" />
+    <option name="buildset.tasks"                       value="asm cc link" />
+    <option name="buildset.cc.defines"                  value="EA_DLL" />
+    <option name="impliboutputname" value="%outputdir%/%outputname%.lib"/>
+    <!-- name of import library -->
+    <option name="buildset.link.options">
+      -ENTRY:"_DllMainCRTStartup"
+    </option>
+  </optionset>
+
+  <!-- This template is only used for NAnt builds. -->
+  <property name="cc.template.commandline">
+    %defines%
+    %includedirs%
+    %options%
+    -Fo"%objectfile%"                  <!-- object file name -->
+    "%sourcefile%"
+  </property>
+
+  <property name="cc.template.includedir"    value='-I "%includedir%"'/>
+  <property name="cc.template.define"        value='-D %define%'/>
+
+  <!-- <link> task properties -->
+  <property name="link.options">
+    ${property.value}
+    -subsystem:xbox    <!-- specify subsystem to xbox (Even though it's Xenon) -->
+  </property>
+
+  <property name="link.librarydirs">
+    ${package.xenonsdk.appdir}\lib\xbox
+  </property>
+
+  <property name="link.libraries">
+  </property>
+
+  <property name='link.template.librarydir'  value='-libpath:"%librarydir%"'/>
+  <property name='link.template.libraryfile' value='"%libraryfile%"'/>
+  <property name='link.template.objectfile'  value='"%objectfile%"'/>
+
+  <property name="link.template.commandline">
+    %options%
+    %librarydirs%
+    %objectfiles%
+    %libraryfiles%
+  </property>
+
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="link.useresponsefile" value="true"/>
+
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="lib.useresponsefile" value="true"/>
+
+  <do if="'${package.VisualStudio.version}' gte '8.0.0'">
+    <!-- Add -xex:no option to VS2005-only linker options to tell linker to not generate .xex file
+           since the .xex file will be generated in the postlink step using image builder-->
+    <property name="link.template.commandline">
+      -xex:no
+      ${property.value}
+    </property>
+    <property name="link.postlink.program" value="${package.xenonsdk.appdir}\bin\win32\imagexex.exe" />
+    <property name="link.postlink.commandline" >
+      -nologo
+      "-out:%outputdir%\%outputname%.xex"
+      "%outputdir%\%outputname%.exe"
+    </property>
+  </do>
+
+  <property name="platform.sdklibs.regular">
+    ${package.xenonsdk.appdir}/lib/xbox/xgraphics.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3d9.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3dx9.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xapilib.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xboxkrnl.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xaudio2.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xmcore.lib
+    ${package.xenonsdk.appdir}/lib/xbox/libpmcpb.lib
+  </property>
+  <property name="platform.sdklibs.regular" unless="@{StrCompareVersions('${package.xenonsdk.version}', '2.0.9328.0')} gte 0">
+    ${property.value}
+    ${package.xenonsdk.appdir}/lib/xbox/xaudio.lib
+  </property>
+
+
+  <property name="platform.sdklibs.profile">
+    ${package.xenonsdk.appdir}/lib/xbox/xgraphics.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3d9i.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3dx9i.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xapilibi.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xboxkrnl.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xaudio2.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xmcorei.lib
+    ${package.xenonsdk.appdir}/lib/xbox/libpmcpb.lib
+  </property>
+  <property name="platform.sdklibs.profile" unless="@{StrCompareVersions('${package.xenonsdk.version}', '2.0.9328.0')} gte 0">
+    ${property.value}
+    ${package.xenonsdk.appdir}/lib/xbox/xaudioi.lib
+  </property>
+
+
+  <property name="platform.sdklibs.debug">
+    ${package.xenonsdk.appdir}/lib/xbox/xgraphicsd.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3d9d.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3dx9d.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xboxkrnl.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xbdm.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xapilibd.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xaudiod2.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xmcored.lib
+    ${package.xenonsdk.appdir}/lib/xbox/libpmcpbd.lib
+  </property>
+  <property name="platform.sdklibs.debug" unless="@{StrCompareVersions('${package.xenonsdk.version}', '2.0.9328.0')} gte 0">
+    ${property.value}
+    ${package.xenonsdk.appdir}/lib/xbox/xaudiod.lib
+  </property>
+
+
+  <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+The "Dll" optionset is deprecated.  Please do not start using it for new
+code - you should use the DynamicLibrary optionset instead.  A Job Manager
+1.0 dependency on this optionset is preventing this change from being made:
+
+BUG#17826
+* "Removed the 'Dll' optionset"
+* Removed the "Dll" optionset, which was present on PC and XBOX 360
+platforms.  This was cut-and-paste legacy from tlconfig, and doesn't
+appear to be used by anybody.   DLLs should use the "DynamicLibrary"
+buildtype.
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+
+  <optionset name="Dll">
+    <option name="build.tasks" value="cc link"/>
+
+    <option name="cc.options">
+      -WX          <!-- treat all warnings as errors -->
+      -nologo       <!-- suppress copyright message -->
+      -c          <!-- compile only, no link -->
+      -Zc:forScope    <!-- enforce Standard C++ for scoping rules -->
+      -GF         <!-- enable read-only string pooling -->
+      -Zi          <!-- Debug Information Format -->
+      -MD
+      <!--
+        link with LIBCMD.LIB (multithreaded static C runtime library).
+        We are intentionally using this option even in debug builds
+        because the debug version of the CRT doesn't really add any
+        value and mixing the debug and non-debug versions will cause
+        link errors.  If you want to use the Debug version of the CRT,
+        pass -nodefaultlibrary:libcmt.lib on the linker command line.
+      -->
+    </option>
+
+    <!-- All options except link.options are the same -->
+    <option name="link.options">
+      -nologo        <!-- suppress copyright message -->
+      -dll        <!-- Make a DLL, not an exe. -->
+      -incremental:no    <!-- disable incremental compilation -->
+      -machine:PPCBE    <!-- specify target platform to ix86 -->
+      -ignore:4089    <!-- disable warning: dll discarded by OPT:ref option -->
+      -out:"%outputdir%/%outputname%${temp-dll-suffix}"    <!-- set output file name -->
+      -implib:"%outputdir%/%outputname%.lib"  <!-- name of import library -->
+      -map:"%outputdir%/%outputname%.map"    <!-- generate mapfile -->
+      -opt:ref
+      -debug
+    </option>
+  </optionset>
+
+  <do if="${package.xenonsdk.version} gte '2.0.5426.0'">
+    <fail unless="@{StrCompareVersions('${package.VisualStudio.version}' , '8.0.0')} gte 0"
+          message="ERROR:  Support for Visual Studio .NET 2003 was dropped in February 2007 XDK.  Please upgrade to Visual Studio 2005."/>
+  </do>
+
+  <!-- pointer size -->
+  <property name="platform-ptrsize" value="32bit"/>
+  <!-- registers size -->
+  <property name="platform-wordsize" value="64bit"/>
+
+</project>

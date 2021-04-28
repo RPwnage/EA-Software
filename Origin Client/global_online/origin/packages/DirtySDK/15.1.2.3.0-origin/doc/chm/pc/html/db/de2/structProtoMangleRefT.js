@@ -1,0 +1,27 @@
+var structProtoMangleRefT =
+[
+    [ "ST_MNGL_IDLE", "db/de2/structProtoMangleRefT.html#a23140444a6f60e94e6c3c19709df317aac73fcfc41a71384bb4d5efbc7ff6e724", null ],
+    [ "ST_MNGL_WAIT", "db/de2/structProtoMangleRefT.html#a23140444a6f60e94e6c3c19709df317aaa3e28da003983377115d9484a8cc2c02", null ],
+    [ "ST_MNGL_DONE", "db/de2/structProtoMangleRefT.html#a23140444a6f60e94e6c3c19709df317aa6be611e08a21e490a1a707cd5d6c9c58", null ],
+    [ "ST_MNGL_FAIL", "db/de2/structProtoMangleRefT.html#a23140444a6f60e94e6c3c19709df317aa4a69be9e9b4032fa158214979efdb122", null ],
+    [ "ST_MNGL_REPT", "db/de2/structProtoMangleRefT.html#a23140444a6f60e94e6c3c19709df317aaba77cc3a6f43f040973f3e8cbdb09a78", null ],
+    [ "eMangleState", "db/de2/structProtoMangleRefT.html#a5f92ff2af7bda3bf5166b7a492517593", null ],
+    [ "eResponse", "db/de2/structProtoMangleRefT.html#a9ce0b85e270d3d6221af0847f4a824ac", null ],
+    [ "iGamePort", "db/de2/structProtoMangleRefT.html#aadb680751bd0751c0ecf3323738b0882", null ],
+    [ "iHostAddr", "db/de2/structProtoMangleRefT.html#a4eab1a7af75f75eeabd6123d84230331", null ],
+    [ "iMemGroup", "db/de2/structProtoMangleRefT.html#a301e9ba6868f03c8895cde64961fd62c", null ],
+    [ "iPeerAddr", "db/de2/structProtoMangleRefT.html#ae988fe802d3afb9f0275195e06acbac2", null ],
+    [ "iPeerPort", "db/de2/structProtoMangleRefT.html#af42b9b3df51c6bc787d346aff90f2942", null ],
+    [ "iRandPort", "db/de2/structProtoMangleRefT.html#a87b773417ec4ff9694b23869e98fa3d8", null ],
+    [ "iRecvSize", "db/de2/structProtoMangleRefT.html#a20f23d76c0d0feef8ce6ade7504a2e34", null ],
+    [ "iServerPort", "db/de2/structProtoMangleRefT.html#a7a3e3a6fc27236afeea7717c904b6191", null ],
+    [ "pHttp", "db/de2/structProtoMangleRefT.html#a1759ef9d2a8d946f2a584258e8b164b0", null ],
+    [ "pMemGroupUserData", "db/de2/structProtoMangleRefT.html#ac78581a65cf6b9ea8861d7ec017bac3a", null ],
+    [ "pProbeSock", "db/de2/structProtoMangleRefT.html#acb14f20963ab0a36e515ead62677cadf", null ],
+    [ "pSharedProbeSock", "db/de2/structProtoMangleRefT.html#a6f93bbc779408187ae9c97ad77496350", null ],
+    [ "strBuf", "db/de2/structProtoMangleRefT.html#a558f61a5089f8c71c9d7f7293eab05a7", null ],
+    [ "strCookie", "db/de2/structProtoMangleRefT.html#a8258720817bbe664aa29b61176b817c4", null ],
+    [ "strGameID", "db/de2/structProtoMangleRefT.html#a2d5cb9341840797fe809d24bafdb786b", null ],
+    [ "strLKey", "db/de2/structProtoMangleRefT.html#a2a79ec2a35806f2b511e713c66144a63", null ],
+    [ "strServer", "db/de2/structProtoMangleRefT.html#a0c8aa30162d741eabb80864a025d047e", null ]
+];

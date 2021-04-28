@@ -1,0 +1,61 @@
+﻿<project default="build">
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+		<option name="build" value="exclude"/>
+	</optionset>
+
+	<!-- ******************* -->
+	<!-- Package declaration -->
+	<!-- ******************* -->
+	<property name="package.bridgedocgen.dir"  value="@{PathGetFullPath('.')}"/>
+	<property name="package.bridgedocgen.version"  value="@{PathGetFileName('${package.bridgedocgen.dir}')}"/>
+	<package name="bridgedocgen" targetversion="${package.bridgedocgen.version}"/>
+	
+	<dependent name="jdk" />
+	<dependent name="originClient" />
+	<dependent name="origin_config" />
+	
+	<property name="jsinterface.doc.source.dir" value="${package.originClient.dir}\jsinterface\doc" />
+	<property name="jsinterface.doc.output.dir" value="${package.originClient.dir}\jsinterface\doc\html" />
+	
+	<target name="build">
+		<call target="gen-bat" />
+		<call target="gen-docs" />
+		<call target="copy-to-web" />
+	</target>
+
+	<target name="gen-bat">
+		<property name="package.bridgedocgen.sbt" value="${package.bridgedocgen.dir}/bin/sbt.bat" />
+
+		<echo message="set SCRIPT_DIR=%~dp0" file="${package.bridgedocgen.sbt}" />
+		<echo message="${package.jdk.appdir}\bin\java.exe -Xmx1024M -jar &quot;%SCRIPT_DIR%sbt-launch.jar&quot; %*" file="${package.bridgedocgen.sbt}" append="true" />
+	</target>
+	
+	<target name="gen-docs">
+		<exec program="${package.bridgedocgen.dir}/bin/sbt.bat" workingdir="${package.bridgedocgen.dir}" >
+		<args>
+			<arg value="&quot;run ${jsinterface.doc.source.dir}&quot;" />
+		</args>
+			<env>
+				<option name="SCRIPT_DIR" value="%~dp0"/>
+				<option name="Path" value="${sys.env.Path};${package.bridgedocgen.dir}/bin"/>
+			</env>
+		</exec>
+	</target>
+
+	<!-- target to generate docs and put them on the network -->
+	<target name="copy-to-web">
+	    <property name="originApiDocs.outputdir" value="${jsinterface.doc.output.dir}" />
+		<property name="originApiDocs.webdir" value="\\opqa-online.rws.ad.ea.com\Webserver\OriginAPIDocs" />
+		<property name="originApiDocs.webdir" value="\\opqa-online.rws.ad.ea.com\Webserver\OriginAPIDocs\${origin.branch}" unless="${origin.branch} == 'DL'"/>
+		<copy todir="${originApiDocs.webdir}\${package.name}">
+			<fileset basedir="${originApiDocs.outputdir}">
+				<includes name="**/*.*" />
+			</fileset>
+		</copy>
+	</target>
+	
+</project>

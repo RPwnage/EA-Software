@@ -1,0 +1,25 @@
+var voipheadsetps3_8c =
+[
+    [ "VoipHeadsetParamT", "df/dfe/structVoipHeadsetParamT.html", "df/dfe/structVoipHeadsetParamT" ],
+    [ "VoipHeadsetRefT", "db/d44/structVoipHeadsetRefT.html", "db/d44/structVoipHeadsetRefT" ],
+    [ "VOIP_HEADSET_BLOCK_SIZE", "d5/d0b/voipheadsetps3_8c.html#aa1315455bb093b83cf1637595d1b36a1", null ],
+    [ "VOIP_HEADSET_DEFAULTFRAMESAMPLES", "d5/d0b/voipheadsetps3_8c.html#a8119becf99634f40bb006b75f437a515", null ],
+    [ "VOIP_HEADSET_DEFAULTSAMPLERATE", "d5/d0b/voipheadsetps3_8c.html#adbb401a177908a70c0347eafcd2445d8", null ],
+    [ "VOIP_HEADSET_MAX_BLOCKS", "d5/d0b/voipheadsetps3_8c.html#a88779ea58d719792a92ca16b81e464e3", null ],
+    [ "VOIP_HEADSET_MAX_READ_SAMPLES", "d5/d0b/voipheadsetps3_8c.html#ab0ce22a23cdc55349c818ed10ee0dab4", null ],
+    [ "VOIP_HEADSET_OUTBUFFER_BLOCKS", "d5/d0b/voipheadsetps3_8c.html#aed3677983188daa60f8f7c7143229fe6", null ],
+    [ "VOIP_HEADSET_SOUND_TRIGGER_DECIBEL", "d5/d0b/voipheadsetps3_8c.html#a00d1e2cf15b7596c884598b22c1dba3b", null ],
+    [ "VOIP_HEADSET_TALKING_MIN_DURATION", "d5/d0b/voipheadsetps3_8c.html#ab0cd96332a8b49cc5465e073474c6962", null ],
+    [ "VoipHeadsetParamT", "d5/d0b/voipheadsetps3_8c.html#a0f90bd0a5f8c19348b94b117da7ce18b", null ],
+    [ "VoipHeadsetControl", "d5/d0b/voipheadsetps3_8c.html#aaaf6ee658ec0ea71d80e306e28891d98", null ],
+    [ "VoipHeadsetCreate", "d5/d0b/voipheadsetps3_8c.html#ac52e6d0e8c9cd9c19038ff42770596d8", null ],
+    [ "VoipHeadsetDestroy", "d5/d0b/voipheadsetps3_8c.html#a9498bf3a53795febd7c9e322e7153471", null ],
+    [ "VoipHeadsetProcess", "d5/d0b/voipheadsetps3_8c.html#a8a6fe7a70f57dc22b61af43717d12fa8", null ],
+    [ "VoipHeadsetReceiveVoiceDataCb", "d5/d0b/voipheadsetps3_8c.html#ad5eb96c0265d7a53cd782f78a1246403", null ],
+    [ "VoipHeadsetRegisterUserCb", "d5/d0b/voipheadsetps3_8c.html#a3c834ba390a47b4d627699e92d53e6dd", null ],
+    [ "VoipHeadsetSetVolume", "d5/d0b/voipheadsetps3_8c.html#a9213d20e455175fe8d23a2e5f8f3184a", null ],
+    [ "VoipHeadsetSpkrCallback", "d5/d0b/voipheadsetps3_8c.html#a5215825f3ca2a03fd9bb3e06eee402ba", null ],
+    [ "VoipHeadsetStatus", "d5/d0b/voipheadsetps3_8c.html#a8065c4e174b9083d419cffc6732f13cb", null ],
+    [ "_VoipHeadsetPS3_iDefaultCodecIdent", "d5/d0b/voipheadsetps3_8c.html#a965913d3c9fd1d6e1a48f809565deddd", null ],
+    [ "_VoipHeadsetPS3_iDefaultSampleRate", "d5/d0b/voipheadsetps3_8c.html#a94469cc879bb234cb9d94fbfabaf8b32", null ]
+];

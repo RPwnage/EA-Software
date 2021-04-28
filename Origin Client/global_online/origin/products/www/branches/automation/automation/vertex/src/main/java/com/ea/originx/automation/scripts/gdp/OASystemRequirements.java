@@ -1,0 +1,57 @@
+package com.ea.originx.automation.scripts.gdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroGDP;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPNavBar;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPSections;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test clicking on 'System Requirements' Nav bar link scrolls page to 'System
+ * Requirements' section
+ */
+public class OASystemRequirements extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 3086510)
+    @Test(groups = {"gdp", "full_regression"})
+    public void testSystemRequirements(ITestContext context) throws Exception {
+
+        final boolean isClient = ContextHelper.isOriginClientTesing(context);
+        final OriginClient client = OriginClientFactory.create(context);
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+        final EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.TITANFALL_2);
+
+        logFlowPoint("Log into Origin with random account"); // 1
+        logFlowPoint("Navigate to the GDP for any game"); // 2
+        logFlowPoint("Click on the 'System Requirements' nav bar link and verify page scrolls to 'System Requirements' section"); // 3
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+
+        // 2
+        logPassFail(MacroGDP.loadGdpPage(driver, entitlement), true);
+
+        // 3
+        if (isClient) {
+            new MainMenu(driver).clickMaximizeButton();
+        }
+        new GDPNavBar(driver).clickSystemRequirements();
+        logPassFail(new GDPSections(driver).verifySystemRequirementsSectionVisible(), false);
+
+        softAssertAll();
+    }
+}

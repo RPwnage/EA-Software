@@ -1,0 +1,40 @@
+	OriginErrorT OriginIGORenderer::transferFrame(OriginIGOStreamingInfo_T* output)
+	{
+		if (!output || !output->data || output->frameTimeStamp == m_streamingProperties.frameTimeStamp || !m_streamData.data)
+		{
+			// always update this state
+			if (output)
+			{
+				output->streaming = m_streamingProperties.streaming;
+				output->data = nullptr;
+			}
+			return ORIGIN_SUCCESS_IGOAPI;
+		}
+		output->size = sizeof(OriginIGOStreamingInfo_T);
+		output->height = m_streamData.height;
+		output->width =  m_streamData.width;
+		output->format = ORIGINIGOSTREAMFORMAT_RGBA8888;		// YUV444 / h264 / h265 encoded frames are supported in the future !
+		output->frameTimeStamp = m_streamingProperties.frameTimeStamp;
+		output->streaming = m_streamingProperties.streaming;
+
+		// do we provide what IGO was requesting?
+		if (m_streamData.height != m_streamingProperties.height
+			|| m_streamData.width != m_streamingProperties.width
+			|| m_streamingProperties.format != output->format)
+			output->matchRequestedProperties = false;		// IGO has to perform additional processing of frame data - not yet supported !
+		else
+			output->matchRequestedProperties = true;
+
+		if (!output->matchRequestedProperties)
+		{
+			output->data = nullptr;
+			return ORIGIN_ERROR_IGOAPI_STREAMING_PROPERTIES_MISMATCH;
+		}
+
+		if (output->dataSize == m_streamData.dataSize)
+			memcpy(output->data, m_streamData.data, output->dataSize);
+		else
+			output->data = nullptr;
+
+		return ORIGIN_SUCCESS_IGOAPI;
+	}

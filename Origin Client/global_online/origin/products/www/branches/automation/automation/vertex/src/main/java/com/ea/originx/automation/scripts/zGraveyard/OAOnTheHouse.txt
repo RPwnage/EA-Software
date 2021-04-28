@@ -1,0 +1,203 @@
+package com.ea.originx.automation.scripts.rtb;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.helpers.EACoreHelper;
+import com.ea.originx.automation.lib.helpers.I18NUtil;
+import com.ea.originx.automation.lib.helpers.csv.OriginOTHReader;
+import com.ea.originx.automation.lib.macroaction.*;
+import com.ea.originx.automation.lib.pageobjects.account.AccountSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHousePage;
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHouseTile;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.net.helpers.CrsHelper;
+import com.ea.vx.originclient.resources.CountryInfo;
+import com.ea.vx.originclient.resources.LanguageInfo;
+import com.ea.vx.originclient.resources.OSInfo;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.vx.originclient.utils.S3Service;
+import com.ea.vx.originclient.webdrivers.BrowserType;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.net.URISyntaxException;
+import java.util.Date;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openqa.selenium.logging.LogEntry;
+import org.openqa.selenium.logging.LogType;
+
+/**
+ * Tests the 'On the House' Entitlements are valid and are free for the user for
+ * all the countries
+ *
+ * @author nvarthakavi
+ */
+public class OAOnTheHouse extends EAXVxTestTemplate {
+    public void testOnTheHouse(ITestContext context, CountryInfo.CountryEnum countryEnum, LanguageInfo.LanguageEnum languageEnum, String testName) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        String countryName = countryEnum.getCountry();
+        String countryCodeX = countryEnum.getCountryCodeX();
+        String countryCode = countryEnum.getCountryCode();
+        String languageCodeX = languageEnum.getCode();
+        String languageCode = languageEnum.getLanguageCode();
+
+        UserAccount userAccount;
+        WebDriver driver = startClientObject(context, client);
+        if (countryName.equals(CountryInfo.CountryEnum.SOUTH_KOREA.getCountry())) {
+            userAccount = MacroAccount.createNewThrowAwayAccountInKorea(driver, client);
+        } else {
+            userAccount = AccountManagerHelper.createNewThrowAwayAccount(countryName);
+            MacroLogin.startLogin(driver, userAccount);
+        }
+
+        //Set Language and Change country
+        boolean setLanguage = MacroSettings.setLanguage(driver, client, languageEnum);
+        client.stop();
+        ProcessUtil.killOriginProcess(client);
+        EACoreHelper.overrideCountryTo(countryEnum, client.getEACore());
+        driver = startClientObject(context, client);
+
+        //Set Locale
+        I18NUtil.setLocale(new Locale(languageCode, countryCode));
+        I18NUtil.registerResourceBundle("i18n.MessagesBundle");
+
+        logFlowPoint("Launch Origin and login as newly registered user in " + countryName); // 1
+        logFlowPoint("Navigate to 'On the House' page and verify there is at least one entitlement in 'OTH'"); // 2
+        logFlowPoint("Get all the 'OTH' tiles and verify they are valid for current the date and time"); // 3
+        logFlowPoint("Verify all the 'OTH' tiles have their price as 'free'"); // 4
+        logFlowPoint("Navigate to all the 'OTH' tile's GDP page and verify the 'OTH' tag and there 100% off code message is there"); // 5
+        logFlowPoint("Verify all the 'OTH' tiles are free to entitle"); // 6
+
+        // 1
+        if (MacroLogin.startLogin(driver, userAccount) && setLanguage) {
+            logPass("Verified login successful to user account: " + userAccount.getUsername());
+        } else {
+            logFailExit("Failed: Cannot login to user account: " + userAccount.getUsername());
+        }
+
+        // Need to catch exception before propogated. As soon as the exception
+        // gets out of the test class, the driver is shut down. When that
+        // happens, we can no longer get the network logs.
+        try {
+            //2
+            new NavigationSidebar(driver).gotoOnHousePage();
+            OnTheHousePage onTheHousePage = new OnTheHousePage(driver);
+            onTheHousePage.verifyOnTheHousePageReached();
+            boolean isOTHHasMinimumOneTile = onTheHousePage.verifyOnTheHouseHasMinimumOneEntitlement();
+            if (isOTHHasMinimumOneTile) {
+                logPass("Verified there is at least one entitlement: ");
+            } else {
+                storeLogInformation(driver, languageCode, context, testName);
+                logFailExit("Failed: there is no entitlement");
+            }
+
+            //3
+            List<OnTheHouseTile> onTheHouseTiles = onTheHousePage.getAllOnTheHouseTiles();
+            List<String> onTheHouseEntitlementNames = onTheHousePage.getOTHTilesEntitlementName();
+            Map<String, String> onTheHouseEntitlementNamesOfferId = onTheHousePage.getOTHTilesEntitlementNameOfferId();
+            boolean isAllOTHTiles = OriginOTHReader.verifyAllOTHTilesValid(countryCodeX, languageCodeX, onTheHouseTiles);
+            if (isAllOTHTiles) {
+                logPass("Verified all he 'OTH' tiles are valid for the current date and time: ");
+            } else {
+                storeLogInformation(driver, languageCode, context, testName);
+                logFailExit("Failed: all he 'OTH' tiles are not valid for the current date and time: ");
+            }
+
+            //4
+            boolean isAllTilesFree = onTheHousePage.verifyAllOTHTilesFree();
+            if (isAllTilesFree) {
+                logPass("Verified all the entitlements have price as 'free'");
+            } else {
+                storeLogInformation(driver, languageCode, context, testName);
+                logFailExit("Failed: one or more entitlements doest not have price as 'free'");
+            }
+
+            //5
+            boolean isAllTilesFreeOnGDP = MacroGDP.verifyOTHTilesFreeOnGDP(driver, onTheHouseEntitlementNames);
+            if (isAllTilesFreeOnGDP) {
+                logPass("Verified all the entitlements are free in their GDP pages");
+            } else {
+                logFailExit("Failed: there are one or more entitlements that are not free in their GDP pages");
+            }
+
+            //6
+            new NavigationSidebar(driver).gotoOnHousePage();
+            boolean isAllOTHTileEntitledFree = MacroPurchase.entitleAllOTHTiles(driver, onTheHouseEntitlementNamesOfferId);
+            WebDriver settingsDriver = client.getAnotherBrowserWebDriver(BrowserType.CHROME);
+            MacroAccount.loginToAccountPage(settingsDriver, userAccount);
+            new AccountSettingsPage(settingsDriver).gotoOrderHistorySection();
+            boolean isOrderHistory = MacroAccount.verifyAllOrderDescriptionExists(settingsDriver, onTheHouseEntitlementNames);
+            if (isAllOTHTileEntitledFree && isOrderHistory) {
+                logPass("Verified all the entitlements are free to entitle");
+            } else {
+                storeLogInformation(driver, languageCode, context, testName);
+                logFailExit("Failed: there are one or more entitlements that are not free to entitle");
+            }
+        } catch (Exception e) {
+            storeLogInformation(driver, languageCode, context, testName);
+            throw e;
+        }
+
+        softAssertAll();
+    }
+
+    /**
+     * Store the network logs from the test. This should be called if there any
+     * unexpected behaviour.
+     *
+     * @param driver The WebDriver we want to get the network logs from
+     * @param language The language the test is running on. This is used to make
+     * the file name unique when running nightly
+     * @param context The context associated with the test
+     * @param testName The name of the test that is currently being run
+     * @throws IOException
+     * @throws URISyntaxException
+     * @throws NoSuchFieldException
+     */
+    private void storeLogInformation(WebDriver driver, String language, ITestContext context, String testName)
+            throws IOException, URISyntaxException, NoSuchFieldException {
+        Logger _scriptLog = LogManager.getLogger(MethodHandles.lookup().lookupClass());
+        boolean isLocal = ContextHelper.isLocalHub(context);
+        String outputLocation;
+        if (isLocal) {
+            outputLocation = "C:\\network_logs.txt";
+        } else { // If running on vm, store on the executor
+            String workspace = OSInfo.getEnvValue("WORKSPACE");
+            outputLocation = String.format("%s/network_logs_%s.txt", workspace, language);
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(outputLocation)))) {
+            List<LogEntry> entries = driver.manage().logs().get(LogType.PERFORMANCE).getAll();
+            _scriptLog.info(entries.size() + " " + LogType.PERFORMANCE + " log entries found");
+            for (LogEntry entry : entries) {
+                writer.write(new Date(entry.getTimestamp()) + " " + entry.getLevel() + " " + entry.getMessage());
+                writer.newLine();
+            }
+        } catch (FileNotFoundException e) {
+            _scriptLog.error("Could not find file: " + e.getMessage());
+        } catch (IOException e) {
+            _scriptLog.error("Could not write to file: " + e.getMessage());
+        }
+
+        if (!isLocal) { // Upload results to correct test_case_result
+            String reportID = CrsHelper.getReportId();
+            int testCaseID = CrsHelper.getTestCaseId(testName);
+            int testResultID = CrsHelper.getTestResultId(reportID, testCaseID, true);
+            S3Service.uploadTestArtifact(outputLocation, "" + testResultID);
+        }
+    }
+}

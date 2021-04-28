@@ -1,0 +1,154 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.PDPSections;
+import com.ea.originx.automation.lib.pageobjects.store.PaymentInformationPage;
+import com.ea.originx.automation.lib.resources.games.Battlefield4;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test to verify the 'Comparison Table: Buy Now CTAs' are displayed on a PDP page
+ * at the bottom of the table.
+ *
+ * Click 'Deluxe Edition' Buy Now CTA and verify 'In your game library' text appears
+ * for the edition you own and for 'Lesser Editions' check the Buy Now CTAs are hidden.
+ *
+* @author cdeaconu
+*/
+
+public class OAComparisonTableCTA extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12227)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testComparisonTableCTA(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        final EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_DIGITAL_DELUXE);
+        final String entitlementName = entitlement.getName();
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+
+        final String standardEdition = Battlefield4.BF4_STANDARD_EDITION_NAME;
+        final String deluxeEdition = Battlefield4.BF4_DIGITAL_DELUXE_EDITION_NAME;
+        final String premiumEdition = Battlefield4.BF4_PREMIUM_EDITION_NAME;
+
+        if (isClient) {
+            logFlowPoint("Launch Origin and log in"); // 1
+        }
+        logFlowPoint("Navigate to a PDP page that has a comparison table"); // 2
+        logFlowPoint("Verify the correct PDP page has loaded"); // 3
+        logFlowPoint("Verify that there is a purchase CTA (Call to Action) for each product on the bottom of the comparison table"); // 4
+        if (!isClient) {
+            logFlowPoint("Verify that the log in window appears if you are not logged in"); // 5
+        }
+        logFlowPoint("Verify that the checkout flow modal appears"); // 6
+        logFlowPoint("Verify that the 'In your game library' messaging appears instead of the purchase CTA on the correct owned edition of the game"); // 7
+        logFlowPoint("Verify the user cannot purchase the product they own from the Comparison Table"); // 8
+        logFlowPoint("Verify that the Buy Now CTAs are hidden for 'Lesser Editions' "); // 9
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (isClient) {
+            if (MacroLogin.startLogin(driver, userAccount)) {
+                    logPass("Successfully logged into Origin with entitled account " + username);
+                } else {
+                    logFailExit("Could not log into Origin with the user " + username);
+            }
+        }
+
+        // 2
+        if (MacroPDP.loadPdpPage(driver, entitlement)) {
+            logPass("Successfully reached for " + entitlementName);
+        } else {
+            logFailExit("Failed to reach for " + entitlementName);
+        }
+
+        // 3
+        PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+        pdpHeroDescription.waitForPdpHeroToLoad();
+        if (pdpHeroDescription.verifyGameTitle(entitlementName)) {
+            logPass("Successfully navigated to the PDP for " + entitlementName);
+        } else {
+            logFailExit("Failed to navigate to the PDP for " + entitlementName);
+        }
+
+        // 4
+        PDPSections pdpSections = new PDPSections(driver);
+        boolean isStandardEditionBuyCtaDisplayed = pdpSections.verifyEditionPurchasable(standardEdition);
+        boolean isDeluxeEditionBuyCtaDisplayed = pdpSections.verifyEditionPurchasable(deluxeEdition);
+        boolean isPremiumEditionBuyCtaDisplayed = pdpSections.verifyEditionPurchasable(premiumEdition);
+        if (isStandardEditionBuyCtaDisplayed && isDeluxeEditionBuyCtaDisplayed && isPremiumEditionBuyCtaDisplayed) {
+            logPass("Successfully verifies all CTAs are displayed");
+        } else {
+            logFail("Failed to verifies all CTAs are displayed");
+        }
+        pdpSections.clickPurchasableEditions(deluxeEdition);
+
+        // 5
+        if (!isClient) {
+            if (MacroLogin.startLogin(driver, userAccount)) {
+                    logPass("Successfully logged into Origin with entitled account " + username);
+                } else {
+                    logFailExit("Could not log into Origin with the user " + username);
+            }
+        }
+
+        // 6
+        PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        if (paymentInformationPage.verifyPaymentInformationReached()) {
+            logPass("Successfully navigated to Payment Information Page");
+        } else {
+            logFail("Failed to navigate to the Payment Information Page");
+        }
+        MacroPurchase.completePurchaseAndCloseThankYouPage(driver);
+
+        // 7
+        // sometimes the page doesn't update the comparison table CTA's after a purchase was made
+        if (isClient) {
+            new MainMenu(driver).selectRefresh();
+        } else {
+            driver.navigate().refresh();
+        }
+        pdpHeroDescription.waitForPdpHeroToLoad();
+
+        if (pdpSections.verifyEditionOwned(deluxeEdition)) {
+            logPass("Successfully verified the message 'In your game library' appears instead of Buy CTA for " + deluxeEdition);
+        } else {
+            logFail("Failed to verify the message 'In your game library' appears for owned edition");
+        }
+
+        // 8
+        if (!pdpSections.verifyEditionPurchasable(deluxeEdition)) {
+            logPass("Successfully verified the user cannot purchase the product they own from the 'Comparison Table'");
+        } else {
+            logFail("Failed to verify the product owned by the user is purchasable");
+        }
+
+        // 9
+        if (!pdpSections.verifyEditionPurchasable(standardEdition)) {
+            logPass("Successfully verified the Buy Now CTAs are hidden for 'Lesser Editions', " + standardEdition);
+        } else {
+            logFail("Failed to verify 'Lesser Editions' Buy Now CTAs are displayed");
+        }
+    }
+}

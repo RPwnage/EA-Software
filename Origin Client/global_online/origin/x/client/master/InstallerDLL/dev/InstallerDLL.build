@@ -1,0 +1,186 @@
+<project name="InstallerDLL" default="build">
+  
+  <!-- ************************* -->
+  <!-- EAConfig target overrides -->
+  <!-- ************************* -->
+  <optionset name="config.targetoverrides" >
+    <option name="clean" value="exclude"/>
+  </optionset>
+
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+  <property name="package.InstallerDLL.dir"  value="@{PathGetFullPath('.')}"/>
+  <property name="package.InstallerDLL.version"  value="@{PathGetFileName('${package.InstallerDLL.dir}')}"/>
+  <package name="InstallerDLL" targetversion="${package.InstallerDLL.version}"/>
+
+  
+  <!-- ******************* -->
+  <!-- Package dependencies -->
+  <!-- ******************* -->
+  <dependent name="OriginConfig" />
+  <dependent name="OriginVersion" />
+  <dependent name="VisualStudio" />
+
+  <!-- ***************************** -->
+  <!-- Build Configuration properties-->
+  <!-- ***************************** -->
+  <BuildType name="InstallerDLL.buildtype" from="OriginDLL">
+    <option name="buildset.link.options" >
+    ${option.value}
+      /DEF:${package.InstallerDLL.dir}/source/InstallerDLL.def
+    /NODEFAULTLIB:uafxcw${debug-suffix}.lib;libcpmt${debug-suffix}.lib
+    </option>
+    <option name="buildset.cc.options">
+      ${option.value}
+      /wd4189
+      /wd4266
+      /FI ${package.InstallerDLL.dir}/source/OriginCommon.h
+    </option>
+    <option name="buildset.cc.defines">
+      ${option.value}
+      _WINDLL
+      _ATL_STATIC_REGISTRY
+      TELEMETRYAPI_STATIC
+    </option>
+    <remove>
+      <defines>
+        EA_DLL
+        _WINSOCKAPI_
+      </defines>
+    </remove>
+    <option name="multithreadeddynamiclib"        value="off" />
+    <option name="pcconsole"        value="off" />
+  </BuildType>    
+
+  <property name="runtime.buildtype" value="InstallerDLL.buildtype" />
+  <property name="runtime.outputdir" value="${package.InstallerDLL.dir}/bin"/>
+  <property name="runtime.outputname" value="InstallerDLL${debug-suffix}"/>
+
+  <property name="runtime.InstallerDLL.outputdir" value="${runtime.outputdir}" />
+  <property name="runtime.InstallerDLL.outputname" value="${runtime.outputname}" />
+  
+  <mkdir dir="${runtime.outputdir}" unless="@{DirectoryExists(${runtime.outputdir})}" />
+  
+  <property name="dirtysdk-samples" value="false" />
+  
+  <!-- ********************************************************** -->
+  <!-- Package USE dependencies                                   -->
+  <!-- inclusion into the project but does not affect build order -->
+  <!-- ********************************************************** -->
+  <property name="runtime.usedependencies">
+    OriginConfig
+    OriginVersion
+  </property>
+  
+  <!-- ********************************************************** -->
+  <!-- Package BUILD dependencies                                 -->
+  <!-- inclusion into the project, affects build order             -->
+  <!-- ********************************************************** -->
+  <property name="runtime.builddependencies">
+    coreallocator
+    EABase
+    EAIO
+    EATrace
+    EAStdC
+    EAThread
+    EASTL
+    BugSentry
+    EAAssert
+    DirtySDK
+    EACallstack
+    PPMalloc
+    ExceptionHandler
+    EABase
+    TelemetryAPI
+    TelemetrySDK
+  </property>
+  
+  <!-- ************ -->
+  <!-- Include path -->
+  <!-- ************ -->
+  <property name="runtime.includedirs" >
+    ${package.InstallerDLL.dir}/include
+    ${package.VisualStudio.appdir}\VC\INCLUDE
+  </property>
+
+  <property name="runtime.libs">
+    ${property.value}
+    ${package.VisualStudio.appdir}\VC\atlmfc\lib\uafxcw${debug-suffix}.lib
+    ${package.VisualStudio.appdir}\VC\lib\libcpmt${debug-suffix}.lib
+  </property>
+  
+  <fileset name="runtime.headerfiles" basedir="${package.dir}">
+    <includes name="${package.InstallerDLL.dir}/**/*.h" />
+  </fileset>  
+  
+
+  <!-- ************ -->
+  <!-- Source path  -->
+  <!-- ************ -->
+  <fileset name="runtime.sourcefiles" basedir="${package.dir}">
+    <includes name="${package.InstallerDLL.dir}\source\*.cpp" />
+  </fileset>
+
+  <fileset name="runtime.resourcefiles">
+    <includes name="${package.InstallerDLL.dir}\source\InstallerDLL.rc" />
+  </fileset>
+
+  <property name="runtime.res.includedirs">
+    ${package.OriginVersion.dir}\include
+  </property>
+
+  <target name="sign-exe">
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="${runtime.outputname}" in="${runtime.outputdir}/${runtime.outputname}.dll" retries="${signing.retries.default}" />
+  </target>  
+  
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+  
+
+  <property name="postbuild.target.list">
+    ${property.value}
+  </property>
+  
+  <property name="postbuild.target.list" if="${config-type} == 'opt'" >
+    ${property.value}
+    sign-exe
+  </property>
+  
+  <target name="embed-manifest">
+    <exec program="${package.WindowsSDK.appdir}\bin\mt.exe">
+      <args>
+        <arg value="/manifest ${package.InstallerDLL.dir}\resources\InstallerDLL.manifest /outputresource:${package.InstallerDLL.dir}\bin\InstallerDLL.exe;1" /> 
+      </args>
+      </exec>
+  </target>    
+  
+  <target name="post-build-tasks">
+    <foreach property="runtarget" item="String" in="${postbuild.target.list}">
+      <call target="${runtarget}" />
+    </foreach>
+  </target>
+  
+  <!-- NANT Postbuild target. Will execute this after compiling happens. -->
+  <property name="runtime.postbuildtarget" value="post-build-tasks" />
+  
+  <!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+  <property name="runtime.vcproj.post-build-step">
+    ${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.postbuildtarget}
+  </property>  
+
+	<target name="clean-custom">
+		<delete dir="${package.configbuilddir}" />
+    <delete>
+			<fileset basedir="${runtime.InstallerDLL.outputdir}">
+				<includes name="${runtime.InstallerDLL.outputname}.*"/>
+			</fileset>
+		</delete>
+	</target>
+  
+</project>
+
+
+
+

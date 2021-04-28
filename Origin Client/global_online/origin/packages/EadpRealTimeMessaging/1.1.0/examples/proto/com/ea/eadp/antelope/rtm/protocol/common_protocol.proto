@@ -1,0 +1,120 @@
+package com.ea.eadp.antelope.rtm.protocol;
+
+import "player_protocol.proto";
+import "presence_protocol.proto";
+
+option java_outer_classname = "CommonProtocol";
+
+message PersonaV1 {
+	optional string personaId = 1;
+	optional string displayName = 2;
+	optional string nickName = 3;
+}
+
+message SuccessV1 {
+	oneof body {
+		LoginV2Success loginV2Success = 1;
+		ChatInitiateSuccessV1 chatInitiateSuccess = 2;
+		LoginV3Response loginV3Response = 3;
+	}
+}
+
+message LoginV2Success {
+	optional string sessionKey = 1;
+}
+
+message ChatInitiateSuccessV1 {
+	optional ChannelV1 channel = 1;
+}
+
+enum ChannelType {
+	EADP_GROUP_SERVICE = 1;
+	INVITE_CHANNEL = 2;
+	WORLD_CHAT = 3;
+	GAME = 4;
+}
+
+enum MutedByV1 {
+	ADMIN_MUTED = 1;
+	USER_MUTED = 2;
+}
+
+message MutedSetV1 {
+	repeated MutedByV1 mutedBy = 1;
+}
+
+message ChannelV1 {
+	 optional string channelId = 1;
+	 optional string channelName = 2;
+	 optional ChannelType type = 3 [default = EADP_GROUP_SERVICE];
+	 // When respond to ChatChannelsRequestV2, -1 will be returned for newly joined channels to indicate this is a newly joined channel.
+	 optional int32 unreadMessageCount = 4 [default = 0];
+
+	 optional TextMessageV1 lastMessageInfo = 5;
+
+	 optional string lastReadTimestamp = 6;
+
+	 // length limit 1000
+	 optional string customProperties = 7;
+}
+message ChannelMuteListV1 {
+	optional string channelId = 1;
+	repeated PersonaV1 mutedUsers = 2 [deprecated=true];
+	repeated MutedSetV1 mutedBy = 3;
+	repeated Player mutedPlayers = 4;
+}
+
+message HeartbeatV1 {}
+
+message StickyMessageV1 {
+	optional string stickyAuthorPersonaId = 1;
+	optional string stickyAuthorDisplayName = 2;
+	optional string timestamp = 3;
+	optional TextMessageV1 textMessage = 4;
+	optional string messageId = 5;
+	optional string stickyAuthorNickName = 6;
+}
+
+// equivalent of TextMessage in SocialProtocol to be used in RTM Protocol
+message TextMessageV1 {
+	optional string fromPersonaId = 1 [deprecated=true];
+	optional string fromDisplayName = 2;
+	optional string timestamp = 3;
+	optional string text = 4;
+	optional string originalText = 5;
+	optional Player player = 6;
+	optional string fromNickName = 7;
+}
+
+enum MessageType {
+	REGULAR_MESSAGE = 1;
+	STICKY_MESSAGE = 2;
+}
+
+enum UserType{
+	PERSONA = 1;
+	NUCLEUS = 2;
+}
+
+message LoginV3Response {
+	optional string sessionKey = 1;
+	repeated SessionV1 connectedSessions = 2;
+}
+
+message SessionV1 {
+	optional string sessionKey = 1;
+	optional PlatformV1 platform = 2;
+	optional string clientVersion = 3;
+	optional string timestamp = 4;
+}
+
+message SessionRequestV1 {}
+
+message SessionResponseV1 {
+	repeated SessionV1 connectedSessions = 1;
+}
+
+// This lets a logged in client log out another session from the same user.
+message SessionCleanupV1 {
+	optional string sessionKey = 1;
+}

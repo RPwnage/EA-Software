@@ -1,0 +1,144 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.PaymentInformationPage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test PDP Hero for a non-subscriber viewing the vault edition when owning the lower edition
+ *
+ * @author cbalea
+ */
+public class OAPDPOwnLowerViewVaultNonSub extends EAXVxTestTemplate{
+
+    @TestRail(caseId = 10906)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testPDPOwnLowerViewVaultNonSub(ITestContext context) throws Exception{
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EntitlementId lesserEntitlementID = EntitlementId.DA_INQUISITION;
+        EntitlementId vaultEntitlementID = EntitlementId.DA_INQUISITION_DIGITAL_DELUXE;
+        EntitlementInfo ownedEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(lesserEntitlementID);
+        EntitlementInfo entitlementToView = EntitlementInfoHelper.getEntitlementInfoForId(vaultEntitlementID);
+
+        final UserAccount userAccount = AccountManager.getEntitledUserAccount(ownedEntitlement);
+
+        logFlowPoint("Using an account which owns a lower edition than a game offered in the Vault, log into Origin client"); // 1
+        logFlowPoint("Navigate to the PDP of the vault edition of entitlement"); // 2
+        logFlowPoint("Verify there is a message indicating that the user owns the higher edition"); // 3
+        logFlowPoint("Verify there is a hyperlink to the edition in your game library"); // 4
+        logFlowPoint("Verify 'Play Now Access' CTA  is visible"); // 5
+        logFlowPoint("Verify 'Play Now Access' CTA colour is 'orange'"); // 6
+        logFlowPoint("Verify the 'OR' separator is visible"); // 7
+        logFlowPoint("Verify there is a secondary 'Buy' CTA to purchase the game"); // 8
+        logFlowPoint("Verify the secondary 'Buy' CTA is clear colour"); // 9
+        logFlowPoint("Verify clicking the secondary CTA starts the checkout flow"); // 10
+        logFlowPoint("Verify legal links are visible"); // 11
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with newly registered account " + userAccount.getUsername());
+        } else {
+            logFailExit("Could not log into Origin with the user " + userAccount.getUsername());
+        }
+
+        //2
+        if (MacroPDP.loadPdpPage(driver, entitlementToView)) {
+            logPass("Successfully navigated to the PDP for " + entitlementToView.getName());
+        } else {
+            logFailExit("Could not navigate to the PDP for " + entitlementToView.getName());
+        }
+
+        //3
+        PDPHeroActionDescriptors pdpHeroActionDescriptors = new PDPHeroActionDescriptors(driver);
+        if (pdpHeroActionDescriptors.verifyOwnedProductStatusMessage()) {
+            logPass("Verified that there's a message regarding edition ownership");
+        } else {
+            logFailExit("Failed to verify edition ownership message");
+        }
+
+        //4
+        if (pdpHeroActionDescriptors.verifyOGDLinkVisible()) {
+            logPass("Verified hyperlink 'View in Library' is displayed ");
+        } else {
+            logFailExit("Failed to verify hyperlink 'View in Library'");
+        }
+
+        //5
+        PDPHeroActionCTA pdpHeroActionCTA = new PDPHeroActionCTA(driver);
+        boolean visibleCTA  = pdpHeroActionCTA.verifyPlayNowAccessVisible();
+        String textCTA = pdpHeroActionCTA.getPlayNowAccessText();
+
+        if(visibleCTA){
+            logPass("Verified CTA with message " + textCTA + " is displayed ");
+        } else {
+            logFailExit("Failed to verify " + textCTA + " CTA");
+        }
+
+        //6
+        if(pdpHeroActionCTA.verifyPlayNowAccessColour()){
+            logPass("Verified orange colour of " + textCTA + " CTA");
+        } else {
+            logFailExit("Failed to verify color of " + textCTA + " CTA");
+        }
+
+        //7
+        if (pdpHeroActionCTA.verifySeparatorVisible()) {
+            logPass("Verified 'OR separator' is visible");
+        } else {
+            logFailExit("Failed to verify visibily of 'OR separator'");
+        }
+
+        //8
+        if (pdpHeroActionCTA.verifySubscriberBuyButtonVisible()) {
+            logPass("Verified 'Buy' button is visible");
+        } else {
+            logFail("Failed to verify visibily of 'Buy' button");
+        }
+
+        //9
+        if (pdpHeroActionCTA.verifySubscriberBuyButtonColor()) {
+            logPass("Verified 'Buy' button color is clear");
+        } else {
+            logFail("Failed to verify color of 'Buy' button ");
+        }
+
+        //10
+        PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+        pdpHeroActionCTA.clickSubscriberBuyButton();
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        if (paymentInformationPage.verifyPaymentInformationReached()) {
+            logPass("On clicking the 'Buy' button, verified the checkout flow is displayed");
+        } else {
+            logFail("On clicking the 'Buy' button, the checkout flow failed to start");
+        }
+
+        //11
+        paymentInformationPage.clickCloseButton();
+        boolean EULALink = pdpHeroActionDescriptors.verifyEULALinkText();
+        boolean TOSLink = pdpHeroActionDescriptors.verifyTermsAndConditionsLinkText();
+        if (EULALink && TOSLink) {
+            logPass("Verified 'EULA' and 'TOS' links are displayed");
+        } else {
+            logFailExit("Failed to verifiy 'EULA' or 'TOS' link");
+        }
+
+        softAssertAll();
+    }
+}

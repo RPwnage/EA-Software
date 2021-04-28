@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Untitled Document</title>
+</head>
+
+<body>
+<p>&nbsp;</p>
+<h3>Common function prologue and epilogue patterns.</h3>
+<h2>Android</h2>
+<pre>Android Debug
+Common Thumb pattern. Hard to deal with because sp is stored in r7.
+Can solve this by reading the prologue and reversing what it does.
+00013c58 &lt;_ZN5eastl12fixed_stringIcLi24ELb1EN2EA9Callstack18EASTLCoreAllocatorEEaSEPKc&gt;:<br>   13c58:	b580      	push	{r7, lr}<br>   13c5a:	b082      	sub	sp, #8<br>   13c5c:	af00      	add	r7, sp, #0<br>   .
+   13c84:	46bd      	mov	sp, r7<br>   13c86:	b002      	add	sp, #8<br>   13c88:	bd80      	pop	{r7, pc}<br>
+
+Android Debug
+This is an extra complicated version of the r7 problem. It happens with large functions.
+sp is bumped by a constant read from code instead of by a simple constant.
+Can solve this by reading the prologue and reversing what it does.
+00013a0c &lt;_Z21TestCallstackRecorderv&gt;:
+   13a0c: b5b0 push {r4, r5, r7, lr}
+   13a0e: 4c86 ldr r4, [pc, #536] (13c28 &lt;_Z21TestCallstackRecorderv+0x21c&gt;)
+   13a10: 44a5 add sp, r4
+   13a12: af02 add r7, sp, #8
+   .
+   13c1e: 46bd mov sp, r7
+   13c20: 23ac movs r3, #172
+   13c22: 011b lsls r3, r3, #4
+   13c24: 449d add sp, r3
+   13c26: bdb0 pop {r4, r5, r7, pc}
+
+
+Android Debug
+leaf function, no local variables or calls.
+Can solve it by regular simulation.
+00007898 &lt;_Z18androidGetFileRootv&gt;:<br>    7898:	e52db004 	push	{fp}		; (str fp, [sp, #-4]!)<br>    789c:	e28db000 	add	fp, sp, #0	; 0x0<br>    .
+    78a8:	e28bd000 	add	sp, fp, #0	; 0x0<br>    78ac:	e8bd0800 	pop	{fp}<br>    78b0:	e12fff1e 	bx	lr<br>
+
+Android Debug
+Empty function
+00007e84 &lt;__aeabi_idiv0&gt;:<br>    7e84:	e12fff1e 	bx	lr<br>
+
+Android Debug
+This is a common pattern for debug ARM32.
+00007a44 &lt;__wrap_fputs&gt;:<br>    7a44:	e92d4800 	push	{fp, lr}<br>    7a48:	e28db004 	add	fp, sp, #4	; 0x4<br>    7a4c:	e24dd008 	sub	sp, sp, #8	; 0x8<br>    .
+    7a8c:	e24bd004 	sub	sp, fp, #4	; 0x4<br>    7a90:	e8bd8800 	pop	{fp, pc}<br>
+
+Android Debug
+libc function. May actually be an optimized function.
+Analyzing the prologue wouldn't help here, as the 'prologue' is late in the function.
+Simulation would solve it for some unknown percentage of cases.
+00007b54 &lt;__aeabi_uidiv&gt;:<br>    7b54:	e2512001 	subs	r2, r1, #1	; 0x1<br>    7b58:	012fff1e 	bxeq	lr<br>    .
+    7bf0:	e52de008 	str	lr, [sp, #-8]!<br>    7bf4:	eb0000a2 	bl	7e84 &lt;__aeabi_idiv0&gt;<br>    7bf8:	e3a00000 	mov	r0, #0	; 0x0<br>    7bfc:	e49df008 	ldr	pc, [sp], #8<br>
+
+Android debug
+Apparently this function makes no stack for itself.
+Can solve it by regular simulation.
+000082a4 &lt;__adddf3&gt;:<br>    82a4:	e92d4030 	push	{r4, r5, lr}<br>    .
+    83d0:	e8bd8030 	pop	{r4, r5, pc}<br>
+
+Android debug
+Trampoline function
+Maybe not solvable, but uncommon and not always critical.
+00009330 &lt;__aeabi_cfrcmple&gt;:<br>    9330:	e1a0c000 	mov	ip, r0<br>    9334:	e1a00001 	mov	r0, r1<br>    9338:	e1a0100c 	mov	r1, ip<br>    933c:	eaffffff 	b	9340 &lt;__aeabi_cfcmpeq&gt;<br>
+
+Android opt
+Can solve it by regular simulation.
+00011488 &lt;_ZN5eastl15allocate_memoryINS_9allocatorEEEPvRT_jjj.clone.32&gt;:<br>   11488:	b500      	push	{lr}<br>   1148a:	b085      	sub	sp, #20<br>   .
+   114a4:	b005      	add	sp, #20<br>   114a6:	bd00      	pop	{pc}<br>
+
+Android opt
+Drawn out prologue due to needing to pushing many registers.
+Can solve it by regular simulation.
+000114bc &lt;_ZN5eastl6vectorIN2EA9Callstack19CallstackContextSPUENS_9allocatorEE13DoInsertValueEPS3_RKS3_&gt;:<br>   114bc:	b5f0      	push	{r4, r5, r6, r7, lr}<br>   114be:	465f      	mov	r7, fp<br>   114c0:	4656      	mov	r6, sl<br>   114c2:	464d      	mov	r5, r9<br>   114c4:	4644      	mov	r4, r8<br>   114c6:	b4f0      	push	{r4, r5, r6, r7}<br>   114c8:	4693      	mov	fp, r2<br>   114ca:	6843      	ldr	r3, [r0, #4]<br>   114cc:	6882      	ldr	r2, [r0, #8]<br>   114ce:	b083      	sub	sp, #12<br>   .
+   11546:	b003      	add	sp, #12<br>   11548:	bc3c      	pop	{r2, r3, r4, r5}<br>   1154a:	4690      	mov	r8, r2<br>   1154c:	4699      	mov	r9, r3<br>   1154e:	46a2      	mov	sl, r4<br>   11550:	46ab      	mov	fp, r5<br>   11552:	bdf0      	pop	{r4, r5, r6, r7, pc}
+
+
+Android opt
+Drawn out prologue due to needing to pushing many registers.
+But it has no local stack and so sp is unmodified aside from register push/pop.
+000122a8 &lt;_ZN5eastl6vectorIN2EA9Callstack22CallstackContextX86_64ENS_9allocatorEE7reserveEj&gt;:<br>   122a8:	b5f8      	push	{r3, r4, r5, r6, r7, lr}<br>   122aa:	4657      	mov	r7, sl<br>   122ac:	4646      	mov	r6, r8<br>   122ae:	b4c0      	push	{r6, r7}<br>   .
+   12318:	bc0c      	pop	{r2, r3}<br>   1231a:	4690      	mov	r8, r2<br>   1231c:	469a      	mov	sl, r3<br>   1231e:	bdf8      	pop	{r3, r4, r5, r6, r7, pc}<br>
+
+Android opt
+GeneralAllocator::MallocInternal dasm
+Large function. 750 instructions.
+00031a4c &lt;_ZN2EA9Allocator16GeneralAllocator14MallocInternalEji&gt;:<br>   31a4c:	b5f0      	push	{r4, r5, r6, r7, lr}<br>   31a4e:	465f      	mov	r7, fp<br>   31a50:	4656      	mov	r6, sl<br>   31a52:	464d      	mov	r5, r9<br>   31a54:	4644      	mov	r4, r8<br>   31a56:	b4f0      	push	{r4, r5, r6, r7}<br>   31a58:	b091      	sub	sp, #68<br>   .
+   31b90:	b011      	add	sp, #68<br>   31b92:	bc3c      	pop	{r2, r3, r4, r5}<br>   31b94:	4690      	mov	r8, r2<br>   31b96:	4699      	mov	r9, r3<br>   31b98:	46a2      	mov	sl, r4<br>   31b9a:	46ab      	mov	fp, r5<br>   31b9c:	bdf0      	pop	{r4, r5, r6, r7, pc}
+   .
+    &lt;more code that appears to be part of this function&gt;
+
+Android opt
+This function crashed the unwinder due to a bad memory read.
+This function is hard to deal with. Might need to try a different approach.
+It also might worthwhile to have the emulator detect where the pop sequence is and avoid jumps that go past it.
+0000efec &lt;_Z15VerifyCallstackRN2EA9Callstack15AddressRepCacheERN5eastl6vectorI18CallstackEntryInfoNS3_9allocatorEEERi&gt;:<br>    efec:	b5f0      	push	{r4, r5, r6, r7, lr}<br>    efee:	465f      	mov	r7, fp<br>    eff0:	4656      	mov	r6, sl<br>    eff2:	464d      	mov	r5, r9<br>    eff4:	4644      	mov	r4, r8<br>    eff6:	b4f0      	push	{r4, r5, r6, r7}<br>    eff8:	4cb3      	ldr	r4, [pc, #716]	(f2c8 &lt;_Z15VerifyCallstackRN2EA9Callstack15AddressRepCacheERN5eastl6vectorI18CallstackEntryInfoNS3_9allocatorEEERi+0x2dc&gt;<br>    effa:	4bb4      	ldr	r3, [pc, #720]	(f2cc &lt;_Z15VerifyCallstackRN2EA9Callstack15AddressRepCacheERN5eastl6vectorI18CallstackEntryInfoNS3_9allocatorEEERi+0x2e0&gt;)<br>    effc:	1c0f      	adds	r7, r1, #0<br>    effe:	49b4      	ldr	r1, [pc, #720]	(f2d0 &lt;_Z15VerifyCallstackRN2EA9Callstack15AddressRepCacheERN5eastl6vectorI18CallstackEntryInfoNS3_9allocatorEEERi+0x2e4&gt;)<br>    f000:	44a5      	add	sp, r4<br>    f002:	447b      	add	r3, pc<br>    f004:	1859      	adds	r1, r3, r1<br>    f006:	9006      	str	r0, [sp, #24]<br>    f008:	aec4      	add	r6, sp, #784<br>    .
+    f0a0:	23f1      	movs	r3, #241<br>    f0a2:	009b      	lsls	r3, r3, #2<br>    f0a4:	449d      	add	sp, r3<br>    f0a6:	bc3c      	pop	{r2, r3, r4, r5}<br>    f0a8:	4690      	mov	r8, r2<br>    f0aa:	4699      	mov	r9, r3<br>    f0ac:	46a2      	mov	sl, r4<br>    f0ae:	46ab      	mov	fp, r5<br>    f0b0:	bdf0      	pop	{r4, r5, r6, r7, pc}
+    .
+    &lt;more code that appears to be part of this function, and the crash occurred down here&gt;</pre>
+<h2>Palm</h2>
+<pre>palm opt
+Another case of code past the epilogue.
+00057200 &lt;_ZN2EA4Text17SubstituteGlyphs1ERNS0_10LineLayoutEjPKtj&gt;:<br>   57200:	e3530001 	cmp	r3, #1	; 0x1<br>   57204:	e1a0c001 	mov	ip, r1<br>   57208:	e92d47f0 	push	{r4, r5, r6, r7, r8, r9, sl, lr}<br>   5720c:	e1a07003 	mov	r7, r3<br>   57210:	e24dd008 	sub	sp, sp, #8	; 0x8<br>   .
+   572e4:	e28dd008 	add	sp, sp, #8	; 0x8<br>   572e8:	e8bd87f0 	pop	{r4, r5, r6, r7, r8, r9, sl, pc}<br>   572ec:	e320f000 	nop	{0}<br>   572f0:	e590202c 	ldr	r2, [r0, #44]<br>   572f4:	e1a03081 	lsl	r3, r1, #1<br>   572f8:	e1daa0b0 	ldrh	sl, [sl]<br>   572fc:	e182a0b3 	strh	sl, [r2, r3]<br>   57300:	eafffff7 	b	572e4 &lt;_ZN2EA4Text17SubstituteGlyphs1ERNS0_10LineLayoutEjPKtj+0xe4&gt;
+</pre>
+<h2>iPhone</h2>
+<pre>
+iPhone debug
+All iPhone functions seem to follow this pattern, which is documented by Apple.
+   00184c0c	e2400f42	sub	r0, r0, #264	; 0x108<br>   00184c10	ea000001	b	0x184c1c<br>   00184c14	e2400008	sub	r0, r0, #8	; 0x8<br>   00184c18	eaffffff	b	0x184c1c<br>   00184c1c	e92d4080	push	{r7, lr}<br>   00184c20	e28d7000	add	r7, sp, #0	; 0x0<br>   00184c24	e24dd008	sub	sp, sp, #8	; 0x8<br>   .<br>   00184c70	e247d000	sub	sp, r7, #0	; 0x0<br>   00184c74	e8bd8080	pop	{r7, pc}<br>
+
+iPhone opt
+No stack frame created. Corresponds to this code. 
+Our stack unwinds won't show it.
+   void GlyphMeshGLES::Build(float fYScale)<br>     { mImplGlyphMesh-&gt;Build(fYScale); } mImplGlyphMesh is a C++ interace class.
+__ZN2EA4Text13GlyphMeshGLES5BuildEf:        r0 holds the 'this' pointer.<br>0008c68c	e5900008	ldr	r0, [r0, #8]      Load address of mImplGlyphMesh<br>0008c690	e5903000	ldr	r3, [r0]          Read value of mImplGlyphMesh vtable.<br>0008c694	e5933030	ldr	r3, [r3, #48]     Load address of Build function from the vtable.<br>0008c698	e12fff13	bx	r3                Call Build function.
+
+iPhone opt
+Similar to above but with a stack frame:
+__ZNK2EA4Text13GlyphMeshGLES17IsClippingEnabledEv:<br>0008c660	e92d4080	push	{r7, lr}<br>0008c664	e28d7000	add	r7, sp, #0	; 0x0<br>0008c668	e5900008	ldr	r0, [r0, #8]<br>0008c66c	e5903000	ldr	r3, [r0]<br>0008c670	e5933028	ldr	r3, [r3, #40]<br>0008c674	e12fff33	blx	r3<br>0008c678	e8bd8080	pop	{r7, pc}<br>
+
+
+
+
+</pre>
+<hr>
+<pre>&nbsp;
+</pre>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+</body>
+</html>

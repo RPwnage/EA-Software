@@ -1,0 +1,235 @@
+package com.ea.originx.automation.lib.macroaction;
+
+import com.ea.originx.automation.lib.pageobjects.common.GlobalSearch;
+import com.ea.originx.automation.lib.pageobjects.common.GlobalSearchResults;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.vx.originclient.utils.SystemUtilities;
+import com.ea.vx.originclient.utils.Waits;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openqa.selenium.WebDriver;
+import java.lang.invoke.MethodHandles;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Macro class containing static methods for multi-step actions related to the
+ * PDP.
+ *
+ * @author rchoi
+ * @author micwang
+ */
+public final class MacroPDP {
+
+    private static final Logger _log = LogManager.getLogger(MethodHandles.lookup().lookupClass());
+
+    /**
+     * Constructor
+     */
+    private MacroPDP() {
+    }
+
+    /**
+     * Navigates to the PDP of a game by searching for the title in the 'Browse
+     * Games' page.
+     *
+     * @param driver Selenium WebDriver
+     * @param entitlementInfo Entitlement to navigate to
+     * @return true if successfully navigated to the entitlement's PDP page from
+     * the 'Browse Games' page, false otherwise
+     */
+    public static boolean loadPdpPageBySearch(WebDriver driver, EntitlementInfo entitlementInfo) {
+        return loadPdpPageBySearch(driver, entitlementInfo.getName());
+    }
+
+    /**
+     * Navigates to the PDP of a game by searching for the title in the 'Browse
+     * Games' page.
+     *
+     * @param driver Selenium WebDriver
+     * @param entitlementName Name of the game to navigate to
+     * @return true if successfully navigated to the entitlement's PDP page from
+     * the 'Browse Games' page, false otherwise
+     */
+    public static boolean loadPdpPageBySearch(WebDriver driver, String entitlementName) {
+        //Sometimes long strings will only be entered partially, so a retry will need to be done
+        int retry = 2;
+        GlobalSearch globalSearch = new GlobalSearch(driver);
+        boolean verifiedSearchBoxValue = false;
+        do {
+            globalSearch.enterSearchText(entitlementName.replaceAll("™", "").replaceAll("®", ""));
+        } while (!(verifiedSearchBoxValue = globalSearch.verifySearchBoxValue(entitlementName.replaceAll("™", "").replaceAll("®", ""))) && --retry > 0);
+
+        if (!verifiedSearchBoxValue) {
+            _log.error("Unable to enter search term: " + entitlementName);
+            return false;
+        }
+
+        //If game shows up within initial store search, go to PDP.
+        //Else click view all store search results.
+        GlobalSearchResults globalSearchResults = new GlobalSearchResults(driver);
+        globalSearchResults.waitForResults();
+        globalSearchResults.waitForGamesToLoad(); //Waits for the game titles to load before checking for their visibility
+        if (globalSearchResults.verifyStoreResultContainsOffer(entitlementName)) {
+            globalSearchResults.viewGDPOfGame(entitlementName);
+            return verifyPdpHeroLoad(driver, entitlementName);
+        }
+
+        //If there is no view all, return false
+        if (!globalSearchResults.verifyViewAllStoreResults()) {
+            _log.error("Cannot find 'View All' link on store search results");
+            return false;
+        }
+
+        //Check if game tile is visible in view all search
+        globalSearchResults.clickViewAllStoreResults();
+        globalSearchResults.waitForResults();
+        globalSearchResults.waitForGamesToLoad(); // wait for games to load before checking visibility
+        if (!globalSearchResults.verifyStoreResultContainsOffer(entitlementName)) {
+            _log.error("Cannot find " + entitlementName + " in view all of store results");
+            return false;
+        }
+
+        globalSearchResults.viewGDPOfGame(entitlementName);
+        return verifyPdpHeroLoad(driver, entitlementName);
+    }
+
+    /**
+     * Verify the correct PDP hero is loaded.
+     *
+     * @param driver Selenium WebDriver
+     * @param entitlementName Name of the game to navigate to
+     * @return true if the correct PDP hero is loaded, false otherwise
+     */
+    private static boolean verifyPdpHeroLoad(WebDriver driver, String entitlementName) {
+        PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+        if (!pdpHeroDescription.verifyPDPHeroReached()) {
+            return false;
+        }
+        pdpHeroDescription.waitForPdpHeroToLoad();
+        return pdpHeroDescription.verifyGameTitle(entitlementName);
+    }
+
+    /**
+     * Loads the PDP page directly either using Origin2 parameter if Client or
+     * going directly to the PDP URL if web or mobile.
+     * <p>
+     * This method is the quickest and the safest way to navigate to the PDP of
+     * a game if you do not need to satisfy other flow requirements.
+     *
+     * @param driver Selenium WebDriver
+     * @param entName The name of the entitlement
+     * @param entOfferID The name of the Offer ID
+     * @param partialPdpUrl The Partial PDP URL of the entitlement, used for
+     * opening a PDP page on the browser
+     * @return true if the PDP page loaded up successfully, false otherwise
+     */
+    public static boolean loadPdpPage(WebDriver driver, String entName, String entOfferID, String partialPdpUrl) {
+        final OriginClient client = OriginClient.getInstance(driver);
+        boolean resultOK = true;
+        if (client.isQtClient(driver)) {
+            Waits.sleep(2000);
+            //if client launch origin.exe with the Origin2 parameter with the offer id
+            resultOK = ProcessUtil.launchProcessWithArguments(client, "\"" + SystemUtilities.getOriginPath(client)
+                    + "\"", "origin2://store/open?contextType=OFFER&id=" + entOfferID);
+            PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+            resultOK = resultOK && pdpHeroDescription.verifyPDPHeroReached() && Waits.pollingWait(() -> pdpHeroDescription.verifyGameTitle(entName));
+            if (!resultOK) {
+                _log.error("Failed to load PDP page using Origin2://store/open protocol for offer id: " + entOfferID
+                        + ". Searching PDP page by name: " + entName + "...");
+            }
+        } else { // Browser and mobile
+            PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+            resultOK = loadPartialPDPURL(driver, partialPdpUrl) && pdpHeroDescription.verifyPDPHeroReached() && Waits.pollingWait(() -> pdpHeroDescription.verifyGameTitle(entName));
+        }
+
+        //This is a fallback using Global Search in case previous methods do not work.
+        if (!resultOK) {
+            resultOK = loadPdpPageBySearch(driver, entName);
+            if (!resultOK) {
+                _log.error("Failed to search PDP page by name: " + entName);
+            }
+        }
+
+        return resultOK;
+    }
+
+    /**
+     * Loads the PDP page directly by using the given partial PDP URL.
+     *
+     * @param driver Selenium WebDriver
+     * @param partialPdpUrl The Partial PDP URL of the entitlement, used for
+     * opening a PDP page on the browser
+     * @return true if the PDP page loaded up successfully, false otherwise
+     */
+    public static boolean loadPartialPDPURL(WebDriver driver, String partialPdpUrl) {
+        final OriginClient client = OriginClient.getInstance(driver);
+        boolean resultOK = true;
+        if (partialPdpUrl.isEmpty()) {
+            String errorMessage = String.format("Given partial PDP URL is undefined.");
+            _log.error(errorMessage);
+            throw new RuntimeException(errorMessage);
+        }
+
+        //eg. split https://qa.www.origin.com/myhome?automation=true&& using ? as delimiter
+        String url[] = driver.getCurrentUrl().split("\\?");
+        // split the first part of url https//... using '/' as delimiter
+        String partialURL[] = url[0].split("\\/");
+        // Copy elements https,'',qa.www.origin.com(,'can','en-us') and join them intro a string using '/'
+        String partialURLAfterReplace = String.join("/", Arrays.copyOfRange(partialURL, 0, 5));
+        // final url is concatenated to this url https//qa.www.origin.com/store/battlefield4/....?automation=true&..&
+        // partial PDP url's contain a ?, so we should not add another if there is already one there.
+        String pdpPageUrl = partialURLAfterReplace + partialPdpUrl.replace("?", "") + '?' + url[1];
+
+        driver.get(pdpPageUrl);
+        PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+        pdpHeroDescription.waitForPdpHeroToLoad();
+        resultOK = pdpHeroDescription.verifyPDPHeroReached();
+        if (!resultOK) {
+            _log.error("Failed to load PDP page using given partial PDP URL.");
+        }
+
+        return resultOK;
+    }
+
+    /**
+     * Loads the PDP Page of a given entitlement directly.
+     *
+     * @param driver Selenium WebDriver
+     * @param entitlementInfo The entitlementInfo object to extract the
+     * information from
+     * @return true if the PDP page loaded up successfully, false otherwise
+     */
+    public static boolean loadPdpPage(WebDriver driver, EntitlementInfo entitlementInfo) {
+        return loadPdpPage(driver, entitlementInfo.getName(), entitlementInfo.getOfferId(), entitlementInfo.getPartialPdpUrl());
+    }
+
+    /**
+     * Verify the 'On the House' tile is Free(in 'On the House') in its PDP Page
+     * for different locale
+     *
+     * @param driver Selenium WebDriver
+     * @param entitlementName the 'OTH' tile to be verified
+     * @return true if the tile is 'On the House' in its PDP page
+     */
+    public static boolean verifyOTHTileFreeOnPDP(WebDriver driver, String entitlementName) {
+        MacroPDP.loadPdpPageBySearch(driver, entitlementName);
+        return new PDPHeroActionDescriptors(driver).verifyEntitlementIsOTH();
+    }
+
+    /**
+     * Verify the 'On the House' tiles are Free(in 'On the House') in their
+     * corresponding PDP Pages for different locale
+     *
+     * @param driver Selenium WebDriver
+     * @param oTHEntitlementNames the tiles to be verified
+     * @return true if the tile is 'On the House' in its PDP page
+     */
+    public static boolean verifyOTHTilesFreeOnPDP(WebDriver driver, List<String> oTHEntitlementNames) {
+        return oTHEntitlementNames.stream().allMatch(onTheHouseTile -> (verifyOTHTileFreeOnPDP(driver, onTheHouseTile)));
+    }
+}

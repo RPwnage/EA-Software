@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build">
+
+  <optionset name="config.targetoverrides">
+    <option name="build" value="exclude"/>
+    <option name="clean" value="exclude"/>
+  </optionset>
+
+	<property name="package.uitoolkit.dir"  value="@{PathGetFullPath('.')}"/>
+	<property name="package.uitoolkit.version"  value="@{PathGetFileName('${package.uitoolkit.dir}')}"/>
+	<package name="uitoolkit" targetversion="${package.uitoolkit.version}"/>
+
+  <property name="package.build.dir" value="${package.uitoolkit.dir}/build"/>
+
+  <mkdir dir="${package.build.dir}" unless="@{DirectoryExists(${package.build.dir})}"/>
+  
+  <!-- You need Cygwin in the path -->
+  <target name="clean">
+    <trycatch>
+      <try>
+        <exec program="rm">
+          <args>
+            <arg value="-rf"/>
+            <arg value="${package.build.dir}"/>
+          </args>
+        </exec>
+      </try>
+      <catch>
+         <echo message="Make sure Cygwin is installed and in the path."/>
+      </catch>
+     </trycatch>
+  </target>
+  
+  <target name="build">
+    <echo message="BUILD TARGET"/>
+  </target>
+  <!--  publish - Builds the uitoolkit and copies the results to ${otk.output.dir}. You can override the target location by specifying 
+        -D:otk.output.dir=<path> in the command line. -->
+  <target name="publish">
+    <dependent name="npm"/>
+    <property name="otk.output.dir" value="\\origin-web\htdocs\OriginToolkit" unless="@{PropertyExists('otk.output.dir')}"/>
+    <exec program="${npm.root}/bower.cmd" workingdir="${package.uitoolkit.dir}">
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <exec program="${npm.root}/grunt.cmd" workingdir="${package.uitoolkit.dir}">
+      <args>
+        <arg value="dist"/>
+        <arg value="--force"/>        <!-- This forces overwriting of RO files -->
+      </args>
+    </exec>
+    <delete failonerror="false">
+      <fileset basedir="${otk.output.dir}">
+        <includes name="*"/>
+        <includes name="**/*"/>
+        <includes name="**"/>
+        <excludes name=".htaccess"/>
+      </fileset>
+    </delete>
+    <copy todir="${otk.output.dir}/dist">
+      <fileset basedir="${package.uitoolkit.dir}/dist">
+        <includes name="**"/>
+      </fileset>
+    </copy>
+    <copy todir="${otk.output.dir}">
+      <fileset basedir="${package.uitoolkit.dir}/docs">
+        <includes name="**"/>
+      </fileset>
+    </copy>
+    <copy todir="${otk.output.dir}">
+      <fileset basedir="${package.uitoolkit.dir}">
+        <includes name="otk.zip"/>
+      </fileset>
+    </copy>
+    <!-- copy ui to test page -->
+    <delete dir="c:/QATools/ak47/magazine/static/magazine/dist" failonerror="false"/>
+    <copy todir="c:/QATools/ak47/magazine/static/magazine/dist">
+      <fileset basedir="${package.uitoolkit.dir}/dist">
+        <includes name="**"/>
+      </fileset>
+    </copy>
+  </target>
+  
+  <target name="publish-proto">
+    <property name="proto.build.dir" value="${package.uitoolkit.dir}/build/proto"/>
+    <property name="proto.working.dir" value="${proto.build.dir}"/>
+    <property name="proto.output.dir" value="c:\xampp\htdocs\origin-x-design-prototype" unless="@{PropertyExists('proto.output.dir')}"/>
+    <property name="git.command" value="clone"/>
+    <mkdir dir="${proto.build.dir}" unless="@{DirectoryExists(${proto.build.dir})}"/>
+    <do if="@{DirectoryExists('${proto.working.dir}/origin-x-design-prototype')}">
+        <property name="proto.working.dir" value="${proto.build.dir}/origin-x-design-prototype" />
+        <property name="git.command" value="pull"/>
+    </do>
+    <exec program="C:\Program Files (x86)\Git\bin\git.exe" workingdir="${proto.working.dir}">
+        <args>
+            <arg value="${git.command}"/>
+            <arg value="https://stash.ea.com/scm/or/origin-x-design-prototype.git"/>
+        </args>
+    </exec>
+    <dependent name="npm"/>
+    <exec program="${npm.exe}" workingdir="${proto.build.dir}/origin-x-design-prototype">
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <exec program="${npm.root}/bower.cmd" workingdir="${proto.build.dir}/origin-x-design-prototype">
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <echo message="Deleting ${proto.output.dir}"/>
+    <delete dir="${proto.output.dir}" failonerror="false"/>
+    <mkdir dir="${proto.output.dir}" unless="@{DirectoryExists(${proto.output.dir})}"/>
+    <!-- Copy to the web server -->
+    <echo message="Copying origin-x-design-prototype docs to ${proto.output.dir}"/>
+    <copy todir="${proto.output.dir}">
+      <fileset basedir="${proto.build.dir}/origin-x-design-prototype">
+        <includes name="**"/>
+        <excludes name="**/node_modules/**"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="publish-otk">
+    <property name="otk.docs.build.dir" value="${package.uitoolkit.dir}/build/otk"/>
+    <property name="otk.docs.zip.file" value="${otk.docs.build.dir}/target/otk.zip"/>
+    <property name="otk.docs.working.dir" value="${otk.docs.build.dir}"/>
+    <property name="otk.output.dir" value="c:\xampp\htdocs\OriginToolkit" unless="@{PropertyExists('otk.output.dir')}"/>
+    <property name="git.command" value="clone"/>
+    <mkdir dir="${otk.docs.build.dir}" unless="@{DirectoryExists(${otk.docs.build.dir})}"/>
+    <do if="@{DirectoryExists('${otk.docs.working.dir}/otk')}">
+        <property name="otk.docs.working.dir" value="${otk.docs.build.dir}/otk" />
+        <property name="git.command" value="pull"/>
+    </do>
+    <exec program="C:\Program Files (x86)\Git\bin\git.exe" workingdir="${otk.docs.working.dir}">
+        <args>
+            <arg value="${git.command}"/>
+            <arg value="https://stash.ea.com/scm/or/otk.git"/>
+        </args>
+    </exec>
+    <dependent name="npm"/>
+    <exec program="${npm.exe}" workingdir="${otk.docs.build.dir}/otk">
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <exec program="${npm.root}/bower.cmd" workingdir="${otk.docs.build.dir}/otk">
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <zip zipfile="${otk.docs.zip.file}/">
+      <fileset basedir="${otk.docs.build.dir}/otk/dist">
+        <includes name="**"/>
+      </fileset>
+    </zip>
+    <echo message="Deleting ${otk.output.dir}"/>
+    <delete dir="${otk.output.dir}" failonerror="false"/>
+    <mkdir dir="${otk.output.dir}" unless="@{DirectoryExists(${otk.output.dir})}"/>
+    <!-- Copy to the web server -->
+    <echo message="Copying OTK docs to ${otk.output.dir}"/>
+    <copy todir="${otk.output.dir}">
+      <fileset basedir="${otk.docs.build.dir}/otk">
+        <includes name="bower_components/**"/>
+        <includes name="dist/**"/>
+      </fileset>
+    </copy>
+    <copy todir="${otk.output.dir}">
+      <fileset basedir="${otk.docs.build.dir}/otk/docs">
+        <includes name="**"/>
+      </fileset>
+    </copy>
+    <copy file="${otk.docs.zip.file}" todir="${otk.output.dir}"/>
+    <echo message="DirectoryIndex index.html" file="${otk.output.dir}/.htaccess"/>
+  </target>
+
+</project>

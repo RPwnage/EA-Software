@@ -1,0 +1,127 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroAccount;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.account.AccountSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.account.OriginAccessSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.CancelMembership;
+import com.ea.originx.automation.lib.pageobjects.dialog.CancellationConfirmed;
+import com.ea.originx.automation.lib.pageobjects.dialog.CancellationSurveyDialog;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessPage;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.utils.OriginAccessService;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.webdrivers.BrowserType;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test Canceling a Free Trial from the Account Page
+ *
+ * @author glivingstone
+ */
+public class OAAccessFreeTrialCancel extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 39644)
+    @Test(groups = {"originaccess", "full_regression", "int_only"})
+    public void testAccessFreeTrialCancel(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        logFlowPoint("Login as a user who currently has an Origin Access Free Trial"); //1
+        logFlowPoint("Navigate to the MyAccount page, then the Origin Access section"); //2
+        logFlowPoint("Verify clicking the cancel button surfaces a confirmation dialog"); //3
+        logFlowPoint("Verify the expiration date on the dialog is correct"); //4
+        logFlowPoint("Click the 'Continue Membership' button and verify the user's subscription is 'Active'"); //5
+        logFlowPoint("Cancel the subscription, and verify the user's subscription is 'cancelled'"); //6
+        logFlowPoint("Verify the banner at the top of the page has the correct cancellation date and has a 'Renew Membership' link"); //7
+        logFlowPoint("Click 'Renew Membership', Verify the subscription is 'Active' and the billing date is correct"); //8
+        logFlowPoint("Cancel the subscription, let it expire, and verify the user no longer has an active subscription");//9
+        logFlowPoint("Navigate to the Origin Access page and verify the user cannot get another Free Trial");//10
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        boolean loggedIn = MacroLogin.startLogin(driver, userAccount);
+        boolean purchasedAccess = MacroOriginAccess.purchaseOriginAccess(driver);
+        logPassFail(loggedIn && purchasedAccess, true);
+
+        //2
+        final WebDriver browserDriver;
+        if (isClient) {
+            browserDriver = client.getAnotherBrowserWebDriver(BrowserType.CHROME);
+            MacroAccount.loginToAccountPage(browserDriver, userAccount);
+        } else {
+            browserDriver = driver;
+            new AccountSettingsPage(browserDriver).navigateToIndexPage();
+        }
+        AccountSettingsPage accountPage = new AccountSettingsPage(browserDriver);
+        accountPage.gotoOriginAccessSection();
+        OriginAccessSettingsPage originAccessPage = new OriginAccessSettingsPage(browserDriver);
+        logPassFail(originAccessPage.verifyOriginAccessSectionReached(), true);
+
+        //3
+        originAccessPage.clickCancelMembership();
+        CancelMembership cancelMembership = new CancelMembership(browserDriver);
+        logPassFail(cancelMembership.isDialogVisible(), true);
+
+        //4
+        boolean correctExpiration = originAccessPage.verifyCancelDialogDate(OriginAccessSettingsPage.ORIGIN_ACCESS_PLAN.TRIAL);
+        logPassFail(correctExpiration, true);
+
+        //5
+        cancelMembership.clickCloseCTA();
+        boolean membershipActive = originAccessPage.isMembershipActive();
+        logPassFail(membershipActive, false);
+
+        //6
+        originAccessPage.cancelMembership();
+        cancelMembership.clickContinueCTA();
+        new CancellationSurveyDialog(browserDriver).clickCompleteCancellationCTA();
+        logPassFail(new CancellationConfirmed(browserDriver).isDialogVisible(), true);
+
+        //7
+        boolean correctDate = originAccessPage.verifyCancelBannerMessageDate(OriginAccessSettingsPage.ORIGIN_ACCESS_PLAN.TRIAL);
+        boolean renewMembershipLink = originAccessPage.isRenewMemebershipVisible();
+        logPassFail(correctDate && renewMembershipLink, false);
+
+        //8
+        originAccessPage.clickRenewMembership();
+        membershipActive = originAccessPage.isMembershipActive();
+        logPassFail(membershipActive, true);
+
+        //9
+        sleep(60000); // Make the expiration time different from start
+        OriginAccessService.immediateCancelSubscription(userAccount);
+        sleep(60000); // Allow the expiration to propogate to the client
+        browserDriver.navigate().refresh();
+        logPassFail(!originAccessPage.isMembershipActive(), true);
+
+        //10
+        if (isClient) {
+            new MiniProfile(driver).selectSignOut();
+        } else {
+            driver.quit();
+            driver = startClientObject(context, client);
+        }
+        MacroLogin.startLogin(driver, userAccount);
+        OriginAccessPage oaPage = new NavigationSidebar(driver).gotoOriginAccessPage();
+        oaPage.refreshPageForJoinButton();
+        logPassFail(oaPage.verifyJoinAccessHeroButtonExists(), false);
+
+        browserDriver.quit();
+        driver.quit();
+        softAssertAll();
+    }
+}

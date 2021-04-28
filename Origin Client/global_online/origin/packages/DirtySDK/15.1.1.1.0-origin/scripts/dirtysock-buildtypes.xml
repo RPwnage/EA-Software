@@ -1,0 +1,199 @@
+<project>
+    <!-- Define the dirtysock platform names used for source locations -->
+    <!-- remove when EATech Gen4 packages are released -->
+    <property name="dirtyplat" value="${config-system}"/>
+    <property name="dirtyplat" value="xboxone" if="${config-system} == 'capilano'"/>
+    <property name="dirtyplat" value="pc" if="${config-system} == 'pc64'"/>
+    <property name="dirtyplat" value="winrt" if="${config-system} == 'winprt'"/>
+    <property name="dirtyplat" value="unix" if="${config-system} == 'unix' or ${config-system} == 'unix64'"/>
+    <property name="dirtyplat" value="ps4" if="${config-system} == 'kettle'"/>
+
+    <!-- Defines custom build types for DirtySDK modules. 
+    This is the correct way to set custom compiler, linker, and librarian flags in Framework3.
+    -->
+    <PartialModule name="DSLibrary">
+        <!-- Select the correct buildtype
+             WinRTCppLibrary/WinRTRuntimeComponent adds a bunch of options for capilano/winrt like exceptions/windowsruntime
+             We are setting that specific buildtype as an optionset to improve the sizes of the projects generated 
+             EA_DLL comes with all the DLL buildtypes -->
+        <buildtype name="CLibrary"/>
+        <buildtype name="CDynamicLibrary" if="${Dll??false}"/>
+
+        <config>
+            <defines if="${Dll??false}">
+                DIRTYCODE_API=__declspec(dllexport)
+            </defines>
+
+            <warningsuppression>
+                <do if="${config-compiler} == 'vc'">
+                    -wd4242 <!-- 'identifier' : conversion from 'type1' to 'type2', possible loss of data -->
+                    -wd4244 <!-- 'conversion' conversion from 'type1' to 'type2', possible loss of data -->
+                </do>
+
+                <!-- These warnings are already suppressed on most of the capilano configurations, they are just missing for WinRTRuntimeComponent -->
+                <do if="${config-system} == 'capilano'">
+                    -wd4365 <!-- conversion from 'long' to 'unsigned long', signed/unsigned mismatch -->
+                    -wd4946 <!-- reinterpret_cast used between related classes: 'class 1' and 'class 2' -->
+                </do>
+
+                <do if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    -Wno-multichar
+                </do>
+
+                <do if="${config-compiler} == 'sn'">
+                    --diag_suppress=1437 <!-- multi-character literal -->
+                </do>
+            </warningsuppression>
+
+            <buildoptions>
+                <option name="buildset.cc.options" if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    ${option.value}
+                    -Wextra
+                    -Wformat=2
+                    -Winit-self
+                    -Wmissing-declarations
+                    -Wmissing-field-initializers
+                    -Wold-style-definition
+                    -Wpointer-arith
+                    -Wsign-compare
+                    -Wstrict-aliasing
+                    -Wstrict-prototypes
+                    -Wuninitialized
+                    -Wwrite-strings
+                    -fno-omit-frame-pointer
+                </option>
+
+                <!-- Only fails on android-arm-clang builds -->
+                <option name="buildset.cc.options" if="(${config-compiler} == 'gcc' or ${config-compiler} == 'clang') and ${config-platform} != 'android-arm-clang'">
+                    ${option.value}
+                    -Wunreachable-code
+                </option>
+
+                <option name="buildset.link.options" if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    ${option.value}
+                    -rdynamic
+                </option>
+
+                <!-- Setting the option here, since we are using optionsets to trigger the C++ options this flag doesn't come in with the WinRTCppLibrary -->
+                <option name="buildset.lib.options" if="${config-system} == 'capilano' or ${config-system} == 'winrt' or ${config-system} == 'winprt'">
+                    ${option.value}
+                    -IGNORE:4264
+                </option>
+            </buildoptions>
+        </config>
+    </PartialModule>
+
+    <PartialModule name="DSProgram" buildtype="CProgram">
+        <config>
+            <warningsuppression>
+                <do if="${config-compiler} == 'vc'">
+                    -wd4242 <!-- 'identifier' : conversion from 'type1' to 'type2', possible loss of data -->
+                    -wd4244 <!-- 'conversion' conversion from 'type1' to 'type2', possible loss of data -->
+                </do>
+
+                <do if="${config-system} == 'xenon'">
+                    -wd4214 <!-- nonstandard extension used : bit field types other than int (caused by xbdm.h) -->
+                    -wd4255 <!-- no function prototype given: converting '()' to '(void)' (caused by several xenonsdk includes) -->
+                </do>
+
+                <do if="${config-system} == 'winrt' or ${config-system} == 'winprt'">
+                    -wd4255 <!-- no function prototype given: converting '()' to '(void)' (caused by minwindef.h) -->
+                </do>
+
+                <do if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    -Wno-multichar
+                </do>
+
+                <do if="${config-compiler} == 'sn'">
+                    --diag_suppress=1437 <!-- multi-character literal -->
+                </do>
+            </warningsuppression>
+
+            <buildoptions>
+                <option name="buildset.cc.options" if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    ${option.value}
+                    -Wsign-compare
+                    -Wstrict-prototypes
+                    -Wmissing-prototypes
+                </option>
+
+                <option name="buildset.cc.options" if="${config-system} == 'kettle'">
+                    ${option.value}
+                    -Wmissing-field-initializers
+                </option>
+
+                <option name="buildset.cc.options" if="${config-system} == 'iphone' or ${config-system} == 'iphonesim' or ${config-system} == 'osx'">
+                    ${option.value}
+                    -Wformat
+                    -Wimplicit-int
+                    -Wshadow
+                </option>
+            </buildoptions>
+        </config>
+
+        <libraries>
+            <includes name="iphlpapi.lib" asis="true" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+            <includes name="ws2_32.lib" asis="true" if="${config-system} == 'pc' or ${config-system} == 'pc64'" />
+
+            <includes name="xbdm.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} == 'dev-opt'" />
+            <includes name="xhv2.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} == 'dev-opt'" />
+            <includes name="xonline.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} == 'dev-opt'" />
+            <includes name="xnet.lib" asis="true"  if="${config-system} == 'xenon' and ${config-name} == 'dev-opt'"/>
+            <includes name="xauth.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} == 'dev-opt'" />
+            <includes name="xhttp.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} == 'dev-opt'" />
+            <includes name="xhvd2.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} != 'dev-opt'" />
+            <includes name="xonlined.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} != 'dev-opt'" />
+            <includes name="xnetd.lib" asis="true"  if="${config-system} == 'xenon' and ${config-name} != 'dev-opt'"/>
+            <includes name="xauthd.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} != 'dev-opt'" />
+            <includes name="xhttpd.lib" asis="true" if="${config-system} == 'xenon' and ${config-name} != 'dev-opt'" />
+
+            <includes name="bcrypt.lib" asis="true" if="${config-system} == 'capilano'"/>
+
+            <!-- build needs this to avoid this link error: "LNK2038: mismatch detected for 'vccorlib_lib_should_be_specified_before_msvcrt_lib_to_linker': value '1' doesn't match value '0' in MSVCRTD.lib(appinit.obj)" -->
+            <includes name="vccorlib.lib" asis="true" if="${config-system} == 'capilano' and ${config-platform} != 'capilano-vc-adk' and ${config-name} == 'dev-opt'"/>
+            <includes name="vccorlibd.lib" asis="true" if="${config-system} == 'capilano' and ${config-platform} != 'capilano-vc-adk' and ${config-name} != 'dev-opt'"/>
+
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAjm_stub_weak.a"       asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAudioIn_stub_weak.a"   asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAudioOut_stub_weak.a" asis="true" if="${config-system} == 'kettle'"/>
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceCommonDialog_stub_weak.a" asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceErrorDialog_stub_weak.a" asis="true" if="${config-system} == 'kettle'"/>
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceHttp_stub_weak.a"      asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceInvitationDialog_stub_weak.a" asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceMsgDialog_stub_weak.a" asis="true" if="${config-system} == 'kettle'"/>
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNetCtl_stub_weak.a"    asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNet_stub_weak.a"       asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpAuth_stub_weak.a"       asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpCommerce_stub_weak.a"   asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpCommon_stub_weak.a"  asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpManager_stub_weak.a" asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceNpWebApi_stub_weak.a"     asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceSsl_stub_weak.a"       asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceSysmodule_stub_weak.a"    asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceUserService_stub_weak.a"  asis="true" if="${config-system} == 'kettle'" />
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceVoice_stub_weak.a"     asis="true" if="${config-system} == 'kettle'" />
+
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/${lib-prefix}rtc_stub${lib-suffix}" asis="true" if="${config-system} == 'ps3'" />
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/${lib-prefix}mic_stub${lib-suffix}" asis="true" if="${config-system} == 'ps3'"  />
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/${lib-prefix}adec_stub${lib-suffix}" asis="true" if="${config-system} == 'ps3'" />
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/${lib-prefix}celpenc_stub${lib-suffix}" asis="true" if="${config-system} == 'ps3'" />
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/${lib-prefix}celp8enc_stub${lib-suffix}" asis="true" if="${config-system} == 'ps3'" />
+        </libraries>
+    </PartialModule> 
+
+    <PartialModule name="WinDSProgram" buildtype="WindowsProgram">
+        <config>
+            <warningsuppression>
+                -wd4242 <!-- 'identifier' : conversion from 'type1' to 'type2', possible loss of data -->
+                -wd4244 <!-- 'conversion' conversion from 'type1' to 'type2', possible loss of data -->
+                -wd4201 <!-- nonstandard extension used : nameless struct/union (caused by richedit.h) -->
+            </warningsuppression>
+        </config>
+
+        <libraries>
+            <includes name="iphlpapi.lib" asis="true"/>
+            <includes name="ws2_32.lib" asis="true"/>
+            <includes name="tapi32.lib" asis="true"/>
+        </libraries>
+    </PartialModule>
+</project>

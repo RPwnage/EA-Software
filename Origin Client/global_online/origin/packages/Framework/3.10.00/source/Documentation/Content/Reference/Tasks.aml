@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="44df9582-e180-4d2f-bdaa-636ef7322d7b" revisionNumber="1">
+  <developerConceptualDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>This section contains auto-generated documentation describing each task. Each 
+      task is an xml element that may be used in *.build files or other related xml files.</para>
+    </introduction>
+
+	<section>
+		<title>What are Tasks?</title>
+		<content>
+			<para>
+			A task is a code module which can be executed by NAnt. 
+			Common tasks are defined in the framework package but other packages can define there own.
+			</para>
+			<para>
+			Tasks appear in the build scripts as xml elements, however not all xml elements in build scripts are tasks, some are simpler elements, for example an option in an optionset.
+			</para>
+		</content>
+	</section>
+	
+	<section>
+		<title>Defining a Task</title>
+		<content>
+			<para>
+			Tasks can be defined in two main ways, firstly they can be defined through C# by creating a class that extends <codeInline>NAnt.Core.Task</codeInline> and has a Task metadata Attribute. 
+			</para>
+			<code language="C#" title="An example of a Task defined in C#">
+/// &lt;summary&gt;An empty task.&lt;/summary&gt;
+[TaskName("sample")]
+public class SampleTask : Task {
+
+    string _message  = null;
+
+    /// &lt;summary&gt;An example attribute.&lt;/summary&gt;
+    [TaskAttribute("message", Required=false)]
+    public string Message {
+        get { return _message; }
+        set { _message = value; }
+    }
+    
+    /// &lt;summary&gt;Initializes the task where the message can be either an attribute of the task or within the body.&lt;/summary&gt;
+    protected override void InitializeTask(XmlNode taskNode) {
+        if (Message != null &amp;&amp; taskNode.InnerText.Length &gt; 0) {
+            throw new BuildException("Cannot specify a message attribute and element value, use one or the other.", Location);
+        }
+
+        // use the element body if the message attribute was not used.
+        if (Message == null) {
+            if (taskNode.InnerText.Length == 0) {
+                throw new BuildException("Need to specify a message attribute or have an element body.", Location);
+            }
+            Message = Project.ExpandProperties(taskNode.InnerText);
+        }
+    }
+    
+    /// &lt;summary&gt;Writes the message to the console.&lt;/summary&gt;
+    protected override void ExecuteTask() {
+    	Console.WriteLine(Message);
+    }
+}
+			</code>
+			<para>
+			Secondly, tasks can be defined as a fragment of build script using the <link xlink:href="4f9d0113-6371-9a3b-3f66-5fc16a8eacad">&lt;createtask&gt; Task</link>.
+			However, this is a framework 2 feature and may not be supported in the future.
+			</para>
+		</content>
+	</section>
+	
+	<section>
+		<title>How Tasks Work</title>
+		<content>
+			<para>
+			The important methods to look for in a class are <codeInline>InitializeTask</codeInline> and <codeInline>ExecuteTask</codeInline>.
+      		InitializeTask gets called during loading the of build script when the task's attributes are being initialized.
+      		ExecuteTask gets called when the script is running and the task gets executed.
+			</para>
+		</content>
+	</section>
+	
+    <relatedTopics>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

@@ -1,0 +1,5302 @@
+Aries protocol (client <-> slave server)
+----------------------------------------
+
+1 Operations
+=============
+
+acct - Create a new master account.
+
+    Request:
+        Kind: 'acct'
+        Code: 0
+        Args:
+             NAME=<master account name>
+             PASS=<encrypted password>
+             MAIL=<email address>
+             PMAIL=<email address>          - Optional: Parental/guardian email
+                                              address.
+             BORN=<yyyymmdd>                - User's birth date
+             GEND=<M|F>                     - User's gender
+             SPAM=<Y/N><Y/N>                - EA can spam user (yes/no)
+                                            - Anyone can spam user (yes/no)
+             TOS=<0|1>                      - Optional: user has agreed to
+                                              Terms of Service?
+             ALTS=<count>                   - Optional: Number of alternate
+                                              names to provide if account name
+                                              duplicate is found.
+                                              Max = MAX_ALTERNATE_NAMES.
+             LOC=<locality>                 - Locality (see lobbylang.h)
+             STREET1=<string>               - Optional: 1st line of street address.
+             STREET2=<string>               - Optional: 2nd line of street address.
+             CITY=<string>                  - Optional: user's city
+             STATE=<string>                 - Optional: user's state
+             ZIP=<zip/postal code>
+             DISCLAIMER=1                   - Optional: Return an error if the
+                                              user's age and country requires that
+                                              a parental consent warning must be
+                                              shown.
+                                            
+    Response:
+        Code: EC_OKAY
+        Results:
+            NAME=<master account name>
+            PERSONAS=<list of personas>     - Comma(,) separated list of
+                                              persona names.  Initially this
+                                              will only contain the default
+                                              persona which has the same name
+                                              as the master account.
+            AGE=<age of user>               - Age (in years) of user calculated
+                                              from date of birth passed in BORN
+                                              param.  Negative if birth date
+                                              given in the future.
+
+        Code: EC_DUPLICATE - Failure: account name already in use
+        Results:
+            OPTS=<list of options>          - Comma(,) separated list of
+                                              alternate account names (if
+                                              param ALTS > 0).
+
+        Code: EC_MISSING_PARAM - Failure: missing parameter(s)
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_INV_MAIL - Failure: Invalid email address
+        Results:
+            None.
+
+        Code: EC_INV_PMAIL - Failure: Invalid parental email address
+        Results:
+            None.
+
+        Code: EC_INV_BIRTH - Failure: Invalid birth date
+        Results:
+            None.
+
+        Code: EC_INV_GENDER - Failure: Invalid gender
+        Results:
+            None.
+
+        Code: EC_INV_SPAM - Failure: Invalid SPAM settings
+        Results:
+            None.
+
+        Code: EC_PASS_LENGTH - Failure: Invalid password length;
+                            MIN_PASSWORD_LENGTH <= pass <= MAX_PASSWORD_LENGTH
+        Results:
+            None.
+
+        Code: EC_NAME_LENGTH - Failure: Invalid account name length;
+                            MIN_MASTER_LENGTH <= name <= MAX_MASTER_LENGTH
+        Results:
+            None.
+
+        Code: EC_EMAIL_LENGTH - Failure: Invalid email length;
+                            name <= MAX_EMAIL_LENGTH
+        Results:
+            None.
+
+        Code: EC_FILTER - Failure: profanity detected in account name.
+        Results:
+            None.
+
+        Code: EC_TOO_YOUNG - Failure: user's age is below minimum age
+                             specified in MINAGE param.
+        Results:
+            AGE=<age of user>               - Age (in years) of user calculated
+                                              from date of birth passed in BORN
+                                              param.  Negative if birth date
+                                              given in the future.
+
+        Code: EC_INV_MASTER - Failure: account name contains invalid characters
+        Results:
+            None.
+
+        Code: EC_INV_ZIPCODE - Failure: Invalid zip/postal code provided.
+        Results:
+            None.
+
+        Code: EC_INV_DISCLAIMER - Failure: A parental consent disclaimer message
+                                  must be shown before proceeding.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+addr - Report client address to slave
+
+    Request:
+        Kind: 'addr'
+        Code: 0
+        Args:
+            ADDR=<IP address>
+            PORT=<port>
+
+    Response:
+        None.
+
+    Async responses:
+        ~png
+
+-------------------------------------------------------------------------------
+
+arom - Generate a set of +rom responses for required auto-rooms
+
+    Request:
+        Kind: 'arom'
+        Code: 0
+        Args:
+            CAT<x>=<category prefix>
+            PARM<x>=<category parameter>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            COUNT=<n>       Number of +rom async msgs to follow.
+
+    Async responses:
+        +rom for each of the <n> parameters passed.
+
+-------------------------------------------------------------------------------
+
+attr - Change room attributes.
+
+    Request:
+        Kind: 'attr'
+        Code: 0
+        Args:
+            NAME=<room name>                       - # = current room
+            CAT=<room category>                    - Optional
+            PASS=<password>                        - Optional
+            HOST=<name of host>                    - Optional
+            VICE=<name of assistant room host>     - Optional
+            PERSIST=<persistance>                  - Optional
+            LIMIT=<new room size max>              - Optional
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account is not authorized.
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_ROOM - Failure: Room does not exist
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: Not authorized to make change.
+        Results:
+            None.
+
+        Code: EC_SAME - Failure: Attempt to change host to same value
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_CATEGORY - Failure: Unknown category to associate room with.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USER - Failure: User specified not online (vice/host).
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: User given is already the assistant.
+        Results:
+            None.
+
+    Async responses:
+        +msg - Indicates new room host
+        +msg - Indicates new room assistant
+
+-------------------------------------------------------------------------------
+
+auth - Authenticate a master account
+
+    Request:
+        Kind: 'auth'
+        Code: 0
+        Args:
+            NAME=<master account name>
+            PASS=<password>
+            TOS=<0|1>                - Optional: User has agreed to
+                                       Terms of Service?
+            TOSVER=<version>         - Optional: Latest TOS version, will be
+                                       checked against the version the user
+                                       last agreed to
+            SHARE=<0|1>              - Optional: User has agreed to share
+                                       XBOX persona info?
+            MID=<machine id>         - ID unique to client hardware
+                                       (eg. PS2 console ID or XBOX XUID).
+                                       Stored in persona record for customer
+                                       support and banning.
+            MAC=<MAC address>        - MAC address of client.
+            BORN=<yyyymmdd>          - Optional: User's birth date
+            SKU                      - Client's game SKU
+            SLUS                     - Client's game SLUS
+            VERS                     - Client's game version string
+            LOC                      - Optional: Locality (see lobbylang.h)
+            REGKEY                   - Optional: Product registration key
+            PUID                     - Optional: Platform-specific userid of sender
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            Master account record returned with sensitive fields removed.
+            The fields existing may vary from user to user but you will be
+            guaranteed to have the following:
+
+            INTRO=<intro message>
+            IDENT=<user identifier>
+            SERV=<server IP address>
+            ADDR=<external IP address of client>
+            PERSONAS=<comma separated list of personas>
+            LAST=<last time account was used by current game>
+            SINCE=<time account was created>
+
+        Code: EC_BLACKLIST - Failure: Client hardware has been blacklisted.
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_MASTER - Failure: Invalid master account name
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_INV_PASS - Failure: Invalid password
+        Results:
+            None.
+
+        Code: EC_ALREADY_LOGGED_IN - Failure: User already logged in.
+        Results:
+            None.
+
+        Code: EC_FILTER - Failure: Invalid user name - profanity filtered
+        Results:
+            None.
+
+        Code: EC_LOCKED - Failure: Account is locked.
+        Results:
+            DATE=<date when account will be unlocked>
+            INTRO=<intro message>
+
+        Code: EC_RESERVED - Failure: Account name is reserved
+        Results:
+            None.
+
+        Code: EC_TOSA - Failure: Terms of service not agree to.
+        Results:
+            None.
+
+        Code: EC_SHARE - Failure: User did not agree to share XBOX persona
+                         info with EA.
+        Results:
+            None.
+
+        Code: EC_INV_REGKEY - Failure: An invalid registration key was
+                              provided. (Only applicable if REGKEY is passed
+                              as a parameter.)
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+auxi - Set/get auxilliary, non-persistent user information.
+
+    Request:
+        Kind: 'auxs'
+        Code: 0
+        Args:
+            TEXT=<auxilliary text>          - ? = Get current value.
+                                            - If TEXT is missing, 'get' is done.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            TEXT=<auxilliary text>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+    Async responses:
+        +usr message pushed out to notify clients of new aux info when set
+             operation performed.
+
+-------------------------------------------------------------------------------
+
+boot - Boot a user from the server.
+
+    Request:
+        Kind: 'boot'
+        Code: 0
+        Args:
+            MEMB                     - Optional: Master account name
+            PERS                     - Optional: Persona name
+            NAME                     - Optional: Master account or persona name
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account is not authorized.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: Not authorized to boot (admin only).
+        Results:
+            None.
+
+        Code: EC_INV_MASTER - Failure: User to boot not found.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+cate - retrieve ranking categories
+
+    Request:
+        Kind: 'cate'
+        Code: 0
+        Args: 
+            VIEW=<view>  - optional view to select.  Default is "PS2".
+
+    Response:
+        Kind: 'cate'
+        Code: EC_OKAY
+        Results:
+            CC=<total # of categories in this view>
+            IC=<total # of indices in this view>
+            VC=<total # of variations in this view>
+            R=<comma-separated-list of category,index,view data>
+
+    Async responses:
+        none
+
+-------------------------------------------------------------------------------
+
+chal - Challenge a user to a game.
+
+    Request:
+        Kind: 'chal'
+        Code: 0
+        Args:
+            PERS=<persona of user to challenge>  - * = force reset/unchallenge
+                                                        
+            HOST=<0|1>              - 1 = we are the host
+            KIND=<game type>        - Number
+            ROOM=<0|1>              - 1 = users must be in same room to succeed
+            EVID      - Optional: Event ID this game is for (eg. tourney ID)
+            EVGID     - Optional: Event game ID (eg. tourney game ID)
+            START     - Optional: - 0 = do not start game when challenge accepted
+                                    1 = start game when challenge accepted
+                                    default = 1
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            MODE=idle                               - If PERS=* or missing
+            MODE=chal                               - If oppo not challenging us
+            MODE=play                               - If game started
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+        Code: EC_IN_GAME - Failure: User already playing a game.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USER - Failure: Opponent not online.
+        Results:
+            None.
+
+        Code: EC_IGNORE - Failure: Opponent ignoring challenges.
+        Results:
+            None.
+
+        Code: EC_CHAL - Failure: Opponent already challenging someone else.
+        Results:
+            None.
+
+        Code: EC_NO_ROOM - Failure: Opponent is not in same room.
+        Results:
+            None.
+
+    Async responses:
+        // todo
+
+-------------------------------------------------------------------------------
+
+clcc - Create a club.
+
+    Request:
+        Kind: 'clcc'
+        Code: 0
+        Args:
+            NAME=<name of club>
+            TAG=<club tag>
+            DESC=<club description>
+            LOGO=<integer logo identifier>
+            COUNTRY=<country identifier>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            ID=<id of club>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_TOO_MANY - Failure: Maximum number of clubs exist for this game
+        Results:
+            None.
+
+        Code: EC_ALREADY_MEMBER - Failure: Cannot create new club if already in one
+        Results:
+            None.
+
+        Code: EC_NAME_TAKEN - Failure: Club name already in use.
+        Results:
+            None.
+
+        Code: EC_TAG_TAKEN - Failure: Club tag already in use.
+        Results:
+            None.
+
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+cluc - Update a club.
+
+    Request:
+        Kind: 'cluc'
+        Code: 0
+        Args:
+            ID=<id of club>
+            DESC=<new description, optional>
+            NEWS=<new news, optional>
+            ADMIN=<1 for admin access, default 0>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_NOT_MANAGER - Failure: Only GM can update club
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+cldc - Delete a club.
+
+    Request:
+        Kind: 'cldc'
+        Code: 0
+        Args:
+            ID=<id of club>
+            ADMIN=<1 for admin access, default 0>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_NOT_MANAGER - Failure: Only GM can update club
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+cljc - Join a club.
+
+    Request:
+        Kind: 'cljc'
+        Code: 0
+        Args:
+            ID=<id of club>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_USER_ALREADY_JOINED - Failure: Cannot join if already in
+        Results:
+            None.
+
+        Code: EC_NOT_RECRUIT - Failure: Cannot join if not a recruit
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+cllc - Leave a club.
+
+    Request:
+        Kind: 'cllc'
+        Code: 0
+        Args:
+            ID=<id of club>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_USER_ALREADY_MANAGER - Failure: Cannot leave if GM
+        Results:
+            None.
+
+        Code: EC_NOT_MEMBER - Failure: Cannot leave if not a member
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+cldm - Delete a club member.
+
+    Request:
+        Kind: 'cldm'
+        Code: 0
+        Args:
+            ID=<id of club>
+            NAME=<name of persona to delete>
+            ADMIN=<1 for admin access, default 0>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_NOT_MANAGER - Failure: Must be manager to delete users
+        Results:
+            None.
+
+        Code: EC_NOT_MEMBER - Failure: Cannot delete non-existent member
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: Cannot delete yourself
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+clrm - Recruit a club member.
+
+    Request:
+        Kind: 'clrm'
+        Code: 0
+        Args:
+            ID=<id of club>
+            NAME=<name of persona to delete>
+            ADMIN=<1 for admin access, default 0>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_NOT_MANAGER - Failure: Must be manager to recruit users
+        Results:
+            None.
+
+        Code: EC_ALREADY_MEMBER - Failure: Cannot recruit your own members
+        Results:
+            None.
+
+        Code: EC_ALREADY_RECRUIT - Failure: Cannot recruit your own recruits
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+clfc - Find clubs.
+
+    Request:
+        Kind: 'clfc'
+        Code: 0
+        Args:
+            TAG=<tag to search>
+            NAME=<name to search>
+            COUNTRY=<country to search>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            IDS=<comma-separated list of club IDS>
+            NAMES=<comma-separated list of club names>
+            TAGS=<comma-separated list of club tags>
+            COUNTRIES=<comma-separated list of club countries>
+            GMS=<comma-separated list of club gms>
+            COUNT=<comma-separated list of club sizes>
+            MAXSIZE=<comma-separated list of club max sizes>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+clgc - Get a club.
+
+    Request:
+        Kind: 'clgc'
+        Code: 0
+        Args:
+            ID=<id of club>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            ID=<club id>
+            NAME=<club name>
+            TAG=<club tag>
+            COUNTRY=<club country>
+            GM=<club GM>
+            DESC=<club description>
+            LOGO=<club logo identifier>
+            GAMES=<club games played>
+            WINS=<club wins>
+            TIES=<club ties>
+            LOSSES=<club losses>
+            DISC=<club disconnects>
+            DNF=<club DNF percentage>
+            COUNT=<club size>
+            RECCOUNT=<number of recruits>
+            MAXSIZE=<max members in club>
+            OFFICIAL=<1 if official, 0 otherwise>
+            NEWS=<club news>
+            NEWSDATE=<club news date>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+clgf - Get club flags
+
+    Request:
+        Kind: 'clgf'
+        Code: 0
+        Args:
+            LOC=<locality>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            WIN=<required wins for flag0>,<required wins for flag1>,...
+            CLUBOWN=<club id that owns flag0>,<club id that owns flag1>,...
+            LAST=<epoch of last transfer of ownership for flag0>,...
+            EXPIRE=<epoch expiration date for flag0>,<epoch expiration date for flag1>,...
+            NAME=<flag0 name>,<flag1 name>,...
+            DESC=<desc for flag0>,<desc for flag1>,...
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_DISABLED- Failure: club is disabled
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+clgm - Get the members of a club.
+
+    Request:
+        Kind: 'clgm'
+        Code: 0
+        Args:
+            ID=<id of club>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            NAMES=<comma-separated list of member names>
+            WINS=<comma-separated list of member wins>
+            LOSSES=<comma-separated list of member losses>
+            TIES=<comma-separated list of member ties>
+            WINPCT=<comma-separated list of member win percentages>
+            DISC=<comma-separated list of member disconnects>
+            DNF=<comma-separated list of member DNF percentages>
+            RECNAMES=<comma-separated list of recruit names>
+            RECSINCE=<comma-separated list of recruit dates>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+clgr - Get the recruits of a club.
+
+    Request:
+        Kind: 'clgr'
+        Code: 0
+        Args:
+            ID=<id of club>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            RECNAMES=<comma-separated list of recruit names>
+            RECSINCE=<comma-separated list of recruit dates>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+clgv - Get the rivals of a club.
+
+    Request:
+        Kind: 'clgv'
+        Code: 0
+        Args:
+            ID=<id of club>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            IDS=<comma-separated list of club ids>
+            NAMES=<comma-separated list of club names>
+            TAGS=<comma-separated list of club tags>
+            GAMES=<comma-separated list of club games played>
+            WINS=<comma-separated list of club wins>
+            TIES=<comma-separated list of club ties>
+            LOSSES=<comma-separated list of club losses>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+conf - Reconfigure the server.
+
+    Request:
+        Kind: 'conf'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account is not authorized.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: Not authorized to reconfigure (admin only).
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+cper - Create a persona for logged in master account.
+
+    Request:
+        Kind: 'cper'
+        Code: 0
+        Args:
+            PERS=<new persona name>
+            ALTS=<count>                    - Optional: Number of alternate
+                                              names to provide if persona
+                                              duplicate is found.
+                                              Max = MAX_ALTERNATE_NAMES.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_MASTER - Failure: Invalid master account
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_MAX_PERSONAS - Failure: Max # of personas already created
+        Results:
+            None.
+
+        Code: EC_DUPLICATE - Failure: Duplicate persona already exists
+        Results:
+            OPTS=<list of options>          - Comma(,) separated list of
+                                              alternate account names (if
+                                              param ALTS > 0).
+
+        Code: EC_FILTER - Failure: profanity detected in persona name.
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: persona name contains invalid characters
+        Results:
+            None.
+
+        Code: EC_NAME_LENGTH - Failure: Invalid account name length;
+                            MIN_PERSONA_LENGTH <= name <= MAX_PERSONA_LENGTH
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+ctrl - Send or ack a control message.
+
+    Request:
+        Kind: 'ctrl'
+        Code: 0
+        Args:
+            To send a message:
+
+            PERS        - User to send control message to (String)
+            CAT         - Message category (Token)
+            MSG         - Message type (Token)
+            EXPIRE      - Optional: Number of second from now that message will
+                          expire.  Default: 24 hours
+            DATA        - Optional: Custom payload based on CAT + MSG
+
+            To acknowledge receipt of a message:
+
+            ACK         - Message ID of message to ack.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter.
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing required parameter.
+        Results:
+            None.
+
+        Code: EC_NOT_FOUND - Failure: Message not found (for ACK).
+        Results:
+            None.
+
+        Code: EC_NO_SPACE - Failure: User's mailbox has no space for new messages.
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: Database access/update error.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+cusr - Get/set user attributes via mas-cust.c
+
+    Request:
+        Kind: 'cusr'
+        Code: 0
+        Args:
+            PERS=<persona name>
+            SKEY=<storage key>    - Optional: determines which persona record
+                                    will be fetched.  Only valid for PERS fetch.
+
+            This method may pass other parameters as well.  These parameters
+            will be passed to PlayModuleUserinfo() for processing.  It is up
+            to this function to determine the action to take.
+
+    Response:
+        Code: EC_OKAY - Success.
+        Results:    
+            Determined by PlayModuleUserinfo()
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: Unknown persona
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: Database access/update error
+        Results:
+            None.
+
+        Note that PlayModuleUserinfo() has the ability to return other error
+        codes.  The user of this command needs to determine and handle other
+        error codes that may be returned.
+
+-------------------------------------------------------------------------------
+
+dper - Delete a persona for logged in master account
+
+    Request:
+        Kind: 'dper'
+        Code: 0
+        Args:
+            PERS=<persona name>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: Attempt to delete current active persona
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: Unknown persona
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_ALREADY_LOGGED_IN - Failure: Persona is in use.
+        Results:
+            None.
+
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+edit - Edit master/persona account attributes
+
+    Request:
+        Kind: 'edit'
+        Code: 0
+        Args:
+            NAME=<master account name>
+            SPAM=<Y/N><Y/N>                - EA can spam user (yes/no)
+                                           - Anyone can spam user (yes/no)
+            MAIL=<email address>           - Set new email address
+
+            PASS=<current password>        - Change password
+            CHNG=<new password>
+
+            One or more of SPAM, MAIL, (PASS/CHNG) may be specified at a time
+            to edit each of the properties.
+
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_SPAM - Failure: Invalid spam settings
+        Results:
+            None.
+
+        Code: EC_INV_MASTER - Failure: Invalid master account name
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_INV_PASS - Failure: Invalid password
+        Results:
+            None.
+
+        Code: EC_INV_NEW_PASS - Failure: Invalid new password.
+        Results:
+            None.
+
+        Code: EC_PASS_LENGTH - Failure: Invalid password length;
+                            MIN_PASSWORD_LENGTH <= pass <= MAX_PASSWORD_LENGTH
+        Results:
+            None.
+
+        Code: EC_INV_MAIL - Failure: Invalid email address
+        Results:
+            None.
+
+        Code: EC_EMAIL_LENGTH - Failure: Invalid email length;
+                            name <= MAX_EMAIL_LENGTH
+        Results:
+            None.
+
+
+-------------------------------------------------------------------------------
+
+eget - Get next available extension server supporting a given extension type
+
+    Request:
+        Kind: 'eget'
+        Code: 0
+        Args:
+            TYPE     - Extension server type
+
+    Resposne:
+        Code: EC_OKAY
+        Results:
+            ADDR=<server addr>
+            PORT=<server port>
+            SECRET=<server secret>
+            FLAGS=<server flags>
+
+        Code: EC_NO_SERVER - Failure: No server of given type is available.
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+fget - Retrieve friend/rival lists from server
+
+    Request:
+        Kind: 'fget'
+        Code: 0
+        Args:
+            TAG      - Tag in user record where friend/rival list is stored
+
+    Resposne:
+        Code: EC_OKAY
+        Results:
+            <TAG>=<comma delineated list of friend/rival personas>
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+filt - Profanity filter a string.
+
+    Request:
+        Kind: 'filt'
+        Code: 0
+        Args:
+            TEXT=<text to filter>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            TEXT=<filtered text>
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+flag - Set attribute flags.
+
+    Request:
+        Kind: 'flag'
+        Code: 0
+        Args:
+            CLR=<flags to clear>
+            SET=<flags to set>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            IDENT=<user identifier>
+            FLAGS=<new flags>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+fupd - Update friend/rival lists in user record
+
+    Request:
+        Kind: 'fupd'
+        Code: 0
+        Args:
+            TAG      - Tag in user record to store friend/rival list.
+            ADD      - List of personas to add.
+            DELETE   - List of personas to delete.
+            SET      - List of personas to store.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        The ADD/DELETE tags can be used in the same command.  SET can be used
+        in place of ADD/DELETE to set the friend/rival list to be a specific
+        list provided by the client.
+
+-------------------------------------------------------------------------------
+
+gban - Ban or unban a user from a game, or modify ban lists
+
+    Request:
+        Kind: 'gban'
+        Code: 0
+        Args:
+            BAN      - Optional: Persona of user to ban.
+            UNBAN    - Optional: Persona of user to unban.
+            LISTMOD  - Optional: If 1, modify ban lists with UNBANLIST/BANLIST
+            BANLIST  - Optional: List of persona/master/MAC to add to ban list
+            UNBANLIST - Optional: List of persona/master/MAC to unban
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_NO_GAME - Failure: Caller is not joined to a game.
+        Results:
+            None.
+
+        Code: EC_NOT_GAME_HOST - Failure: Caller is not the game host
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: Cannot ban yourself
+        Results:
+            None.
+
+        Code: EC_NOT_FOUND - Failure: User to ban is not a member of the game
+        Results:
+            None.
+            
+-------------------------------------------------------------------------------
+
+gcre - Create a new game
+
+    Request:
+        Kind: 'gcre'
+        Code: 0
+        Args:
+            NAME      - Name of game. (if omitted, random, unique name will be used)
+            MAXSIZE   - Maximum players allowed in game.
+            MINSIZE   - Minimum players required to start game.
+            MAXPRIMARY - Max # of slots available for primary console users (non-guests)
+            PARAMS    - Game specific parameters.
+            ROOM      - Optional: Associate game with this room identifier.
+            CUSTFLAGS - Optional: Custom flags.
+                        Encode/decode with TagFieldSet/GetNumber
+            SYSFLAGS  - Optional: System flags.  Valid flags are:
+                            LOBBYAPI_GAME_FL_* as defined in lobbycommondefs.h
+                        Encode/decode with TagFieldSet/GetNumber
+            PASS      - Optional: Game password required for joining.
+            EVID      - Optional: Event ID this game is for (eg. tourney ID)
+            EVGID     - Optional: Event game ID (eg. tourney game ID)
+            NUMPART   - Optional: Number of partitions to create (default=1)
+            PARTSIZE<x> - Optional: Size of each of the partitions.
+            PARTPARAMS<x> - Optional: Custom params for each partition.
+            USERPART  - Optional: Partition to put creator in (default=0)
+            USERPARAMS - Optional: Custom params for creator (host).
+            USERFLAGS - Optinoal: Custom flags for creator (host);
+            SET - Optional: 1=join user's entire set
+            PRES - Optional: Host presence value
+            IGNPROFNAME - Optional: If set to 1, allow creation of games with
+                                    profane names.
+            SESS - Optional: Game session identifier
+            PLATPARAMS - Optional: Platform specific game parameters.
+
+            GUESTS - Optional: Number of guests to also join.
+            GUEST<n> - Optional: Name of guest <n> to join.
+            GUSERPARAMS<n> - Optional: Guest <n>'s parameters.
+            GUSERFLAGS<n> - Optional: Guest <n>'s flags.
+            GPRES<n> - Optional: Guest <n>'s presence.
+            PRIV - Optional: Number of slots to reserve for private joins.
+            GAMEMODE  - Optional: Gameserver mode if being created by a GPS.
+            GAMEPORT  - Optional: Gameserver port if being created by a GPS.
+            VOIPPORT  - Optional: Voipserver port if being created by a GPS.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+	    IDENT          - The internal game identifier for this game
+            WHEN           - When game was created.
+            HOST           - Name of host
+            ROOM           - Room game is associated with.
+            MAXSIZE        - Max number of players allowed in game.
+            MINSIZE        - Min number of players needed to start game.
+            COUNT          - Number of players currently joined.
+            PRIV           - Number of private slots available/reserved
+	    CUSTFLAGS      - Custom game flags (used to be USERFLAGS)
+            SYSFLAGS       - System flags.
+                             Encode/decode with TagFieldSet/GetNumber
+	    EVID           - Game event identifier (used for tournaments - tournament game ID)
+	    EVGID          - Game event identifier (used for tournaments - tournament game ID)
+	    NUMPART        - Number of partitions defined for game. 
+            OPPO<x>        - Opponent <x> name.
+	    OOPART<x>      - Partition that player <x> belongs to
+	    OPFLAG<x>      - Custom flags for player <x>
+	    PRES<x>        - Presence value for player <x>
+	    OPID<x>        - Player <x>'s internal user identifier
+            ADDR<x>        - IP address of opponent <x>.
+	    LADDR<x>       - Player <x>'s local IP address
+	    MADDR<x>       - Player <x>'s machine address.  
+	    PARTSIZE<x>    - Number of users allowed in partition <x>. 
+	    PARAMS         - Game parameters. 
+	    PARTPARAMS<x>  - Partition parameters. 
+	    OPPARM<x>      - Custom opponent parameters for player <x>. 
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_IN_GAME - Failure: Already member of another game.
+        Results:
+            None.
+
+        Code: EC_DUPLICATE - Failure: Duplicate game name.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_ROOM - Failure: Unknown room given.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USERSET - Failure: User set given was not found.
+        Results:
+            None.
+
+        Code: EC_NOT_LOCKED - Failure: User set given is not locked.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: No permission (not owner of user set)
+        Results:
+            None.
+
+        Code: EC_TOO_MANY - Failure: Too many games have already been created
+                            in the supplied room.
+        Results:
+            None.
+
+        This command may also return any other error code as defined by the
+        mas-cust creation filter function (PlayModuleGameCreateFilter());
+            
+-------------------------------------------------------------------------------
+
+gdel - Delete a game
+
+    Delete the game the current user is hosting.
+
+    Request:
+        Kind: 'gdel'
+        Code: 0
+        Args:
+            FORCE - Optional: != 0 -> Force delete even if game started.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_NOT_GAME_HOST - Failure: Only game host can delete game.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_GAME - Failure: Game not found.
+        Results:
+            None.
+
+        Code: EC_IN_GAME - Failure: Game is in progress.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+gget - Fetch a game
+
+    Request:
+        Kind: 'gget'
+        Code: 0
+        Args:
+            One of these must be provided:
+
+            NAME - Name of game.
+            IDENT - Game identifier.
+            PERS - Game this user is joined to.
+            SESS - Private session key of game.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            See 'gcre'.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_GAME - Failure: Game not found.
+        Results:
+            None.
+
+        This command may also return any other error code as defined by the
+        slv-cust search filter function (SlaveCustGameFilter());
+
+-------------------------------------------------------------------------------
+
+ggst - Get game status
+
+    Request:
+        Kind: 'ggst'
+        Code: 0
+        Args:
+            IDENT - Identifier of game to get status for
+            NAME - Optional: Name of game to get status for
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            LAST  - Last time this status was updated
+            IDENT - Game identifier
+
+            The result will also include any custom fields as defined by
+            SlaveCustGameExtractStatus().
+
+        Code: EC_MISSING_PARAM - Failure: IDENT/NAME missing
+        Results:
+            None.
+
+        Case: EC_NOT_FOUND - Failure: requested game not found.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+gjoi - Join a game
+
+    Request:
+        Kind: 'gjoi'
+        Code: 0
+        Args:
+            ONE of these must be provided:
+
+            NAME - Join by name of the game
+            IDENT - Join by game identifier
+            PERS - Join game this user is joined to
+            SESS - Join by private session key
+
+            Other params:
+
+            PASS - Optional: Game password if required.
+            PART - Optional: Partition to join (default=0).
+            USERPARAMS - Optional: Custom params for calling user.
+            USERFLAGS - Optinoal: Custom flags for calling user.
+            PRES - Optional: Game presence value.
+            SET - Optional: 1=join user's entire set
+
+            GUESTS - Optional: Number of guests to also join.
+            GUEST<n> - Optional: Name of guest <n> to join.
+            GUSERPARAMS<n> - Optional: Guest <n>'s parameters.
+            GUSERFLAGS<n> - Optional: Guest <n>'s flags.
+            GPRES<n> - Optional: Guest <n>'s presence.
+            FORCE=1 - Optional: force a join even if the game is locked or started.
+            FORCE_LEAVE=1 - Optional: try and remove the user from any game he
+                            is currently joined to before performing the join
+                            operation.  If the leave would fail then
+                            return EC_IN_GAME and do nothing further.  If the
+                            join would fail then return the join failure code
+                            but leave the user joined to the original game.
+            PRIV=1 - Optional: If provided, attempt to join this user into a
+                     private slot.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            See 'gcre'.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_GAME - Failure: Game not found.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_USER_ALREADY_JOINED - Failure: Already a member of this game.
+        Results:
+            None.
+
+        Code: EC_IN_GAME - Failure: Already a member of another game.
+        Results:
+            None.
+
+        Code: EC_FULL - Failure: Game is full.
+        Results:
+            None.
+
+        Code: EC_NO_SPACE - Failure: Game is full (due to reservations).
+        Results:
+            None.
+
+        Code: EC_INV_PASS - Failure: Invalid password given.
+        Results:
+            None.
+
+        Code: EC_STARTED - Failure: Game already started.
+        Results:
+            None.
+
+        Code: EC_LOCKED - Failure: Game has been locked.
+        Results:
+            None.
+
+        Code: EC_INV_PARTITION - Failure: Partition given was invalid or
+                                          the user had previously left the
+                                          game and is attempting to re-join
+                                          into a different partition.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USERSET - Failure: User set given was not found.
+        Results:
+            None.
+
+        Code: EC_NOT_LOCKED - Failure: User set given is not locked.
+        Results:
+            None.
+
+        Code: EC_BANNED - Failure: User has been banned from the game.
+        Results:
+            None.
+
+        Code: EC_USER_NOT_JOINED - Failure: Attempt to join guest account when
+                                   calling user is not a member of the game yet.
+        Results:
+            None.
+
+        This command may also return any other error code as defined by the
+        mas-cust join filter function (PlayModuleGameJoinFilter());
+
+    Async responses:
+        +ses record if game is "auto start" and became full with this join.
+
+-------------------------------------------------------------------------------
+
+glea - Leave a game
+
+    Request:
+        Kind: 'glea'
+        Code: 0
+        Args:
+            FORCE - Optional: != 0 -> Force leave regardless of game state
+            FORCE_LOCK - Optional: != 0 -> Force leave even if game is locked
+            FORCE_START - Optional: != 0 -> Force leave even if game is started
+            GUEST - Optional: Name of guest to withdraw rather than calling user
+            SET-  0 = Only remove calling user
+                  1 = Remove calling user and all his user set members if he is
+                      the userset owner (default)
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            See 'gcre'.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_GAME - Failure: Game not found.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_USER_NOT_JOINED - Failure: Not a member of this game.
+        Results:
+            None.
+
+        Code: EC_GAME_HOST - Failure: Host may not leave game.
+        Results:
+            None.
+
+        Code: EC_STARTED - Failure: Game already started.
+        Results:
+            None.
+
+        Code: EC_LOCKED - Failure: Game has been locked.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: No permission (not owner of user set)
+        Results:
+            None.
+
+        This command may also return any other error code as defined by the
+        mas-cust leave filter function (PlayModuleGameLeaveFilter());
+
+-------------------------------------------------------------------------------
+
+gpsc - Create a game on a persistent game spawn service for a user.
+
+    Request:
+        Kind: 'gpsc'
+        Code: 0
+        Args:
+            GPSNAME  - (Optional) Create game on named GPS only.
+            REGIONS  - (Optional) Comma seperated list of ping times to each
+                       rebroadcaster region.
+
+            Any additional arguments are forwarded to the hosting GPS
+            and should use the same argument list as 'gcre'.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_DUPLICATE - Failure: Duplicate game name.
+        Results:
+            None.
+
+        Code: EC_FULL - Failure: Requested GPS is already hosting a game.
+        Results:
+            None.
+
+        Code: EC_NOT_FOUND - Failure: No available GPS have been found.
+        Results:
+            None.
+
+    Async responses:
+        $cre async message is sent to the GPS that will host the game, this
+        async message contains all the arguments sent in for game creation.
+
+-------------------------------------------------------------------------------
+
+gpss - Update the status of a persistent game spawn service.
+
+    Request:
+        Kind: 'gpss'
+        Code: 0
+        Args:
+            STATUS   - Status flags
+                         PERSIST_FL_AVAIL   GPS is available to host a game
+                         PERSIST_FL_HOSTING GPS is hosting a game
+            IDENT    - (Optional) Ident of hosted game.
+            NAME     - (Optional) Display name to associate with GPS.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+    Async responses:
+        $gps response is sent on receipt of first 'gpss' from a game spawn
+        service. Response contains "PING" parameter indicating number of
+        milliseconds before the next gpss should be sent.
+
+-------------------------------------------------------------------------------
+
+gqwk - Join the best matching game based on provided criteria.
+
+    Request:
+        Kind: 'gqwk'
+        Code: 0
+        Args:
+            REGIONS  - (Optional) Comma seperated list of ping times to each
+                       rebroadcaster region.
+            PRIV - Number of private slots (available + taken) in desired game
+            MODE - Control what happens if no game is found:
+                LOBBYAPI_GQWK_MODE_FAIL   - Fail with EC_NOT_FOUND error code.
+                LOBBYAPI_GQWK_MODE_CREATE - Create a game.
+                LOBBYAPI_GQWK_MODE_WAIT   - Wait until a game or user becomes
+                                            available.
+                LOBBYAPI_GQWK_MODE_CANCEL - Cancel a MODE_WAIT request.
+
+            Any custom parameters may be provided for use in determining a
+            matching game.
+
+            Parameters from 'gjoi' must also be provided for use when a game
+            is found and the server needs to join the user.
+
+            If MODE==LOBBYAPI_GQWK_MODE_CREATE then the game creation parameters
+            must also be provided (as per 'gcre').  NAME may be omitted.
+
+            If MODE==LOBBYAPI_GQWK_MODE_WAIT then EC_OKAY will be returned on 
+            success and the arrival of a 'game' (+mgm) message on the
+            LOBBYAPI_CBTYPE_EVNT callback will indicate that the user has been
+            joined to a game.
+
+    Response:
+        Code: EC_NOT_FOUND - Failure:
+                    No matching game was found (LOBBYAPI_GQWK_MODE_FAIL)
+                    User not found in queue (LOBBYAPI_GQWK_MODE_CANCEL)
+        Results:
+            None.
+
+        Code: EC_IN_GAME - Failure: user is already joined to a game
+        Results:
+            None.
+
+        Code: EC_EXISTS - Failure: user is already in quick join queue
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USERSET - Failure: SET parameter provided for userset joins
+                                            specified an invalid userset.
+        Results:
+            None.
+
+        All return codes from 'gjoi' may be returned.
+
+        All return codes from 'gcre' may be returned when
+        MODE == LOBBYAPI_GQWK_MODE_CREATE
+
+    Async responses:
+        +ses record if game is "auto start" and became full with this join.
+
+-------------------------------------------------------------------------------
+
+gres - Reserve or unreserve a slot in a game for the given user.  Only the
+       game host can reserve or unreserve a slot.  A user can unreserve their own
+       slot.  This will happen automatically when a user joins the game or can be
+       done manually via this comment.
+
+    Request:
+        Kind: 'gres'
+        Code: 0
+        Args:
+            NAME    - Optional: Name of game (if omitted, use the game the
+                                user is joined to).
+            RES     - Optional: Name of user to reserve slot for
+            UNRES   - Optional: Name of user to release reserved slot for
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_NO_GAME - Failure: Caller is not joined to a game.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: Caller does not have access to perform
+                                         the operation
+        Results:
+            None.
+
+        Code: EC_FULL - Failure: Game is already full
+        Results:
+            None.
+
+        Code: EC_STARTED - Failure: Game is already started
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: Cannot perform operation on yourself
+        Results:
+            None.
+
+        Code: EC_NOT_FOUND - Failure: No reservation found (for unreserve)
+                                      User to reserve not found (for reserve)
+        Results:
+            None.
+
+        Code: EC_IN_GAME - Failure: User is already in another game
+        Results:
+            None.
+
+        Code: EC_USER_ALREADY_JOINED - Failure: User is already joined to the game
+        Results:
+            None.
+
+        Code: EC_RESERVED - Failure: User already has a reservation
+        Results:
+            None.
+
+        Code: EC_NO_SPACE - Failure: No reservation slots available
+        Results:
+            None.
+
+
+-------------------------------------------------------------------------------
+
+gsea - Search for games
+
+    Request:
+        Kind: 'gsea'
+        Code: 0
+        Args:
+            START     - Game index to start at.
+            COUNT     - Number of game records to return.
+            CUSTFLAGS - Optional: Custom game flags.
+            CUSTMASK  - Optional: Custom game flag mask.
+            SYSFLAGS  - Optional: System flags.
+                        Encode/decode with TagFieldSet/GetNumber
+            SYSMASK   - Optional: System flag mask.
+                        Encode/decode with TagFieldSet/GetNumber
+            MINSIZE   - Optional: Min game size.
+            MAXSIZE   - Optional: Max game size.
+            NAME      - Optional: Game name substring.
+            ROOM      - Optional: Game must belong to this room (identifier).
+            ASYNC     - Optional: 1=async updates; 0=snapshot
+            PLAYERS   - Optional: 1=include all players information
+
+
+            CANCEL    - If provided; cancel a previous ASYNC search
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            COUNT=<number of records returned>
+
+        Code: EC_UNKNOWN_ROOM - Failure: Room specific does not exist.
+        Results:
+            None.
+
+    Async responses:
+        +gam record for each matched game.  These records contains same
+        attributes as returned by other game params.  See 'gcre'.
+
+-------------------------------------------------------------------------------
+
+gset - Set game parameters
+
+    Request:
+        Kind: 'gset'
+        Code: 0
+        Args:
+            PARAMS    - Optional: Game parameters.
+            MAXSIZE   - Optional: Max players allowed in game.
+            MINSIZE   - Optional: Min players required to start game.
+            HOST      - Optional: Name of new game host.
+            GPSHOST   - Optional: Name of new GPS host.
+            CUSTFLAGS - Optional: Custom defined flags.
+                        Encode/decode with TagFieldSet/GetNumber
+            SYSFLAGS  - Optional: System flags.  See 'gcre' for definition.
+                        Encode/decode with TagFieldSet/GetNumber
+            PASS      - Optional: Game password.
+            EVID      - Optional: Event ID this game is for (eg. tourney ID)
+            EVGID     - Optional: Event game ID (eg. tourney game ID)
+            PARTPARAMS<x> - Optional: Custom params for each partition.
+            KICK      - Optional: Comma separated list of users to kick out of
+                        the game.
+            KICK_SET  - A value of 1 indicates that all the members of the
+                        user set the kicked user belongs to should also be booted.
+            KICK_REASON - An integer value indicating the reason why the user
+                          is being kicked from the game.
+            SESS      - Optional: Game session identifier.
+            PLATPARAMS - Optional: Platform specific game parameters.
+
+            PERS      - Optional: If provided, USERPARAMS, USERFLAGS, and PRES
+                        will be modified for this user rather than the host.
+
+            The above parameters can only be set by the game host.
+
+            FORCE      - Optional: != 0 -> Force change regardless of game state
+            USERPARAMS - Optional: Custom params for calling user.
+            USERFLAGS  - Optinoal: Custom flags for calling user.
+            PRES       - Optional: New presence value
+
+            GUEST      - Optional: If provided, then USERPARAMS, USERFLAGS,
+                         and PRES apply to the named guest account rather than
+                         the calling primary user.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            See 'gcre'.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_GAME - Failure: Game of given name does not exist.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_NOT_GAME_HOST - Failure: Only game host can change settings.
+        Results:
+            None.
+
+        Code: EC_NO_GAME - Failure: Not a member of given game.
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameters.
+        Results:
+            None.
+
+        Code: EC_STARTED - Failure: Game has already been started.
+        Results:
+            None.
+
+        Code: EC_NOT_OWNER - Failure: Attempt to set guest parameters for a
+                             guest not owned by the caller.
+        Results:
+            None.
+
+        This command may also return any other error code as defined by the
+        mas-cust game set filter function (PlayModuleGameSetFilter());
+
+    Async responses:
+        +mgm if game is modified
+
+        +kik sent to user being kicked out of game (if applicable).
+            GAME=<game ident being kicked out of>
+
+-------------------------------------------------------------------------------
+
+gsst - Set game status.
+
+    Status will be set for the game the calling user is a member of.
+
+    Request:
+        Kind: 'gsst'
+        Code: 0
+        Args:
+            Any parameters may be passed in.  They will be filtered through
+            SlaveCustGameExtractStatus() for extraction to build the final
+            game status.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Case: EC_NO_GAME - Failure: The calling user is not joined to a game.
+        Results:
+            None.
+
+        Case: EC_STARTED - Failure: The game has not been started yet.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+gsta - Start a game
+
+    Request:
+        Kind: 'gsta'
+        Code: 0
+        Args: None
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Account not authorized.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_GAME - Failure: Game not found.
+        Results:
+            None.
+
+        Code: EC_NO_GAME - Failure: Not a member of this game.
+        Results:
+            None.
+
+        Code: EC_NOT_GAME_HOST - Failure: Only host can start a game.
+        Results:
+            None.
+
+        Code: EC_STARTED - Failure: Game already started.
+        Results:
+            None.
+
+        Code: EC_NOT_ENOUGH_PLAYERS - Failure: Game doesn't have enough players
+                                               to start (MINSIZE).
+        Results:
+            None.
+
+    Async responses:
+        +ses record if game was started.
+
+-------------------------------------------------------------------------------
+
+ilgf - Get user's selected favorite teams for any Interactive Leagues schedules
+
+    Request:
+        Kind: 'ilgf'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            NUM       - Number favorite teams selected
+            SID       - Comma separated list of schedule ids with favorite teams
+            TID       - Comma separated list of favorite team ids for the schedule
+            CHANGES   - Comma separated list of the number of times the favourite
+                        team was changed for the schedule
+            MAXCHANGES - Comma separated list of maximum team changes for the
+                         schedule
+
+        Code: EC_INV_PERSONA - Failure: Persona does not exist.
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+ilgs - Get schedule information for all Interactive Leagues schedules
+
+    Request:
+        Kind: 'ilgs'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            NUM       - Number of active Interactive Leagues schedules
+            SID       - Comma separated list of schedule ids
+            SNAME     - Comma separated list of localized schedule names
+            SIMAGE    - Comma separated list of image resources for schedules
+            SPKSTART  - Comma separated list of peak usage start times
+                        (minutes from midnight, GMT)
+            SPKEND    - Comma separated list of peak usage end times
+                        (minutes from midnight, GMT)
+            START     - Comma separated list of schedule start time
+            END       - Comma separated list of schedule end time
+            MINLVL    - Comma separated list of min level required for entry
+            MAXLVL    - Comma separated list of max level required for entry
+            SLOT      - Comma separated list of slots for each schedule
+            
+
+-------------------------------------------------------------------------------
+
+ilgt - Get list of allowed favourite teams for a given schedule
+
+    Request:
+        Kind: 'ilgt'
+        Code: 0
+        Args:
+            SID       - Requested schedule id
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            NUM       - Number of teams in the schedule
+            TID       - Comma separated list of team ids in priority order
+            COUNTS    - Comma separated list of number of users who have
+                        selected each team listed in TID.
+
+-------------------------------------------------------------------------------
+
+ilmf - Get maximum number of favorite teams allowed per user
+
+    Request:
+        Kind: 'ilmf'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            MAX       - Maximum number of favorite teams allowed
+
+-------------------------------------------------------------------------------
+
+ilou - Get number of users online for a given favorite team
+
+    Request:
+        Kind: 'ilou'
+        Code: 0
+        Args:
+            SID       - Requested schedule id
+            TID       - Requested list of favorite team ids (comma separated)
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            NUM       - Comma separated list of the number of users online for each
+                        of the requested teams.
+
+-------------------------------------------------------------------------------
+
+ilsc - Request Interactive Leagues scheduled games snapshot
+
+    Request:
+        Kind: 'ilsc'
+        Code: 0
+        Args:
+            CHAN      - Display list channel
+            SID       - Requested schedule id
+            COUNT     - Optional: Max number of results to return (defaults to 50).
+            INDEX     - Optional: Starting index (used for paging if too many results
+                        are available).  Defaults to 0.
+            START     - Optional: Epoch time to start snapshot window
+            END       - Optional: Epoch time to end snapshot window
+            TID       - Optional: Favorite team
+            TYPE      - Type of snapshot (LEAGUE_VIEW_ALL,
+                                          LEAGUE_VIEW_TEAM,
+                                          LEAGUE_VIEW_OPEN,
+                                          LEAGUE_VIEW_TEAM_OPEN)
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            CHAN      - Matches requested display list channel
+            NUM       - Number of games found
+
+    Async responses:
+        +ils
+
+-------------------------------------------------------------------------------
+
+ilsf - Set specified favorite team for the chosen schedule
+
+    Request:
+        Kind: 'ilsf'
+        Code: 0
+        Args:
+            SID       - Schedule id to set favorite team for
+            TID       - Requested favorite team id
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_TOO_MANY - Failure: Attempting to change team too many times
+                            for this league.
+        Results:
+            None.
+
+        Code: EC_FULL - Failure: Too many favorite teams already selected
+        Results:
+            None.
+
+        Code: EC_ALREADY_JOINED - Failure: User has a team for this schedule
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+ilti - Get team statistics information for a given favorite team
+
+    Request:
+        Kind: 'ilti'
+        Code: 0
+        Args:
+            SID       - Requested schedule id
+            TID       - Requested favorite team id
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            TEAMSTAT  - Structure containing win/loss/tie and other statistics
+                        Decodes to TeamStatT
+
+-------------------------------------------------------------------------------
+
+invt - Invite a user into a room.
+
+    Request:
+        Kind: 'invt'
+        Code: 0
+        Args:
+            PERS=<persona of user to invite>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_NO_ROOM - Failure: User is not in a chat room.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: User is not authorized to
+                                         invite into this room.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USER - Failure: Invitee is not logged in.
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: You cannot invite yourself.
+        Results:
+            None.
+
+        Code: EC_IN_ROOM - Failure: The invitee is already in the room.
+        Results:
+            None.
+
+        Code: EC_KICKED - Failure: Invitee has been kicked out of this room.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+    Async responses:
+        +msg sent to invitee // todo
+
+
+-------------------------------------------------------------------------------
+
+kick - Kick user out of room (or clear unkick status).
+
+    Request:
+        Kind: 'kick'
+        Code: 0
+        Args:
+            PERS=<persona of user to kick>  - ? = return current kick list
+                                            - -<name> = unkick <name>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            KICK=</ separated kick list>        - PERS=?
+
+        Code: EC_NOT_KICKED - Failure: User not on kick list.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+        Code: EC_NO_ROOM - Failure: User is not in a room.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: User not authorized to kick.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USER - Failure: User to kick is not logged in.
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: Cannot kick yourself.
+        Results:
+            None.
+
+        Code: EC_KICK_HOST - Failure: Cannot kick out the host.
+        Results:
+            None.
+
+    Async responses:
+        +msg - Private msg indicating to user that he has been kicked out
+        +msg - Indiciating to all users that user has been kicked out
+
+-------------------------------------------------------------------------------
+
+kill - Deleting existing room.
+
+    Request:
+        Kind: 'kill'
+        Code: 0
+        Args:
+            NAME=<room name>
+            CAT=<room category>                    - Optional
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            KILL=<room name>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_ROOM - Failure: Invalid room name.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_CATEGORY - Failure: Unknown category to associate room with.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: Insufficient privileges.
+        Results:
+            None.
+
+    Async responses:
+        // todo
+
+-------------------------------------------------------------------------------
+
+lath - Login user using LKEY
+
+    Request:
+        Kind: 'lath'
+        Code: 0
+        Args:
+            LKEY    - LKEY for user as previously issued by the lobby server
+
+            VERS    - Client's game version string
+            SKU     - Client's game SKU
+            SLUS    - Client's game SLUS
+            PUID    - Optional: Platform-specific userid of sender
+            XUID    - Optional: User's XUID (Xbox/Xenon only)
+            MADDR   - Optional: Machine address of client
+            MID     - ID unique to client hardware (eg. PS2 console ID or
+                      XBOX XUID).  Stored in persona record for customer
+                      support and banning.
+            MAC     - MAC address of client.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            Full persona record will be returned well as:
+
+            EX-<extension server type>=<server connection info>
+
+            You will receive one of these fields for each extension server
+            type that is available and has its ADVERT flag set.  <auth> is an
+            authorization key that can be used to authenticate a connection
+            with the given extension server.
+
+        Code: EC_PERSONA_AUTH - Failure: LKEY was not valid.
+        Results:
+            None.
+
+        Code: EC_PERSONA_SET - Failure: Persona has already been set.
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+line - Command line commands.  See section below on command line commands.
+
+-------------------------------------------------------------------------------
+
+llvl - Request to load level information, mainly for use in my career screen.
+       This command should only be used when retrieving info about one
+       user for a career / biography screen, it should not be used
+       indisciminantly multiple times to retrieve info about every user in a
+       room for example.
+       
+
+    Request:
+        Kind: 'llvl'
+        Code: 0
+        Args:
+            PERS=<personaName>    -Optional: defaults to logged-in user
+            THRESHOLDS=<int>      -Optional: defaults to 0, if 1 then will
+                                             request skill, social, and gamer
+                                             thresholds above and below the
+                                             user's current values
+            CONFIG=<0|1>          -Optional: defaults to 0, if set to 1 will
+                                             request the level threshold
+                                             configuration instead of one
+                                             particular user's data
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            SKILL_PTS=<User's skill points in the current game title>
+            SOCIAL_PTS=<User's cross-product social points>
+            GAMER_PTS=<User's cross-product gamer points>
+            SKILL_LVL=<User's skill level in the current game title>
+            SOCIAL_LVL=<User's cross-product social level>
+            GAMER_LVL=<User's cross-product gamer level>
+            SKILL_NEXT=<User's next skill point threshold, -1 if maxxed out>
+            SKILL_PREV=<User's previous skill point threshold>
+            SOCIAL_NEXT=<User's next social point threshold, -1 if maxxed out>
+            SOCIAL_PREV=<User's previous social point threshold>
+            GAMER_NEXT=<User's next gamer point threshold, -1 if maxxed out>
+            GAMER_PREV=<User's previous gamer point threshold>
+            TITLES=<Comma delimited list of user's games>
+            LEVELS=<Comma delimited list of corresponding levels>
+
+            The following are returned instead of the above if request
+            parameter CONFIG is set to 1:
+
+            SKILL=<Comma delimited list of skill thresholds,
+                   starting with points needed to reach level 1>
+            SOCIAL=<Comma delimited list of social thresholds,
+                   starting with points needed to reach level 1>
+            GAMER=<Comma delimited list of gamer thresholds,
+                   starting with points needed to reach level 1>
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: Invalid persona account name
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+loct - Localize text. Given a string, localize the string based on the given locality
+       or use the user's locality.  The strings and parameters are passed in using the
+       numbered TEXT(X) and PARM(X) fields.
+
+    Request:
+        Kind: 'loct'
+        Code: 0
+        Args:
+            TEXT(X)=<string>               - Comma seperated list of text to localize
+                                             marked with with quotes ("")
+                                             - TEXT0="phrase one is <0> <1>.."
+            LOC=<locality>                 - Optional - Locality to use
+            MODE=<output mode>             - Optional - Output mode
+                                             - MODE=0 (DEFAULT): TEXT(X)=<localized tag>
+                                             - MODE=1: <tagtolocalize>=<localized tag>
+            PARM(X)=<parameters>           - Optional - PARM0="one two","three,four"
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+loff - Log the calling user out.  Once this call returns, the connection will
+       have been reset to the same state as when a new connection has been
+       made.
+
+    Request:
+        Kind: 'loff'
+        Code: 0
+        Args: None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+lost - Request lost account name or password information.  Set either the NAME
+       param or the MAIL param.  If the NAME parameter is passed, then the
+       user password will be emailed to the email address associated with the
+       account.  If the MAIL param is sent, then the list of account names 
+       associated with that email address will emailed to the address given.
+
+    Request:
+        Kind: 'lost'
+        Code: 0
+        Args:
+            NAME=<master account name>      - Optional
+            MAIL=<email address>            - Optional
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_NO_EMAIL - Failure: No email address is available for the
+                                     given master account
+        Results:
+            None.
+
+        Code: EC_INV_MASTER - Failure: Invalid master account name
+        Results:
+            None.
+
+        Code: EC_INV_MAIL - Failure: Invalid email address given (syntax).
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USER - Failure: No account exists with the given email
+                                         address
+        Results:
+            None.
+
+        Code: EC_TOO_MANY - Failure: Too many lost password or lost user name
+                                     requests have been made for this account.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+madr - Lookup the machine address of a user.
+
+    Request:
+        Kind: 'madr'
+        Code: 0
+        Args:
+            PERS=<user to lookup>
+
+                or
+
+            MADDR=<machine address to lookup>
+
+            If PERS is provided, the matching MADDR will be looked up.  If
+            MADDR is provided, the matching PERS will be looked up.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            PERS=<persona>
+            MADDR=<machine address>
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_NOT_FOUND - Failure: Could not locate mapping.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+mesg - Send a chat message.
+
+    Request:
+        Kind: 'mesg'
+        Code: 0
+        Args:
+            PRIV=<name of user to send msg to>     - Optional
+            SET=<user set name to send msg to>     - Optional
+            ATTR=<message attributes>              - Optional
+            TEXT=<text of chat message>
+        Notes:
+            The N-attribute flag causes messages to be sent unfiltered.
+            It is up to the client to discard all N-attribute messages.
+            These are normally used for private client-client application
+            messages (where the filter would mess up the data). The E-flag
+            will prevent the server from sending back an echo of the
+            message. The R-flag will cause the server to attach the sending
+            users information to the message.
+
+            If the SET parameter is given, the message will be sent to all
+            members of the given user set name as long as the calling user
+            is a member of that set.  The LOBBYAPI_MESG_FL_SET flag will be set
+            on the message attributes in the +msg to indicate a user set
+            message.
+
+            If the LOBBYAPI_MESG_FL_GAME is set, the mesasge will be sent to
+            all members of the calling user's current game.
+
+    Response:
+        No response on success.
+
+        Code: EC_DETENTION - Failure: User on detention.  May not post.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USER - Failure: Dest user not logged in.
+        Results:
+            None.
+
+        Code: EC_IN_GAME - Failure: User is currently playing a game.
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: Cannot send messages to yourself.
+        Results:
+            None.
+
+        Code: EC_NO_PRIV - Failure: Dest user is not accepting messages.
+        Results:
+            None.
+
+        Code: EC_NO_ROOM - Failure: User is not in a chat room.
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid message body.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+    Async respones:
+        +msg // todo
+
+-------------------------------------------------------------------------------
+
+minf - Get master account info
+    Request:
+        Kind: 'minf'
+        Code: 0
+        Args: No args
+	    
+    Response:
+        Code: EC_OKAY
+        Results:
+            NAME=<master account name>
+            MAIL=<email address>
+            SPAM=<spam settings>
+	
+-------------------------------------------------------------------------------
+
+mlog - fetch message logs
+    Request:
+        Kind: 'mlog'
+        Code: 0
+        Args: No args
+	    
+		             
+    Response:
+        Code: mlog
+	message header :
+		COUNT : number of messages
+		SIZE  : The size in bytes of all the messages  
+		
+	for all message logs a Asynchronous message is created with the following format:
+	code:+mlg
+	LOG<ID>=<color in hex>,<TimeStamp in hex>,<Message>
+	
+-------------------------------------------------------------------------------
+
+move - Move to a different room or out of a room altogether.
+
+    Request:
+        Kind: 'move'
+        Code: 0
+        Args:
+            NAME=<name of room>       - Name of the room to move into.
+                                      - If empty/missing then move out of all
+                                        rooms.
+            CAT=<room category>       - Optional
+            IDENT=<room identifier>   - Room identifier to move into.  If NAME
+                                        is given, set IDENT=-1.
+            PASS=<password for room>  - If necessary.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            IDENT=<room identifier>
+            NAME=<room name>
+            COUNT=<room population>
+            FLAGS=<room flags>                 - If moving into new room
+            LIDENT=<last room identifier>      - If moving out of all rooms
+            LCOUNT=<# users in last room>      - If moving out of all rooms
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_DETENTION - Failure: User is on detention.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_ROOM - Failure: Unknown room.
+        Results:
+            None.
+
+        Code: EC_KICKED - Failure: User has been kicked out of this room.
+        Results:
+            None.
+
+        Code: EC_FULL - Failure: The room is already full.
+        Results:
+            None.
+
+        Code: EC_NO_HOST - Failure: Cannot join room until host returns.
+        Results:
+            None.
+
+        Code: EC_INV_PASS - Failure: Invalid password given.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_CATEGORY - Failure: Unknown category to associate room with.
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+    Async responses:
+        None. // todo
+
+-------------------------------------------------------------------------------
+
+news - Get the news.
+
+    Request:
+        Kind: 'news'
+        Code: 0
+        Args:
+            NAME=<#>         - Index of news file to get.
+                             - Alternately, the name of a section in the
+                              config file may be specified.
+            LOCALIZE=<0|1>   - Optional: indicate if results should be localized.
+                               If set to 1, each TagField attribute will be
+                               run through the server localizer.
+            LOC=<locality>   - Optional: locality to use if LOCALIZE=1.  If
+                               omitted, the calling user's locality will be used.
+                               Note that if this command is issued prior to
+                               the user being logged in (eg. prior to the 'pers'
+                               command), then you MUST provide this parameter if
+                               a language other than english is required.
+
+
+    Response:
+        Code: EC_NEWS_0 + index - Success
+        Results:
+            <News text>
+
+        Code: EC_NOT_FOUND: Requested item was not found.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olcr - Create an online league.
+
+    Request:
+        Kind: 'olcr'
+        Code: 0
+        Args:
+            NAME=<name>	                                            - Name of the online league
+	    ABBR=<abbreviation>                                     - abbreviation of the league
+            MAXSIZE=<maximum number of users in the online league>
+            GAMES=<games to be played between each player>
+            PASS=<password of the online league>                    - Optional
+            TOGL1=<toggle field 1>				    - Range from 0-9
+            TOGL2=<toggle field 2>				    - Range from 0-9
+            TOGL3=<toggle field 3>				    - Range from 0-9
+            TOGL4=<toggle field 4>				    - Range from 0-9
+            TOGL5=<toggle field 5>				    - Range from 0-9
+            DNF=<DNF limit to join>
+            REP=<REP limit to join>                                 - For XBOX
+            LOGO=<logo of the online league>
+            DESC=<description of the online league>
+            TEAM=<team id>                                          - For creating user
+            
+    Response:
+        Code: EC_OKAY
+        Results:
+            ID=<online league id>
+
+	Code: EC_INV_PARAM	- name length is invalid
+                		- abbr length is invalid
+				- number of users per league is invalid
+				- number of games for each team is invalid
+				- password length is invalid
+				- online league id is not given
+	Results:
+	    None.
+
+	Code: EC_FILTER	- name has profanity
+			- abbr has profanity
+			- password has profanity
+	Results:
+	    None.
+
+	Code: EC_USER_ALREADY_JOINED	- user's already in max number of leagues to join ( = 10 )
+	Results:
+	    None.
+
+	Code: EC_NAME_TAKEN		- online league with the name already exists
+	Results:
+	    None.
+
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olup - Update online league content
+
+    Request:
+        Kind: 'olup'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+	    TRPY=<trophy>          - Trophy to replace with
+	    NEWS=<news>            - News to replace with
+            PASS=<password>        - Password to replace with
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM	- password length is invalid
+				- online league id is not given
+        Results:
+            None.
+
+	Code: EC_FILTER		- password has profanity
+        Results:
+            None.
+
+	Code: EC_NOT_MEMBER	- caller's not a member of the online league
+        Results:
+            None.
+
+	Code: EC_NOT_MANAGER	- caller's not a GM of the online league        
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olde - Delete online league
+
+    Request:
+        Kind: 'olde'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+	    None.
+
+	Code: EC_INV_PARAM	- online league id is not given
+	Results:
+	    None.
+
+	Code: EC_UNKNOWN_GAME	- no such online league exist
+        Results:
+	    None.
+
+	Code: EC_NO_SPACE 	- there are less than 3 members in the online league
+        Results:
+	    None.
+
+	Code: EC_NOT_MEMBER	- caller's not a member of the online league
+        Results:
+	    None.
+
+	Code: EC_NOT_MANAGER	- caller's not a member of the online league
+        Results:
+	    None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olre - Reset online league. All records disappear and schedule starts over.
+
+    Request:
+        Kind: 'olre'
+        Code: 0 
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM	- online league id is not given
+        Results:
+            None.
+
+	Code: EC_NOT_MEMBER	- caller's not a member of the online league
+        Results:
+            None.
+
+	Code: EC_NOT_MANAGER	- caller's not a member of the online league
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+oljo - Join online league.
+
+    Request:
+        Kind: 'oljo'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM		- online league id is not given
+        Results:
+            None.
+
+	Code: EC_USER_ALREADY_JOINED	- user's already in max number of leagues to join ( = 10 )
+        Results:
+            None.
+
+	Code: EC_ALREADY_MEMBER		- user's already in the online league
+        Results:
+            None.
+
+	Code: EC_FULL			- there's no room in online league
+        Results:
+            None.
+
+	Code: EC_MEMBER_BANNED		- user's DNF is higher than that of the online league
+        Results:
+            None.
+
+	Code: EC_INV_PASS 		- user's password does not match that of the online league
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olle - Leave online leave. This is voluntary and different from delete member function.
+
+    Request:
+        Kind: 'olle'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM	- online league id is not given
+        Results:
+            None.
+
+	Code: EC_NOT_MEMBER	- caller's not a member of the online league
+        Results:
+            None.
+
+	Code: EC_NOT_MANAGER	- caller's not a member of the online league
+        Results:
+            None.
+
+	Code: EC_NO_HOST	 - there's no GM other than the caller
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olag - Add GM to the online league.
+
+    Request:
+        Kind: 'olag'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM 	- online league id is not given
+        Results:
+            None.
+
+	Code: EC_NOT_MEMBER	- caller's not a member of the online league
+				- member to make GM does not exist in the online league
+        Results:
+            None.
+
+	Code: EC_NOT_MANAGER 	- caller's not a member of the online league
+        Results:
+            None.
+
+	Code: EC_ALREADY_MANAGER - member to make GM is already a GM
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olfi - Find online league(s)
+
+    Request:
+        Kind: 'olfi'
+        Code: 0
+        Args:
+	    MYREC=<0|1>		   - If this field is 1, all other fields are neglected and only the caller's online leagues are returned.
+	    ABBR=<abbreviation>                                     - abbreviation of the league
+            MAXSIZE=<maximum number of users in the online league>
+            GAMES=<games to be played between each player>
+            TOGL1=<toggle field 1>				    - Range from 0-9
+            TOGL2=<toggle field 2>				    - Range from 0-9
+            TOGL3=<toggle field 3>				    - Range from 0-9
+            TOGL4=<toggle field 4>				    - Range from 0-9
+            TOGL5=<toggle field 5>				    - Range from 0-9
+
+    Response:
+        Code: EC_OKAY
+        Results:
+	    CNT=<#>			- number of online leagues returned.
+	    IDS=<list of id's>
+	    NAMES=<list of names>
+	    PRIVATE=<list of 0|1>	- indicates whether the online league is passworded or not
+
+	Code: EC_INV_PARAM - no argument is given
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+oldm - Delete member from the online league
+
+    Request:
+        Kind: 'oldm'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+	    RUSR=<user id>	   - User to be deleted
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM	- online league id is not given
+        Results:
+            None.
+
+	Code: EC_NOT_MEMBER 	- caller's not a member of the online league
+				- member to delete does not exist in the online league
+        Results:
+            None.
+
+	Code: EC_NOT_MANAGER 	- caller's not a member of the online league
+        Results:
+            None.
+
+	Code: EC_SELF		- caller's the member to delete
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olme - Fetch the online league user information
+
+    Request:
+        Kind: 'olme'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM	- online league id is not given
+        Results:
+            None.
+
+	Code: EC_NOT_MEMBER	- member to fetch does not exist in the online league
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+olge - Fetch the online league information
+
+    Request:
+        Kind: 'olge'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM	- online league id is not given
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+ollg - Fetch the last 100 games played in the online league
+
+    Request:
+        Kind: 'ollg'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+	Code: EC_INV_PARAM	- online league id is not given
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+ollb - Fetch leaderboard for the online league
+
+    Request:
+        Kind: 'ollb'
+        Code: 0
+        Args:
+            ID =<online league id> - To locate online league
+
+    Response:
+        Code: EC_OKAY
+        Results:
+	    <list of users who are in the online league with their records>
+            ON=<0|1>	- To indicate whether the user is online or offline
+
+	Code: EC_INV_PARAM	- online league id is not given
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+onln - Get information about a user
+
+    Request:
+        Kind: 'onln'
+        Code: 0
+        Args:
+            PERS=<persona name>  - To locate data by persona
+            OFFLINE=<0|1>        - 0 = online search online users;
+                                   1 = if user not online, search user record
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            I=<user identifier>
+            N=<persona name>
+            M=<master account name>
+            F=<attribute flags>
+            A=<IP address of user>
+            P=<current server/user ping>
+            S=<ranked game stats>
+            X=<auxilliary info>
+            G=<game identifier>
+            AT=<attributes>
+            CL=<display colour (8-bit value)>
+            LV=<level>
+            MD=<medals>
+            C=<room entry criteria>
+            R=<user's current overall rank>
+            US=<user set ident>
+            LA=<local IP address of user>
+            RP=<users reputation>
+
+            If in room:
+
+            RM=<name of room>
+            RI=<room identifier>
+            RF=<room flags>
+            RT=<room current population>
+
+        Code: EC_UNKNOWN_USER - Failure: User is not online.
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: User could not be found.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+pass - Change master account password
+
+    Request:
+        Kind: 'pass'
+        Code: 0
+        Args:
+            CHNG=<new password>
+            PASS=<current password>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter
+        Results:
+            None.
+
+        Code: EC_INV_MASTER - Failure: Master account not found
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_INV_PASS - Failure: Invalid password
+        Results:
+            None.
+
+        Code: EC_PASS_LENGTH - Failure: Invalid password length;
+                            MIN_PASSWORD_LENGTH <= pass <= MAX_PASSWORD_LENGTH
+        Results:
+            None.
+
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+peek - Peek in a room.  Client will begin receiving room updates for the given
+       room even though the user is not in the room.  Peeking can only be done
+       when the user is not in any other room.
+
+    Request:
+        Kind: 'peek'
+        Code: 0
+        Args:
+            NAME=<room name>            - If not present, perform "unpeek".
+            CAT=<room category>         - Optional
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            IDENT=<room identifier>
+            NAME=<room name>
+            COUNT=<room population>
+            FLAGS=<room flags>
+
+        Code: EC_UNKNOWN_ROOM - Failure: Room given does not exist.
+        Results:
+            None.
+
+        Code: EC_IN_ROOM - Failure: User is already in a room.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_CATEGORY - Failure: Unknown category to associate room with.
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+    Async responses:
+        Client will start receiving room updates for specified room.
+        // todo
+
+-------------------------------------------------------------------------------
+
+pers - Set the active persona for the logged in master account.
+
+    Request:
+        Kind: 'pers'
+        Code: 0
+        Args:
+            PERS=<persona name>
+            MID=<machine id>         - ID unique to client hardware
+                                       (eg. PS2 console ID or XBOX XUID).
+                                       Stored in persona record for customer
+                                       support and banning.
+            MAC=<MAC address>        - MAC address of client.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            Full persona record will be returned (see 'user' command) as
+            well as:
+
+            EX-<extension server type>=<server connection info>
+
+            You will receive one of these fields for each extension server
+            type that is available and has its ADVERT flag set.  <auth> is an
+            authorization key that can be used to authenticate a connection
+            with the given extension server.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_SET - Failure: Persona has already been set.
+        Results:
+            None.
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: Unknown persona.
+        Results:
+            None.
+
+        Code: EC_NOT_OWNER - Failure: Master doesn't own given persona.
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+        Code: EC_LOCKED - Failure: Persona is locked.
+        Results:
+            DATE=<date when account will be unlocked>
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+priv - Set private message mode.
+
+    Request:
+        Kind: 'priv'
+        Code: 0
+        Args:
+            MODE=<on|off>           - on = enable private messages
+                                    - off = disable private messages
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            PRIV=<0|1>              - New status: 0=disabled 1=enabled
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+qdef - Quick Message Defaults -- load a user's default quickmessages.    
+
+    Request:
+        Kind: 'qdef'
+        Code: 0
+        Args:
+            none -- the users id is implicit.
+             
+    Response:
+        Code: EC_OKAY
+        Results  
+           Set of tag fields, which are the default quick messages for this user.
+
+    Code:
+        None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+quik - Find an opponent via quick-match.
+
+    Request:
+        Kind: 'quik'
+        Code: 0
+        Args:
+            KIND=<game type>            - * = remove from quick list
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            If no match found, append request to queue.
+            Otherwise, start new game.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+    Async responses:
+        // todo
+
+-------------------------------------------------------------------------------
+
+rank - Send ranking results.
+
+    Request:
+        Kind: 'rank'
+        Code: 0
+        Args:
+            AUTH=<MD5 hash>        - Game authorisation hash matching
+                                     hash provided when game set up.
+                                     Only include this for ranked
+                                     games.
+            REPT=<persona name>    - Persona name of game reporter.
+            NAME<x>=<persona name> - Name of opponent <x> (from +ses
+                                     packet).
+            TEAM<x>=<team id>      - ID of team used by player x.
+            VENUE=<venue id>       - ID of venue used for game.
+            SKU=<sku name>         - Name of the client SKU
+            WHEN=<time>            - Start time of game (from +ses
+                                     packet).
+            CLONE=1                - Optional: If provided, the game will be
+                                     cloned and the users will be left in the
+                                     game.  The cloned game will be identical
+                                     to the initial game and the started state
+                                     will have been reset.
+            LOCK=1                 - Optional: When used with CLONE=1, the cloned
+                                     game will be locked after cloning to prevent
+                                     users from joining/leaving until the host
+                                     explicitly unlocks it.
+
+            Game specific ranking info.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            RANK=<"Reported"|"Unranked">
+            TIME=<time when game played>
+
+        Code: EC_UNKNOWN_USER - Failure: Game reporter is not logged on.
+        Results:
+            None.
+
+        Code: EC_BOGUS - Failure: Invalid report.  See ranklog.txt log file.
+        Results:
+            None.
+
+        Code: EC_QUIT - Failure: Game quit.
+        Results:
+            None.
+
+        Code: EC_SOON - Failure: Record submitted too soon - invalid game.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+rcat - Fetch room category information
+
+    Request:
+        Kind: 'rcat'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            Each category will be returned encoded as:
+
+            CAT<categoryID>=name,params,prefix,res0,res1,res2,res3,auto_create
+
+            where:
+                name : name of the category
+                params : custom parameters for this category
+                prefix : room prefix used for this category
+                res0-3 : resource strings
+                auto_create : 0 = normal category
+                              1 = this is an auto-create category
+
+-------------------------------------------------------------------------------
+
+rent - Refresh entitlements.
+
+    Request:
+        Kind: 'rent'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account is not authorized.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+rept - Complain about another user.
+
+    Request:
+        Kind: 'rept'
+        Code: 0
+        Args:
+            PERS=<persona of user to report>
+            PROD=<product-platform-year>      - Optional: product identifier
+            TYPE=<report type>                - Use one of the preset #defines in
+                                                lobbyfeedback.h:
+                        LOBBYAPI_FEEDBACK_xxx_SUBTYPE_yyy
+            TEXT=<report description>         - Optional
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+        Code: EC_DISABLED - Failure: User reporting is unavailable.
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: No user of given persona name.
+        Results:
+            None.
+
+        Code: EC_SELF - Failure: Cannot report yourself.
+        Results:
+            None.
+
+        Code: EC_WOLF - Failure: Attempt to report user that hasn't posted.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+rlst - Get a list of ranker views.
+
+    Request:
+        Kind: 'rlst'
+        Code: 0
+        Args: None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            COUNT           - Number of view names returned
+            VIEW<x>         - View <x>'s name
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+room - Create a new room and move into it.
+
+    Request:
+        Kind: 'room'
+        Code: 0
+        Args:
+            NAME=<room name>
+            CAT=<room category>
+            PASS=<password>              - Optional
+                                         - $invis$ = invisible room
+            DESC=<description>           - Default: none
+            FLAGS=<room flags>           - Default: 0
+            CAP=<room capacity>          - Default: 25
+            IGNEXIST=<0|1>               - Optional:
+                                                0 = fail if room exists
+                                                1 = if room exists, ignore
+                                                    the create failure and
+                                                    just move into the room.
+            IGNPROFNAME=<0|1>            - Optional:
+                                               0 = fail if room name is profane
+                                               1 = do not check for profane room name
+
+            Any additional parameters may be added to specify room filter
+            criteria.  These parameters will be parsed and converted by
+            PlayModuleBuildRoomCriteria() (from mas-cust.cpp).
+
+            The room name (NAME) parameter should not contain the room
+            category.  The category should instead be specified in the CAT
+            parameter.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            IDENT=<room identifier>
+            NAME=<room name>
+            HOST=<room host>
+            DESC=<room description>
+            COUNT=<room population>
+            LIMIT=<room capacity>
+            FLAGS=<room flags>
+
+        Code: EC_MASTER_AUTH - Failure: Master account not authorized
+        Results:
+            None.
+
+        Code: EC_PERSONA_AUTH - Failure: Persona has not been authorized.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: Not authorized to create room.
+        Results:
+            None.
+
+        Code: EC_FULL - Failure: No more rooms can be created.
+        Results:
+            None.
+
+        Code: EC_FILTER - Failure: Invalid room name (profanity).
+        Results:
+            None.
+
+        Code: EC_INV_PASS - Failure: Password is invalid (eg. profanity)
+        Results:
+            None.
+
+        Code: EC_DUPLICATE - Failure: Duplicate room name
+        Results:
+            None.
+
+        Code: EC_ROOM_AUTH - Failure: user would not be able to enter
+                                      the room due to failing the room
+                                      filter criteria.
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_CATEGORY - Failure: Unknown category to associate room with.
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid room name given.
+        Results:
+            None.
+
+    Async responses:
+        +msg - Indicating user has left old room
+        +msg - Indicating room has been created
+        // todo: room creation?
+
+-------------------------------------------------------------------------------
+
+sele -  Select update mask to control the type of async updates the
+        client receives from the server.  The new update mask is returned.
+
+    Request:
+        Kind: 'sele'
+        Code: 0
+        Args:
+            USERS=<#>                - Select user update mask
+                                           0  = no updates
+                                           >0 = provide updates
+            GAMES=<#>                - Select games update mask
+                                           0  = no updates
+                                           >0 = provide updates
+            MYGAME=<#>                - Enable updates for joined game
+                                           0  = no updates
+                                           >0 = provide updates
+            ROOMS=<#>                - Select rooms update mask
+                                           0  = no updates
+                                           2  = no updates
+                                                (don't reset history rev #)
+                                           >0 = provide updates
+
+            MESGS=<#>                - Select messages update mask
+                                           >1 = provide updates
+            MESGTYPES=<flags>        - Indicate which messages types are wanted.
+                                       Set of:
+                                         LOBBYAPI_MESG_FL_PRIV  (private)
+                                         LOBBYAPI_MESG_FL_SET   (user set)
+                                         LOBBYAPI_MESG_FL_BROAD (broadcast)
+                                         LOBBYAPI_MESG_FL_GAME  (game members)
+                                         LOBBYAPI_MESG_FL_ROOM  (room)
+
+            ASYNC=<#>                - Select async messages update mask
+                                           >1 = provide updates
+                                     - Async messages must be have their kind
+                                       prefixed with '$' (eg. '$msg') or they
+                                       won't be delivered via the
+                                       LOBBYAPI_CBTYPE_EVNT callback.
+
+            USERSETS=<#>             - Select user set update mask
+                                           >1 = provide updates
+
+            USERSET<x>=<name>        - Select updates for user set <name> into
+                                       LOBBYAPI_LS_USERSET<x> slot.
+
+            STATS=<x>                - Select server stats updates
+                                            0 = no updates
+                                            >0 = # milliseconds between updates
+            INGAME=<0|1>             - Indicate to the server if the caller is
+                                       in-game.  This will affect things like
+                                       the profanity filtering of chat messages.
+
+            CTRL=<0|1|2>             - Set when user control messages are to be
+                                       delivered.
+
+                                       0 = No updates.
+                                       1 = Send updates but do not reset sent state
+                                          on already delivered but unacked messages.
+                                       2 = Send updates and reset sent state
+
+
+    Response:
+        Kind: 'sele'
+        Code: EC_OKAY
+        Results:
+            GAMES=<0|1>              - 0 = no updates / 1 = updates
+            MYGAME=<0|1>             - 0 = no updates / 1 = updates
+            ROOMS=<0|1>              - 0 = no updates / 1 = updates
+            USERS=<0|1>              - 0 = no updates / 1 = updates
+            MESGS=<0|1>              - 0 = no updates / 1 = updates
+            RANKS=<#>                - 0 = no updates / >0 = update range
+            ASYNC=<#>                - 0 = no updates / 1 = updates
+            USERSETS=<#>             - 0 = no updates / 1 = updates
+            USERSET<x>=<set name>    - (<set name> != "") = updates
+            MORE=<0|1>               - 1 = (RANKS < 1000) / 0 = (RANKS >= 1000)
+            CTRL=<0|1>               - 0 = no updates / 1 = updates
+
+
+    Async responses:
+        None. // todo?
+
+-------------------------------------------------------------------------------
+
+shut - Shutdown the server.
+
+    Request:
+        Kind: 'shut'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account is not authorized.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: Not authorized to shutdown (admin only).
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+skey - Send session key to server.
+
+    Request:
+        Kind: 'skey'
+        Code: 0
+        Args:
+            PKEY=<client's public key>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            PKEY=<unique session key>
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+slst - Retrieve a list of statbook views available from the server
+
+    Request:
+        Kind: 'slst'
+        Code: 0
+        Args:
+            EXTERNAL=1      - Optional: Fetch list of external statbook views only
+                              (eg. cross-product/cross-year views)
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            COUNT=<number of views returned>
+            VIEW<x>=<name>,<desc>,<style>     - 1 for each view
+
+        Code: EC_MASTER_AUTH - User is not authenticated
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+snap - Request ranking snapshot
+
+    Request:
+        Kind: 'snap'
+        Code: 0
+        Args:
+            CHAN=<display list channel>
+            INDEX=<index of ranking list>   - List to get snapshot for
+            START=<start ranking>           - Default: -1
+            RANGE=<0-500>                   - Default: 50; Valid: 0-500
+            FIND=<user name to find>        - Optional:
+                                            - "$" = Use current user
+                                            - This param overrides the START
+                                              param.  Records returned will
+                                              be centered around this user's
+                                              entry in the ranking list.
+            SEQN=<sequence number>          - Optional: echoed back in response
+            COLS=<integer>                  - 1 means send column information
+                                              0 means already have it, don't send
+            CI=<category-index>
+            II=<index-index>
+            VI=<variation-index>
+            BUDDIES=<comma-separated list of buddies>
+
+      Either of INDEX or CI&II&VI must be specified.  If both are then
+      INDEX takes precedence.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            CHAN=<matching request value>
+            START=<actual start used>
+            RANGE=<actual range used>
+            SEQN=<value provided in request>
+            CC=<number of columns>
+            FC=<number of fixed columns>
+            DESC=<list-description>
+            PARAMS=<comma-separated list of integer parameters>
+            CN%d=<column-name>
+            CD%d=<column-name>
+            CP%d=<column-parameter>
+            CW%d=<column-width>
+            CT%d=<column-type>
+            CS%d=<column-style>
+
+          where %d gets replaced by 0 to CC-1.
+
+        Code: EC_UNKNOWN_LIST - Failure: ranking list does not exist.
+        Results:
+            None.
+
+        Code: EC_INV_RANGE - Failure: Invalid range given.
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: FIND user could not be found.
+        Results:
+            None.
+
+        Code: EC_INV_START - Failure: No start point specified.
+        Results:
+            None.
+
+    Async responses:
+        // todo
+        +snp
+
+-------------------------------------------------------------------------------
+
+sdta - Request the statbook for a given user.
+
+    Request:
+        Kind: 'sdta'
+        Code: 0
+        Args:
+            PERS=<persona-name> -- Persona of user to fetch.  If preceeded by the
+                                   prefix defined as LOBBYAPI_GENERATE_USER_PREFIX
+                                   in lobbycommondefs.h then handled
+                                   specially.  For example, average user stats
+                                   can be fetched by passing "$avg"
+                                   (LOBBYAPI_GENERATED_USER_AVERAGE).
+            SLOT=<slot-number>  -- not interpreted, just echoed back
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            STATS=<comma-separated list of stat values>
+            SLOT=<slot-number>       -- same as value in request
+
+        Code: EC_INV_PERSONA - Failure: Unknown persona
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_VIEW - Failure: sview has not been called to set view.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+sviw - Request names for each fields in a user's stats record.
+
+    Request:
+        Kind: 'stat'
+        Code: 0
+        Args:
+            VIEW=<view-name>
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            VIEW=<view-name>
+            N=<number of NAMES/DESCS/PARAMS/WIDTHS>
+            NAMES=<comma-separated list of stat field names>
+            DESCS=<comma-separated list of stat field descriptions>
+            LAYOUTS=<comma-separated list of stat layouts>
+            TYPES=<comma-separated list of types>
+
+        Code: EC_UNKNOWN_VIEW - Failure: unknown view
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+trpy - Fetch trophies information for a user
+
+    Request:
+        Kind: 'trpy'
+        Code: 0
+        Args:
+            PERS=<persona to fetch info for>
+            DEFAULTS=<0|1>        - Optional: If 1, return trophies in the
+                                    DEFAULTS list in trophies.txt on the server 
+                                    for trophy families that the user has not
+                                    won any trophies in yet.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            PERS                                    - Requested persona
+            COUNT                                   - Number of trophies
+            T<x>=ident,name,desc,image,date,count   - Trophy info
+
+                where:
+                    ident = trophy identifier (as defined in trophies.txt)
+                    name = trophy name
+                    desc = trophy description
+                    image = image resource string
+                    date = time when last trophy of this type was awarded
+                    count = number of trophies of this type the user has been awarded
+
+
+        Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: Persona does not exist.
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access/write error.
+        Results:
+            None.
+
+-------------------------------------------------------------------------------
+
+uadm - Allow owner to adjust user set parameters
+
+    Request:
+        Kind: 'uadm'
+        Code: 0
+        Args:
+            SYSFLAGS   - Optional: System flags (LOBBYAPI_USERSET_FL_xx) (Flags)
+            CUSTFLAGS  - Optional: Custom flags (Flags)
+            PASS       - Optional: New password (String)
+            DESC       - Optional: New description (String)
+            PARAMS     - Optional: New custom parameters (String)
+            OWNER      - Optional: New owner (String)
+            KICK       - Optional: User to kick out (String)
+            KICK_REASON - Optional : An integer value indicating the reason why
+                          the user is being kicked from the user set
+            SESS       - Optional: Platform specific session identifier (String)
+            PLATPARAMS - Optional: Platform specific parameters (String)
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_NOT_FOUND - Set not found
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - No privilege to perform operation
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - User is not authenticated
+        Results:
+            None.
+
+        Code: EC_NOT_OWNER - User is the owner of the set
+        Results:
+            None.
+
+        Code: EC_UNKNOWN_USER - New owner not found
+        Results:
+            None.
+
+
+    Async responses:
+        +ust if "sele USERSETS=1" has been set.
+
+-------------------------------------------------------------------------------
+
+uatr - Update user attributes and hardware flags
+
+    User attributes are stored as bitfields in a 32 bit unsigned integer and
+    are non-persistent between logins.  These attributes can be used in
+    conjunction with room entry filtering to control user access to certain
+    rooms.  Hardware flags indicate which hardware the user has available
+    (such as a headset or keyboard).  The HWMASK parameter is used to filter
+    out attributes which aren't appropriate for the client's hardware.
+    
+    A user's flags (LOBBYAPI_USER_FL_xxx) may be set with this command as
+    well.  Only the FILT, PRIV, and ATTR[0-3] flags may be modified though.
+
+
+    Request:
+        Kind: 'uatr'
+        Code: 0
+        Args:
+            ATTR=<user attributes>     - Optional: Integer attribute
+            HWFLAG=<hardware flags>    - Optional: LOBBYAPI_HW_xxx flags
+            HWMASK=<hardware mask>     - Optional but paired with HWFLAG
+            FLAGS=<user flags>         - Optional: set of LOBBYAPI_USER_FL_xxx
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: Master account is not authorized.
+        Results:
+            None.
+
+    Async responses:
+        +who and +usr msg will be sent if attributes changed.
+
+-------------------------------------------------------------------------------
+
+ucre - Create a new user set.
+
+    A user set maps a set of online users into a group.
+
+    Request:
+        Kind: 'ucre'
+        Code: 0
+        Args:
+            NAME       - Optional: Name of the user set (String)
+                         If not provided, a unique name will be created
+            SIZE       - Size of set (Number)
+            TYPE       - Optional: Type of the user set (Number)
+            SYSFLAGS   - Optional: System flags (LOBBYAPI_USERSET_FL_xx) (Flags)
+            CUSTFLAGS  - Optional: Custom flags (Flags)
+            DESC       - Optional: Description (String)
+            PARAMS     - Optional: Custom params (String)
+            PASS       - Optional: Entry password (String)
+            SESS       - Optional: Platform specific session identifier (String)
+            PLATPARAMS - Optional: Platform specific parameters (String)
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            IDENT       - Identifier of newly created set
+            NAME        - Name of newly created set
+
+        Code: EC_MISSING_PARAM - Failure: Required parameter missing
+        Results:
+            None.
+
+        Code: EC_INV_PARAM - Failure: Invalid parameter
+        Results:
+            None.
+
+        Code: EC_DUPLICATE - Failure: Duplicate set name
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: User not authenticated
+        Results:
+            None.
+
+        Code: EC_USER_ALREADY_JOINED - Failure: Calling user is already in a set
+        Results:
+            None.
+
+    Async responses:
+        +ust if "sele USERSETS=1" has been set.
+
+-------------------------------------------------------------------------------
+
+udel - Delete a user set.
+
+    Request:
+        Kind: 'udel'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_NOT_FOUND - Failure: Set not found.
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: No access to delete set
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: User not authenticated
+        Results:
+            None.
+
+        Code: EC_NOT_OWNER - Failure: User is not the owner of the set
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+ujoi - Join a user set
+
+    Request:
+        Kind: 'ujoi'
+        Code: 0
+        Args:
+            NAME       - Name of the user set to join (String)
+            PASS       - Optional: Password (if required) (String)
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            IDENT       - Identifier of joined set
+
+        Code: EC_NOT_FOUND - Failure: Set not found
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: No privilege to join
+        Results:
+            None.
+
+        Code: EC_INV_PASS - Failure: Invalid password
+        Results:
+            None.
+
+        Code: EC_FULL - Failure: Set is full.
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: User is not authenticated
+        Results:
+            None.
+
+        Code: EC_ALREADY_JOINED - Failure: User is already joined to a set
+        Results:
+            None.
+
+        Code: EC_LOCKED - Failure: Set is locked
+        Results:
+            None.
+
+    Async responses:
+        +usm if "sele USERSET<x>=<name>" is set
+
+-------------------------------------------------------------------------------
+
+ulea - Withdraw from a user set
+
+    Request:
+        Kind: 'ulea'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            None.
+
+        Code: EC_NOT_FOUND - Failure: Set not found
+        Results:
+            None.
+
+        Code: EC_NO_PRIVILEGE - Failure: No privilege to join
+        Results:
+            None.
+
+        Code: EC_MASTER_AUTH - Failure: User is not authenticated
+        Results:
+            None.
+
+        Code: EC_INV_OPERATION - Failure: Owner may not leave set
+        Results:
+            None.
+
+        Code: EC_USER_NOT_JOINED - Failure: User not a member of given set
+        Results:
+            None.
+
+    Async responses:
+        +usm if "sele USERSET<x>=<name>" is set
+
+-------------------------------------------------------------------------------
+
+usea - Search for user sets
+
+      Request:
+          Kind: 'usea'
+          Code: 0
+          Args:
+            START      - Set index to start at (Number)
+            COUNT      - Number of userset records to return (Number)
+            CUSTFLAGS  - Optional: custom game defined flags (Number)
+            CUSTMASK   - Optional: custom game flag mask (Number)
+            SYSFLAGS   - Optional: userset system defined flags (Number)
+            SYSMASK    - Optional: system flag mask (Number)
+            NAME       - Optional: userset name substring (String)
+
+      Response:
+          Code: EC_OKAY
+          Results:
+              COUNT - Number of matches (number of +uss responses expected).
+
+            Code: EC_UNKNOWN_USER - Failure: Calling user not logged in.
+            Results:
+                None.
+
+-------------------------------------------------------------------------------
+
+user - Fetch master account information for the logged in user.
+
+    Request:
+        Kind: 'user'
+        Code: 0
+        Args:
+            None.
+
+    Response:
+        Code: EC_OKAY
+        Results:
+            NAME - Master account name.
+            SPAM - Spam setting flags.
+            MAIL - Email address.
+
+        Code: EC_INV_MASTER - Failure: User not found.
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+usld - User Settings Load -- load a user's (persona's) common game specific settings.    
+
+    Request:
+        Kind: 'usld'
+        Code: 0
+        Args:
+            none -- the users id is implicit.
+             
+    Response:
+        Code: EC_OKAY
+        Results  
+           Set of tag fields, which are  the user settings for this user.
+
+Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB access error.
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: Unknown persona account
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+-------------------------------------------------------------------------------
+
+ussv - User Settings Save -- Save a this user's common and game specific settings to the db. 
+
+    Request:
+        Kind: 'ussv'
+        Code: 0
+        Args:
+	    Set of tag fields, which are various game specific  and common settings.
+		             
+    Response:
+        Code: EC_OKAY
+        Results (for PERS=<persone> ):
+            Was saved ok.    
+
+Code: EC_MISSING_PARAM - Failure: Missing parameter.
+        Results:
+            None.
+
+        Code: EC_DB_ERROR - Failure: DB write access error.
+        Results:
+            None.
+
+        Code: EC_INV_PERSONA - Failure: Unknown persona account
+        Results:
+            None.
+
+    Async responses:
+        None.
+
+
+-------------------------------------------------------------------------------
+
+vote - vote on someone for reputation 
+    Request:
+        Kind: 'vote'
+        Code: 0
+        Args: 2 args : PERS=<persona voting on> VOTE=<1=good / 0=bad>
+	    
+		             
+    Response:
+		None 
+        	
+-------------------------------------------------------------------------------
+
+
+~png - Ping the server.  Internal use only.  Not to be initiated by application.
+    Request:
+        Kind: '~png'
+        Code: <time time>
+        Args:
+            None.
+
+    Response:
+        None.
+
+    Async responses:
+        None.
+
+
+2 Asynchronous messages
+=======================
+
++bud - Buddy add/remove - from slave to client
+
+    +bud TYPE=<module issuing message (eg. "tourney")
+         OP="add" | "rem"
+         PERS=<persona name to add/remove>
+         TEMP=[0|1] - Is this a temporary buddy?
+
+-------------------------------------------------------------------------------
+
++cat - Ranking category - from slave to client
+
+    +cat C=<category-name>
+         L=<list-name>
+         V=<variation-name>
+         I=<list-index>
+
+-------------------------------------------------------------------------------
+
++ctl - Control message  - from slave to client
+
+    +ctl I=<message identifier (Number)>
+         C=<category (Token)>
+         M=<type (Token)>
+         D=<custom data (String)>
+
+-------------------------------------------------------------------------------
+
++ils - Send Interactive League game schedule snapshot
+
+    +ils I=<game id>
+         S=<game window start time>
+         E=<game window end time>
+         D=<game start time>
+         T=<comma separated list of team ids>
+         W=<comma separated list of ranking order of team winners>
+            - If the game hasn't completed yet, this attribute will be missing
+            - A 0 value indicates the winner and progressively larger values
+              indicate the order of the remaining players.  Eg. for a two
+              team game, the winner would have value 0 and the loser would
+              have value 1.
+         G=<game status, int mapping in LeagueGameStatusE>
+         C=<channel passed in on 'ilsc' request as CHAN parameter>
+
+-------------------------------------------------------------------------------
+
++msg - Chat message
+
+    +msg F=<flags>
+         N=<name of user sending message>
+         T=<text of message>
+         U=<platform-specific user id of sender>
+
+-------------------------------------------------------------------------------
+
++pop - Room population update
+
+    +pop Z=<id/pop,...>     - Room id/population pairs
+
+-------------------------------------------------------------------------------
+
++rka - Distribute ranking list - master to slave
+
+    +rka IDX=<ranking-list-index>
+         CNT=<#users-in-list>
+         WID=<width-of-data-in-bytes>
+
+-------------------------------------------------------------------------------
+
++rom - Distribute room change updates
+
+    +rom N=<room name>
+         H=<room host>
+         D=<room description>
+         F=<attribute flags>
+         T=<current room population>
+         L=<max users allowed in room>
+         P=<room ping>
+         A=<room address>
+
+
+-------------------------------------------------------------------------------
++cat - Distribute Category information
+    +cat CATEGORY_ID 		= <Category unique identifier>              
+	 AUTO_CREATE_ROOM 	= <Booloean representing if should create room automatically> 
+	 DESCRIPTION		= <The description of this category>
+	 PREFIX			= <The prefix to display for this category>
+	 PARAM			= <Extra information about the category>
+	 IMG1			= <The resource id of the first Image>
+	 IMG2			= <The resource id of the second Image>
+	 IMG3			= <The resource id of the third Image>
+	 IMG4			= <The resource id of the forth Image>
+	 LIMIT			= <The limit per room in the category>
+	 PCT			= <the percentage of people in which to create a new room>
+	 
+-------------------------------------------------------------------------------
++koh - Distribute the king of the hill data 
+	+koh
+		SIZE=<number of member in list>
+		
+	for each member of the list :
+		N=<name of persona>
+		S=The record associated with this persona
+	
+-------------------------------------------------------------------------------
+
++ses - Game startup notification
+
+    +ses IDENT=<game identifier>
+         WHEN=<game start time>
+         NAME=<name of the game>
+         HOST=<persona of host>
+         ROOM=<room name (if associated with a room)>
+         MAXSIZE=<max opponents allowed in game>
+         MINSIZE=<min opponents required to start game>
+         COUNT=<number of opponents>
+         CUSTFLAGS=<custom game defined flags>
+         SYSFLAGS=<game system flags>
+         EVID=<event id>
+         EVGID=<event game id>
+         NUMPART=<number of partitions>
+         OPID<x>=<opponent <x>'s user identifier>
+         OPPO<x>=<opponent <x>'s persona>
+         ADDR<x>=<external address of opponent <x>>
+         LADDR<x>=<internal address of opponent <x>>
+         MADDR<x>=<MAC address of opponent <x>>
+         OPPART<x>=<opponent <x>'s partition>
+         PARAMS=<custom game parameters>
+         PARTPARAMS<x>=<custom params for partition <x>>
+         OPPARAMS<x>=<custom params for user <x>>
+         OPFLAG<x>=<custom flags for user <x>>
+
+         SEED=<random # seed>
+         AUTH=<authentication string>
+             
+-------------------------------------------------------------------------------
+
++snp - Send ranking snapshot
+
+    +snp N=<persona name>
+         R=<rank>
+         P=<points>
+         O=<online>
+         S=<stats>
+    
+-------------------------------------------------------------------------------
+
++usr - Send user updates
+
+    See 'onln' command for encoded values.
+
+-------------------------------------------------------------------------------
+
++who - Send a user update record for the current logged in user.
+
+    See 'onln' command for encoded values.
+
+-------------------------------------------------------------------------------
+
++var - Distribute ranking variation - master to slave
+
+    +var IDX=<ranking-list-index>
+         DESC=<list-description>
+         CC=<number of columns>
+         FC=<number of fixed columns>
+         COLNAME%d=<column-name>
+         COLDESC%d=<column-description>
+         COLPARM%d=<column-parameter>
+         COLWIDTH%d=<column-width>
+         VIEW=<view-name>
+         CN=<category-name>
+         VN=<variation-name>
+         CI=<category-index>          - 0 based
+         II=<index-index>             - 0 based
+         VI=<variation-index>         - 0 based
+
+     where %d gets replaced by 0 to CC-1.
+
+
+
+3 Command line
+==============
+
+Unless otherwise documented, all command line commands return an error code
+of 0 with the MESG field containing a description of the action taken or the
+reason for failure.
+
+==============
+
+/HELP - Show available commands.
+
+    /HELP
+
+-------------------------------------------------------------------------------
+
+/ME - Send a chat message.
+
+    /ME <text for message>
+
+    Response:
+        Same return codes as 'move' command.
+
+-------------------------------------------------------------------------------
+
+/JOIN - Join a chat room
+
+    /JOIN <room name> [<room password>]
+
+    Response:
+        Same return codes as 'move' command.
+    
+-------------------------------------------------------------------------------
+
+/LEAVE - Leave the current room.
+
+    /LEAVE ROOM
+
+    Response:
+        Same return codes as 'move' command.
+
+-------------------------------------------------------------------------------
+
+/KILL - Delete the current room.
+
+    /KILL ROOM
+
+    Response:
+        Same return codes as 'kill' command.
+
+-------------------------------------------------------------------------------
+
+/TELL - Send private chat message.
+
+    /TELL "<username>" <message text>
+
+    Response:
+        Same return codes as 'mesg' command.
+
+-------------------------------------------------------------------------------
+
+/INVITE - Invite a user into current room.
+
+    /INVITE <user name>
+
+    Response:
+        Same return codes as 'invt' command.
+
+-------------------------------------------------------------------------------
+
+/PRIVATE - Turn private messages on/off.
+
+    /PRIVATE [ON | OFF]
+
+    Response:
+        Same return codes as 'priv' command.
+
+-------------------------------------------------------------------------------
+
+/PROFILE - Set/get profile text
+
+    /PROFILE <profile text>
+    /PROFILE NONE                   - Clear profile text
+
+    Response:
+        Same return codes as 'prof' command.
+        
+-------------------------------------------------------------------------------
+
+/REPORT - Report a user to administrators.
+
+    /REPORT <user name>
+
+    Response:
+        Same return codes as 'rept' command.
+
+-------------------------------------------------------------------------------
+
+/KICK - Kick a user out of current room.
+
+    /KICK <username>
+
+    Response:
+        Same return codes as 'kick' command.
+
+-------------------------------------------------------------------------------
+
+/ROOMHOST - Set room host for current room.
+
+    /ROOMHOST <user name>
+
+    Response:
+        Same return codes as 'attr' command.
+
+-------------------------------------------------------------------------------
+
+/ROOMVICE - Set room host assistant for current room.
+
+    /ROOMVICE <user name>
+
+    Response:
+        Same return codes as 'attr' command.
+
+-------------------------------------------------------------------------------
+
+/VERSION - Get server version.
+
+    /VERSION
+
+-------------------------------------------------------------------------------
+
+/WHOAMI - Describe current user persona.
+
+    /WHOAMI
+
+    Response:
+        Same return codes as 'user' command.
+
+-------------------------------------------------------------------------------
+
+/WHOIS - Describe given user persona.
+
+    /WHOIS <user name>
+
+    Response:
+        Same return codes as 'user' command.
+
+-------------------------------------------------------------------------------
+
+/TIME - Get server time.
+
+    /TIME
+
+-------------------------------------------------------------------------------
+
+/QUIT - Disconnect from server.
+    
+    /QUIT NOW
+
+-------------------------------------------------------------------------------
+
+/MONITOR - Monitor messages within a room. (Moderator)
+
+    /MONITOR <room name>
+
+-------------------------------------------------------------------------------
+
+/PERSIST - Make current room persistent. (Moderator)
+
+    /PERSIST ROOM
+
+    Response:
+        Same return codes as 'attr' command.
+
+-------------------------------------------------------------------------------
+
+/UNPERSIST - Make current room non-persistent. (Moderator)
+
+    /UNPERSIST ROOM
+
+    Response:
+        Same return codes as 'attr' command.
+
+-------------------------------------------------------------------------------
+
+/LIMIT - Set maximum users allowed in current room. (Moderator)
+
+    /LIMIT <count>
+
+    Response:
+        Same return codes as 'attr' command.
+
+-------------------------------------------------------------------------------
+
+/PASSWORD - Set password for current room. (Moderator)
+
+    /PASSWORD <password>
+
+    Response:
+        Same return codes as 'attr' command.
+
+-------------------------------------------------------------------------------
+
+/USERLIST - Current list of users currently online. (Moderator)
+
+    /USERLIST [<filter>]
+
+        <filter> : room name
+                   IP address of server
+
+-------------------------------------------------------------------------------
+
+/LOCATE - See if user is online and get user info if they are.
+
+    /LOCATE <user name>
+
+-------------------------------------------------------------------------------
+
+/CONSOLE - Output slave server console debugging to given filename.
+           (Administrator)
+
+    /CONSOLE <filename>
+
+        Win32: <filename> = "null"
+                            "con"
+                            "file:<filename>"
+
+        Unix: <filename> = "/dev/<device>"
+
+-------------------------------------------------------------------------------
+        
+/HELP2 - Show help for administrator/moderator commands.
+
+    /HELP2
+
+-------------------------------------------------------------------------------
+
+/SHUTDOWN - Shutdown the server. (Administrator)
+            If given timeout is <= 0 or > 3600 then shutdown will be cancelled.
+
+    /SHUTDOWN <timeout in seconds> <message>
+
+-------------------------------------------------------------------------------
+
+/ACCOUNT - Set master account attributes. (Administrator)
+
+    /ACCOUNT <user name> <attribs>
+        
+        <attribs> = +m = make moderator
+                    -m = remove moderator
+                    +t = make tester
+                    -t = remove tester
+
+-------------------------------------------------------------------------------
+
+/DETEN - Set/clear detention for user (master or persona account). (Moderator)
+
+    /DETEN [NAME|PERS] <user name> <timeout>
+
+        <timeout> : * = lock
+                    0 = clear
+                    <x>m = <x> minutes
+                    <x>h = <x> hours
+                    <x>d = <x> days
+                    <x>w = <x> weeks
+
+-------------------------------------------------------------------------------
+
+/WELCOME - Set message to show user at login. (Moderator)
+
+    /WELCOME <user name> <message text>
+
+-------------------------------------------------------------------------------
+
+/STATS - Get server stats. (Moderator)
+
+    /STATS
+
+-------------------------------------------------------------------------------
+
+/BACKUP - Start a DB backup of user accounts. (Administrator)
+          Purge operation does not currently work with new account server.
+
+    /BACKUP USERS [PURGE]
+
+-------------------------------------------------------------------------------
+
+/PERSKILL - Delete a persona account. (Administrator)
+
+    /PERSKILL <user name> <user name>
+
+-------------------------------------------------------------------------------
+
+/PERSNAME - Rename a persona account. (Administrator)
+
+    /PERSNAME <old name> <new name>
+
+-------------------------------------------------------------------------------
+
+/CONSOLE2 - Output master server console debugging to filename. (Administrator)
+
+    /CONSOLE2 <filename>
+
+        Win32: <filename> = "null"
+                            "con"
+                            "file:<filename>"
+
+        Unix: <filename> = "/dev/<device>"
+
+-------------------------------------------------------------------------------
+
+/UNRANK - Unrank a given user. (Administrator)
+
+    /UNRANK <user name> <user name>
+
+-------------------------------------------------------------------------------
+
+/UNRANKALL - Unrank all users. (Administrator)
+    
+    /UNRANKALL #yes# #reset#
+
+-------------------------------------------------------------------------------
+
+/RELOAD - Reload server config/news/filter files. (Moderator)
+
+    /RELOAD NOW
+
+-------------------------------------------------------------------------------
+
+/ARCHIVE - Move logfile into archive directory.
+    
+    /ARCHIVE <filename>
+
+        <filename> is name of log file to move.
+
+-------------------------------------------------------------------------------
+
+/BOOT - Boot user off system. (Moderator)
+    
+    /BOOT <user name>
+
+        <user name> may be either master account name or persona.
+
+-------------------------------------------------------------------------------
+
+/USERKILL - Delete master account. (Administrator)
+
+    /USERKILL <user name> <user name>
+
+-------------------------------------------------------------------------------
+
+/USERNAME - Change master account name. (Administrator)
+
+    /USERNAME <old name> <new name>
+
+-------------------------------------------------------------------------------
+
+/USERPASS - Change master account password. (Administrator)
+
+    /USERPASS <user name> <new password> <new password>
+
+-------------------------------------------------------------------------------
+
+/BROADCAST - Broadcast a message to all users. (Moderator)
+
+    /BROADCAST <message text>
+
+-------------------------------------------------------------------------------
+
+/BLACKLIST - Add a machine to the blacklist. (Administrator)
+
+    /BLACKLIST USER|MID <user name>|<machine ID> [<description>]
+
+-------------------------------------------------------------------------------
+
+/TROPHYADD - Add a new trophy for a user. (Administrator)
+
+    /TROPHYADD <user name> <trophy id>
+
+-------------------------------------------------------------------------------
+
+/TROPHYDEL - Remove a trophy from a user. (Administrator)
+
+    /TROPHYDEL <user name> <trophy id>
+
+-------------------------------------------------------------------------------
+
+/MEDAL - Set a user's medal value. (Administrator)
+
+    /MEDAL <user name> <medal value>
+
+    Medal value can be either a decimal or hex (0x) number.

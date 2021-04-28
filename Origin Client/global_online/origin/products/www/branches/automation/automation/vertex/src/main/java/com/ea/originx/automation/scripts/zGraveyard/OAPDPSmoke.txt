@@ -1,0 +1,158 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.helpers.EACoreHelper;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.macroaction.MacroSettings;
+import com.ea.originx.automation.lib.pageobjects.dialog.MediaDialog;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroPackartRating;
+import com.ea.originx.automation.lib.pageobjects.store.PDPPage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.resources.CountryInfo;
+import com.ea.vx.originclient.resources.LanguageInfo;
+import com.ea.vx.originclient.resources.LanguageInfo.LanguageEnum;
+import com.ea.vx.originclient.resources.OSInfo;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Test the PDP Page for Smoke Tests
+ *
+ * @author nvarthakavi
+ * @author micwang
+ */
+public class OAPDPSmoke extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 1016687)
+    @Test(groups = {"pdp", "release_smoke"})
+    public void testPDPSmoke(ITestContext context) throws Exception {
+
+        OriginClient client = OriginClientFactory.create(context);
+
+        final boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String userName = userAccount.getUsername();
+
+        EntitlementInfo twoLineEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.PVZ_GW_2_STANDARD_EDITION);
+        String twoLineEntitlementName = twoLineEntitlement.getName();
+
+        EntitlementInfo oneLineEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_DIGITAL_DELUXE);
+        String oneLineEntitlementName = oneLineEntitlement.getName();
+
+        final EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.SIMS4_STANDARD);
+        final String entitlementName = entitlement.getName();
+        final String entitlementFrenchName = "Les Sims™ 4";
+
+        String sandboxKey = "SANDBOX_ADDRESS";
+
+        List<PDPHeroDescription.EDITIONS> oneLineEntitlementEditionList = Arrays.asList(
+                PDPHeroDescription.EDITIONS.PREMIUM_EDITION,
+                PDPHeroDescription.EDITIONS.DIGITAL_DELUXE_EDITION,
+                PDPHeroDescription.EDITIONS.STANDARD_EDITION);
+
+        logFlowPoint("Login as a newly registered user"); //1
+        logFlowPoint("Navigate to an entitlement's PDP page with text title in two lines and verify the title exist and the text is in two lines"); //2
+        logFlowPoint("Navigate to an entitlement's PDP page with text title in one line and verify the title exist and the text is in one line"); //3
+        logFlowPoint("Verify the title is localized to English"); //4
+        logFlowPoint("Verify the packart is visible and localized to English"); //5
+        logFlowPoint("Verify the edition selector has options for different editions");//6
+        logFlowPoint("Click on the first video in the 'Screenshots and Videos' section to open the player");//7
+        logFlowPoint("Click on next button to verify the video scrolls to next video in the list");//8
+        logFlowPoint("Change the locale to French");//9
+        logFlowPoint("Navigate to an entitlement's Page and verify the title and packart is localized");//10
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+
+        //2
+        MacroPDP.loadPdpPage(driver, twoLineEntitlement);
+        PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+        logPassFail(pdpHeroDescription.verifyTitleInTwoLines(), true);
+
+        //3
+        boolean isPDPPageLoaded = MacroPDP.loadPdpPage(driver, oneLineEntitlement);
+        boolean isTitleInOneLine = pdpHeroDescription.verifyTitleInOneLine();
+        logPassFail(isPDPPageLoaded && isTitleInOneLine, true);
+
+        //4
+        boolean isTitleLocalized = pdpHeroDescription.verifyGameTitle(oneLineEntitlementName);
+        logPassFail(isTitleLocalized, true);
+
+        //5
+        PDPHeroPackartRating pdpHeroPackartRating = new PDPHeroPackartRating(driver);
+        boolean isPackArtLocalized = pdpHeroPackartRating.verifyPackartIsLocalized(CountryInfo.CountryEnum.USA);
+        logPassFail(isPackArtLocalized, true);
+
+        //6
+        logPassFail(pdpHeroDescription.verifyEditions(oneLineEntitlementEditionList), true);
+
+        //7
+        PDPPage pdpPage = new PDPPage(driver);
+        pdpPage.openItemOnCarousel(0);
+        String pdp_video_id_0 = pdpPage.getVideoID(0); // The source/ video-id of the 0th item
+        String pdp_video_id_1 = pdpPage.getVideoID(1); // The source/ video-id of the 1st item
+        MediaDialog mediaDialog = new MediaDialog(driver);
+        boolean isMediaDialogOpen = mediaDialog.waitIsVisible();
+        String video_id_0 = mediaDialog.getVideoID(); // The source/ video-id of the 0'th item in media dialog
+        // Verify The source/ video-id of the 0'th item matches with the 0'th item in Media Carousel in PDP Page
+        logPassFail(isMediaDialogOpen && pdp_video_id_0.equals(video_id_0), true);
+
+        //8
+        mediaDialog.clickNextArrow();
+        String video_id_1 = mediaDialog.getVideoID();// The source/ video-id of the 1'st item in media dialog
+        // Verify The source/ video-id of the 1'st item matches with the 1'st item in Media Carousel in PDP Page
+        logPassFail(pdp_video_id_1.equals(video_id_1), true);
+        mediaDialog.closeAndWait();
+
+        //9
+        //Set the language and restart the client
+        boolean setLanguage = false;
+        if (isClient) {
+            setLanguage = MacroSettings.setLanguage(driver, client, LanguageEnum.FRENCH);
+            Waits.sleep(10000);
+            client.stop();
+            ProcessUtil.killOriginProcess(client);
+            EACoreHelper.overrideCountryTo(CountryInfo.CountryEnum.FRANCE, client.getEACore());
+            driver = startClientObject(context, client);
+        } else {
+            client.stop();
+            ProcessUtil.killOriginProcess(client);
+            driver = startClientObject(context, client);
+            driver.get(OSInfo.getXURL(sandboxKey, "/fra/fr-fr", null));
+            LanguageInfo languageInfo = new LanguageInfo(LanguageEnum.FRENCH);
+            setLanguage = languageInfo.verifyOriginUrlLanguage(driver.getCurrentUrl());
+        }
+        logPassFail(MacroLogin.startLogin(driver, userAccount) && setLanguage, true);
+
+        //10
+        MacroPDP.loadPdpPageBySearch(driver, entitlementFrenchName);
+        pdpHeroDescription = new PDPHeroDescription(driver);
+        pdpHeroPackartRating = new PDPHeroPackartRating(driver);
+        boolean isTitleLocalizedFrench = pdpHeroDescription.verifyGameTitle(entitlementFrenchName);
+        boolean isPackArtLocalizedFrench = false;
+        if (pdpHeroPackartRating.verifyPackArtVisible()) {
+            isPackArtLocalizedFrench = pdpHeroPackartRating.verifyPackartIsLocalized(CountryInfo.CountryEnum.FRANCE);
+        }
+        logPassFail(isTitleLocalizedFrench && isPackArtLocalizedFrench, true);
+
+        softAssertAll();
+
+    }
+}

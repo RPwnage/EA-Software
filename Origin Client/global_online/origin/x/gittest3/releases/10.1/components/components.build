@@ -1,0 +1,153 @@
+﻿<project name="originweb" default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="build" value="exclude"/>
+        <option name="clean" value="exclude"/>
+    </optionset>
+  
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.components.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.components.version"  value="dev"/>
+    <package name="components" targetversion="${package.components.version}"/>
+
+    <property name="currversion.file" value="${package.components.dir}/build/currversion.txt"/>
+    <property name="xsdtemp.dir" value="${package.components.dir}/build/xsdtemp"/>
+    <property name="target.dir" value="${package.components.dir}/build/target"/>
+    <property name="xsdexport.file" value="${package.components.dir}/build/target/originxsdexport.zip"/>
+    <property name="imagetemp.dir" value="${package.components.dir}/build/imagetemp"/>
+    <property name="version.file" value="${package.components.dir}/version.txt"/>
+
+    <!-- The xsd import can either take a file or a directory. If its a dir, then it will recurse the xsd files
+         within it. If you specify a file, it will write out a schema.yml file each time destructively -->
+    <createtask name="cms.mapper.import">
+      <parameters>
+        <option name="xsdfile" value="Required"/>
+      </parameters>
+      <code>
+        <exec program="php">
+          <args>
+            <arg value="../cms/build/cms/app/console"/>
+            <arg value="schema:compile"/>
+            <arg value="${cms.mapper.import.xsdfile}"/>
+            <arg value="@{PathGetFullPath('../cms/build/cms/app/config/schema.yml')}"/>
+          </args>
+        </exec>
+      </code>
+    </createtask>
+    
+    <createtask name="cms.mapper.export">
+      <parameters>
+        <option name="output" value="Required"/>
+      </parameters>
+      <code>
+        <exec program="php">
+          <args>
+            <arg value="../cms/build/cms/app/console"/>
+            <arg value="schema:generate:translations"/>
+            <arg value="${cms.mapper.export.output}"/>
+          </args>
+        </exec>
+      </code>
+    </createtask>
+    
+    <target name="import-xsd">
+     
+      <!-- create a build directory to put the xsd files in -->
+      <delete dir="${xsdtemp.dir}"/>
+      <mkdir dir="${xsdtemp.dir}"/>
+      <!-- create a target directory to put the output -->
+      <delete dir="${target.dir}"/>
+      <mkdir dir="${target.dir}"/>
+			<!-- create the image temp directory to build the image -->
+			<delete dir="${imagetemp.dir}"/>
+			<mkdir dir="${imagetemp.dir}"/>
+
+      <fileset name="xsdfiles" basedir="${package.components.dir}/src/directives">
+        <includes name="**/*.xsd"/>
+        <excludes name="bower_components/**"/>
+      </fileset>
+      
+      <foreach property="file" item="FileSet" in="xsdfiles">
+        <property name="xsd.basedir" value="@{PathGetDirectoryName(${file})}"/>
+        <echo message="xsd.basedir = ${xsd.basedir}"/>
+        <property name="xsd.basedir" value="@{PathGetFileName(@{PathGetFullPath('${property.value}/..')})}"/>
+        <echo message="xsd.basedir = ${xsd.basedir}"/>
+        <property name="filename" value="@{PathGetFileName(${file})}"/>
+        <property name="outfile" value="${xsd.basedir}-${filename}"/>
+        <!-- copy the xsd files in all subdirs to that dir -->
+        <copy file="${file}" tofile="${xsdtemp.dir}/${outfile}" flatten="true"/>
+      </foreach>
+
+      <!-- run the mapper app to import that xsd files -->
+      <task name="cms.mapper.import" xsdfile="${xsdtemp.dir}"/>
+      <task name="cms.mapper.export" output="${xsdexport.file}"/>
+
+      <property name="dollar" value="$"/>
+      <property name="propstart" value="${dollar}{"/>
+      <property name="propend" value="}"/>
+      <property name="version" fromfile="${version.file}" unless="@{PropertyExists('version')}"/>
+      <property name="pom-temp.contents" fromfile="${package.components.dir}/pom-temp.xml" />
+      <property name="pom.file" value="${package.components.dir}/pom.xml" />
+      <property name="pom-temp.contents" value="@{StrReplace(${property.value},'__ORIGIN_VERSION__',${version})}" />
+      <echo message="${pom-temp.contents}" file="${pom.file}"/>
+
+      <echo message="Writing version ${version} to ${currversion.file}"/>
+      <echo message="${version}" file="${currversion.file}"/>
+
+      <echo message="Unzipping ${xsdexport.file} to ${imagetemp.dir}"/>     
+      <unzip zipfile="${xsdexport.file}" outdir="${imagetemp.dir}"/>
+      <copy file="${package.components.dir}/pom.xml" todir="${imagetemp.dir}"/>
+
+      <!-- package tnd deploy the build -->
+      <exec program="mvn" workingdir="${imagetemp.dir}">
+        <args>
+          <arg value="-P origin.x.build"/>
+          <arg value="clean deploy"/>
+        </args>
+      </exec>
+    </target>
+    
+    <!-- This target will deploy a build via cURL PUT to the server Jenkins job to deploy to Cq5. It will take the contents of the currbuild.file 
+	 to get the version if not specified on the command-line -->
+    <target name="cq5-deploy-translations">
+      <fail message="No 'cqcluster' defined. You must define a cluster. Use '-D:cqcluster=' on the cmd line." unless="@{PropertyExists('cqcluster')}"/>
+
+      <property name="${version}" fromfile="${curreversion.file}" unless="@{PropertyExists('version')}"/>
+      <property name="jenkins.server.url" value="http://10.51.1.197:8080"/>
+      <property name="token" value="origincq5"/>
+
+      <echo message="Deploying origin-cq5-directive-default-translations origin-cq5-directive-default-translations ${version} to CQ5 ${cqcluster}"/>
+      <exec program="curl">
+        <args>
+          <arg value="&quot;${jenkins.server.url}/view/Tools/job/Store_CQ5_Package_Deploy_QA-Main_2x/buildWithParameters?token=${token}&amp;qcluster_name=${cqcluster}&amp;store_cq_package_list=origin-cq5-directive-default-translations=${version}&quot;"/>
+          <arg value="--insecure"/>
+        </args>
+      </exec>
+    </target>
+    
+    <target name="comp-test">
+      <fileset name="xsdfiles" basedir="${package.components.dir}/src/directives">
+        <includes name="**/*.xsd"/>
+        <excludes name="bower_components/**"/>
+      </fileset>
+      
+      <foreach property="file" item="FileSet" in="xsdfiles">
+        <property name="xsd.basedir" value="@{PathGetDirectoryName(${file})}"/>
+        <echo message="xsd.basedir = ${xsd.basedir}"/>
+        <property name="xsd.basedir" value="@{PathGetFileName(@{PathGetFullPath('${property.value}/..')})}"/>
+        <echo message="xsd.basedir = ${xsd.basedir}"/>
+        <property name="filename" value="@{PathGetFileName(${file})}"/>
+        <property name="outfile" value="${xsd.basedir}-${filename}"/>
+        <!-- copy the xsd files in all subdirs to that dir -->
+        <copy file="${file}" tofile="${xsdtemp.dir}/${outfile}" flatten="true"/>
+      </foreach>
+    </target>
+</project>
+
+
+
+

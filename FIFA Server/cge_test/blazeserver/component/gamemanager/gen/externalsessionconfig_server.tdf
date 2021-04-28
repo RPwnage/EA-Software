@@ -1,0 +1,133 @@
+/*! ************************************************************************************************/
+/*!
+    \file externalsessionconfig_server.tdf
+
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+[headername="gamemanager/tdf/externalsessiontypes_server.h"]
+#include "gamemanager/gen/externalsessiontypes_server.tdf"
+
+[headername="gamemanager/tdf/gamemanager_server.h"]//for GameTypeList in primaryExternalSessionTypeForUx
+#include "gamemanager/gen/gamemanager_server.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+    class ExternalServiceCallOptions
+    {
+        [tag="retr", default=6, reconfigurable="yes", description="For internal use. Max retries for errors from the external service."]
+        uint64_t mTotalRetryLimit;
+        [tag="resu", default=2, reconfigurable="yes", description="For internal use. Max retries for External Service Unavailable errors."] //MS recommended default
+        uint64_t mServiceUnavailableRetryLimit;
+        [tag="suwm", default="2s", reconfigurable="yes", description="For internal use. Min back off time before a retry on External Service Unavailable error."] //MS recommended default
+        TimeValue mServiceUnavailableBackoff;
+        [tag="crwm", default="1000ms", reconfigurable="yes", description="For internal use. Min back off time before a retry on Conflicting Request error. For PS5 Matches."] //defaults for mConflictBackoff, mConflictBackoffRange, mTotalRetryLimit based on data and expected worst cases for Trama.x
+        TimeValue mConflictBackoff;
+        [tag="crwr", default="1500ms", reconfigurable="yes", description="For internal use. Max random time added to mConflictBackoff, to get total back off time before a retry on Conflicting Request error. For PS5 Matches."]
+        TimeValue mConflictBackoffRange;
+    };
+
+    class ExternalSessionServerConfig
+    {
+        [tag="scid", reconfigurable="no", description="external sessions' service config identifier. Part 1 of the session identifier"]
+        XblScid scid;
+
+        [tag="stmn", reconfigurable="no", description="List of supported external session template names. A session template name is part 2 of the session identifier"]
+        XblSessionTemplateNameList sessionTemplateNames;
+        
+        [tag="conv", default="107", reconfigurable="no", description="External session services contract version."]
+        XblContractVersion contractVersion;
+
+        [tag="snst", reconfigurable="no", description="Optional string added to your external sessions' names. Specify a unique value to avoid conflicting names when re-using the same scid and session template name across blaze server system instances, during testing etc."]
+        XblSessionNamePrefix externalSessionNamePrefix;
+
+        [tag="etid", reconfigurable="no", description="title id for external sessions"]
+        TitleId externalSessionTitle;
+
+        [tag="svcl", default=INVALID_PSN_SERVICE_LABEL, reconfigurable="no", description="Service label for title's external sessions service. (Non-reconfigurable, as Blaze wouldn't be able to otherwise cleanup/access existing sessions it created under a different label)."]
+        PsnServiceLabel mExternalSessionServiceLabel;
+
+        [tag="exin", default="3m", reconfigurable="yes", description="How long a member of an external session can be inactive before getting removed. For Xbox One, members become inactive due to first party sign outs, the title's console process being terminated, etc."]
+        TimeValue externalSessionInactivityTimeout;
+
+        [tag="exrt", default="6m", reconfigurable="yes", description="How long a member of an external session member can remain in the ready state before getting removed. For Xbox One, this should be set to allow at least enough time for the titles to start up, after users accept first party invites to join a game."]
+        TimeValue externalSessionReadyTimeout;
+
+        [tag="exet", default="0s", reconfigurable="yes", description="How long a session can remain empty before it is remotely cleaned up."]
+        TimeValue externalSessionEmptyTimeout;
+        
+        [tag="eahc", default="", reconfigurable="no", description="External sessions service's handles contract version. For Xbox One, specify this to enable Blaze handling presence of the sessions. If sessions should not have presence, disable this, by setting to empty."]
+        XblContractVersion externalSessionHandlesContractVersion;
+
+        //side: even if this is reconfigurable, Blaze would not auto-update the primary session for all users at the reconfigure (inefficient).
+        [tag="esgt", description="A list of GameType's for which Blaze automatically handles which session is the primary external session for a user. If multiple are in the list, their order determines priority. If sessions should not have presence, disable this, by setting to empty."]
+        GameTypeList primaryExternalSessionTypeForUx;
+        
+        [tag="invp", default="game", description="External session invite protocol. For Xbox One, when set to 'game', when you send first party invites, the invitee will get a toast shown in their client's first party UX. If XblSessionInviteProtocol is empty, no such toast will appear."]
+        XblSessionInviteProtocol externalSessionInviteProtocol;
+
+        [tag="esrs", default=false, description="If true, the gametypes listed in externalSessionFullnessExcludesReservationsGameTypes is don't count reserved players when determining whether external sessions are deemed full (for first party UX etc). For titles that make reservations for invited players on PS4, this setting may need to be enabled to ensure the join button is functional for those invitees."]
+        bool externalSessionFullnessExcludesReservations;
+
+        [tag="esrt", description="Game types that will disregard reservations when determining if a 1st party session is full. Only in effect if externalSessionFullnessExcludesReservations is 'true'."]
+        GameTypeList externalSessionFullnessExcludesReservationsGameTypes;
+
+        [tag="esfq", default=true, description="Whether a game's queue space is included when determining whether external sessions are deemed full (for first party UX etc)."]
+        bool externalSessionFullnessIncludesQueue;
+        
+        [tag="esfl", default=false, description="Whether the available space in the role specified by externalSessionFullnessRole is included when determining whether external sessions are deemed full (for first party UX etc)."]
+        bool externalSessionFullnessIncludesRole;
+
+        [tag="esfr", default="", description="Role whose fullness is checked in addition to the game's general space in determining whether the external session is deemed full (for first party UX etc)."]
+        RoleName externalSessionFullnessRole;
+
+        [tag="dimg", default="", reconfigurable="yes", description="A file name specifying a default image shown for external sessions advertised in the shell UX."]
+        ExternalSessionImageHandle mExternalSessionImageDefault; 
+
+        [tag="mimg", default=163840, reconfigurable="yes", description="For internal use. Maximum allowed size in bytes for the images shown for external sessions advertised in the shell UX."]
+        uint32_t mExternalSessionImageMaxSize; // default is PS4's max of 160 kibibytes
+
+        [tag="mdat", default=1000, reconfigurable="yes", description="For internal use. Maximum allowed size in bytes for the external session's custom data. Load testing is recommended for higher values."]
+        uint32_t mExternalSessionCustomDataMaxSize; // arbitrary default
+
+        [tag="vloc", default="en,ja,fr,es,de,ut,nl,pt,ru,ko,zh-TW,zh-CN,fi,sv,da,no,pl,pt-BR,en-GB,tr,es-MX,ar,fr-CA,cs,el,hu,id,it,ro,th,vi", reconfigurable="yes", description="For internal use. Valid locales for an external session's status localizations."]
+        string(-1) mExternalSessionStatusValidLocales; // default is PS4/PS5's
+
+        [tag="mloc", default=10, reconfigurable="yes", description="For internal use. Maximum number of localizations used for an external session's status. Extra localizations specified may not be used, and may be replaced by the default non-localized status for display in the shell UX."]
+        uint16_t mExternalSessionStatusMaxLocales; // default is PS4's max
+
+        [tag="rtry", default=8, reconfigurable="yes", description="For internal use. For platforms requiring it, if an external session update call fails due to a user's rate limit etc, Blaze may immediately retry this number of times with other users. Higher values may incur extra performance overhead."]
+        uint8_t mExternalSessionUpdateRetryLimit;
+
+        [tag="etnc", default="3", reconfigurable="no", description="External tournament service's contract version. For Xbox One."]
+        XblContractVersion mExternalTournamentsContractVersion;
+
+        [tag="mxnm", default=100, reconfigurable="yes", description="Max length of External Session names, allowed by the external service. For Xbox One."]
+        uint16_t mExternalSessionNameMaxLength; // default is Xbox One's max
+
+        [tag="pcnv", reconfigurable="no", default="2", description="External user profile service contract version. To disable using the external service set this to empty string."]
+        XblContractVersion externalUserProfilesContractVersion;
+
+        [tag="mock", default=false, description="For testing only. Indicates that the platform is enabled in mock mode.  Clients must still indicate that they are using the apropriate platform."]
+        bool mUseMock;
+
+        [tag="pspr", default="ps5:playersession:", reconfigurable="yes", description="For internal use. PersistedGameId prefix reserved for handling the UX boot to new game flow on PS5."]
+        string(28) mPsnPlayerSessionPersistedIdPrefix;
+
+        [tag="svcm", default=INVALID_PSN_SERVICE_LABEL, reconfigurable="no", description="Service label for title's PSN Matches service. (Non-reconfigurable, as Blaze wouldn't be able to otherwise cleanup/access existing sessions it created under a different label)."]
+        PsnServiceLabel mPsnMatchesServiceLabel;
+
+        [tag="retr", reconfigurable="yes"]
+        ExternalServiceCallOptions mCallOptions;
+
+        [tag="xgen", default=false, description="Whether the platform explicitly uses crossgen APIs for external sessions/invites. For PS4 and PS5. Ignored for XBSX and XONE, as crossgen is enabled/supported by default regardless on those."]
+        bool mCrossgen;
+
+    };
+    typedef map<ClientPlatformType, ExternalSessionServerConfig> ExternalSessionServerConfigMap;
+
+} // namespace GameManager
+} // namespace Blaze

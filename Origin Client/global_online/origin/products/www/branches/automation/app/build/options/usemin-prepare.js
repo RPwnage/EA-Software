@@ -1,0 +1,23 @@
+// Reads HTML for usemin blocks to enable smart builds that automatically
+// concat, minify and revision files. Creates configurations in memory so
+// additional tasks can operate on them
+
+module.exports = function() {
+    return {
+        html: ['<%= yeoman.app %>/index.html', '<%= yeoman.app %>/social-chatwindow.html', '<%= yeoman.app %>/social-hub.html',],
+
+        options: {
+            dest: '<%= yeoman.dist %>',
+            flow: {
+                html: {
+                    steps: {
+                        worker: ['concat', 'uglifyjs'],
+                        js: ['concat', 'uglifyjs'],
+                        css: ['cssmin']
+                    },
+                    post: {}
+                }
+            }
+        }
+    };
+};

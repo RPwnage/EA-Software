@@ -1,0 +1,634 @@
+<?xml version="1.0"  encoding="utf-8" ?>
+<!--
+================================================================================
+options.xml
+
+nantToVcproj XML specification for parsing rules.
+
+Rule element attribute spec:
+    regex                  - The regular expression matching the command line switch described by the rule
+    xmlname(optional)    - The corresponding XML attribute name for the switch (can be empty if switch is recognized but ignored)
+    xmlvalue(optional)    - A formatting string describing the value of the attribute;
+                              {0} is the previous value {1} and up are the corresponding regex matches
+    setonce(optional)    - Can this attribute be  only set once?
+                              If missing, 'true'
+    ignorecase(optional)  - Is the switch expression  case insensitive?
+                              If missing, 'false' - is case sensitive
+    typespec(optional)    - A comma separated type specification for each of the regex matches; available types are: string, int, hex
+
+Written  by Alex  Vostrov.
+
+A given configuration has a <platform_name>, which determines in turn the <compiler_name>.
+The  sections in this file are defined by:
+
+<compiler_name>
+    vc:    if platform_name ==  pc,   xbox, xenon
+    gcc:  if platform_name ==  ps3
+    sn:    if platform_name ==  ps2, gc
+
+<platform_name>
+    pc,  xbox, xenon, ps2, ps3, gc
+
+For  a given  configuration, the options are merged: <compiler_name> + <platform_name>.
+NOTE! options with the same regex do not replace each other. Matches are performed on all of them.
+
+When platform is pecified inside tool name: 
+
+    <compiler_name>
+         <platform_name>
+         </platform_name>
+    </compiler_name>     
+
+  Platform specific rules replace rules in this compiler that have same regex.
+
+
+The <general> section includes rules which are global, as displayed by VisualStudio
+under 'Properties | Configuration Properties | General'.
+These  options are passed as part of the cc options, in
+order to avoid the use of another option set, which may break existing builds.
+The rules in <general> must be blocked by corresponding rules in <compiler> and/or
+<linker>.
+
+(c) Electronic Arts. All Rights Reserved.
+================================================================================
+-->
+
+<rules>
+  <general>
+    <rule regex="^[-/]clr$"                                         xmlname="CLRSupport"                        xmlvalue="true"                                   ignorecase="true"/>
+    <rule regex="^[-/]clr:pure$"                                    xmlname="CLRSupport"                        xmlvalue="Pure"                                   ignorecase="true"/>
+    <rule regex="^[-/]clr:safe$"                                    xmlname="CLRSupport"                        xmlvalue="Safe"                                   ignorecase="true"/>
+    <rule regex="^[-/]clr:oldSyntax$"                               xmlname="CLRSupport"                        xmlvalue="OldSyntax"                              ignorecase="true"/>
+    <rule regex="^[-/]UseOfMFC=&quot;?([^&quot;]+)&quot;?$"         xmlname="UseOfMFC"                          xmlvalue="{1}"                                    ignorecase="true"/>
+    <rule regex="^([-/]GL)$"                                        xmlname="WholeProgramOptimization"          xmlvalue="TRUE"                 setonce="false"   ignorecase="true"/>
+  </general>
+  <compiler>
+    <vc>
+      <rule regex="^[-/]c$"                                         xmlname="CompileOnly"                       xmlvalue="TRUE"/>
+      <!-- CLR and UseOfMFC are processed as a general option -->
+      <rule regex="^[-/]clr$"                                       xmlname="CompileAsManaged"                  xmlvalue="TRUE"                           ignorecase="true"/>
+      <rule regex="^[-/]clr:pure$"                                  xmlname="CompileAsManaged"                  xmlvalue="Pure"                           ignorecase="true"/>
+      <rule regex="^[-/]clr:safe$"                                  xmlname="CompileAsManaged"                  xmlvalue="Safe"                           ignorecase="true"/>
+      <rule regex="^[-/]clr:oldSyntax$"                             xmlname="CompileAsManaged"                  xmlvalue="OldSyntax"                      ignorecase="true"/>
+      <rule regex="^[-/]UseOfMFC=&quot;?([^&quot;]+)&quot;?$"       xmlname=""                                  xmlvalue=""/>
+      <rule regex="^[-/]nologo$"                                    xmlname="SuppressStartupBanner"             xmlvalue="TRUE"/>
+      <rule regex="^[-/]X$"                                         xmlname="IgnoreStandardIncludePath"         xmlvalue="TRUE"/>
+      <!-- allow to overwrite -->
+      <rule regex="^[-/]W0$"                                        xmlname="WarningLevel"                      xmlvalue="TurnOffAllWarnings"                                 setonce="false" />
+      <rule regex="^[-/]W([1-4])$"                                  xmlname="WarningLevel"                      xmlvalue="Level{1}"                                           setonce="false" />
+      <rule regex="^([-/]Wall)$"                                    xmlname="WarningLevel"                      xmlvalue="EnableAllWarnings"                                  setonce="false" />
+      <rule regex="^[-/]WX$"                                        xmlname="TreatWarningAsError"               xmlvalue="TRUE" />
+      <rule regex="^[-/]WX-$"                                       xmlname="TreatWarningAsError"               xmlvalue="FALSE" />
+      <rule regex="^[-/]Zc:forScope$"                               xmlname="ForceConformanceInForLoopScope"    xmlvalue="TRUE" />
+      <rule regex="^[-/]FR$"                                        xmlname="BrowseInformation"                 xmlvalue="TRUE" />
+      <rule regex="^[-/]FR&quot;?([^&quot;]+)&quot;?$"              xmlname="BrowseInformationFile"             xmlvalue="{1}" />
+      <rule regex="^[-/]analyze$"                                   xmlname="EnablePREfast"                     xmlvalue="TRUE" />
+      <rule regex="^([-/]analyze:WX-)$"                             xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false" />
+      <rule regex="^([-/]analyze:WX)$"                              xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false" />
+      <rule regex="^([-/]analyze:only)$"                            xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false" />
+      <rule regex="^([-/]analyze:quiet)$"                           xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false" />
+      <rule regex="^([-/]analyze:log\s&quot;?([^&quot;]+)&quot;?)$" xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="true" />
+      <rule regex="^([-/]analyze:stacksize\s[0-9]+)$"               xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="true" />
+      <rule regex="^([-/]analyze:max_paths\s[0-9]+)$"               xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="true" />
+      <rule regex="^[-/]errorReport:none$"                          xmlname="ErrorReporting"                    xmlvalue="None" />
+      <rule regex="^[-/]errorReport:prompt$"                        xmlname="ErrorReporting"                    xmlvalue="Prompt" />
+      <rule regex="^[-/]errorReport:queue$"                         xmlname="ErrorReporting"                    xmlvalue="Queue" />
+      <rule regex="^[-/]errorReport:send$"                          xmlname="ErrorReporting"                    xmlvalue="Send" />
+      <!-- GL is processed as a general option -->
+      <rule regex="^([-/]GL)$"                                      xmlname=""                                  xmlvalue=""/>
+      <rule regex="^[-/]GS-$"                                       xmlname="BufferSecurityCheck"               xmlvalue="FALSE" />
+      <rule regex="^[-/]GS$"                                        xmlname="BufferSecurityCheck"               xmlvalue="TRUE" />
+      <rule regex="^[-/]GF$"                                        xmlname="StringPooling"                     xmlvalue="TRUE" />
+      <rule regex="^[-/]GF-$"                                       xmlname="StringPooling"                     xmlvalue="FALSE" />
+      <rule regex="^[-/]Gy$"                                        xmlname="FunctionLevelLinking"              xmlvalue="TRUE" />
+      <rule regex="^[-/]Gy-$"                                       xmlname="FunctionLevelLinking"              xmlvalue="FALSE" />
+      <rule regex="^[-/]GT$"                                        xmlname="EnableFiberSafeOptimizations"      xmlvalue="TRUE" />
+      <rule regex="^[-/]GR-$"                                       xmlname="RuntimeTypeInfo"                   xmlvalue="FALSE" />
+      <rule regex="^[-/]GR$"                                        xmlname="RuntimeTypeInfo"                   xmlvalue="TRUE" />
+      <rule regex="^[-/]Gd$"                                        xmlname="CallingConvention"                 xmlvalue="Cdecl" />
+      <rule regex="^[-/]Gr$"                                        xmlname="CallingConvention"                 xmlvalue="FastCall" />
+      <rule regex="^[-/]Gz$"                                        xmlname="CallingConvention"                 xmlvalue="StdCall" />
+      <rule regex="^[-/]Zp1$"                                       xmlname="StructMemberAlignment"             xmlvalue="1Byte" />
+      <rule regex="^[-/]Zp2$"                                       xmlname="StructMemberAlignment"             xmlvalue="2Bytes" />
+      <rule regex="^[-/]Zp4$"                                       xmlname="StructMemberAlignment"             xmlvalue="4Bytes" />
+      <rule regex="^[-/]Zp8$"                                       xmlname="StructMemberAlignment"             xmlvalue="8Bytes" />
+      <rule regex="^[-/]Zp16$"                                      xmlname="StructMemberAlignment"             xmlvalue="16Bytes" />
+      <rule regex="^[-/]Oi$"                                        xmlname="IntrinsicFunctions"                xmlvalue="TRUE" />
+      <rule regex="^[-/]Oi-$"                                       xmlname="IntrinsicFunctions"                xmlvalue="FALSE" />
+      <rule regex="^[-/]MT$"                                        xmlname="RuntimeLibrary"                    xmlvalue="MultiThreaded" />
+      <rule regex="^[-/]MTd$"                                       xmlname="RuntimeLibrary"                    xmlvalue="MultiThreadedDebug" />
+      <rule regex="^[-/]MD$"                                        xmlname="RuntimeLibrary"                    xmlvalue="MultiThreadedDLL" />
+      <rule regex="^[-/]MDd$"                                       xmlname="RuntimeLibrary"                    xmlvalue="MultiThreadedDebugDLL" />
+      <!--TODO
+      <rule regex="^[-/]ML$"                                        xmlname="RuntimeLibrary"                    xmlvalue="4" />
+      <rule regex="^[-/]MLd$"                                       xmlname="RuntimeLibrary"                    xmlvalue="5" />
+      -->
+      <rule regex="^[-/]RTCs$"                                      xmlname="BasicRuntimeChecks"                xmlvalue="StackFrameRuntimeCheck" />
+      <rule regex="^[-/]RTCu$"                                      xmlname="BasicRuntimeChecks"                xmlvalue="UninitializedLocalUsageCheck" />
+      <rule regex="^[-/]RTC1$"                                      xmlname="BasicRuntimeChecks"                xmlvalue="EnableFastChecks" />
+      <rule regex="^[-/]RTCc$"                                      xmlname="SmallerTypeCheck"                  xmlvalue="TRUE" />
+      <rule regex="^[-/]ZI$"                                        xmlname="DebugInformationFormat"            xmlvalue="EditAndContinue" />
+      <rule regex="^[-/]Zi$"                                        xmlname="DebugInformationFormat"            xmlvalue="ProgramDatabase" />
+      <rule regex="^[-/]Z7$"                                        xmlname="DebugInformationFormat"            xmlvalue="OldStyle" />
+      <rule regex="^[-/]Za$"                                        xmlname="DisableLanguageExtensions"         xmlvalue="true" />
+      <rule regex="^[-/]Og$"                                        xmlname="GlobalOptimizations"               xmlvalue="TRUE" />
+      <rule regex="^[-/]Og-$"                                       xmlname="GlobalOptimizations"               xmlvalue="FALSE" />
+      <rule regex="^[-/]Ob0$"                                       xmlname="InlineFunctionExpansion"           xmlvalue="Disabled" />
+      <rule regex="^[-/]Ob1$"                                       xmlname="InlineFunctionExpansion"           xmlvalue="OnlyExplicitInline" />
+      <rule regex="^[-/]Ob2$"                                       xmlname="InlineFunctionExpansion"           xmlvalue="AnySuitable" />
+      <rule regex="^[-/]Ot$"                                        xmlname="FavorSizeOrSpeed"                  xmlvalue="Speed" />
+      <rule regex="^[-/]Os$"                                        xmlname="FavorSizeOrSpeed"                  xmlvalue="Size" />
+      <rule regex="^[-/]Od$"                                        xmlname="Optimization"                      xmlvalue="Disabled" />
+      <rule regex="^[-/]O1$"                                        xmlname="Optimization"                      xmlvalue="MinSpace" />
+      <rule regex="^[-/]O2$"                                        xmlname="Optimization"                      xmlvalue="MaxSpeed" />
+      <rule regex="^[-/]Ox$"                                        xmlname="Optimization"                      xmlvalue="Full"                                               setonce="false"  />
+      <rule regex="^[-/]Oy$"                                        xmlname="OmitFramePointers"                 xmlvalue="TRUE"/>
+      <rule regex="^[-/]Oy-$"                                       xmlname="OmitFramePointers"                 xmlvalue="FALSE"/>
+      <rule regex="^([-/]Oy-)$"                                     xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false" />
+      <rule regex="^[-/]Fo&quot;[^&quot;]+&quot;$"                  xmlname=""                                  xmlvalue=""   />
+      <rule regex="^&quot;[^&quot;]+&quot;$"                        xmlname=""                                  xmlvalue=""   />
+      <rule regex="^[-/]Fd&quot;?([^&quot;]+)&quot;?$"              xmlname="ProgramDataBaseFileName"           xmlvalue="{1}" />
+      <rule regex="^[-/]I(&quot;[^&quot;]+&quot;)$"                 xmlname="AdditionalIncludeDirectories"      xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^[-/]D&quot;?([^&quot;]+)&quot;?$"               xmlname="PreprocessorDefinitions"           xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^[-/]C"  xmlname="PreprocessKeepComments"        xmlvalue="TRUE"   />
+      <rule regex="^[-/]C-"  xmlname="PreprocessKeepComments"       xmlvalue="FALSE"  />
+      <rule regex="^[-/]Fi&quot;?([^&quot;]+)&quot;?$"              xmlname="PreprocessOutputPath"              xmlvalue="{1}"    />
+      <rule regex="^[-/]EP"                                         xmlname="PreprocessSuppressLineNumbers"     xmlvalue="TRUE"  />
+      <rule regex="^[-/]EP-"                                        xmlname="PreprocessSuppressLineNumbers"     xmlvalue="FALSE"  />
+      <rule regex="^[-/]u"                                          xmlname="UndefineAllPreprocessorDefinitions" xmlvalue="TRUE"  />
+      <rule regex="^[-/]U&quot;?([^&quot;]+)&quot;?$"               xmlname="UndefinePreprocessorDefinitions"   xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^[-/]P"                                          xmlname="PreprocessToFile"                  xmlvalue="TRUE"  />
+      <rule regex="^[-/]P-"                                         xmlname="PreprocessToFile"                  xmlvalue="FALSE"  />
+      <rule regex="^[-/]FC"                                         xmlname="UseFullPaths"                      xmlvalue="TRUE"  />
+      <rule regex="^[-/]FC-"                                        xmlname="UseFullPaths"                      xmlvalue="FALSE"  />
+      <rule regex="^[-/]showIncludes"                               xmlname="ShowIncludes"                      xmlvalue="TRUE"  />
+      <rule regex="^[-/]doc&quot;?([^&quot;]+)&quot;?$"             xmlname="XMLDocumentationFileName"          xmlvalue="{1}"    />
+      <rule regex="^[-/]doc&quot;?([^&quot;]+)&quot;?$"             xmlname="GenerateXMLDocumentationFiles"     xmlvalue="TRUE"    />
+      <rule regex="^[-/]doc$"                                       xmlname="GenerateXMLDocumentationFiles"     xmlvalue="TRUE"    />
+      <rule regex="^[-/]GB$"                                        xmlname="OptimizeForProcessor"              xmlvalue="0" />
+      <rule regex="^[-/]G5$"                                        xmlname="OptimizeForProcessor"              xmlvalue="1" />
+      <rule regex="^[-/]G6$"                                        xmlname="OptimizeForProcessor"              xmlvalue="2" />
+      <rule regex="^[-/]G7$"                                        xmlname="OptimizeForProcessor"              xmlvalue="3" />
+      <rule regex="^[-/]J$"                                         xmlname="DefaultCharIsUnsigned"             xmlvalue="TRUE" />
+      <rule regex="^[-/]Zc:wchar_t$"                                xmlname="TreatWChar_tAsBuiltInType"         xmlvalue="TRUE"/>
+      <rule regex="^[-/]Zc:wchar_t-$"                               xmlname="TreatWChar_tAsBuiltInType"         xmlvalue="FALSE"/>
+      <rule regex="^[-/]wd([0-9]+)$"                                xmlname="DisableSpecificWarnings"           xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^[-/]we([0-9]+)$"                                xmlname="TreatSpecificWarningsAsErrors"     xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^([-/]w1[0-9]+)$"                                xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^([-/]w2[0-9]+)$"                                xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^([-/]w3[0-9]+)$"                                xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^[-/]Yc(&quot;[^&quot;]+&quot;)?$"               xmlname="PrecompiledHeader"                 xmlvalue="Create" />
+      <rule regex="^[-/]Yu(&quot;[^&quot;]+&quot;)?$"               xmlname="PrecompiledHeader"                 xmlvalue="Use" />
+      <rule regex="^[-/]Yc&quot;([^&quot;]+)&quot;$"                xmlname="PrecompiledHeaderFile"             xmlvalue="{1}" />
+      <rule regex="^[-/]Yu&quot;([^&quot;]+)&quot;$"                xmlname="PrecompiledHeaderFile"             xmlvalue="{1}" />
+      <rule regex="^[-/]Fp&quot;([^&quot;]+)&quot;$"                xmlname="PrecompiledHeaderOutputFile"       xmlvalue="{1}" />
+      <rule regex="^([-/]Gs[0-9]*)$"                                xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^[-/]GS$"                                        xmlname="BufferSecurityCheck"               xmlvalue="TRUE" />
+      <rule regex="^[-/]EHsc$"                                      xmlname="ExceptionHandling"                 xmlvalue="Sync" />
+      <rule regex="^[-/]EHa$"                                       xmlname="ExceptionHandling"                 xmlvalue="Async" />
+      <rule regex="^[-/]EHs$"                                       xmlname="ExceptionHandling"                 xmlvalue="SyncCThrow" />
+      <rule regex="^[-/]Fx$"                                        xmlname="ExpandAttributedSource"            xmlvalue="TRUE" />
+      <rule regex="^[-/]Zl$"                                        xmlname="OmitDefaultLibName"                xmlvalue="TRUE" />
+      <rule regex="^[-/]Zl-$"                                       xmlname="OmitDefaultLibName"                xmlvalue="FALSE" />
+      <rule regex="^[-/]openmp$"                                    xmlname="OpenMPSupport"                     xmlvalue="TRUE" />
+      <rule regex="^[-/]AI(&quot;[^&quot;]+&quot;)$"                xmlname="AdditionalUsingDirectories"        xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^[-/]TC$"                                        xmlname="CompileAs"                         xmlvalue="CompileAsC" />
+      <rule regex="^[-/]TP$"                                        xmlname="CompileAs"                         xmlvalue="CompileAsCpp" />
+      <rule regex="^([-/]FD)$"                                      xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^[-/]FU (&quot;[^&quot;]+&quot;)$"               xmlname="ForcedUsingFiles"                  xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^([-/]callcap)$"                                 xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^([-/]fastcap)$"                                 xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^([-/]QVMX128)$"                                 xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^([-/]Wp64)$"                                    xmlname="AdditionalOptions"                 xmlvalue="{1} {0} "                                           setonce="false"/>
+      <rule regex="^([-/]Wp64-)$"                                   xmlname="AdditionalOptions"                 xmlvalue="{1} {0} "                                           setonce="false"/>
+      <rule regex="^([-/]FA)$"                                      xmlname="AssemblerOutput"                   xmlvalue="AssemblyCode"                                       setonce="true" />
+      <rule regex="^([-/]FAcs)$"                                    xmlname="AssemblerOutput"                   xmlvalue="All"                                                setonce="true" />
+      <rule regex="^([-/]FAc)$"                                     xmlname="AssemblerOutput"                   xmlvalue="AssemblyAndMachineCode"                             setonce="true" />
+      <rule regex="^([-/]FAs)$"                                     xmlname="AssemblerOutput"                   xmlvalue="AssemblyAndSourceCode"                              setonce="true" />
+      <rule regex="^[-/]Fa&quot;([^&quot;]+)&quot;$"                xmlname="AssemblerListingLocation"          xmlvalue="{1}" />
+      <rule regex="^([-/]G[hH])$"                                   xmlname="AdditionalOptions"                 xmlvalue="{1} {0} "                                           setonce="false"/>
+      <rule regex="^[-/]fp:except$"                                 xmlname="FloatingPointExceptions"           xmlvalue="TRUE"/>
+      <rule regex="^[-/]fp:precise$"                                xmlname="FloatingPointModel"                xmlvalue="Precise"/>
+      <rule regex="^[-/]fp:strict$"                                 xmlname="FloatingPointModel"                xmlvalue="Strict"/>
+      <rule regex="^[-/]fp:fast$"                                   xmlname="FloatingPointModel"                xmlvalue="Fast"/>
+      <rule regex="^[-/]FI\s*&quot;?([^&quot;]+)&quot;?$"           xmlname="ForcedIncludeFiles"                xmlvalue="{0};{1}"                        ignorecase="true"   setonce="false"/>
+      <rule regex="^[-/]Gm$"                                        xmlname="MinimalRebuild"                    xmlvalue="true"/>
+      <rule regex="^[-/]Gm-$"                                       xmlname="MinimalRebuild"                    xmlvalue="false"/>
+      <rule regex="^[-/]hotpatch$"                                  xmlname="CreateHotpatchableImage"           xmlvalue="true"/>
+      <rule regex="^([-/]MP([0-9]+))$"                              xmlname="ProcessorNumber"                   xmlvalue="{2}"                                                setonce="true" />
+      <rule regex="^([-/]MP[0-9]*)$"                                xmlname="MultiProcessorCompilation"         xmlvalue="TRUE"                                               setonce="true" />
+<!--
+      <rule regex="^([-/]MP[0-9]*)$"                                xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+-->
+      <rule regex="^([-/]Zm[1-9][0-9][0-9][0-9]?)$"                 xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false" />
+      <rule regex="^([-/]bigobj)$"                                  xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^([-/]ZW)$"                                      xmlname="CompileAsWinRT"                    xmlvalue="true"                                               setonce="false"  />
+      <rule regex="^([-/]ZW)$"                                      xmlname="WinRTNoStdLib"                     xmlvalue="false"                                              setonce="false"  />
+      <rule regex="^[-/]arch:SSE$"                                  xmlname="EnableEnhancedInstructionSet"      xmlvalue="StreamingSIMDExtensions"/>
+      <rule regex="^[-/]arch:SSE2$"                                 xmlname="EnableEnhancedInstructionSet"      xmlvalue="StreamingSIMDExtensions2"/>
+      <rule regex="^[-/]arch:AVX$"                                  xmlname="EnableEnhancedInstructionSet"      xmlvalue="AdvancedVectorExtensions"/>
+    </vc>
+    <gcc>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </gcc>
+    <ghs>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </ghs>
+    <sn>
+      <rule regex="^-o\s&quot;%objectfile%&quot;$"                  xmlname=""                                  xmlvalue=""                                                   matchonce="true"/>
+      <rule regex="^-c\s&quot;%sourcefile%&quot;$"                  xmlname=""                                  xmlvalue=""                                                   matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </sn>
+    <mw>
+      <rule regex="^-precompile &quot;([^&quot;]+)&quot;$"          xmlname="PrecompiledHeaderFile"             xmlvalue="{1}" />
+      <rule regex="^-precompile (&quot;[^&quot;]+&quot;)?$"         xmlname="PrecompiledHeader"                 xmlvalue="Use" />
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </mw>
+    <xenon>
+      <rule regex="^[-/]openmp$"                                    xmlname="OpenMP"                            xmlvalue="TRUE"   />
+      <rule regex="^([-/]FastCAP)$"                                 xmlname="FastCAP"                           xmlvalue="TRUE"   />
+      <rule regex="^([-/]QXSTALLS)$"                                xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"  />
+      <rule regex="^[-/]Oc$"                                        xmlname="TrapIntegerDividesOptimization"    xmlvalue="TRUE"/>
+      <rule regex="^[-/]Ou$"                                        xmlname="PreschedulingOptimization"         xmlvalue="TRUE"/>
+      <rule regex="^[-/]Oz$"                                        xmlname="InlineAssemblyOptimization"        xmlvalue="TRUE"/>
+      <rule regex="^[-/]QVMXReserve$"                               xmlname="RegisterReservation"               xmlvalue="TRUE"/>
+      <!--      
+      <rule regex="^([-/]Ou)$"                                      xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"   />
+      <rule regex="^([-/]Oz)$"                                      xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"   />
+      <rule regex="^([-/]Oc)$"                                      xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"   />
+-->
+      <rule regex="^([-/]analyze)$"                                 xmlname="PREfast"                           xmlvalue="EnablePREfast"                                      setonce="true"   />
+      <rule regex="^([-/]analyze:only)$"                            xmlname="PREfast"                           xmlvalue="2"                                                  setonce="true"   />
+<!--
+      <rule regex="^[-/]analyze:wdpath$"                            xmlname="PREfastDisabledDirectories"        xmlvalue=""                                                   setonce="true"   />
+      <rule regex="^[-/]analyze:wdpath (&quot;[^&quot;]+&quot;)?$"  xmlname="PREfastDisabledDirectories"        xmlvalue="{1}"                                                setonce="true"   />
+-->
+      <rule regex="^([-/]analyze:WX-)$"                             xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false" />
+      <rule regex="^([-/]analyze:WX)$"                              xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false" />
+
+    </xenon>
+    <xbox>
+      <rule regex="^[-/]arch:SSE$"                                  xmlname="EnableStreamingSIMDExtensions"     xmlvalue="TRUE"/>
+    </xbox>
+    <ps3>
+      <rule regex="^--use_pch=&quot;([^&quot;]+)&quot;$"            xmlname="PrecompiledHeaderFile"             xmlvalue="{1}" />
+      <rule regex="^--create_pch=&quot;([^&quot;]+)&quot;$"         xmlname="PrecompiledHeaderFile"             xmlvalue="{1}" />
+      <rule regex="^--create_pch=(&quot;[^&quot;]+&quot;)?$"        xmlname="PrecompiledHeader"                 xmlvalue="Create" />
+      <rule regex="^--use_pch=(&quot;[^&quot;]+&quot;)?$"           xmlname="PrecompiledHeader"                 xmlvalue="Use" />
+    </ps3>
+    <psp2>
+      <rule regex="^-o\s&quot;%objectfile%&quot;$"                  xmlname=""                                  xmlvalue=""                                                   matchonce="true"/>
+      <rule regex="^-c\s&quot;%sourcefile%&quot;$"                  xmlname=""                                  xmlvalue=""                                                   matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </psp2>
+  </compiler>
+  <linker>
+    <vc>
+      <rule regex="^[-/]stack:((0x)*[a-fA-F0-9]+)(,((0x)*[a-fA-F0-9]+))?$"  xmlname="StackReserveSize"          xmlvalue="{1}"                            ignorecase="true"   typespec="int-hex" />
+      <rule regex="^[-/]stack:((0x)*[a-fA-F0-9]+)(,((0x)*[a-fA-F0-9]+))?$"  xmlname="StackCommitSize"           xmlvalue="{4}"                            ignorecase="true"   typespec="int-hex" />
+      <rule regex="^[-/]heap:((0x)*[a-fA-F0-9]+)(,((0x)*[a-fA-F0-9]+))?$"   xmlname="HeapReserveSize"           xmlvalue="{1}"                            ignorecase="true"   typespec="int-hex" />
+      <rule regex="^[-/]heap:((0x)*[a-fA-F0-9]+)(,((0x)*[a-fA-F0-9]+))?$"   xmlname="HeapCommitSize"            xmlvalue="{4}"                            ignorecase="true"   typespec="int-hex" />
+
+      <rule regex="^[-/]debug$"                                     xmlname="GenerateDebugInformation"          xmlvalue="TRUE"                           ignorecase="true"/>
+      <rule regex="^[-/]incremental(:yes)?$"                        xmlname="LinkIncremental"                   xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]incremental:no$"                            xmlname="LinkIncremental"                   xmlvalue="false"                          ignorecase="true"/>
+      <rule regex="^[-/]opt:ref$"                                   xmlname="OptimizeReferences"                xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]opt:noref$"                                 xmlname="OptimizeReferences"                xmlvalue="false"                          ignorecase="true"/>
+      <rule regex="^[-/]opt:icf$"                                   xmlname="EnableCOMDATFolding"               xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]opt:noicf$"                                 xmlname="EnableCOMDATFolding"               xmlvalue="false"                          ignorecase="true"/>
+      <rule regex="^[-/]map(:&quot;[^&quot;]+&quot;)?$"             xmlname="GenerateMapFile"                   xmlvalue="TRUE"                           ignorecase="true"/>
+      <rule regex="^[-/]map:&quot;([^&quot;]+)&quot;$"              xmlname="MapFileName"                       xmlvalue="{1}"                            ignorecase="true"/>
+      <rule regex="^[-/]pdb:&quot;([^&quot;]+)&quot;$"              xmlname="ProgramDatabaseFile"               xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]nologo$"                                    xmlname="SuppressStartupBanner"             xmlvalue="TRUE"                           ignorecase="true"/>
+      <rule regex="^[-/]Profile"                                    xmlname="Profile"                           xmlvalue="TRUE"                           ignorecase="true"/>
+      <rule regex="^[-/]machine:x86$"                               xmlname="TargetMachine"                     xmlvalue="MachineX86"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:I386$"                              xmlname="TargetMachine"                     xmlvalue="MachineX86"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:ix86$"                              xmlname="TargetMachine"                     xmlvalue="MachineX86"                     ignorecase="true"/>      
+      <rule regex="^[-/]machine:x64$"                               xmlname="TargetMachine"                     xmlvalue="MachineX64"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:IA64$"                              xmlname="TargetMachine"                     xmlvalue="MachineIA64"                    ignorecase="true"/>
+      <rule regex="^[-/]machine:ARM$"                               xmlname="TargetMachine"                     xmlvalue="MachineARM"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:EBC$"                               xmlname="TargetMachine"                     xmlvalue="MachineEBC"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:MIPS$"                              xmlname="TargetMachine"                     xmlvalue="MachineMIPS"                    ignorecase="true"/>
+      <rule regex="^[-/]machine:MIPS16$"                            xmlname="TargetMachine"                     xmlvalue="MachineMIPS16"                  ignorecase="true"/>
+      <rule regex="^[-/]machine:MIPSFPU$"                           xmlname="TargetMachine"                     xmlvalue="MachineMIPSFPU"                 ignorecase="true"/>
+      <rule regex="^[-/]machine:MIPSFPU16$"                         xmlname="TargetMachine"                     xmlvalue="MachineMIPSFPU16"               ignorecase="true"/>
+      <rule regex="^[-/]machine:SH4$"                               xmlname="TargetMachine"                     xmlvalue="MachineSH4"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:THUMB$"                             xmlname="TargetMachine"                     xmlvalue="MachineTHUMB"                   ignorecase="true"/>
+      
+      
+      <rule regex="^[-/]subsystem:console$"                         xmlname="SubSystem"                         xmlvalue="Console"                        ignorecase="true"/>
+      <rule regex="^[-/]subsystem:windows$"                         xmlname="SubSystem"                         xmlvalue="Windows"                        ignorecase="true"/>
+      <rule regex="^[-/]subsystem:native$"                          xmlname="SubSystem"                         xmlvalue="Native"                         ignorecase="true"/>
+      <rule regex="^[-/]subsystem:EFI_APPLICATION$"                 xmlname="SubSystem"                         xmlvalue="EFI Application"                ignorecase="true"/>
+      <rule regex="^[-/]subsystem:EFI_BOOT_SERVICE_DRIVER$"         xmlname="SubSystem"                         xmlvalue="EFI Boot Service Driver"        ignorecase="true"/>
+      <rule regex="^[-/]subsystem:EFI_ROM$"                         xmlname="SubSystem"                         xmlvalue="EFI ROM"                        ignorecase="true"/>
+      <rule regex="^[-/]subsystem:EFI_RUNTIME_DRIVER$"              xmlname="SubSystem"                         xmlvalue="EFI Runtime"                    ignorecase="true"/>
+      <rule regex="^[-/]subsystem:WINDOWSCE$"                       xmlname="SubSystem"                         xmlvalue="WindowsCE"                      ignorecase="true"/>
+      <rule regex="^[-/]subsystem:POSIX$"                           xmlname="SubSystem"                         xmlvalue="POSIX"                          ignorecase="true"/>
+<!-- Subsystem Xbox is not recognized by VS2010 but linker still accepts it as a parameter-->
+      <rule regex="^([-/]subsystem:xbox)$"                          xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                        ignorecase="true"   setonce="false" />
+      <rule regex="^([-/]xex:no)$"                                  xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                        ignorecase="true"   setonce="false" />
+      <rule regex="^[-/]SWAPRUN:CD$"                                xmlname="SwapRunFromCD"                     xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]SWAPRUN:NET$"                               xmlname="SwapRunFromNET"                    xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]fixed$"                                     xmlname="FixedBaseAddress"                  xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]fixed:no$"                                  xmlname="FixedBaseAddress"                  xmlvalue="false"                          ignorecase="true"/>
+      <rule regex="^[-/]nodefaultlib:&quot;?([^&quot;]+)&quot;?$"   xmlname="IgnoreSpecificDefaultLibraries"    xmlvalue="{1};{0}"                        ignorecase="true"   setonce="false"/>
+      <rule regex="^[-/]nodefaultlib$"                              xmlname="IgnoreAllDefaultLibraries"         xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]out:&quot;([^&quot;]+)&quot;$"              xmlname="OutputFile"                        xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^(.+\\.lib)$"                                    xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot;; {0}"           ignorecase="true"   setonce="false"/>
+      
+      <rule regex="^[-/]LIBPATH:(&quot;[^&quot;]+&quot;)$"          xmlname="AdditionalLibraryDirectories"      xmlvalue="{1}; {0}"                       ignorecase="true"   setonce="false" />
+      <rule regex="^([-/]ignore:[0-9]+)$"                           xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                        ignorecase="true"   setonce="false" />
+      <rule regex="^[^-/].+$"                                       xmlname=""                                  xmlvalue=""                               ignorecase="true"/>
+      <rule regex="^[-/]NOENTRY$"                                   xmlname="NoEntryPoint"                      xmlvalue="TRUE"                           ignorecase="true"/>
+      <rule regex="^[-/]LARGEADDRESSAWARE$"                         xmlname="LargeAddressAware"                 xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]LARGEADDRESSAWARE:NO$"                      xmlname="LargeAddressAware"                 xmlvalue="false"                          ignorecase="true"/>
+      <rule regex="^[-/]ENTRY:&quot;?([^&quot;]+)&quot;?$"          xmlname="EntryPointSymbol"                  xmlvalue="{1}"                            ignorecase="true"/>
+      <rule regex="^[-/]INCLUDE:(.+)$"                              xmlname="ForceSymbolReferences"             xmlvalue="{1}; {0}"                                           setonce="false" />
+      <rule regex="^[-/]DLL$"                                       xmlname="LinkDLL"                           xmlvalue="true"                           ignorecase="true"   setonce="false" matchonce="true"/>
+      <rule regex="^[-/]implib:&quot;?([^&quot;]+)&quot;?$"         xmlname="ImportLibrary"                     xmlvalue="{1}"                            ignorecase="true" />
+      <rule regex="^([-/]export:&quot;?([^&quot;]+)&quot;?)$"       xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                        ignorecase="true"   setonce="false"  />      
+      <!-- LTCG is processed as a general option, using /GL - global optimization 
+      <rule regex="^([-/]LTCG.*)$"                                  xmlname=""                                  xmlvalue=""/>
+      -->
+      
+      <rule regex="^[-/]ltcg$"                                      xmlname="LinkTimeCodeGeneration"            xmlvalue="UseLinkTimeCodeGeneration"      ignorecase="true"/>
+      <rule regex="^[-/]ltcg:pginstrument$"                         xmlname="LinkTimeCodeGeneration"            xmlvalue="PGInstrument"                   ignorecase="true"/>
+      <rule regex="^[-/]ltcg:pgoptimize$"                           xmlname="LinkTimeCodeGeneration"            xmlvalue="PGOptimization"                 ignorecase="true"/>
+      <rule regex="^[-/]ltcg:pgupdate$"                             xmlname="LinkTimeCodeGeneration"            xmlvalue="PGUpdate"                       ignorecase="true"/>
+      <rule regex="^[-/]ltcg:status$"                               xmlname="LinkStatus"                        xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]ltcg:nostatus$"                             xmlname="LinkStatus"                        xmlvalue="false"                          ignorecase="true"/>
+      <rule regex="^[-/]order:&quot;?([^&quot;]+)&quot;?$"          xmlname="FunctionOrder"                     xmlvalue="{1}"                            ignorecase="true"/>
+      <rule regex="^[-/]pgd:&quot;([^&quot;]+)&quot;$"              xmlname="ProfileGuidedDatabase"             xmlvalue="{1}"                            ignorecase="true"/>
+      <rule regex="^[-/]def:&quot;?([^&quot;]+)&quot;?$"            xmlname="ModuleDefinitionFile"              xmlvalue="{1}"                            ignorecase="true"/>
+      <rule regex="^[-/]base:&quot;?([^&quot;]+)&quot;?$"           xmlname="BaseAddress"                       xmlvalue="{1}"                            ignorecase="true"/>
+      <rule regex="^[-/]manifest$"                                  xmlname="GenerateManifest"                  xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifest:no$"                               xmlname="GenerateManifest"                  xmlvalue="false"                          ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifest:&quot;?([^&quot;]+)&quot;?$"       xmlname="GenerateManifest"                  xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]manifest:&quot;?([^&quot;]+)&quot;?$"       xmlname="ManifestFile"                      xmlvalue="{1}"                            ignorecase="true"/>
+      <rule regex="^[-/]manifestfile:&quot;?([^&quot;]+)&quot;?$"   xmlname="GenerateManifest"                  xmlvalue="true"                           ignorecase="true"/>
+      <rule regex="^[-/]manifestfile:&quot;?([^&quot;]+)&quot;?$"   xmlname="ManifestFile"                      xmlvalue="{1}"                            ignorecase="true"/>
+
+      <rule regex="^[-/]manifestuac$"                               xmlname="EnableUAC"                         xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifestuac(:level=[^\s])?$"                xmlname="EnableUAC"                         xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifestuac(:uiAccess=[^\s])?$"             xmlname="EnableUAC"                         xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifestuac:no$"                            xmlname="EnableUAC"                         xmlvalue="false"                          ignorecase="true"   matchonce="true"/>      
+      <rule regex="^[-/]manifestuac:level=asInvoker$"               xmlname="UACExecutionLevel"                 xmlvalue="AsInvoker"                      ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifestuac:level=highestAvailable$"        xmlname="UACExecutionLevel"                 xmlvalue="HighestAvailable"               ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifestuac:level=requireAdministrator$"    xmlname="UACExecutionLevel"                 xmlvalue="RequireAdministrator"           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifestuac:uiAccess=true$"                 xmlname="UACUIAccess"                       xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]manifestuac:uiAccess=true$"                 xmlname="UACUIAccess"                       xmlvalue="false"                          ignorecase="true"   matchonce="true"/>
+
+      <rule regex="^[-/]KEYFILE:&quot;?([^&quot;]+)&quot;?$"        xmlname="LinkKeyFile"                       xmlvalue="{1}"                            ignorecase="true"/>
+      <rule regex="^[-/]KEYCONTAINER:&quot;?([^&quot;]+)&quot;?$"   xmlname="KeyContainer"                      xmlvalue="{1}"                            ignorecase="true"/>
+
+      <rule regex="^[-/]NXCOMPAT$"                                  xmlname="DataExecutionPrevention"           xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]NXCOMPAT:NO$"                               xmlname="DataExecutionPrevention"           xmlvalue="false"                          ignorecase="true"   matchonce="true"/>
+
+      <rule regex="^[-/]ASSEMBLYMODULE:&quot;([^&quot;]+)&quot;$"   xmlname="AddModuleNamesToAssembly"          xmlvalue="{1}"                            ignorecase="true" />
+      <rule regex="^[-/]ALLOWISOLATION$"                            xmlname="AllowIsolation"                    xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]ALLOWISOLATION:NO$"                         xmlname="AllowIsolation"                    xmlvalue="false"                          ignorecase="true" />
+      <rule regex="^[-/]CLRIMAGETYPE:IJW$"                          xmlname="CLRImageType"                      xmlvalue="ForceIJWImage"                  ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRIMAGETYPE:PURE$"                         xmlname="CLRImageType"                      xmlvalue="ForcePureILImage"               ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRIMAGETYPE:SAFE$"                         xmlname="CLRImageType"                      xmlvalue="ForceSafeILImage"               ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRSupportLastError$"                       xmlname="CLRSupportLastError"               xmlvalue="Enabled"                        ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRSupportLastError:NO$"                    xmlname="CLRSupportLastError"               xmlvalue="Disabled"                       ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRSupportLastError:SYSTEMDLL$"             xmlname="CLRSupportLastError"               xmlvalue="SystemDlls"                     ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRTHREADATTRIBUTE:NONE$"                   xmlname="CLRThreadAttribute"                xmlvalue="DefaultThreadingAttribute"      ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRTHREADATTRIBUTE:MTA$"                    xmlname="CLRThreadAttribute"                xmlvalue="MTAThreadingAttribute"          ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRTHREADATTRIBUTE:STA$"                    xmlname="CLRThreadAttribute"                xmlvalue="STAThreadingAttribute"          ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRUNMANAGEDCODECHECK$"                     xmlname="CLRUnmanagedCodeCheck"             xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]CLRUNMANAGEDCODECHECK:NO$"                  xmlname="CLRUnmanagedCodeCheck"             xmlvalue="false"                          ignorecase="true"   matchonce="true"/>
+
+      <rule regex="^[-/]FUNCTIONPADMIN$"                            xmlname="CreateHotPatchableImage"           xmlvalue="Enabled"                        ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]FUNCTIONPADMIN:5$"                          xmlname="CreateHotPatchableImage"           xmlvalue="X86Image"                       ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]FUNCTIONPADMIN:6$"                          xmlname="CreateHotPatchableImage"           xmlvalue="X64Image"                       ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]FUNCTIONPADMIN:16$"                         xmlname="CreateHotPatchableImage"           xmlvalue="ItaniumImage"                   ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]DELAYLOAD:(&quot;[^&quot;]+&quot;)$"        xmlname="DelayLoadDLLs"                     xmlvalue="{1}; {0}"                       ignorecase="true"   setonce="false"/>
+      <rule regex="^[-/]DELAY:NOBIND$"                              xmlname="SupportNobindOfDelayLoadedDLL"     xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]DELAY:UNLOAD$"                              xmlname="SupportUnloadOfDelayLoadedDLL"     xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]DELAYSIGN$"                                 xmlname="DelaySign"                         xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]DELAYSIGN:NO$"                              xmlname="DelaySign"                         xmlvalue="false"                          ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]Driver$"                                    xmlname="Driver"                            xmlvalue="Driver"                         ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]DRIVER:UPONLY$"                             xmlname="Driver"                            xmlvalue="UpOnly"                         ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]DRIVER:WDM$"                                xmlname="Driver"                            xmlvalue="WDM"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]FORCE$"                                     xmlname="ForceFileOutput"                   xmlvalue="Enabled"                        ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]FORCE:MULTIPLE$"                            xmlname="ForceFileOutput"                   xmlvalue="MultiplyDefinedSymbolOnly"      ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]FORCE:UNRESOLVED$"                          xmlname="ForceFileOutput"                   xmlvalue="UndefinedSymbolOnly"            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]ORDER:@(&quot;[^&quot;]+&quot;)$"           xmlname="FunctionOrder"                     xmlvalue="{1}"                            ignorecase="true" />
+      <rule regex="^[-/]IGNOREIDL$"                                 xmlname="IgnoreEmbeddedIDL"                 xmlvalue="true"                           ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]SAFESEH$"                                   xmlname="ImageHasSafeExceptionHandlers"     xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]SAFESEH:NO$"                                xmlname="ImageHasSafeExceptionHandlers"     xmlvalue="false"                          ignorecase="true" />
+      <rule regex="^[-/]MAPINFO:EXPORTS$"                           xmlname="MapExports"                        xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]MERGE:(.+)$"                                xmlname="MergeSections"                     xmlvalue="{1}"                            ignorecase="true" />
+      <rule regex="^[-/]STUB:&quot;?([^&quot;]+)&quot;?$"           xmlname="MSDOSStubFileName"                 xmlvalue="{1}"                            ignorecase="true" />
+      <rule regex="^[-/]ALLOWBIND:NO$"                              xmlname="PreventDllBinding"                 xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]ALLOWBIND$"                                 xmlname="PreventDllBinding"                 xmlvalue="false"                          ignorecase="true" />
+      <rule regex="^[-/]DYNAMICBASE$"                               xmlname="RandomizedBaseAddress"             xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]DYNAMICBASE:NO$"                            xmlname="RandomizedBaseAddress"             xmlvalue="false"                          ignorecase="true" />
+      <rule regex="^[-/]align:([0-9]+)$"                            xmlname="SectionAlignment"                  xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]RELEASE$"                                   xmlname="SetChecksum"                       xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]VERBOSE$"                                   xmlname="ShowProgress"                      xmlvalue="LinkVerbose"                    ignorecase="true" />
+      <rule regex="^[-/]VERBOSE:Lib$"                               xmlname="ShowProgress"                      xmlvalue="LinkVerboseLib"                 ignorecase="true" />
+      <rule regex="^[-/]VERBOSE:ICF$"                               xmlname="ShowProgress"                      xmlvalue="LinkVerboseICF"                 ignorecase="true" />
+      <rule regex="^[-/]VERBOSE:REF$"                               xmlname="ShowProgress"                      xmlvalue="LinkVerboseREF"                 ignorecase="true" />
+      <rule regex="^[-/]VERBOSE:SAFESEH$"                           xmlname="ShowProgress"                      xmlvalue="LinkVerboseSAFESEH"             ignorecase="true" />
+      <rule regex="^[-/]VERBOSE:CLR$"                               xmlname="ShowProgress"                      xmlvalue="LinkVerboseCLR"                 ignorecase="true" />
+      <rule regex="^[-/]TSAWARE$"                                   xmlname="TerminalServerAware"               xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]TSAWARE:NO$"                                xmlname="TerminalServerAware"               xmlvalue="false"                          ignorecase="true" />
+      <rule regex="^[-/]WX$"                                        xmlname="TreatLinkerWarningAsErrors"        xmlvalue="TRUE" />
+      <rule regex="^[-/]WX:NO$"                                     xmlname="TreatLinkerWarningAsErrors"        xmlvalue="FALSE" />
+      <rule regex="^[-/]TLBOUT:&quot;([^&quot;]+)&quot;$"           xmlname="TypeLibraryFile"                   xmlvalue="{1}"                            ignorecase="true" />
+      <rule regex="^[-/]TLBID:([0-9]+)$"                            xmlname="TypeLibraryResourceID"             xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+
+      <!--winrt/winprt VS2012  -->
+      <rule regex="^[-/]WINMD$"                                     xmlname="GenerateWindowsMetadata"           xmlvalue="TRUE" />
+      <rule regex="^[-/]WINMD:NO$"                                  xmlname="GenerateWindowsMetadata"           xmlvalue="FALSE" />
+      <rule regex="^[-/]WINMDFILE:&quot;([^&quot;]+)&quot;$"        xmlname="WindowsMetadataFile"               xmlvalue="{1}"                            ignorecase="true" />
+      
+    </vc>
+    <gcc>
+      <rule regex="^[-/]o\s*&quot;([^&quot;]+)&quot;$"              xmlname="OutputFile"                        xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"  matchonce="true"/>
+      <rule regex="^&quot;?([^&quot;]+)&quot;?$"                    xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot;; {0}"                               setonce="false"  matchonce="true"/>
+    </gcc>
+    <sn>
+      <rule regex="^-o\s*&quot;([^&quot;]+)&quot;$"                 xmlname="OutputFile"                        xmlvalue="{1}"                                                matchonce="true"/>
+      <rule regex="^(.+\.o)$"                                       xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot;; {0}"                               setonce="false"  matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </sn>
+    <mw>
+      <rule regex="^-o\s*&quot;(.+)&quot;$"                         xmlname="OutputFile"                        xmlvalue="&quot;{1}&quot;"                                    matchonce="true"/>
+      <rule regex="^(.+\.o)$"                                       xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot;; {0}"                               setonce="false"  matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </mw>
+    <xenon>
+      <rule regex="^([-/]XEXSECTION:.+)$"                           xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                        ignorecase="true"   setonce="false"   matchonce="true"/>
+      <rule regex="^([-/]XEXFORMAT:.+)$"                            xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                        ignorecase="true"   setonce="false"/>
+      <rule regex="^([-/]XEXCONFIG:.+)$"                            xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                        ignorecase="true"   setonce="false"   matchonce="true"/>
+      <rule regex="^[-/]base:&quot;?([^&quot;]+)&quot;?$"           xmlname="BaseAddress"                       xmlvalue="{1}"                            ignorecase="true"   setonce="true"    matchonce="true"/>
+      <!--
+      <rule regex="^([-/]align:.+)$"                                xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                        ignorecase="true"   setonce="false"   matchonce="true"/>
+      -->
+    </xenon>
+    <pc>
+      <rule regex="^[-/]ASSEMBLYDEBUG$"                             xmlname="AssemblyDebug"                     xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]ASSEMBLYDEBUG:DISABLE$"                     xmlname="AssemblyDebug"                     xmlvalue="false"                          ignorecase="true" />
+      <rule regex="^[-/]ASSEMBLYRESOURCE:(&quot;[^&quot;]+&quot;)$" xmlname="EmbedManagedResourceFile"          xmlvalue="{1}; {0}"                       ignorecase="true"   setonce="false"/>
+    </pc>
+    <pc64>
+      <rule regex="^[-/]ASSEMBLYDEBUG$"                             xmlname="AssemblyDebug"                     xmlvalue="true"                           ignorecase="true" />
+      <rule regex="^[-/]ASSEMBLYDEBUG:DISABLE$"                     xmlname="AssemblyDebug"                     xmlvalue="false"                          ignorecase="true" />
+      <rule regex="^[-/]ASSEMBLYRESOURCE:(&quot;[^&quot;]+&quot;)$" xmlname="EmbedManagedResourceFile"          xmlvalue="{1}; {0}"                       ignorecase="true"   setonce="false"          />
+    </pc64>
+    <ghs>
+      <rule regex="^-o\s*&quot;(.+)&quot;$"                         xmlname="OutputFile"                        xmlvalue="&quot;{1}&quot;"                                    matchonce="true"/>
+      <rule regex="^(.+\ .o)$"                                      xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot; {0}"                                setonce="false"      matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+      <rule regex="^&quot;*(.+\.ld)&quot;*$"                        xmlname="AdditionalOptions"                 xmlvalue="{0} &quot;{1}&quot;"                                setonce="false"       matchonce="true"/>
+    </ghs>
+    <psp2>
+      <rule regex="^-o\s*&quot;([^&quot;]+)&quot;$"                 xmlname="OutputFile"                        xmlvalue="{1}"                                                matchonce="true"/>
+      <rule regex="^(.+\.o)$"                                       xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot; {0}"                                setonce="false"      matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </psp2>
+  </linker>
+  <librarian>
+    <vc>
+      <rule regex="^[-/]out:&quot;([^&quot;]+)&quot;$"              xmlname="OutputFile"                        xmlvalue="{1}" />
+      <rule regex="^[-/]nologo$"                                    xmlname="SuppressStartupBanner"             xmlvalue="TRUE" />
+      <rule regex="^([-/]LTCG)$"                                    xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"     ignorecase="true"  />
+      <rule regex="^([-/]force:allowzwobj)$"                        xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"     ignorecase="true" />
+      <rule regex="^([-/]ignore:[0-9]+)$"                           xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"                                            setonce="false"     ignorecase="true" />
+      <!--
+        /MACHINE Specifies the target platform for the program. Usually, you do not need to specify /MACHINE. 
+        LIB infers the machine type from the .obj files. However, in some circumstances, LIB cannot determine the
+        machine type and issues an error message. If such an error occurs, specify /MACHINE. 
+        In /EXTRACT mode, this option is for verification only.
+      -->
+      <rule regex="^[-/]machine:x86$"                               xmlname="TargetMachine"                     xmlvalue="MachineX86"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:I386$"                              xmlname="TargetMachine"                     xmlvalue="MachineX86"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:ix86$"                              xmlname="TargetMachine"                     xmlvalue="MachineX86"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:x64$"                               xmlname="TargetMachine"                     xmlvalue="MachineX64"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:IA64$"                              xmlname="TargetMachine"                     xmlvalue="MachineIA64"                    ignorecase="true"/>
+      <rule regex="^[-/]machine:ARM$"                               xmlname="TargetMachine"                     xmlvalue="MachineARM"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:EBC$"                               xmlname="TargetMachine"                     xmlvalue="MachineEBC"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:MIPS$"                              xmlname="TargetMachine"                     xmlvalue="MachineMIPS"                    ignorecase="true"/>
+      <rule regex="^[-/]machine:MIPS16$"                            xmlname="TargetMachine"                     xmlvalue="MachineMIPS16"                  ignorecase="true"/>
+      <rule regex="^[-/]machine:MIPSFPU$"                           xmlname="TargetMachine"                     xmlvalue="MachineMIPSFPU"                 ignorecase="true"/>
+      <rule regex="^[-/]machine:MIPSFPU16$"                         xmlname="TargetMachine"                     xmlvalue="MachineMIPSFPU16"               ignorecase="true"/>
+      <rule regex="^[-/]machine:SH4$"                               xmlname="TargetMachine"                     xmlvalue="MachineSH4"                     ignorecase="true"/>
+      <rule regex="^[-/]machine:THUMB$"                             xmlname="TargetMachine"                     xmlvalue="MachineTHUMB"                   ignorecase="true"/>
+    </vc>
+    <gcc>
+      <rule regex="^[-/]rs\s(&quot;[^&quot;]+&quot;)$"              xmlname="OutputFile"                        xmlvalue="{1}" />
+      <rule regex="^(.+\.o)$"                                       xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot;; {0}"                               matchonce="true" setonce="false"/>
+
+      <!--
+      Disabling rule. Snarl task for 2010 doesn't like additional options.
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+      -->
+
+    </gcc>
+    <sn>
+      <rule regex="^[-/]rs\s(&quot;[^&quot;]+&quot;)$"              xmlname="OutputFile"                        xmlvalue="{1}" />
+    </sn>
+    <mw>
+      <rule regex="^[-/]o\s(&quot;[^&quot;]+&quot;)$"               xmlname="OutputFile"                        xmlvalue="{1}" />
+      <rule regex="^(.+\.obj)$"                                     xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot;; {0}"                               setonce="false"       matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </mw>
+    <ghs>
+      <rule regex="^[-/]o\s(&quot;[^&quot;]+&quot;)$"               xmlname="OutputFile"                        xmlvalue="{1}" />
+      <rule regex="^(.+\.obj)$"                                     xmlname="AdditionalDependencies"            xmlvalue="&quot;{1}&quot; {0}"                                setonce="false"       matchonce="true"/>
+      <rule regex="^-(.+)$"                                         xmlname="AdditionalOptions"                 xmlvalue="{0} -{1}"                                           setonce="false"/>
+    </ghs>
+    <psp2>
+      <rule regex="^[-/]rs\s(&quot;[^&quot;]+&quot;)$"              xmlname="OutputFile"                        xmlvalue="{1}" />
+    </psp2>
+  </librarian>
+  <midl>
+    <pc>
+      <rule regex="^[-/]D&quot;?([^&quot;]+)&quot;?$"               xmlname="PreprocessorDefinitions"           xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^[-/]I(&quot;?[^&quot;]+&quot;?)$"               xmlname="AdditionalIncludeDirectories"      xmlvalue="{1}; {0}"                                           setonce="false"  />
+      <rule regex="^[-/]W0$"                                        xmlname="WarningLevel"                      xmlvalue="TurnOffAllWarnings"                                 setonce="false"/>
+      <rule regex="^[-/]W([1-4])$"                                  xmlname="WarningLevel"                      xmlvalue="Level{1}"                                           setonce="false"/>
+      <rule regex="^[-/]WX$"                                        xmlname="WarnAsError"                       xmlvalue="TRUE" />
+      <rule regex="^[-/]WX-$"                                       xmlname="WarnAsError"                       xmlvalue="FALSE" />
+      <rule regex="^[-/]nologo$"                                    xmlname="SuppressStartupBanner"             xmlvalue="TRUE"                           ignorecase="true" />
+      <rule regex="^[-/]no_def_idir$"                               xmlname="IgnoreStandardIncludePath"         xmlvalue="TRUE" />
+      <rule regex="^[-/]mktyplib203$"                               xmlname="MkTypLibCompatible"                xmlvalue="TRUE" />
+      <rule regex="^[-/]out &quot;?([^&quot;]+)&quot;?$"            xmlname="OutputDirectory"                   xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]iid &quot;?([^&quot;]+)&quot;?$"            xmlname="InterfaceIdentifierFileName"       xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]proxy &quot;?([^&quot;]+)&quot;?$"          xmlname="ProxyFileName"                     xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]tlb &quot;?([^&quot;]+)&quot;?$"            xmlname="TypeLibraryName"                   xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]h&quot;?([^&quot;]+)&quot;?$"               xmlname="HeaderFileName"                    xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]dlldata &quot;?([^&quot;]+)&quot;?$"        xmlname="DLLDataFileName"                   xmlvalue="{1}"                            ignorecase="true"   matchonce="true"/>
+      <rule regex="^[-/]notlb$"                                     xmlname="GenerateTypeLibrary"               xmlvalue="FALSE"                          ignorecase="true"   matchonce="true"/>
+    </pc>
+  </midl>
+  <imagebuilder>
+    <xbox>
+      <rule regex="^[-/]debug$"                                     xmlname="IncludeDebugInfo"            xmlvalue="TRUE" />
+      <rule regex="^[-/]defaultsaveimage:&quot;([^&quot;]+)&quot;$" xmlname="SaveGameImage"               xmlvalue="{1}" />
+      <rule regex="^[-/]in:(.+)$"                                   xmlname=""                            xmlvalue="" />
+      <rule regex="^[-/]insertfile:(.+)$"                           xmlname="InsertFile"                  xmlvalue="{1};{0}"         setonce="false"  />
+      <rule regex="^[-/]limitmem$"                                  xmlname="LimitAvailableMemoryTo64MB"  xmlvalue="TRUE" />
+      <rule regex="^[-/]nologo$"                                    xmlname="SuppressStartupBanner"       xmlvalue="TRUE" />
+      <rule regex="^[-/]out:(.+)$"                                  xmlname="FileName"                    xmlvalue="{1}" />
+      <rule regex="^[-/]stack:&quot;?([^&quot;]+)&quot;?$"          xmlname="StackSize"                   xmlvalue="{1}" />
+      <rule regex="^[-/]testid:&quot;?([^&quot;]+)&quot;?$"         xmlname="TitleID"                     xmlvalue="{1}" />
+      <rule regex="^[-/]testname:&quot;?([^&quot;]+)&quot;?$"       xmlname="TitleName"                   xmlvalue="{1}" />
+      <rule regex="^[-/]testsignkey:(.+)$"                          xmlname="SignKey"                     xmlvalue="{1}" />
+      <rule regex="^[-/]testregion:(.+)$"                           xmlname="XboxGameRegion"              xmlvalue="{1}"             typespec="hex" />
+      <rule regex="^[-/]titleimage:&quot;?([^&quot;]+)&quot;?$"     xmlname="TitleImage"                  xmlvalue="{1}" />
+      <rule regex="^[-/]titleinfo:&quot;?([^&quot;]+)&quot;?$"      xmlname="TitleInfo"                   xmlvalue="{1}" />
+      <rule regex="^[-/]testratings:0$"                             xmlname="XboxGameRating"              xmlvalue="1" />
+      <rule regex="^[-/]testratings:1$"                             xmlname="XboxGameRating"              xmlvalue="2" />
+      <rule regex="^[-/]testratings:2$"                             xmlname="XboxGameRating"              xmlvalue="3" />
+      <rule regex="^[-/]testratings:3$"                             xmlname="XboxGameRating"              xmlvalue="4" />
+      <rule regex="^[-/]testratings:4$"                             xmlname="XboxGameRating"              xmlvalue="5" />
+      <rule regex="^[-/]testratings:5$"                             xmlname="XboxGameRating"              xmlvalue="6" />
+      <rule regex="^[-/]testratings:6$"                             xmlname="XboxGameRating"              xmlvalue="7" />
+    </xbox>
+    <xenon>
+      <rule regex="^[-/]out:&quot;?([^&quot;]+)&quot;?$"            xmlname="OutputFileName"          xmlvalue="{1}" />
+      <rule regex="^[-/]nologo$"                                    xmlname="SuppressStartupBanner"   xmlvalue="TRUE" />
+      <rule regex="^[-/]config:&quot;?([^&quot;]+)&quot;?$"         xmlname="ConfigurationFile"       xmlvalue="{1}" />
+      <rule regex="^[-/]titleid:&quot;?([^&quot;]+)&quot;?$"        xmlname="TitleID"                 xmlvalue="{1}" />
+      <rule regex="^[-/]alttitleid:&quot;?([^&quot;]+)&quot;?$"     xmlname="ALTTITLEID"              xmlvalue="{1}" />
+      <rule regex="^[-/]lankey:&quot;?([^&quot;]+)&quot;?$"         xmlname="LANKey"                  xmlvalue="{1}" />
+      <rule regex="^[-/]baseaddr:&quot;?([^&quot;]+)&quot;?$"       xmlname="BaseAddress"             xmlvalue="{1}" />
+      <rule regex="^[-/]xapiheap:&quot;?([^&quot;]+)&quot;?$"       xmlname="XapiHeapSize"            xmlvalue="{1}" />
+      <rule regex="^[-/]workspace:&quot;?([^&quot;]+)&quot;?$"      xmlname="WorkspaceSize"           xmlvalue="{1}" />
+      <rule regex="^[-/]section:&quot;?([^&quot;]+)&quot;?$"        xmlname="AdditionalSections"      xmlvalue="{0};{1}" setonce="false" />
+      <rule regex="^[-/]exportnames$"                               xmlname="ExportByName"            xmlvalue="TRUE" />
+      <rule regex="^([-/]alttitleid:&quot;?([^&quot;]+)&quot;?)$"   xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^([-/]in:&quot;?([^&quot;]+)&quot;?)$"           xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^([-/]xex)$"                                     xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^([-/]baseaddrfile:&quot;?([^&quot;]+)&quot;?)$" xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^([-/]error:&quot;?([^&quot;]+)&quot;?)$"        xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^(([-/]format:raw)|([-/]format:compressed))$"    xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" ignorecase="true" />
+      <rule regex="^([-/]dump)$"                                    xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^([-/]spafile:&quot;?([^&quot;]+)&quot;?)$"      xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^([-/]sectionname:&quot;?([^&quot;]+)&quot;?)$"  xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^([-/]sectionfile:&quot;?([^&quot;]+)&quot;?)$"  xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+      <rule regex="^([-/]AdditionalTitleMemory:&quot;?([^&quot;]+)&quot;?)$"    xmlname="AdditionalOptions"       xmlvalue="{0} {1}" setonce="false" />
+
+      <rule regex="^[-/]privilege:2$"                               xmlname="OpticalDiscDriveMapping"          xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:10$"                              xmlname="Pal50Incompatible"                xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:15$"                              xmlname="MultiDiscTitle"                   xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:16$"                              xmlname="MultiDiscTitle"                   xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:25$"                              xmlname="PreferBigButtonInput"             xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:14$"                              xmlname="CrossPlatformSystemLink"          xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:29$"                              xmlname="AllowAvatarGetMetadata"           xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:30$"                              xmlname="AllowControllerSwapping"          xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:34$"                              xmlname="RequireFullExperience"            xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:35$"                              xmlname="GameVoiceRequiredUI"              xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:37$"                              xmlname="KinectElevationControl"           xmlvalue="true"             matchonce="true"/>
+      <rule regex="^[-/]privilege:38$"                              xmlname="KinectSupportLevel"               xmlvalue="RequiresTracking" matchonce="true"/>
+      <rule regex="^[-/]privilege:39$"                              xmlname="KinectSupportLevel"               xmlvalue="SupportsTracking" matchonce="true"/>
+      <rule regex="^([-/]privilege:[0-9]+)$"                        xmlname="AdditionalOptions"                 xmlvalue="{1} {0}"      setonce="false"  />
+    </xenon>
+  </imagebuilder>
+</rules>

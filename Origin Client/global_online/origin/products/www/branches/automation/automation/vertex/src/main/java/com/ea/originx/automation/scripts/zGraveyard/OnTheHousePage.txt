@@ -1,0 +1,153 @@
+package com.ea.originx.automation.lib.pageobjects.store;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+import com.ea.originx.automation.lib.helpers.I18NUtil;
+import com.ea.originx.automation.lib.helpers.StringHelper;
+import com.ea.originx.automation.lib.pageobjects.template.EAXVxSiteTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import com.google.gson.Gson;
+import org.openqa.selenium.By;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Page object that represents the 'On the House' page.
+ *
+ * @author nvarthakavi
+ */
+public class OnTheHousePage extends EAXVxSiteTemplate {
+
+    protected static final By ON_THE_HOUSE_PAGE_LOCATOR = By.cssSelector(".origin-store-promo-banner-content");
+    protected static final By OTH_CARD_LOCATOR = By.cssSelector(".origin-store-oth-card");
+    protected static final By OTH_IMAGE_LOCATOR = By.cssSelector("img.origin-telemetry-store-backgroundimagecarousel-image");
+
+    /**
+     * Constructor
+     *
+     * @param driver Selenium WebDriver
+     */
+    public OnTheHousePage(WebDriver driver) {
+        super(driver);
+    }
+
+    /**
+     * Verify the 'On the House' page is displayed
+     *
+     * @return true if page displayed, false otherwise
+     */
+    public boolean verifyOnTheHousePageReached() {
+        return waitIsElementVisible(ON_THE_HOUSE_PAGE_LOCATOR);
+    }
+
+    /**
+     * Verify the 'On the House' image is visible at the top of the page.
+     *
+     * @return true if the image is visible, false otherwise
+     */
+    public boolean verifyOnTheHouseImageVisible() {
+        return waitIsElementVisible(OTH_IMAGE_LOCATOR);
+    }
+
+    /**
+     * Check if the game is a free game.
+     *
+     * @param onTheHouseTile The 'On the House' tile to check
+     * @return true if the game is free, false otherwise
+     */
+    public boolean verifyGameIsFree(OnTheHouseTile onTheHouseTile) {
+        String price = onTheHouseTile.getPrice();
+        return StringHelper.containsIgnoreCase(price, I18NUtil.getMessage(("free")));
+    }
+
+    /**
+     * Get all of the 'On the House' tiles on the page.
+     *
+     * @return A list WebElements of all the 'On the House' tiles on the page
+     */
+    private List<WebElement> getAllOnTheHouseTileElements() {
+        return waitForAllElementsVisible(OTH_CARD_LOCATOR);
+    }
+
+    /**
+     * Get a list of all the 'On the House' tile objects.
+     *
+     * @return List of all 'On the House' tiles on this 'On The House' page.
+     * Returns null if no tiles exist.
+     */
+    public List<OnTheHouseTile> getAllOnTheHouseTiles() {
+        List<OnTheHouseTile> onTheHouseTiles = null;
+        try {
+            onTheHouseTiles = getAllOnTheHouseTileElements().
+                    stream().map(webElement -> new OnTheHouseTile(driver, webElement)).collect(Collectors.toList());
+        } catch (TimeoutException ex) {
+            _log.error("Failed to find any 'on the house' entitlement : " + ex.getMessage());
+        }
+        return onTheHouseTiles;
+    }
+
+    /**
+     * Get first 'OTH' tile on the page that isn't a 'Third Party' entitlement.
+     *
+     * @return The first 'OTH' tile that is not a 'Third Party' entitlement.
+     */
+    public OnTheHouseTile getFirstNonThirdPartyOTHTile() throws JSONException {
+        jsExec.executeScript("return angular.reloadWithDebugInfo()"); // reloads page with angular debug info
+        Waits.pollingWait(() -> verifyOnTheHouseHasMinimumOneEntitlement());
+
+        List<WebElement> othTiles = driver.findElements(OTH_CARD_LOCATOR);
+
+        for (int i = 0; i < othTiles.size(); i++) {
+            WebElement element = othTiles.get(i);
+            Object obj = jsExec.executeScript("return angular.element(arguments[0]).scope().model", element);
+            String json = new Gson().toJson(obj); // convert 'json look-a-like string' into an actual json string
+            if (new JSONObject(json).getString("isThirdPartyTitle") == "false") {
+                return new OnTheHouseTile(driver, element);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Verify there is at least 1 entitlement in 'On the House' page
+     *
+     * @return true if there is at least 1 entitlement
+     */
+    public boolean verifyOnTheHouseHasMinimumOneEntitlement() {
+        return getAllOnTheHouseTiles().size() >= 1;
+    }
+
+    /**
+     * Get all the 'On the House' Tile's Entitlement Name
+     *
+     * @return the list of string of the entitlement name
+     */
+    public List<String> getOTHTilesEntitlementName() {
+        return getAllOnTheHouseTiles().stream().map(OnTheHouseTile::getTitle).collect(Collectors.toList());
+    }
+
+    /**
+     * Get all the 'On the House' Tile's Entitlement Name
+     *
+     * @return the list of string of the entitlement name
+     */
+    public Map<String, String> getOTHTilesEntitlementNameOfferId() {
+        return getAllOnTheHouseTiles().stream().collect(Collectors.toMap(OnTheHouseTile::getTrialEntitlementName, OnTheHouseTile::getOfferId));
+    }
+
+
+    /**
+     * Verify all the 'On the House' tiles are 'Free' for different locale
+     *
+     * @return true if all the 'On the House' tiles are free
+     */
+    public boolean verifyAllOTHTilesFree() {
+        return getAllOnTheHouseTiles().stream().allMatch(onTheHouseTile -> verifyGameIsFree(onTheHouseTile));
+    }
+}
+

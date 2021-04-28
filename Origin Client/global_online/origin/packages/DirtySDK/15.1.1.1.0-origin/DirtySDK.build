@@ -1,0 +1,44 @@
+<project default="build">
+
+    <package name="DirtySDK" targetversion="15.1.1.1.0"/>
+
+    <fail if="${config-system} == xenon" message="Xenon is no longer supported. If you require Gen3 support please contact the DirtySock Team."/>
+    <fail if="${config-system} == ps3" message="PS3 is no longer supported. If you require Gen3 support please contact the DirtySock Team."/>
+    
+    <do if="${dirtysdk-uniquesln??false}">
+        <property name="runtime.gen.slnname.template" value="%outputname%_${config-system}"/>
+        <property name="runtime.gen.projectname.template" value="${config-system}_%outputname%"/>
+    </do>
+
+    <!-- bring in the init and build files for dirtysock -->
+    <include file="scripts/dirtysock-buildtypes.xml"/>
+    <include file="scripts/dirtysock-initialize.xml" />
+    <include file="scripts/dirtysock-build.xml" />
+
+    <!-- define targets for DirtySDK packages -->
+    <include file="scripts/package-targets.xml" />
+
+    <!-- define release targets for DirtySDK -->
+    <do if="@{FileExists('scripts/release-targets.xml')}" >
+        <include file="scripts/release-targets.xml" />
+    </do>
+
+    <do if="${dirtysdk-samples??false}">
+        <!-- determine which contribs to use/build -->
+        <include file="scripts/select-contribs.xml"/>
+
+        <foreach property="contrib" item="String" in="${package.DirtySDK.contribs.available}">
+            <!-- The initialize is used to define our public facing includes. If the contrib isn't really public facing in that
+                 way then we don't add an initialize -->
+            <include file="scripts/contrib/${contrib}-initialize.xml" if="@{FileExists('scripts/contrib/${contrib}-initialize.xml')}"/>
+            <include file="scripts/contrib/${contrib}-build.xml"/>
+        </foreach>
+
+        <!--determine which samples to use/build--> 
+        <include file="scripts/select-samples.xml"/>
+
+        <foreach property="sample" item="String" in="${package.DirtySDK.samples.available}">
+            <include file="scripts/sample/${sample}-build.xml"/>
+        </foreach>
+    </do>
+</project>

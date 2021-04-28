@@ -1,0 +1,81 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <do if="false">
+    <target
+        name="post"
+        description="Copy all package zip files created by packages target to package server"
+        >
+
+      <!-- Tell the package target to store zip file names into this variable -->
+      <property name="package_filenames"/>
+
+      <call target="packages" force="true"/>
+
+      <foreach item="String" in="${package_filenames}" property="package">
+        <exec program="eapm">
+          <arg value="post ${package}"/>
+        </exec>
+      </foreach>
+    </target>
+
+
+    <target
+        name="post-all-platform-packages"
+        description="Copy all package zip files created by all-platform-packages target to package server"
+        >
+
+      <!-- Tell the package target to store zip file names into this variable -->
+      <property name="package_filenames"/>
+
+      <call target="all-platform-packages" force="true"/>
+
+      <foreach item="String" in="${package_filenames}" property="package">
+        <exec program="eapm">
+          <arg value="post ${package}"/>
+        </exec>
+      </foreach>
+    </target>
+
+    <!-- Must supply the following arguments
+      ${replace.fileset.oldconfigtype}: old config type to replace (usually ${config-type})
+      ${replace.fileset.newconfigtype}: new config type that replaces the old one
+      ${replace.fileset}: fileset to perform operation on (i.e. package.realcore.libs)
+  
+     Note: the replacing fileset will not inherit attributes like asis and force from fileset.includes
+         or fileset.excludes
+  -->
+    <target
+        name="replace-fileset-configtype"
+        description="Replaces the config-type of a fileset with the specified config-type"
+        >
+
+      <fileset name="replace.fileset.tmp"/>
+
+      <!-- assume lib suffix are the same as the project -->
+      <foreach item="FileSet" in="${replace.fileset}" property="filename">
+        <property name="arg1" value="@{StrConcat('${replace.fileset.oldconfigtype}', '${lib-suffix}' )}"/>
+        <property name="arg2" value="@{StrConcat('${replace.fileset.newconfigtype}', '${lib-suffix}' )}"/>
+
+        <property name="filename" value="@{StrReplace('${filename}', '${arg1}', '${arg2}' )}"/>
+
+        <!-- Doesn't care about the attributes or patterns originally passed in.  It only cares
+         about files that have matched the patterns of the original fileset -->
+        <fileset name="replace.fileset.tmp" fromfileset="replace.fileset.tmp">
+          <includes name="${filename}"/>
+        </fileset>
+      </foreach>
+
+      <!-- replace the original fileset with the new one -->
+      <fileset name="${replace.fileset}" fromfileset="replace.fileset.tmp"/>
+
+      <!-- Perform a check to see if the files in the new fileset is valid -->
+      <foreach item="FileSet" in="${replace.fileset}" property="filename">
+      </foreach>
+
+    </target>
+  </do>
+
+</project>

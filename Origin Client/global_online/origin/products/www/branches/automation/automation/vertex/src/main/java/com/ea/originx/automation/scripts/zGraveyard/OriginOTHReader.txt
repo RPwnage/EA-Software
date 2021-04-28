@@ -1,0 +1,155 @@
+package com.ea.originx.automation.lib.helpers.csv;
+
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHouseTile;
+import com.ea.vx.originclient.utils.SystemUtilities;
+import com.opencsv.CSVReader;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.invoke.MethodHandles;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * To read 'On the House' information from oth_info.csv file in Suites.
+ * Each row represents a valid 'On the House' tile in a specific country and language
+ *
+ * @author nvarthakavi
+ */
+public class OriginOTHReader {
+
+    static final String csvFile = SystemUtilities.getCurrentWorkingDirectory() + "/Suites/oth_info.csv";
+    private static final Logger _log = LogManager.getLogger(MethodHandles.lookup().lookupClass());
+
+    /**
+     * To get a line from the 'OTH' CSV file
+     *
+     * @param line line of the CSV file as a String array
+     * @return {@link OriginOTHHelper} constructed from a line of the CSV file
+     */
+    private static OriginOTHHelper getOTHInfoFromCSVRow(String[] line) {
+        String entitlementName = line[0].trim();
+        String entitlementOfferId = line[1].trim();
+        String countryCode = line[2].trim();
+        String languageCode = line[3].trim();
+        String entitlementPartialPDPUrl = line[4].trim();
+        String startTime = line[5].trim();
+        String endTime = line[6].trim();
+        return new OriginOTHHelper(entitlementName, entitlementOfferId, countryCode, languageCode, entitlementPartialPDPUrl, startTime, endTime);
+    }
+
+    /**
+     * Verify the 'On the House' Tile passed is valid for the current date
+     *
+     * @param othHelper the 'On the House' Tile to be validated
+     * @return true if the 'On the House' Tile is valid for current date
+     * @throws ParseException
+     */
+    public static boolean verifyOTHTileCurrentlyValid(OriginOTHHelper othHelper) throws ParseException {
+        Date date = new Date(); // current date
+        DateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy");
+        dateFormat.setCalendar(new GregorianCalendar());
+        Date startDate = dateFormat.parse(othHelper.getEntitlementStartTime()); //start date of the oth tile is valid
+        Date endDate = dateFormat.parse(othHelper.getEntitlementEndTime()); //end date of the oth tile is valid
+        return startDate.compareTo(date) * date.compareTo(endDate) >= 0;
+    }
+
+    /**
+     * Verify the the 'On the House' entitlement is valid for the current date for the country and language provided
+     *
+     * @param countryCode            code of the country to be verified
+     * @param languageCode           code of the language to be verified
+     * @param othTileEntitlementName 'On the House' entitlement name
+     * @return
+     */
+    public static boolean verifyOTHTileIsValid(String countryCode, String languageCode, String othTileEntitlementName) {
+        OriginOTHHelper othHelper;
+
+        try (CSVReader reader = new CSVReader(new InputStreamReader(new FileInputStream(csvFile), "UTF-8"))) {
+            if (reader.readNext() == null) {
+                String errMessage = String.format("Empty csv file : '%s'", csvFile);
+                _log.debug(errMessage);  // exception may not show in output, need to log first
+                throw new RuntimeException(errMessage);
+            }
+            List<String[]> readers = reader.readAll();
+
+            for (int rowNumber = 0; rowNumber < readers.size(); rowNumber++) {
+                othHelper = getOTHInfoFromCSVRow(readers.get(rowNumber));
+                if (othHelper.getCountryCode().equals(countryCode) && othHelper.getLanguageCode().equals(languageCode) && othHelper.getEntitlementName().equals(othTileEntitlementName))
+                    return verifyOTHTileCurrentlyValid(othHelper);
+            }
+
+        } catch (IOException | ParseException e) {
+            String errMessage = String.format("IO Error encountered reading csvfile %s: %s", csvFile, e.toString());
+            _log.debug(errMessage);
+            throw new RuntimeException(errMessage);
+        }
+
+        return false;
+    }
+
+    /**
+     * Get all the 'On the House' Tiles are valid for the current date for the country and language provided from the file
+     *
+     * @param countryCode  code of the country to be verified
+     * @param languageCode code of the language to be verified
+     * @return List of currently valid 'On the House' from CSV file
+     */
+    public static List<String> getAllOTHTilesFromFile(String countryCode, String languageCode) {
+        OriginOTHHelper othHelperTemp;
+        List<String> othHelpers = new ArrayList<>();
+
+        try (CSVReader reader = new CSVReader(new InputStreamReader(new FileInputStream(csvFile), "UTF-8"))) {
+            if (reader.readNext() == null) {
+                String errMessage = String.format("Empty csv file : '%s'", csvFile);
+                _log.debug(errMessage);  // exception may not show in output, need to log first
+                throw new RuntimeException(errMessage);
+            }
+            List<String[]> readers = reader.readAll();
+
+            for (int rowNumber = 0; rowNumber < readers.size(); rowNumber++) {
+                othHelperTemp = getOTHInfoFromCSVRow(readers.get(rowNumber));
+                if (othHelperTemp.getCountryCode().equals(countryCode) && othHelperTemp.getLanguageCode().equals(languageCode)) {
+                    if (verifyOTHTileCurrentlyValid(othHelperTemp)) {
+                        othHelpers.add(othHelperTemp.getEntitlementName());
+                    }
+                }
+            }
+        } catch (IOException | ParseException e) {
+            String errMessage = String.format("IO Error encountered reading csvfile %s: %s", csvFile, e.toString());
+            _log.debug(errMessage);
+            throw new RuntimeException(errMessage);
+        }
+        return othHelpers;
+    }
+
+    /**
+     * Verify all the 'On the House' Tiles are valid for the current date for the country and language provided
+     *
+     * @param countryCode     code of the country to be verified
+     * @param languageCode    code of the language to be verified
+     * @param onTheHouseTiles list of 'On the House' tiles to be verified
+     * @return true if all the tiles are valid
+     */
+    public static boolean verifyAllOTHTilesValid(String countryCode, String languageCode, List<OnTheHouseTile> onTheHouseTiles) {
+        boolean isAllOTHValid = onTheHouseTiles.stream().allMatch(onTheHouseTile -> verifyOTHTileIsValid(countryCode, languageCode, onTheHouseTile.getTrialEntitlementName()));
+
+        List<String> onTheHouseTilesFromFile = getAllOTHTilesFromFile(countryCode,languageCode);
+        Collections.sort(onTheHouseTilesFromFile);
+        List<String> onTheHouseTilesName = onTheHouseTiles.stream().map(onTheHouseTile -> onTheHouseTile.getTrialEntitlementName()).collect(Collectors.toList());
+        Collections.sort(onTheHouseTilesName);
+        boolean isAllOTHValidFromFile = onTheHouseTilesName.equals(onTheHouseTilesFromFile);
+
+        return isAllOTHValid && isAllOTHValidFromFile;
+    }
+}

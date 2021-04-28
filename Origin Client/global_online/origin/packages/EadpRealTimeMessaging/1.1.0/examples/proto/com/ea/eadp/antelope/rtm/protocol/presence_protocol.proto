@@ -1,0 +1,135 @@
+package com.ea.eadp.antelope.rtm.protocol;
+
+import "player_protocol.proto";
+
+option java_outer_classname = "PresenceProtocol";
+
+//Requests
+//For each player in the list, the requestor either gets back a PresenceV1 with the current presence of that player or PresenceSubscriptionErrorV1 in case of error
+message PresenceSubscribeV1 {
+	repeated string personaId = 1 [deprecated=true];
+	repeated Player players = 2;
+}
+
+message PresenceUnsubscribeV1 {
+	repeated string personaId = 1 [deprecated=true];
+	repeated Player players = 2;
+}
+
+message PresenceUpdateV1 {
+	//existing field
+	// game specific generic extensible string
+	optional string status = 1;
+
+	// New fields
+	// This enum represents a standard basic presence type for the player
+	optional BasicPresenceType basicPresenceType = 2 [default = UNKNOWN_PRESENCE];
+
+	// Allows user to set his presence to a custom string, we will define a max cap of 50 characters
+	optional string userDefinedPresence = 3;
+
+	// This struct contains all information about the rich presence status of the player
+	optional RichPresenceV1 richPresence = 4;
+
+}
+
+//Responses
+message PresenceV1 {
+	//existing fields
+	optional string personaId = 1 [deprecated=true];
+
+	// game specific generic extensible string
+	optional string status = 2;
+
+	// timestamp when the status was updated by the client in UTC
+	optional string timestamp = 3;
+
+	//(playerId + productId)
+	optional Player player = 4;
+
+	// New fields
+	// This enum represents a standard basic presence type for the player
+	optional BasicPresenceType basicPresenceType = 5 [default = UNKNOWN_PRESENCE];
+
+	// Allows user to set his presence to a custom string, we will define a max cap of 50 characters
+	optional string userDefinedPresence = 6;
+
+	// This struct contains all information about the rich presence status of the player
+	optional RichPresenceV1 richPresence = 7;
+
+	optional string sessionKey = 8;
+	optional string clientVersion = 9;
+	optional PlatformV1 platform = 10;
+}
+
+message PresenceUpdateErrorV1 {
+	optional string errorCode = 1;
+	optional string errorMessage = 2;
+}
+
+message PresenceSubscriptionErrorV1 {
+	optional string personaId  = 1 [deprecated=true];
+	optional string errorCode = 2;
+	optional string errorMessage = 3;
+	optional Player player = 4;
+}
+
+enum BasicPresenceType {
+	// Default value for backward and forward compatibility.
+	UNKNOWN_PRESENCE = 1;
+	OFFLINE = 2;
+	ONLINE = 3;
+	DND = 4;
+	AWAY = 5;
+	INVISIBLE = 6;
+	CUSTOM = 7;
+}
+
+message RichPresenceV1 {
+	// What game the player is currently playing
+	optional string game = 1;
+
+	// Which platform is the game being played, this is an optional field that the clients do not need to send with every update but we will be returning this field as a part of the presence returned from the server
+	//(we will add the platform to the new login request as well)
+	optional PlatformV1 platform = 2 [default = UNKNOWN_PLATFORM];
+
+	// The mode type for the current game session
+	optional string gameModeType = 3;
+
+	// The game mode for the current game session
+	optional string gameMode = 4;
+
+	// The current game session info, that has all the encoded info to allow other players to join the game
+	optional string gameSessionData = 5;
+
+	// Rich presence type is an enum that represents the client current rich presence which can be one of LFG or BROADCASTING currently
+	optional RichPresenceType richPresenceType = 6 [default = UNKNOWN_RICH_PRESENCE];
+
+	// Start timestamp to display fields like xx:xx time elapsed in the current state
+	optional string startTimestamp = 7;
+
+	// End timestamp to display fields like xx:xx time remaining in the current state
+	optional string endTimestamp = 8;
+
+	// Generic string field to allow custom game specific rich presence data to be sent as some encoding
+	optional string customRichPresenceData = 9;
+}
+
+enum RichPresenceType {
+	UNKNOWN_RICH_PRESENCE = 1;
+
+	// Looking for groups
+	LFG = 2;
+
+	BROADCASTING = 3;
+}
+
+enum PlatformV1 {
+	UNKNOWN_PLATFORM = 1;
+	MOBILE = 2;
+	PC = 3;
+	WEB = 4;
+	XBOXLIVE = 5;
+	PSN = 6;
+}
+

@@ -1,0 +1,199 @@
+
+<project name="IGOProxy_OSX" default="build">
+	
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+  
+  <property name="dll-suffix" value=".dylib" readonly="true" />
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.IGOProxy_OSX.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.IGOProxy_OSX.version"  value="@{PathGetFileName('${package.IGOProxy_OSX.dir}')}"/>
+    <package name="IGOProxy_OSX" targetversion="${package.IGOProxy_OSX.version}"/>
+	
+	<!-- ******************* -->
+    <!-- Package dependencies -->
+    <!-- ******************* -->
+	<dependent name="OriginConfig" />
+	<dependent name="OriginVersion" />
+	<dependent name="IGO" />
+
+
+	<!-- ***************************** -->
+	<!-- Build Configuration properties-->
+	<!-- ***************************** -->
+  <property name="eaconfig.rtti" value="on" />
+  <property name="dirtysdk-samples" value="false" />
+  <property name="osx-base-sdk-version" value="10.7" />
+  <property name="osx-deployment-target-version" value="10.7" />
+
+
+	<BuildType name="IGOProxy_OSX.buildtype" from="OriginDLL">
+    <remove>
+      <link.options>
+        -framework CoreServices
+        -framework Foundation
+        -framework AudioToolBox
+        -framework Carbon
+      </link.options>
+    </remove>
+		<option name="buildset.cc.defines">
+			${option.value}
+		</option>
+		<option name="RTTI" value="on" />
+		<option name="clanguage" value="on" />
+	</BuildType>
+
+  <property name="runtime.buildmodules" value="IGOProxy_OSX" />
+  <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+  <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+
+  <!-- OriginESImp module section -->
+
+  <property name="module.IGOProxy_OSX.dir" value="${package.dir}/source/IGOProxy_OSX" />
+  <property name="runtime.IGOProxy_OSX.buildtype" value="IGOProxy_OSX.buildtype" />
+
+  <property name="runtime.IGOProxy_OSX.xcode-postprocessing-strip" value="false" />
+  <property name="runtime.IGOProxy_OSX.xcode-osx-template-dir" value="${package.IGOProxy_OSX.dir}/XCodeTemplate/IGOProxy_OSX-xcode.template" />
+  <property name="runtime.IGOProxy_OSX.outputdir" value="${nant.project.buildroot}/XCodeOSX/SubProjects/IGOProxy_OSX/${package.IGOProxy_OSX.version}/IGOProxy_OSX/build/${config-xcode-type}" />
+  <property name="runtime.IGOProxy_OSX.targetdir" value="${package.dir}/target" />
+  <property name="runtime.IGOProxy_OSX.outputname" value="IGOLoader" />
+  <property name="runtime.IGOProxy_OSX.plist" value="${runtime.IGOProxy_OSX.xcode-osx-template-dir}/Info.plist" />
+  <property name="runtime.IGOProxy_OSX.plist.template" value="${runtime.IGOProxy_OSX.xcode-osx-template-dir}/Info.plist.template" />
+
+	<property name="runtime.IGOProxy_OSX.osx-extra-link-options" value="-sectcreate __TEXT __info_plist ${runtime.IGOProxy_OSX.xcode-osx-template-dir}/Info.plist"/>
+  <property name="runtime.IGOProxy_OSX.osx-universal-lib" value="true" />
+
+	<!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	<!-- NANT preprocess target. Step that happens before project generation -->
+  <property name="runtime.IGOProxy_OSX.preprocess" value="update-version" />
+  
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<property name="runtime.IGOProxy_OSX.prebuildtarget" value="IGOProxy_OSX-generate-code" />
+
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.IGOProxy_OSX.vcproj.pre-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.IGOProxy_OSX.prebuildtarget}
+	</property>
+
+	<!-- ********************************************************** -->
+	<!-- Package USE dependencies 																	-->
+	<!-- inclusion into the project but does not affect build order -->
+	<!-- ********************************************************** -->
+	<property name="runtime.IGOProxy_OSX.usedependencies">
+	</property>
+	
+	<!-- ********************************************************** -->
+	<!-- Package BUILD dependencies 																-->
+	<!-- inclusion into the project, affects build order 						-->
+	<!-- ********************************************************** -->
+
+	<property name="runtime.IGOProxy_OSX.builddependencies">
+        EABase
+        EATrace
+        EAStdC
+        EAThread
+        EAAssert
+	</property>
+
+  <property name="runtime.IGOProxy_OSX.osx-frameworks" >
+    -framework Carbon
+    -framework Security
+    -framework ApplicationServices
+  </property>
+
+	<!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+	<property name="runtime.IGOProxy_OSX.includedirs" >
+        ${property.value}
+		${module.IGOProxy_OSX.dir}
+		${package.OriginVersion.includedirs}
+		${package.IGO.includedirs}
+	</property>
+
+    <fileset name="runtime.IGOProxy_OSX.headerfiles" basedir="${module.IGOProxy_OSX.dir}">
+        <includes name="**/*.h" />
+        <includes name="${package.IGO.includedirs}/Disasm/misc.h" />
+        <includes name="${package.IGO.includedirs}/Disasm/disasm.h" />
+        <includes name="${package.IGO.includedirs}/Disasm/disasm_x86.h" />
+        <includes name="${package.IGO.includedirs}/Disasm/disasm_x86_tables.h" />
+        <includes name="${package.IGO.includedirs}/Disasm/cpu.h" />
+		<includes name="${package.IGO.includedirs}/MacWindows.h" />
+		<includes name="${package.IGO.includedirs}/IGOTrace.h" />
+		<includes name="${package.IGO.includedirs}/IGOLogger.h" />
+    </fileset>  
+  
+
+	<!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+	<fileset name="runtime.IGOProxy_OSX.sourcefiles" basedir="${module.IGOProxy_OSX.dir}">
+		<includes name="Loader.cpp" />
+		<includes name="${package.IGO.sourcedir}/MacMach_override.c" />
+		<includes name="${package.IGO.sourcedir}/Disasm/misc.c" />
+		<includes name="${package.IGO.sourcedir}/Disasm/disasm.c" />
+		<includes name="${package.IGO.sourcedir}/Disasm/disasm_x86.c" />
+		<includes name="${package.IGO.sourcedir}/Disasm/cpu.c" />
+
+		<includes name="${package.IGO.sourcedir}/MacWindows.cpp" />
+		<includes name="${package.IGO.sourcedir}/IGOLogger.cpp" />
+	</fileset>
+
+	<target name="sign-exe">
+	</target>
+	
+    <target name="IGOProxy_OSX-generate-code" depends="update-version" >
+        <!-- get the options from the current config -->
+  </target>
+        
+  <target name="update-version" >
+  
+    <echo message="Updating versions in plist files" />
+    <!-- Get the current version -->
+    <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+      <property name="config" value="${config}" />
+    </nant>
+    <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+    <!-- Update the main plist with the new version number -->
+    <property name="plist" value="" />
+    <property name="nextline" value="false" />
+    <foreach property="line" item="Line" in="${runtime.IGOProxy_OSX.plist.template}">
+      <do if="${nextline}" >
+        <property name="line" value="&lt;string&gt;${version}&lt;/string&gt;" />
+        <property name="nextline" value="false" />
+      </do>
+      <do if="@{StrIndexOf(${line},'CFBundleVersion')} != -1">
+        <property name="nextline" value="true" />
+      </do>
+      <property name="plist" value="${property.value}&#10;${line}" />
+    </foreach>
+    <echo message="${plist}" file="${runtime.IGOProxy_OSX.plist}" />
+  </target>
+  
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+	
+	<target name="runtime.IGOProxy_OSX.postbuildtarget">
+	</target>
+
+  <target name="clean-custom" >
+    <delete dir="${package.IGOProxy_OSX.dir}/build" />
+    <delete dir="${package.IGOProxy_OSX.dir}/XCodeOSXTemplate" />
+  </target>
+</project>
+
+
+
+
+

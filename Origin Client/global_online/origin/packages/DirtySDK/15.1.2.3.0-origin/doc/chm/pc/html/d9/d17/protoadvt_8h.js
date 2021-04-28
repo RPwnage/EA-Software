@@ -1,0 +1,13 @@
+var protoadvt_8h =
+[
+    [ "ADVERT_BROADCAST_PORT_IPX", "d9/d17/protoadvt_8h.html#gada9e4fe752742a257a30b33ea39c1823", null ],
+    [ "ADVERT_BROADCAST_PORT_UDP", "d9/d17/protoadvt_8h.html#ga91dd87216386092de7d2d2b01c4bd7fe", null ],
+    [ "ADVERT_PACKET_IDENTIFIER", "d9/d17/protoadvt_8h.html#gae126782e7d35bd05d4242379d2531750", null ],
+    [ "ProtoAdvtRef", "d9/d17/protoadvt_8h.html#gab3ef2c4b1d495e7614dec2a6ad0d8928", null ],
+    [ "ProtoAdvtAnnounce", "d9/d17/protoadvt_8h.html#ga422cef2cf24e7681c449a787b892d48b", null ],
+    [ "ProtoAdvtCancel", "d9/d17/protoadvt_8h.html#ga611e39c8d079d71f58619eb3aa634a13", null ],
+    [ "ProtoAdvtConstruct", "d9/d17/protoadvt_8h.html#ga3a36e3e20a6bf692cb52a426ae89ad3b", null ],
+    [ "ProtoAdvtDestroy", "d9/d17/protoadvt_8h.html#ga9aeee3977f04d65993491cf335a8d88c", null ],
+    [ "ProtoAdvtLocate", "d9/d17/protoadvt_8h.html#gab511742aeed064e74de993005af6852f", null ],
+    [ "ProtoAdvtQuery", "d9/d17/protoadvt_8h.html#ga04b1b0f4987ed0106791b868024ce049", null ]
+];

@@ -1,0 +1,415 @@
+package com.ea.originx.automation.lib.pageobjects.store;
+
+import com.ea.originx.automation.lib.helpers.StringHelper;
+import com.ea.vx.originclient.utils.Waits;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.openqa.selenium.By;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+
+/**
+ * A page object for the PDP hero descriptions. Includes the title, header
+ * description, truncated description, platform icons, edition selector, and
+ * social icons.
+ *
+ * @author glivingstone
+ * @author micwang
+ */
+public class PDPHeroDescription extends PDPHero {
+
+    protected static final String PDP_HERO_INFO_CSS = PDP_HERO_CSS + " .origin-pdp-hero-info";
+
+    // Title
+    protected static final String PDP_HERO_TITLE_CSS = PDP_HERO_INFO_CSS + " origin-store-pdp-sections-description .origin-pdp-hero-title";
+    protected static final By PDP_HERO_TITLE_LOCATOR = By.cssSelector(PDP_HERO_TITLE_CSS);
+    protected static final String[] ONE_LINE_TITLE_LENGTH_IDENTIFIER_KEYWORDS = {"height: 44px", "-webkit-line-clamp: 1"};
+    protected static final String[] TWO_LINES_TITLE_LENGTH_IDENTIFIER_KEYWORDS = {"height: 86px", "-webkit-line-clamp: 2"};
+
+    // Long Description
+    protected static final String PDP_HERO_DESCRIPTION_INFO_BLOCK_CSS = PDP_HERO_INFO_CSS + " origin-store-pdp-infoblock > div";
+    protected static final By PDP_HERO_DESCRIPTION_LOCATOR = By.cssSelector(PDP_HERO_DESCRIPTION_INFO_BLOCK_CSS);
+    protected static final By PDP_HERO_HEADER_DESCRIPTION_LOCATOR = By.cssSelector(PDP_HERO_DESCRIPTION_INFO_BLOCK_CSS + " h2");
+    protected static final By PDP_HERO_TRUNCATED_BODY_DESCRIPTION_LOCATOR = By.cssSelector(PDP_HERO_DESCRIPTION_INFO_BLOCK_CSS + " p span");
+
+    // Platform Icons
+    protected static final By PDP_HERO_PLATFORM_LIST_LOCATOR = By.cssSelector(PDP_HERO_INFO_CSS + " .origin-pdp-hero-platform");
+    protected static final By PDP_HERO_PLATFORM_ICONS_LOCATOR = By.cssSelector(PDP_HERO_INFO_CSS + " .origin-pdp-hero-platform h4 i.platform-icon");
+    protected static final By PLATFORM_ICONS_LOCATOR = By.cssSelector(PDP_HERO_INFO_CSS + " .platform-icon");
+
+    // Social Media
+    protected static final String SOCIAL_MEDIA_CSS = PDP_HERO_INFO_CSS + " .origin-socialmedia";
+    protected static final By FACEBOOK_LOCATOR = By.cssSelector(SOCIAL_MEDIA_CSS + " .origin-socialmedia-icon-facebook");
+    protected static final By TWITTER_LOCATOR = By.cssSelector(SOCIAL_MEDIA_CSS + " .origin-socialmedia-icon-twitter");
+
+    // Editions
+    protected static final By EDITIONS_LIST_LOCATOR = By.cssSelector(PDP_HERO_INFO_CSS + " .store-pdp-editions-list");
+    protected static final By EDITION_BUTTONS_LOCATOR = By.cssSelector(PDP_HERO_INFO_CSS + " .otkbtn.otkbtn-grouped");
+    protected static final By EDITION_SELECTED_LOCATOR = By.cssSelector(PDP_HERO_INFO_CSS + " .otkbtn-selected");
+
+    //Key Beat
+    protected static final By KEYBEAT_MESSAGE_LOCATOR = By.cssSelector(".store-pdp-keybeat");
+
+    // List of text that can be an edition. This should be moved at some point
+    // to the entitlements, so that an entitlement is aware of it's editions
+    /**
+     * List of text that can be an edition.
+     */
+    //This should be moved at some point
+    // to the entitlements, so that an entitlement is aware of it's editions.
+    public enum EDITIONS {
+        PREMIUM_EDITION("Premium Edition"),
+        DIGITAL_DELUXE_EDITION("Digital Deluxe Edition"),
+        STANDARD_EDITION("Standard Edition"),
+        DELUXE_EDITION("Deluxe Edition"),
+        ULTIMATE_EDITION("Ultimate Edition"),
+        GAME_OF_THE_YEAR_EDITION("Game of the Year Edition");
+
+        private final String editionName;
+
+        private EDITIONS(String name) {
+            editionName = name;
+        }
+
+        public boolean equalsName(String otherName) {
+            return editionName.equals(otherName);
+        }
+    }
+
+    /**
+     * Constructor
+     *
+     * @param driver Selenium WebDriver
+     */
+    public PDPHeroDescription(WebDriver driver) {
+        super(driver);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // PDP Hero Title
+    // The game title for the PDPHero Page.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify PDP Hero game title matches the expected title.
+     *
+     * @param gameTitle String to match
+     * @return true if title matches, false otherwise
+     */
+    public boolean verifyGameTitle(String gameTitle) {
+        try {
+            return getGameTitle().contains(gameTitle);
+        } catch (StaleElementReferenceException | TimeoutException se) {
+            return false;
+        }
+    }
+
+    /**
+     * Get the PDP Hero game title.
+     *
+     * @return The game title
+     */
+    public String getGameTitle() {
+        return waitForElementVisible(PDP_HERO_TITLE_LOCATOR).getText();
+    }
+
+    /**
+     * Verify the PDP Hero game title is visible.
+     *
+     * @return true if the game title is visible, false otherwise
+     */
+    public boolean verifyGameTitleVisible() {
+        return waitIsElementVisible(PDP_HERO_TITLE_LOCATOR);
+    }
+
+    /**
+     * Verify the title of the entitlement is wrapped in two lines.
+     *
+     * @return true if the title is wrapped in two lines, false otherwise
+     */
+    public boolean verifyTitleInTwoLines() {
+        return StringHelper.containsAnyIgnoreCase(waitForElementVisible(PDP_HERO_TITLE_LOCATOR).getAttribute("style"), TWO_LINES_TITLE_LENGTH_IDENTIFIER_KEYWORDS);
+    }
+
+    /**
+     * Verify the title of the entitlement is wrapped in one line.
+     *
+     * @return true if the title is wrapped in one line, false otherwise
+     */
+    public boolean verifyTitleInOneLine() {
+        return StringHelper.containsAnyIgnoreCase(waitForElementVisible(PDP_HERO_TITLE_LOCATOR).getAttribute("style"), ONE_LINE_TITLE_LENGTH_IDENTIFIER_KEYWORDS);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // DESCRIPTION
+    // The description text for the PDP Hero. Includes the mini description
+    // and the beginning of the long description.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Get the PDP Hero game's header description.
+     *
+     * @return The game's header description
+     */
+    public String getHeaderDescription() {
+        try {
+            return waitForElementVisible(PDP_HERO_HEADER_DESCRIPTION_LOCATOR, 2).getText();
+        } catch (TimeoutException e) {
+            return "";
+        }
+    }
+
+    /**
+     * Get the PDP Hero game's truncated body description.
+     *
+     * @return The game's truncated body description
+     */
+    public String getTruncatedBodyDescription() {
+        try {
+            return waitForElementVisible(PDP_HERO_TRUNCATED_BODY_DESCRIPTION_LOCATOR, 2).getText();
+        } catch (TimeoutException e) {
+            return "";
+        }
+    }
+
+    /**
+     * Get the PDP Hero game's description.
+     *
+     * @return The game's description
+     */
+    public String getDescription() {
+        return getHeaderDescription() + " " + getTruncatedBodyDescription();
+    }
+
+    /**
+     * Verify the PDP Hero game's header description is visible.
+     *
+     * @return true if the game's header description is visible, false otherwise
+     */
+    public boolean isHeaderDescriptionVisible() {
+        return waitIsElementVisible(PDP_HERO_HEADER_DESCRIPTION_LOCATOR, 3);
+    }
+
+    /**
+     * Verify the PDP Hero game's truncated body description is visible.
+     *
+     * @return true if the game's truncated body description is visible, false
+     * otherwise
+     */
+    public boolean isTruncatedBodyDescriptionVisible() {
+        return waitIsElementVisible(PDP_HERO_TRUNCATED_BODY_DESCRIPTION_LOCATOR, 3);
+    }
+
+    /**
+     * Verify that the short description is faded out.
+     *
+     * @return true if the the text is faded out, false otherwise
+     */
+    public boolean isDescriptionFaded() {
+        return waitForElementVisible(PDP_HERO_DESCRIPTION_LOCATOR).getAttribute("class").contains("dim");
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // PLATFORM ICONS
+    // Icons indicating the platform that the entitlement is available on.
+    // e.g. windows and mac (apple) icons
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Get the number of platforms available for the entitlement.
+     *
+     * @return The count of platforms
+     */
+    public int getPlatformIconCount() {
+        return waitForAllElementsVisible(PLATFORM_ICONS_LOCATOR).size();
+    }
+
+    /**
+     * Verify the platforms available for the entitlement are visible.
+     *
+     * @return true if the platforms are visible, false otherwise
+     */
+    public boolean verifyPlatformIconVisible() {
+        return waitIsElementVisible(PDP_HERO_PLATFORM_LIST_LOCATOR, 2);
+    }
+
+    /**
+     * Verify the PDP Hero game's description is visible.
+     *
+     * @return true if the game's description is visible, false otherwise
+     */
+    public boolean isDescriptionVisible() {
+        return isHeaderDescriptionVisible() && isTruncatedBodyDescriptionVisible();
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // SOCIAL
+    // The buttons for connecting with social media.
+    // e.g. Twitter and Facebook buttons
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify social buttons exist on the PDP Hero.
+     *
+     * @return true if the social buttons exist, false otherwise
+     */
+    public boolean verifySocialButtons() {
+        boolean foundFacebook = waitForAllElementsVisible(FACEBOOK_LOCATOR).size() > 0;
+        boolean foundTwitter = waitForAllElementsVisible(TWITTER_LOCATOR).size() > 0;
+        return foundFacebook && foundTwitter;
+    }
+
+    /**
+     * Verify text for header truncated body description exist.
+     *
+     * @return true if exists, false otherwise
+     */
+    public boolean verifyDescriptions() {
+        return !getTruncatedBodyDescription().isEmpty() && !getDescription().isEmpty();
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // EDITION SELECTOR
+    // List of selectable editions below the description. May not exist,
+    // depending on the entitlement.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Select the edition with the given String.
+     *
+     * @param edition Edition String to select
+     * @return true if the edition was found and selected, false otherwise
+     */
+    public boolean selectEdition(String edition) {
+        WebElement toClick = getElementWithText(getEditions(), edition);
+        if (toClick == null) {
+            throw new RuntimeException("Could find an edition named " + edition);
+        }
+        waitForElementClickable(toClick).click();
+        return true;
+    }
+
+    /**
+     * Returns a list of available editions on the product detail page.
+     *
+     * @return A list of the available editions
+     */
+    public List<WebElement> getEditions() {
+        try {
+            // wait up to 5 seconds for edition list to be loaded and visible
+            if (!waitIsElementVisible(EDITION_BUTTONS_LOCATOR, 5)) {
+                return new ArrayList<>();
+            }
+            return waitForElementVisible(EDITIONS_LIST_LOCATOR).findElements(EDITION_BUTTONS_LOCATOR);
+        } catch (TimeoutException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Returns a list of available editions text on the product detail page.
+     *
+     * @return A list of the available editions
+     */
+    public List<String> getEditionsTexts() {
+        List<WebElement> editionsElements = getEditions();
+        List<String> editionsTexts = new ArrayList<>();
+
+        if (editionsElements.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        for (WebElement editionElement : editionsElements) {
+            editionsTexts.add(editionElement.getText());
+        }
+
+        return editionsTexts;
+    }
+
+    /**
+     * Verifies the product edition selectors are visible.
+     *
+     * @return true if the product edition selectors are visible, false
+     * otherwise
+     */
+    public boolean verifyEditionsVisible() {
+        return isElementVisible(EDITIONS_LIST_LOCATOR);
+    }
+
+    /**
+     * Verifies the product edition selector exists.
+     *
+     * @param x The expected number of editions
+     * @return true if the product edition selector exists and there are
+     * editions available, false otherwise
+     */
+    public boolean verifyEditionCountIs(int x) {
+        return Waits.pollingWait(() -> getEditions().size() == x);
+    }
+
+    /**
+     * Verifies that the currently selected edition is highlighted.
+     *
+     * @return true if the selected edition is highlighted, false otherwise
+     */
+    public boolean verifyCurrentEditionHighlighted() {
+        WebElement selectedEdition = waitForElementVisible(EDITIONS_LIST_LOCATOR)
+                .findElement(EDITION_SELECTED_LOCATOR);
+        return !selectedEdition.getCssValue("color").equals("#ffffff");
+    }
+
+    /**
+     * Hovers over the selected edition.
+     *
+     * @param edition The edition to hover over
+     * @return true if the edition was found and hovered on, false otherwise
+     */
+    public boolean hoverOnEdition(String edition) {
+        WebElement toHover = getElementWithText(getEditions(), edition);
+        if (toHover == null) {
+            return false;
+        } else {
+            hoverElement(toHover);
+            return true;
+        }
+    }
+
+    /**
+     * Verify the list of editions provided by the user exist is valid editions.
+     *
+     * @param editions The expected edition types for an entitlement
+     * @return true if the editions are valid, false otherwise
+     */
+    public boolean verifyEditions(List<EDITIONS> editions) {
+        List<String> editionTexts = getEditionsTexts();
+
+        List<String> editionNames = editions.stream().map(edition -> edition.editionName).collect(Collectors.toList());
+
+        return StringHelper.containsIgnoreCase(editionTexts, editionNames);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // KEYBEATS MESSAGE
+    // Merchandised text at the right bottom of the page
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify the key beats message is visible
+     *
+     * @return true if the key beats mesaage is visible
+     */
+    public boolean verifyKeyBeatsMessageVisible() {
+        return waitIsElementVisible(KEYBEAT_MESSAGE_LOCATOR, 2);
+    }
+
+    /**
+     * Get the key beats message
+     *
+     * @return true if the key beats message is visible
+     */
+    public String getKeyBeatsMessage() {
+        try {
+            return waitForElementVisible(KEYBEAT_MESSAGE_LOCATOR, 2).getText();
+        } catch (TimeoutException e) {
+            return "";
+        }
+    }
+}

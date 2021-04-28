@@ -1,0 +1,412 @@
+<project name="originweb" default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="build" value="exclude"/>
+        <option name="clean" value="exclude"/>
+        <option name="package" value="exclude"/>
+    </optionset>
+  
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+  <!-- ******************* -->
+  <property name="package.originweb.dir"  value="@{PathGetFullPath('.')}"/>
+  <property name="package.originweb.version"  value="@{PathGetFileName('${package.originweb.dir}')}"/>
+  <package name="originweb" targetversion="${package.originweb.version}"/>
+
+	<property name="islinux" value="true" if="@{PropertyExists(sys.env.TERM)}"  unless="@{PropertyExists('islinux')}"/>
+	<property name="islinux" value="false" unless="@{PropertyExists('islinux')}"/>
+  <echo message="islinux = ${islinux}"/>
+	<property name="force" value="${force??false}"/>
+  <property name="package.originweb.build.dir" value="${package.originweb.dir}/build"/>
+  <property name="package.originweb.stage.dir" value="${package.originweb.build.dir}/stage"/>
+  <property name="web.root.dir" value="${package.originweb.dir}/.."/>
+	<property name="automation.dir" value="${web.root.dir}/automation"/>
+  <property name="app.dir" value="${web.root.dir}/app"/>
+  <property name="mockup.dir" value="${automation.dir}/mockup"/>
+  <property name="jssdk.dir" value="${web.root.dir}/jssdk"/>
+  <property name="i18n.dir" value="${web.root.dir}/i18n"/>
+  <property name="cms.dir" value="${web.root.dir}/cms"/>
+  <property name="components.dir" value="${web.root.dir}/components"/>
+  <property name="tools.dir" value="${web.root.dir}/tools"/>
+  <property name="version.file" value="${package.dir}/version.txt"/>
+
+  <dependent name="npm"/>
+  <include file="${components.dir}/components.xml"/>
+
+  <choose>
+    <do if="${islinux} == true">
+      <property name="sudo" value="sudo"/>
+      <property name="bower.cmd" value="bower"/>
+      <property name="grunt.cmd" value="grunt"/>
+    </do>
+    <do>
+      <property name="bower.cmd" value="${npm.root}/bower.cmd"/>
+      <property name="sudo" value=""/>
+      <property name="grunt.cmd" value="${npm.root}/grunt.cmd"/>
+    </do>
+  </choose>
+	
+	<property name="components.dependencies" value="origin-i18n origin-jssdk"/>
+	<property name="app.dependencies" value="origin-jssdk origin-i18n origin-components"/>
+    
+  <optionset name="web.env">
+    <option name="PATH" value="${sys.env.PATH};${package.npm.dir}/dist"/>
+  </optionset>
+  
+  <mkdir dir="${package.originweb.build.dir}" unless="@{DirectoryExists(${package.originweb.build.dir})}"/>
+  
+  <!-- This origin.exec allows you to be able to run a command on windows and unix -->
+  <createtask name="origin.exec">
+    <parameters>
+      <option name="sudo" value="false"/>
+      <option name="cmd" value="Required"/>
+      <option name="args" value=""/>
+      <option name="workingdir" value="."/>
+      <option name="failonerror" value="true"/>
+    </parameters>
+    <code>
+      <exec program="${origin.exec.cmd}" workingdir="${origin.exec.workingdir}" failonerror="${origin.exec.failonerror}" unless="${origin.exec.sudo}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="${origin.exec.args}"/>
+        </args>
+      </exec>
+      <exec program="sudo" workingdir="${origin.exec.workingdir}" failonerror="${origin.exec.failonerror}" if="${origin.exec.sudo}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="${origin.exec.cmd}"/>
+          <arg value="${origin.exec.args}"/>
+        </args>
+      </exec>
+    </code>
+  </createtask>
+  
+  <target name="clean">
+    <!-- Make sure Cygwin is installed! -->
+    <foreach property="module" item="String" in="${jssdk.dir} ${components.dir} ${i18n.dir} ${app.dir}">
+      <foreach property="subdir" item="String" in="node_modules dist docs_gen bower_components src/bower_components tmp">
+        <choose>
+          <do if="${islinux} == true">
+            <echo message="Cleaning ${module}/${subdir}"/>
+            <exec program="rm">
+              <args>
+                <arg value="-rf"/>
+                <arg value="${module}/${subdir}"/>
+              </args>
+            </exec>
+          </do>
+          <do>
+            <echo message="Cleaning ${module}/${subdir}"/>
+            <exec program="rmdir" failonerror="false">
+              <args>
+                <arg value="/s"/>
+                <arg value="/q"/>
+                <arg value="@{PathToWindows('${module}/${subdir}')}"/>
+              </args>
+            </exec>
+          </do>
+        </choose>
+      </foreach>
+    </foreach>
+  </target>
+    
+  <target name="build">
+    <task name="npm-install-grunt" unless="${islinux}"/>
+    <task name="npm-install-grunt-cli" unless="${islinux}" />
+    <task name="npm-install-bower" unless="${islinux}"/>
+    <call target="build-component-packager" if="${jenkins??false}"/>
+    <call target="build-component-packager-dev-tools" if="${jenkins??false}"/>
+    <foreach property="module" item="String" in="jssdk i18n components">
+      <echo message="Building in ${module}"/>
+      <exec program="${npm.cmd}" workingdir="${web.root.dir}/${module}" >
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="install"/>
+        </args>
+      </exec>
+      <do if="@{PropertyExists('${module}.dependencies')}">
+        <foreach property="submodule" item="String" in="${${module}.dependencies}">
+          <exec program="${bower.cmd}" workingdir="${web.root.dir}/${module}">
+            <env fromoptionset="web.env"/>
+            <args>
+            <arg value="link"/>
+            <arg value="${submodule}"/>
+            </args>
+          </exec>
+        </foreach>
+      </do>
+      <exec program="${bower.cmd}" workingdir="${web.root.dir}/${module}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="install"/>
+        </args>
+      </exec>
+      <exec program="${grunt.cmd}" workingdir="${web.root.dir}/${module}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="--force" if="${force}"/>
+        </args>
+      </exec>
+      <exec program="${bower.cmd}" workingdir="${web.root.dir}/${module}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="link"/>
+        </args>
+      </exec>
+    </foreach>
+    <!-- build the grunt-component-packager -->
+    <do if="${jenkins??false}">
+      <task name="origin.exec" cmd="${npm.cmd}" args="link origin-grunt-component-packager" workingdir="${components.dir}" sudo="true"/>
+      <task name="origin.exec" cmd="${npm.cmd}" args="link origin-grunt-component-packager-dev-tools" workingdir="${components.dir}" sudo="true"/>
+      <exec program="${grunt.cmd}" workingdir="${components.dir}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value=" --gruntfile Gruntfile-cq.js"/>
+          <arg value="--force" if="${force}"/>
+        </args>
+      </exec>
+    </do>
+    <exec program="${npm.cmd}" workingdir="${app.dir}" >
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <!-- Build the app folder -->
+    <foreach property="module" item="String" in="${app.dependencies}">
+      <exec program="${bower.cmd}" workingdir="${app.dir}" failonerror="false">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="link"/>
+          <arg value="${module}"/>
+        </args>
+      </exec>
+    </foreach>
+    <exec program="${bower.cmd}" workingdir="${app.dir}">
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="install"/>
+        <arg value="-F"/>
+      </args>
+    </exec>
+    <exec program="${grunt.cmd}" workingdir="${app.dir}">
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="${grunt.target??}" />
+        <arg value="--force" if="${force}"/>
+      </args>
+    </exec>
+  </target>
+    
+	<target name="jssdk-test">
+		<dependent name="ActivePython"/>
+		<dependent name="VisualStudio"/>
+
+		<optionset name="webtest.env" fromoptionset="web.env">
+		  <option name="PATH" value="${package.VisualStudio.compiler.dir};${package.ActivePython.installdir};${sys.env.PATH};${package.npm.dir}/dist"/>
+		</optionset>
+	
+        <exec program="${npm.cmd}" workingdir="${mockup.dir}" >
+          <env fromoptionset="webtest.env"/>
+          <args>
+            <arg value="install"/>
+          </args>
+        </exec>
+        <exec program="${bower.cmd}" workingdir="${jssdk.dir}">
+          <env fromoptionset="webtest.env"/>
+          <args>
+            <arg value="install"/>
+          </args>
+        </exec>
+        <exec program="${grunt.cmd}" workingdir="${jssdk.dir}">
+          <env fromoptionset="webtest.env"/>
+          <args>
+            <arg value="--force" if="${force}"/>
+          </args>
+        </exec>
+        <exec program="${grunt.cmd}" workingdir="${jssdk.dir}">
+          <env fromoptionset="web.env"/>
+          <args>
+            <arg value="start-mockup"/>
+            <arg value="functional-test"/>
+            <arg value="terminate-mockup"/>
+          <arg value="--force" if="${force}"/>
+          </args>
+        </exec>
+	</target>
+
+	<target name="dev">
+		<property name="grunt.target" value="dev"/>
+		<call target="build"/>
+	</target>
+
+  <target name="docs">
+    <call target="dev"/>
+    <exec program="${grunt.cmd}" workingdir="${app.dir}">
+        <args>
+          <arg value="docs"/>
+          <arg value="--force" if="${force}"/>
+        </args>
+    </exec>
+  </target>
+    	
+    <target name="originweb-serve">
+      <task name="npm-install-grunt" unless="${islinux}"/>
+      <task name="npm-install-grunt-cli" unless="${islinux}"/>
+      <task name="npm-install-bower" unless="${islinux}"/>
+      <exec program="${grunt.cmd}" workingdir="${app.dir}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="serve"/>
+        </args>
+      </exec>
+    </target>
+
+    <!-- This target will grab the latest build number from Jenkins job named jekins.jobname and append it to the version number in version.txt -->
+    <!-- Specify -D:use.changelist=true on the command-line to use the current changelist as the version number. -->
+    <target name="update-version-file">
+      <dependent name="wget"/>
+      <dependent name="OriginConfig"/>
+      <choose>
+        <do if="${use.changelist??False}"> 
+          <property name="lastBuildNum" value="${sys.env.P4_CHANGELIST}" />
+        </do>
+        <do>
+          <fail message="jenkins.jobname not defined. Use -D:jenkins.job=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('jenkins.jobname')}" />
+          <property name="lastBuildNum.file" value="${package.builddir}/lastBuildNum.txt" />
+          <choose>
+            <do if="${config-system} == 'osx'" >
+              <exec program="${package.wget.exe}" >
+                <args>
+                  <arg value="--no-check-certificate" />
+                  <arg value="--auth-no-challenge" />
+                  <arg value="--http-user=${jenkins.admin.account}" />
+                  <arg value="--http-passwd=${jenkins.admin.password}" />
+                  <arg value="https://ebisu-build01:8443/hudson/job/${jenkins.jobname}/lastBuild/buildNumber" />
+                  <arg value="-O ${lastBuildNum.file}" />
+                </args>
+              </exec>
+            </do>
+            <do>
+              <exec program="${package.wget.dir}/bin/pc/wget.exe" >
+                <args>
+                  <arg value="--no-check-certificate" />
+                  <arg value="--auth-no-challenge" />
+                  <arg value="--http-user=${jenkins.admin.account}" />
+                  <arg value="--http-password=${jenkins.admin.password}" />
+                  <arg value="https://ebisu-build01:8443/hudson/job/${jenkins.jobname}/lastBuild/buildNumber" />
+                  <arg value="-O ${lastBuildNum.file}" />
+                </args>
+              </exec>
+            </do>
+          </choose> <!-- config-system -->
+          <property name="lastBuildNum" fromfile="${lastBuildNum.file}" />
+        </do>
+      </choose>  <!-- use.changelist -->
+      
+      <property name="version" fromfile="${version.file}"/>
+      <property name="count" value="1" />
+
+      <property name="incrementBy" value="0" unless="@{PropertyExists('incrementBy')}" />
+
+      <foreach property="version.part" item="String" delim="." in="${version}" >
+        <property name="version.part.${count}" value="${version.part}" />
+        <property name="count" value="@{MathAdd(${property.value},1)}" />
+      </foreach>
+      
+      <property name="nextBuildNum" value="@{MathAdd('${lastBuildNum}',${incrementBy})}" />
+
+      <property name="major" value="${version.part.1}" />
+      <property name="minor" value="${version.part.2}" />
+      <property name="patch" value="${version.part.3}" />
+      <property name="revision" value="${nextBuildNum}" />
+
+      <echo message="Updating version.txt counter to ${major}.${minor}.${patch}.${revision}" />
+      <attrib file="${version.file}" readonly="false"/>
+      <trycatch>
+        <try>
+          <echo message="${major}.${minor}.${patch}.${revision}" file="${version.file}"/>
+        </try>
+        <catch>
+          <fail message="Error:${trycatch.error}"/>
+        </catch>
+        <finally>
+          <attrib file="${version.file}" readonly="true"/>
+        </finally>
+      </trycatch>
+    </target>
+
+    <!--  This is used for versioning. The Maven pom.xml file will only use the version string in the pom file to determine what it will call the
+          uploaded file in the repository. We must edir the pom-temp.xmp file to embed the correct version number before deploying. -->
+    <target name="create-pom-file">
+      <property name="dollar" value="$"/>
+      <property name="propstart" value="{"/>
+      <property name="propend" value="}"/>
+      <property name="version" fromfile="${version.file}"/>
+      <property name="pom-temp.contents" fromfile="${package.originweb.dir}/pom-temp.xml" />
+      <property name="pom.file" value="${package.originweb.dir}/pom.xml" />
+      <property name="pom-temp.contents" value="@{StrReplace(${property.value},'__ORIGIN_VERSION__',${version})}" />
+      <echo message="${pom-temp.contents}" file="${pom.file}"/>
+    </target>
+    
+    <target name="originweb-deploy">
+      <dependent name="maven"/>
+      <task name="maven-deploy"/>
+    </target>
+
+    <!-- The Plato target uses Plato https://www.npmjs.com/package/plato to perform static code analysis on the Origin -->
+    <!-- web code base. -->
+    <target name="plato">
+      <property name="plato.output.dir" value="${package.builddir}/plato"/>
+      <property name="jshintrc.file" value="${package.originweb.dir}/.jshintrc"/>
+      <property name="plato.source.dirs">
+        ${app.dir}/src
+        ${jssdk.dir}/src
+        ${i18n.dir}/src
+        ${components.dir}/src
+      </property>
+      <task name="origin.exec" cmd="${npm.cmd}" args="install -g plato" workingdir="${package.originweb.dir}" sudo="true"/>
+      <exec program="plato" workingdir="${package.originweb.dir}">
+        <args>
+          <!-- -r = recursive -->
+          <arg value="-r"/>   
+          <!-- -d = destination folder -->
+          <arg value="-d ${plato.output.dir}"/>   
+          <!-- -l = jshint rc file -->
+          <arg value="-l ${jshintrc.file}"/>   
+          <!-- folders to check -->
+          <arg value="${plato.source.dirs}"/>   
+        </args>
+      </exec>
+    </target>
+
+    <target name="stage">
+      <delete dir="${package.originweb.stage.dir}"/>
+      <!-- Using Robocopy because Windows does not handle pathnames longer than 260 char. -->
+      <exec program="robocopy" failonerror="false">       
+        <args>
+          <arg value="${package.originweb.dir}/dist"/>
+          <arg value="${package.originweb.build.dir}/stage"/>
+          <arg value="/S"/>
+          <arg value="/E"/>
+          <arg value="/XD node_modules"/>
+        </args>
+      </exec>
+      <fail if="${exec.exitcode} > 1" message="Robocopy had an exit code of ${exec.exitcode}. Failed"/>
+    </target>
+    
+    <target name="package">
+      <zip zipfile="${package.originweb.dir}/target/${output.filename}">
+        <fileset basedir="${package.originweb.stage.dir}">
+          <includes name="**"/>
+        </fileset>
+      </zip>
+    </target>
+</project>
+
+
+
+

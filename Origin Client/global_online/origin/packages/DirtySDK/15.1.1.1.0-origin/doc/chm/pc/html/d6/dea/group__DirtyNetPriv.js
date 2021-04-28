@@ -1,0 +1,42 @@
+var group__DirtyNetPriv =
+[
+    [ "SocketPacketQueueEntryT", "da/d17/structSocketPacketQueueEntryT.html", [
+      [ "aPacketData", "da/d17/structSocketPacketQueueEntryT.html#ab9c7afe0fb82bdedd0b2db734706ff74", null ],
+      [ "iPacketSize", "da/d17/structSocketPacketQueueEntryT.html#a2bd941a1a7a336780467c7db651cb0a2", null ],
+      [ "PacketAddr", "da/d17/structSocketPacketQueueEntryT.html#a8088792a9c2e4db78d7c6bac51708fc0", null ],
+      [ "uPacketTick", "da/d17/structSocketPacketQueueEntryT.html#a6f9e429e79d17ac2bb93d001a3eff891", null ]
+    ] ],
+    [ "SocketRateT", "dc/d0a/structSocketRateT.html", [
+      [ "_pad", "dc/d0a/structSocketRateT.html#ab9b2803f735bbf034e795b6b0853d6f8", null ],
+      [ "aCallHist", "dc/d0a/structSocketRateT.html#a6310964d3cec685e4648a47628422837", null ],
+      [ "aDataHist", "dc/d0a/structSocketRateT.html#a5c08d614db127e903d4c4c9cd06a0b28", null ],
+      [ "aTickHist", "dc/d0a/structSocketRateT.html#a08f8f187d5241fb8fb7a0bef06fef242", null ],
+      [ "uCurRate", "dc/d0a/structSocketRateT.html#a8a888152c8d7bb06baf880950a50f223", null ],
+      [ "uDataIndex", "dc/d0a/structSocketRateT.html#ad7e25e81b035053309b373ead27b8345", null ],
+      [ "uLastRateTick", "dc/d0a/structSocketRateT.html#a24a40ae1d085aac42922b94f57d6effe", null ],
+      [ "uLastTick", "dc/d0a/structSocketRateT.html#a20e35a906aa54486ff5d8442937eba74", null ],
+      [ "uMaxRate", "dc/d0a/structSocketRateT.html#abbf9754ebdfa26c0c7f637a4f3646b65", null ],
+      [ "uNextRate", "dc/d0a/structSocketRateT.html#ae99627b2778f8faa6a133c5ddd6e5a7b", null ]
+    ] ],
+    [ "SocketHostnameCacheT", "d6/dea/group__DirtyNetPriv.html#gafe4ed7fd509c7f4474e3738d8266be80", null ],
+    [ "SocketPacketQueueEntryT", "d6/dea/group__DirtyNetPriv.html#ga72406569346f0037f4641707a2e4899a", null ],
+    [ "SocketPacketQueueT", "d6/dea/group__DirtyNetPriv.html#ga45d781c2bc180cfa6f1fb344fed5b8a3", null ],
+    [ "SocketRateT", "d6/dea/group__DirtyNetPriv.html#ga49ecccc80ceaeb97ee634050a29cce07", null ],
+    [ "SocketHostnameAddRef", "d6/dea/group__DirtyNetPriv.html#ga776bfda2944c3874bbd820353261d8e7", null ],
+    [ "SocketHostnameCacheAdd", "d6/dea/group__DirtyNetPriv.html#ga1c7a05e875510edfb2f87884860ba0f9", null ],
+    [ "SocketHostnameCacheCreate", "d6/dea/group__DirtyNetPriv.html#gae81ba16e71872fa5964c85ebe413a556", null ],
+    [ "SocketHostnameCacheDestroy", "d6/dea/group__DirtyNetPriv.html#ga33ad91b1fa137552f7cf6758c57a2090", null ],
+    [ "SocketHostnameCacheGet", "d6/dea/group__DirtyNetPriv.html#ga24a7e76a3b95b30abbec8516ba143776", null ],
+    [ "SocketHostnameListProcess", "d6/dea/group__DirtyNetPriv.html#gaddbe2014d9a68aecfbfaf13e88935174", null ],
+    [ "SocketPacketQueueAdd", "d6/dea/group__DirtyNetPriv.html#ga9a1f26e46487e97f2c2e5c07e272ee06", null ],
+    [ "SocketPacketQueueAlloc", "d6/dea/group__DirtyNetPriv.html#ga706031a42619ce07376b1ce52735da81", null ],
+    [ "SocketPacketQueueControl", "d6/dea/group__DirtyNetPriv.html#ga2ed50e8a2f71866f20dcfcc7b3775ae8", null ],
+    [ "SocketPacketQueueCreate", "d6/dea/group__DirtyNetPriv.html#ga4cf986d178d802f64e06f273fe8276f3", null ],
+    [ "SocketPacketQueueDestroy", "d6/dea/group__DirtyNetPriv.html#gac6b0a88c2ee02c67004368132b587245", null ],
+    [ "SocketPacketQueueRem", "d6/dea/group__DirtyNetPriv.html#ga1687ec08e7ba84d7bd675749eefeaebd", null ],
+    [ "SocketPacketQueueResize", "d6/dea/group__DirtyNetPriv.html#ga105cc2978f2137ee252f857c615863e7", null ],
+    [ "SocketRateThrottle", "d6/dea/group__DirtyNetPriv.html#ga7ab8211828585e467238b13839b4ae49", null ],
+    [ "SocketRateUpdate", "d6/dea/group__DirtyNetPriv.html#ga097c90d4248968643521dbe71b58e5d0", null ],
+    [ "SocketSendCallbackAdd", "d6/dea/group__DirtyNetPriv.html#ga7c11161dcf9a89a97f1213852f77ce08", null ],
+    [ "SocketSendCallbackRem", "d6/dea/group__DirtyNetPriv.html#ga0460928278b76a3227d6b5484c16a50a", null ]
+];

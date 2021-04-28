@@ -1,0 +1,72 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'lint')}' == 'exclude'">
+    <target name="lint" description="Pc-Lint the specific configuration">
+      <property name="eaconfig.build.target" value="eaconfig-lint" />
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="eaconfig-build-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-lint" style="build" hidden="true" >
+
+    <call target="__private_initialize"/>
+
+    <!-- 
+    properties "package.lint-optionfile" and "package.<module name>.lint-optionfile"
+    
+    Property package.<module name>.lint-optionfile takes precedence if exists.
+    -->
+    <property name="___lint-optionfile" value="${build.module}.lnt"/>
+    <property name="___lint-optionfile" value="${package.lint-optionfile}" if="@{PropertyExists('package.lint-optionfile')}"/>
+    <property name="___lint-optionfile" value="${package.${build.module}.lint-optionfile}" if="@{PropertyExists('package.${build.module}.lint-optionfile')}"/>
+
+    <property name="___lint-optiondir" value="${package.dir}/config/pclint"/>
+
+    <property name="__private_optionfolder" value="@{PathGetDirectoryName('${___lint-optionfile}')}"/>
+    <property name="__private_optionfolder" value="@{StrTrim('${__private_optionfolder}')}"/>
+    <do unless="'${__private_optionfolder}' == ''" >
+      <property name="___lint-optiondir" value="${__private_optionfolder}"/>
+      <property name="___lint-optionfile-tmp" value="${___lint-optionfile}"/>
+      <property name="___lint-optionfile" value="@{PathGetFileName('${___lint-optionfile-tmp}')}"/>
+    </do>
+
+
+    <property name="lint.buildname" value="${build.outputname}" />
+
+    <property name="lint.buildtype" value="LintProgram" if="${build.buildtype.base} == 'StdProgram'" />
+    <property name="lint.buildtype" value="LintLibrary" if="${build.buildtype.base} == 'StdLibrary'" />
+
+    <property name="lint.usedependencies" value="${build.usedependencies}" />
+    <property name="lint.builddependencies" value="${build.builddependencies.all}" />
+
+    <property name="lint.optiondir" value="${___lint-optiondir}" />
+    <property name="lint.optionfile" value="${___lint-optionfile}" />
+    <property name="lint.outputdir" value="${package.builddir}/${config}/pclint/${build.module}" />
+    <fileset name="lint.sourcefiles" fromfileset="build.sourcefiles.all" />
+    <property name="lint.includedirs">
+      @{OptionSetGetValue('${build.buildtype}', 'cc.includedirs')} ${build.includedirs.all}
+      ${property.value}
+    </property>
+    <property name="lint.defines" value="@{OptionSetGetValue('${build.buildtype}', 'cc.defines')} ${build.defines.all}"/>
+
+    <dependent name="pclintconfig"/>
+    <include file="${pclintconfig-targetfile}"/>
+    <call target="package-lint" force="true" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'lintall')}' == 'exclude'">
+    <target name="lintall" description="Pc-Lint all the configurations">
+      <property name="eaconfig.buildall.target" value="lint" />
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="eaconfig-buildall-caller" force="true" />
+    </target>
+  </do>
+
+</project>

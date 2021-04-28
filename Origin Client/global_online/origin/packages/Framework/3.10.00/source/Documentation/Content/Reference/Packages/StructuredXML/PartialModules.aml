@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="510739dd-4ca2-4edc-8ad6-e2a19e6a1edc" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>Structured XML allows build script writers to define subsets of module data in partial structured modules and reuse it in module definitions.</para>
+      <para>This functionality is useful when many modules in a package or in a game share a common subset of data or patterns.</para>
+    </introduction>
+
+    <section address="PartialModules">
+      <title>Partial Modules</title>
+      <content>
+        <para>
+          To define a partial module use the 'PartialModule' element. The same 'PartialModule'
+          element can be used to define partial modules for native nant modules and for DotNet (C# and F#). Framework dynamically decides the type depending where the partial module is used.
+        </para>
+        <para>Partial module is derived from 'Module' or from 'DotNetModule' and all elements available there can be used in partial modules.</para>
+        <list class="bullet">
+          <listItem>
+            <para>For native types Partial module is derived from <link xlink:href="3e20cd45-987d-75bc-f172-e401126ffe5a">Module</link>. All 'Module' elements can be used in partial module.
+          </para>
+          </listItem>
+          <listItem>
+            <para>
+              For C# or F# types Partial module is derived from DotNetModule. All 'DotNetModule' elements can be used in partial module.
+            </para>
+            <alert class="note">
+              <para>'DotNetModule' itself can not be used in XML. For list of elements see any of the following:</para>
+              <list class="bullet">
+                <listItem>
+                  <para>
+                    <link xlink:href="e95b433b-e2f2-c03d-6f78-d74aadb10b09">CSharpLibrary</link>
+                  </para>
+                </listItem>
+                <listItem>
+                  <para>
+                    <link xlink:href="150c5169-8f40-0c7e-a217-9f9f00e03656">CSharpProgram</link>
+                  </para>
+                </listItem>
+                <listItem>
+                  <para>
+                    <link xlink:href="637c3115-b68a-ffb0-08e1-d92d1bba0b8c">CSharpWindowsProgram</link>
+                  </para>
+                </listItem>
+              </list>
+            </alert>
+          </listItem>
+        </list>
+      </content>
+      <sections>
+          <section address="UsingPartialModules">
+              <title>Using Partial Modules</title>
+              <content>
+                  <para>To use Partial Module in another Module Definition define the <legacyBold>
+                    <codeInline>frompartial</codeInline>
+                  </legacyBold> attribute:
+                </para>
+                <code language="xml" title=" ">
+                  
+ .                 &lt;CSharpLibrary name="MyLibrary" frompartial="MyPartialCharpModule"&gt;
+ .                   &lt;rootnamespace&gt;EA.MyLibrary&lt;/rootnamespace&gt;
+ .                   &lt;sourcefiles&gt;
+ .                     &lt;includes name="**.cs"/&gt;
+ .                     &lt;includes name="**.xaml"/&gt;
+ .                   &lt;/sourcefiles&gt;
+ .                 &lt;/CSharpLibrary&gt;
+
+                </code>
+                <alert class="note">
+                  <para>
+                    <legacyBold><codeInline>frompartial</codeInline></legacyBold> can contain multiple partial module names separated by spaces.
+                    Partial modules are applied in the order they are defined in <legacyBold>
+                    <codeInline>frompartial</codeInline>
+                  </legacyBold>.
+                  </para>
+                </alert>
+                <alert class="caution">
+                  <para>
+                    PartialModule itself can not use <legacyBold>
+                    <codeInline>frompartial</codeInline>
+                  </legacyBold> attribute. Partial Modules can not be derived from other partial modules.
+                  </para>
+                </alert>
+              </content>
+          </section>
+          <section address="DefiningPartialModules">
+              <title>Defining Partial Modules</title>
+              <content>
+                  <para>
+                    Partial module can be defined like any other module in Structured XML. The difference is that partial module definition script is not executed
+                    right away. Like in Nant Task and Target definitions partial module script is stored and executed in the context of the build file for each module that uses 
+                    Partial Module. This allows writers to put partial modules in packages other than the package that is using them, for example, 
+                    in a game <link xlink:href="193bb2f4-fe6f-4268-a219-d7649904a5ee">configuration</link> package.
+                  </para>
+                <para>Example of the Partial Module definition:</para>
+                <code language="xml" title=" ">
+ .                 &lt;PartialModule name="MyPartialModule" buildtype="${MyStaticOrSharedLibrary}"&gt;
+ .                   &lt;config&gt;
+ .                     &lt;pch enable="${config.enable-pch}" pchheader="Pch.h"/&gt;
+ .                   &lt;/config&gt;
+ .                   &lt;includedirs&gt;
+ .                     ${package.builddir}/__Generated__/${config-system}
+ .                     ${nant.project.basedir}
+ .                   &lt;/includedirs&gt;
+ .                   &lt;headerfiles&gt;
+ .                     &lt;!-- Standard platform excludes  --&gt;
+ .                     &lt;excludes name="**/pc/**" unless="${config-system}==pc or ${config-system}==pc64"/&gt;
+ .                     &lt;excludes name="**/pc64/**" unless="${config-system}==pc64"/&gt;
+ .                     &lt;excludes name="**/xenon/**" unless="${config-system}==xenon"/&gt;
+ .                     &lt;excludes name="**/ps3/**" unless="${config-system}==ps3"/&gt;
+ .                     &lt;!--  Header platform includes --&gt;
+ .                     &lt;includes name="**/${config-system}/**.h"/&gt;
+ .                   &lt;/headerfiles&gt;
+ .                   &lt;sourcefiles&gt;
+ .                     &lt;includes name="Pch.cpp" optionset="create-precompiled-header"/&gt;
+ .                     &lt;!-- Standard platform excludes  --&gt;
+ .                     &lt;excludes name="**/pc/**" unless="${config-system}==pc or ${config-system}==pc64"/&gt;
+ .                     &lt;excludes name="**/pc64/**" unless="${config-system}==pc64"/&gt;
+ .                     &lt;excludes name="**/xenon/**" unless="${config-system}==xenon"/&gt;
+ .                     &lt;excludes name="**/ps3/**" unless="${config-system}==ps3"/&gt;
+ .                     &lt;!-- Source platform includes --&gt;
+ .                     &lt;includes name="**/${config-system}/**.cpp"/&gt;
+ .                   &lt;/sourcefiles&gt;
+ .                   &lt;bulkbuild enable="true"  maxsize="20"/&gt;
+ .                 &lt;/PartialModule&gt;
+
+                </code>
+                <para>Here is how this partial module can be used:</para>
+                <code language="xml" title=" ">
+ .                 &lt;Library name="MyLibrary" frompartial="MyPartialModule"&gt;
+ .                   &lt;config&gt;
+ .                     &lt;warningsuppression&gt;
+ .                       -wd4836
+ .                     &lt;/warningsuppression&gt;
+ .                     &lt;defines&gt;
+ .                       &lt;do if="${Dll}"&gt;
+ .                         DLL_EXPORTS
+ .                       &lt;/do&gt;
+ .                     &lt;/defines&gt;
+ .                   &lt;/config&gt;
+ .                   &lt;dependencies&gt;
+ .                     &lt;use&gt;
+ .                       EABase
+ .                       coreallocator
+ .                     &lt;/use&gt;
+ .                     &lt;auto&gt;
+ .                       EAAssert
+ .                       EAIO
+ .                     &lt;/auto&gt;
+ .                   &lt;/dependencies&gt;
+ .                   &lt;headerfiles&gt;
+ .                     &lt;includes name="**.h"/&gt;
+ .                   &lt;/headerfiles&gt;
+ .                   &lt;sourcefiles&gt;
+ .                     &lt;includes name="**.cpp"/&gt;
+ .                   &lt;/sourcefiles&gt;
+ .                 &lt;/Library&gt;
+
+                </code>
+
+                <para>Example of C# PartialModule</para>
+
+                <code language="xml" title=" ">
+                  
+ .                 &lt;PartialModule name="MyCSharpModule" buildtype="CSharpLibrary"&gt;
+ .                   &lt;script order="before"&gt;
+ .                     &lt;!-- Generate the csproj in the same folder as the .build file, fixes lots of issues with csc / xaml compiler --&gt;
+ .                     &lt;property name="package.${package.name}.designermode" value="true" /&gt;
+ .                   &lt;/script&gt;
+ .                   &lt;config&gt;
+ .                     &lt;targetframeworkversion&gt;4.0&lt;/targetframeworkversion&gt;
+ .                     &lt;buildoptions&gt;
+ .                       &lt;option name="platform"&gt;x64&lt;/option&gt;
+ .                       &lt;option name="warningsaserrors"&gt;true&lt;/option&gt;
+ .                     &lt;/buildoptions&gt;
+ .                   &lt;/config&gt;
+ .                   &lt;assemblies&gt;
+ .                     &lt;includes name="PresentationCore.dll" asis="true"/&gt;
+ .                     &lt;includes name="PresentationFramework.dll" asis="true"/&gt;
+ .                     &lt;includes name="System.ComponentModel.Composition.dll" asis="true"/&gt;
+ .                     &lt;includes name="System.Data.dll" asis="true"/&gt;
+ .                     &lt;includes name="System.Data.DataSetExtensions.dll" asis="true"/&gt;
+ .                   &lt;/assemblies&gt;
+ .                   &lt;sourcefiles&gt;
+ .                     &lt;includes name="**.cs"/&gt;
+ .                     &lt;includes name="**.xaml"/&gt;
+ .                   &lt;/sourcefiles&gt;
+ .                 &lt;/PartialModule&gt;
+                  
+                </code>
+                <para>The definition of a C# module based on a partial module can be as simple as this:</para>
+                <code language="xml" title=" ">
+                  
+ .                 &lt;CSharpLibrary name="MyAssembly"  frompartial="MyCSharpModule"&gt;
+ .                   &lt;dependencies&gt;
+ .                     &lt;build&gt;
+ .                       OtherCSharpMPackage
+ .                       SamePackage/MyOtherAssembly
+ .                     &lt;/build&gt;
+ .                   &lt;/dependencies&gt;
+ .                 &lt;/CSharpLibrary&gt;
+
+                </code>
+              </content>
+          </section>
+      </sections>
+    </section>
+
+    <relatedTopics>
+
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

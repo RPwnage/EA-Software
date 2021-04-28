@@ -1,0 +1,154 @@
+package com.ea.originx.automation.scripts.zGraveyard.oig;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroNetworkOffline;
+import com.ea.originx.automation.lib.macroaction.MacroOfflineMode;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.OfflineFlyout;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.oig.OigOfflineModeIndicator;
+import com.ea.originx.automation.lib.pageobjects.oig.OigOfflineModeMsgBox;
+import com.ea.originx.automation.lib.resources.games.OADipSmallGame;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Verify the OIG 'Offline Mode Indicator'. Used by the following parameterized
+ * test cases:<br>
+ * - OAOigOfflineModeIndicator<br>
+ * - OAOigNetworkOfflineIndicator
+ *
+ * @author palui
+ */
+public class OAOigOfflineIndicator extends EAXVxTestTemplate {
+
+    public void testOigOfflineIndicator(ITestContext context, boolean networkOfflineTest, String testClassName) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        OADipSmallGame entitlement = new OADipSmallGame();
+        final String entitlementName = entitlement.getName();
+        final String entitlementOfferId = entitlement.getOfferId();
+
+        UserAccount userAccount = AccountManager.getEntitledUserAccount(entitlement);
+        final String username = userAccount.getUsername();
+
+        logFlowPoint("Launch Origin and login as user: " + username); //1
+        logFlowPoint(String.format("Navigate to game library and locate '%s' game tile", entitlementName)); //2
+        logFlowPoint(String.format("Download and install '%s' game", entitlementName)); //3
+        if (networkOfflineTest) {
+            logFlowPoint("Disconnect Origin from the network. Verify client is offline"); //4a
+        } else {
+            logFlowPoint("Click 'Go Offline' at the Origin menu. Verify client goes offline"); //4b
+        }
+        logFlowPoint(String.format("Launch '%s' game", entitlementName)); //5
+        logFlowPoint("Verify OIG 'Offline Mode Indicator' is visible"); //6
+        logFlowPoint("Click 'Offline Mode indicator' link button to open the 'Offline Mode Message Box' with 'OFFLINE MODE' as the Windows title"); //7
+        logFlowPoint("Verify 'Offline Mode Message Box' has the expected title and message content"); //8
+        if (networkOfflineTest) {
+            logFlowPoint("Reconnect Origin to the network. Verify client is online"); //9a
+        } else {
+            logFlowPoint("Click 'Go online' button at the 'Offline Mode Message Box'. Verify client goes online"); //9b
+        }
+
+        // Current QtWebDriver limitation for OIG: Cannot verify non-visibility of OIG 'Offline Mode Indicator'. Comment out for now
+//        logFlowPoint("Verify OIG 'Offline Mode Indicator' is no longer visible"); //10
+        //1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Verified login successful as user: " + username);
+        } else {
+            logFailExit("Failed: Cannot login as user: " + username);
+        }
+
+        //2
+        new NavigationSidebar(driver).gotoGameLibrary();
+        GameTile gameTile = new GameTile(driver, entitlementOfferId);
+        if (gameTile.waitForDownloadable()) {
+            logPass(String.format("Verified successful navigation to Game Library with '%s' game tile", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot navigate to Game Library or locate '%s' game tile", entitlementName));
+        }
+
+        //3
+        boolean downloaded = MacroGameLibrary.downloadFullEntitlement(driver, entitlementOfferId);
+        if (downloaded) {
+            logPass(String.format("Verified successful download and installation of '%s'", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot download and install '%s'", entitlementName));
+        }
+
+        //4
+        boolean goOfflineSuccessful = networkOfflineTest
+                ? MacroNetworkOffline.enterOriginNetworkOffline(driver)
+                : MacroOfflineMode.goOffline(driver);
+        if (goOfflineSuccessful) {
+            logPass("Verified client is offline");
+        } else {
+            logFailExit("Failed: Client is not offline");
+        }
+        new OfflineFlyout(driver).closeOfflineFlyout(); // close OfflineFlyout which may interfere with OIG page
+
+        //5
+        gameTile.play();
+        if (entitlement.waitForGameLaunch(client)) {
+            logPass(String.format("Verified '%s' launches successfully", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot launch '%s'", entitlementName));
+        }
+
+        //6
+        OigOfflineModeIndicator oigOfflineModeIndicator = new OigOfflineModeIndicator(driver);
+        if (Waits.pollingWait(() -> oigOfflineModeIndicator.verifyOigOfflineModeButtonText())) {
+            logPass("Verified OIG 'Offline Mode Indicator' is visible");
+        } else {
+            logFailExit("Failed: OIG 'Offline Mode Indicator' is not visible");
+        }
+
+        //7
+        oigOfflineModeIndicator.click();
+        OigOfflineModeMsgBox oigOfflineModeMsgBox = new OigOfflineModeMsgBox(driver);
+        if (oigOfflineModeMsgBox.verifyWindowTitle()) {
+            logPass("Verified OIG 'Offline Mode Message Box' appears with 'OFFLINE MODE' Windows title ");
+        } else {
+            logFailExit("Failed: OIG 'Offline Mode Message Box' does not appear or does not have 'OFFLINE MODE' windows title");
+        }
+
+        //8
+        if (oigOfflineModeMsgBox.verifyTitle() && oigOfflineModeMsgBox.verifyMessage()) {
+            logPass("Verified OIG 'Offline Mode Message Box' has the expected title and message");
+        } else {
+            logFailExit("Failed: OIG 'Offline Mode Message Box' does not have the expected title or message");
+        }
+
+        //9
+        boolean goOnlineSuccessful;
+        if (networkOfflineTest) {
+            goOnlineSuccessful = MacroNetworkOffline.exitOriginNetworkOffline(driver);
+        } else {
+            oigOfflineModeMsgBox.clickGoOnline();
+            goOnlineSuccessful = MacroOfflineMode.isOnline(driver);
+        }
+        if (goOnlineSuccessful) {
+            logPass("Verified client is online");
+        } else {
+            logFailExit("Failed: Client is not online");
+        }
+
+        //10
+        // Current QtWebDriver limitation for OIG: Cannot verify non-visibility of OIG 'Offline Mode Indicator' . Comment out for now
+//        if (MiscUtilities.pollingWait(() -> !oigOfflineModeIndicator.verifyOigOfflineModeButtonText())) {
+//            logPass("Verified OIG 'Offline Mode Indicator' is no longer visible");
+//        } else {
+//            logFailExit("Failed: OIG 'Offline Mode Indicator' is still visible");
+//        }
+        softAssertAll();
+    }
+}

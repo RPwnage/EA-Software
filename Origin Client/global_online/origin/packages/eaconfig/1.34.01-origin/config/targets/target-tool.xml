@@ -1,0 +1,92 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <property name="eaconfig.tool.groupname" value="tool" />
+  <property name="eaconfig.tool.outputfolder" value="/tool" />
+  <property name="eaconfig.tool.sourcedir" value="tools" />
+  <property name="eaconfig.tool.usepackagelibs" value="false" />
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'tool-build')}' == 'exclude'">
+    <target name="tool-build" style="build" description="Build the tools for a specific configuration">
+      <!-- Only call build target if there is moduledependencies on runtime modules -->
+      <property name="__dependOnRuntime" value="false"/>
+
+      <do if="@{PropertyExists('tool.buildmodules')}" >
+        <!-- multiple modules -->
+        <foreach item="String" in="${tool.buildmodules}" delim=" \t\n" property="toolmodule">
+          <property name="__dependOnRuntime" value="true" if="@{PropertyExists('tool.${toolmodule}.runtime.moduledependencies')} or @{PropertyExists('tool.${toolmodule}.runtime.moduledependencies.${config-system}')}"/>
+        </foreach>
+      </do>
+      <do unless="@{PropertyExists('tool.buildmodules')}" >
+        <!-- zero or one module -->
+        <property name="__dependOnRuntime" value="true" if="@{PropertyExists('tool.runtime.moduledependencies')} or @{PropertyExists('tool.runtime.moduledependencies.${config-system}')}"/>
+      </do>
+      <do if="${__dependOnRuntime}">
+        <call target="build" force="false" if="@{TargetExists('build')}" />
+      </do>
+      <eval code="@{PropertyUndefine('__dependOnRuntime')}" type="Function"/>
+
+      <property name="eaconfig.build.target" value="eaconfig-build" />
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="eaconfig-build-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'tool-buildall')}' == 'exclude'">
+    <target name="tool-buildall" description="Build the tools for each configuration">
+      <property name="eaconfig.buildall.target" value="tool-build" />
+      <call target="eaconfig-buildall-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'tool-run')}' == 'exclude'">
+    <target name="tool-run" description="Runs the tools for a specific configuration" depends="tool-build">
+      <property name="eaconfig.build.group" value="tool" />
+        <property name="eaconfig-run-target-name" value="eaconfig-run" />
+      <call target="eaconfig-run-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'tool-run-fast')}' == 'exclude' AND '@{OptionSetGetValue('eaconfig.targets', 'tool-run')}' == 'exclude'">
+    <target name="tool-run-fast" description="Runs the tools for a specific configuration">
+      <property name="eaconfig.build.group" value="tool" />
+        <property name="eaconfig-run-target-name" value="eaconfig-run" />
+      <call target="eaconfig-run-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'tool-deploy')}' == 'exclude'">
+    <target name="tool-deploy" description="Deploys tools for a specific configuration">
+      <property name="eaconfig.build.group" value="tool" />
+      <property name="eaconfig-run-target-name" value="eaconfig-deploy" />
+      <call target="eaconfig-run-caller" force="true"/>
+    </target>
+  </do>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'tool-lint')}' == 'exclude'">
+    <target name="tool-lint" description="Pc-Lint the tool code for the specific configuration" style="use">
+      <property name="eaconfig.build.target" value="eaconfig-lint" />
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="eaconfig-build-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'tool-codewizard')}' == 'exclude'">
+    <target name="tool-codewizard" description="CodeWizard the tool code for the specific configuration" style="use">
+      <property name="eaconfig.build.target" value="eaconfig-codewizard" />
+      <property name="eaconfig.build.group" value="tool" />
+      <call target="eaconfig-build-caller" force="true" />
+    </target>
+  </do>
+
+</project>

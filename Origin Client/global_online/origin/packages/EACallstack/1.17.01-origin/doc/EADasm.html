@@ -1,0 +1,152 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+    <title>EADasm</title>    
+<link type="text/css" rel="stylesheet" href="UTFDoc.css">
+    <meta name="author" content="Paul Schlegel">
+</head>
+<body bgcolor="#FFFFFF">
+<h1>EADasm</h1>
+<h2>Introduction</h2>
+<p>EADasm is a cross-platform disassembler. As of this writing it disassembles 32 bit x86 instructions and 32 and 64 bit PowerPC instructions. </p>
+<p>A primary purpose for a disassembler is to help diagnose program crashes outside of a debugger. EADasm is used, for example, by the ExceptionHandler package in order to generate exception reports with disassembly information near the location of the exception. </p>
+<p>Here is example x86 output:</p>
+<p><span class="code-example">0040ba51 xor eax, eax <br>
+  0040ba53 lea edi, [ebp-1031] <br>
+  0040ba59 repz stosd es:[edi], eax <br>
+  0040ba5b stosd es:[edi], ax <br>
+  0040ba5d stosb es:[edi], al <br>
+  0040ba5e mov eax, [ebp+8] <br>
+  0040ba61 mov [ebp-1056], eax <br>
+  0040ba67 mov ecx, [ebp-1056] <br>
+  0040ba6d sub ecx, 0x01 <br>
+  0040ba70 mov [ebp-1056], ecx <br>
+  0040ba76 cmp [ebp-1056], 0x04 <br>
+0040ba7d ja 0x0040BB88 </span>Here is example PowerPC output:</p>
+<p><span class="code-example">82001db4 stmw r30,-8(r1)<br>
+  82001db8 stwu r1,-64(r1)<br>
+  82001dbc mr r30,r1<br>
+  28001dc0 li r0,0<br>
+  82001dc4 stw r0,32(r30)<br>
+  82001dc8 lwz r0,32(r30)<br>
+  82001dcc cmpwi cr7,r0,9<br>
+  82001dd0 ble- cr7,0x1dd8 <br>
+  82001dd4 b 0x1df0 <br>
+  82001dd8 lwz r0,32(r30)<br>
+  82001ddc stw r0,36(r30)<br>
+  82001de0 lwz r2,32(r30)<br>
+  82001de4 addi r0,r2,1</span></p>
+<h2>Example usage </h2>
+<p>Here's example usage for how to use EADasm:</p>
+<pre class="code-example">#include &lt;EACallstack/EADasm.h&gt;
+ 
+DisassemblerPowerPC dasm;<br>DasmData            dd;
+char                buffer[512]; <span class="code-example-comment">// Assume this is filled with 512 bytes of instructions.</span><br><br>for(const void* pCurrent = buffer, *pEnd = buffer + 512; pCurrent &lt; pEnd; )<br>{<br>    pCurrent = dasm.Dasm(pCurrent, pEnd, dd, kOFHex | kOFMnemonics);<br>    printf(&quot;%s %s %s\n&quot;, dd.mAddress, dd.mOperation, dd.mOperands);
+}</pre>
+<h2>Interface</h2>
+<p>
+  <strong>Enumerations and structs 
+</strong></p>
+<pre class="code-example">enum OptionFlags
+{
+    kOFNone      = 0,   /// Placeholder for zero flags.
+    kOFMnemonics = 1,   /// Enable the reporting of instruction mnemonics, which are simplified forms of instructions.
+    kOFHex       = 2,   /// Display integers as hex.
+    kOFHelp      = 4    /// Appends a small explanation to each instruction.
+};
+
+
+enum Processor
+{
+    kProcessorNone,         /// No identified processor.
+    kProcessorX86,          /// Intel 32 bit x86 processor family.
+    kProcessorX86_64,       /// AMD/Intel 64 bit x86-64 processor family.
+    kProcessorPowerPC,      /// PowerPC 32 bit and 64 bit processor family.
+    kProcessorCellSPU,      /// Cell 32 bit SPU vector processor.
+    kProcessorMIPS          /// MIPS processor family.
+};
+
+
+enum InstructionType
+{
+    kITNone,        /// No instruction in particular.
+    kITBranch,      /// Branch instruction, result of if/for/do/while statements in C/C++.
+    kITLoad,        /// Read of memory into a register.
+    kITStore,       /// Write of register to memory.
+    kITImmediate,   /// Read of or use of an immediate (integer literal) into a register.
+    kITMisc         /// All other instructions.
+};
+
+
+enum InstructionFlags
+{
+    kIFNone       =   0,    /// Placeholder for zero flags.
+    kIFInvalid    =   1,    /// Not a valid instruction.
+    kIFFPU        =   2,    /// FPU instruction.
+    kIFUnsigned   =   4,    /// Unsigned integer as opposed to signed.
+    kIFSupervisor =   8,    /// Priviledged.
+    kIFAltivec    =  16,    /// PowerPC Altivec.
+    kIFSSE        =  32,    /// x86 SSE
+    kIFDebug      =  64,    /// Debug instruction.
+    kIF64Bit      = 128,    /// 64 bit instruction.
+    kIFMicrocode  = 256,    /// Instruction is microcoded.
+    kIFNop        = 512     /// Instruction is a no-op.
+};
+
+
+struct DasmData
+{
+    char            mAddress[17];           /// The address of the instruction; string version of mInstructionAddress.
+    char            mOperation[32];         /// The instruction as a string.
+    char            mOperands[32];          /// The instruction arguments as a string.
+    char            mHelp[384];             /// Help for the instruction, if the kOFHelp option is enabled.
+    InstructionType mInstructionType;       /// See InstructionType.
+    uint32_t        mInstructionFlags;      /// See InstructionFlags.
+    uint64_t        mInstructionAddress;    /// Address of the instruction. Defines as a uint64_t so that it can work for both 32 and 64 bit platforms.
+    int32_t         mDisplacement;          /// Branch, load, or store displacement.
+};</pre>
+<p><strong>Disassembler</strong></p>
+<p>The Disassembler class currently consists of a single public member function: Dasm. <br>
+<br>
+This function works somewhat like an STL iterator; you pass in a pointer to a begin iterator (pData) and an end iterator (pDataEnd) and it returns the iterator to use for the next instruction.<br>
+<br>
+The dataAddress argument is the address which pData refers to. If pData refers to actual instructions in memory on a machine at their current location, then dataAddress should be the same as pData. However, if pData is pointing to memory that is coming from a disk file or was malloc'd and filled with instructions, then you would want to set dataAddress to the actual address that the instructions originally resided at in the running program (if you happen to know what that address is). Sometimes this address is referred to as &quot;rva&quot; (relative virtual address).</p>
+<pre class="code-example">class Disassembler
+{
+<span class="code-example-comment">    /// Disassembles the next instruction, given a processor and pointer to instruction data.<br>    /// Returns a pointer to the next instruction. If the instruction is invalid the return<br>    /// value is a pointer to where the next instruction should be read, even though that <br>    /// instruction may be invalid as well. On RISC platforms, this will always be four bytes <br>    /// later. On CISC platforms, this will be the minimum instruction size for the platform,<br>    /// which is usually one byte.<br></span>    virtual const void* Dasm(const void* pData, const void* pDataEnd, DasmData&amp; dasmData, 
+                              uint32_t optionFlags = 0, uint64_t dataAddress = 0) = 0;
+};
+ 
+
+class DisassemblerPowerPC : public Disassembler
+{
+    virtual const void* Dasm(const void* pData, const void* pDataEnd, DasmData&amp; dasmData, 
+                              uint32_t optionFlags = 0, uint64_t dataAddress = 0);
+};
+
+ 
+<span class="code-example-comment">// <em>Note: You need to make the DasmX86Dll.dll file available to the application in order</em>
+// <em>      to use this DisassemblerX86. This means placing the dll file in the same directory </em>
+//       <em>as the</em> <em>application or in the Windows system directory.</em>
+//
+</span>class DisassemblerX86 : public Disassembler
+{
+    virtual const void* Dasm(const void* pData, const void* pDataEnd, DasmData&amp; dasmData, 
+                              uint32_t optionFlags = 0, uint64_t dataAddress = 0);
+};</pre>
+<p>&nbsp;</p>
+<hr>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p></p>
+</body>
+</html>
+
+
+

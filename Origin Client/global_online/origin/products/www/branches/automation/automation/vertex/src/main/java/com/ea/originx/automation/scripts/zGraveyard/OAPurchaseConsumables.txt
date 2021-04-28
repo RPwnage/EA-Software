@@ -1,0 +1,212 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.helpers.TestScriptHelper;
+import com.ea.originx.automation.lib.macroaction.*;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.Waits;
+import com.ea.originx.automation.lib.pageobjects.common.GlobalFooter;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.resources.OriginClientData;
+import com.ea.originx.automation.lib.resources.games.Battlefield4;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test the purchase consumables flow while owning a base game
+ *
+ * @author mkalaivanan
+ */
+public class OAPurchaseConsumables extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12306)
+    @Test(groups = {"pdp", "full_regression", "int_only"})
+    public void testPurchaseConsumables(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        Battlefield4 battlefield4Entitlement = new Battlefield4();
+        String battlefield4BronzeName = battlefield4Entitlement.BF4_BRONZE_BATTLEPACK_NAME;
+        String battlefield4BronzeOfferID = battlefield4Entitlement.BF4_BRONZE_BATTLEPACK_OFFER_ID;
+        String battlefield4BronzePartialPDP = battlefield4Entitlement.BF4_BRONZE_BATTLEPACK_PARTIAL_PDP_URL;
+
+        UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        logFlowPoint("Launch Origin and register as a new user" + userAccount.getUsername()); //1
+        logFlowPoint("Load " + battlefield4Entitlement.getName() + " Pdp page"); //2
+        logFlowPoint("Purchase the game"); //3
+        logFlowPoint("Verify game appeared in the gamelibrary after purchase"); //4
+        logFlowPoint("Load " + battlefield4BronzeName + " Pdp page"); //5
+        logFlowPoint("Verify the CTA button indicates its purchasable"); //6
+        logFlowPoint("Purchase " + battlefield4BronzeName); //7
+        logFlowPoint("Verify the CTA button indicates its still purchasable after already purchasing it"); //8
+        logFlowPoint("Verify the message indicating user requires a base game is visible"); //9
+        logFlowPoint("Purchase " + battlefield4BronzeName); //10
+        logFlowPoint("Navigate to the Consumable PDP "); //11
+        logFlowPoint("Verify the legal links direct the user to appropriate legal pages"); //12
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully created user and logged in as: " + userAccount.getEmail());
+        } else {
+            logFailExit("Could not create user");
+        }
+
+        //2
+        if (MacroPDP.loadPdpPage(driver, battlefield4Entitlement)) {
+            logPass("Successfully navigated to PDP page");
+        } else {
+            logFailExit("Could not navigate to the Product Description Page");
+        }
+
+        //3
+        PDPHeroActionCTA pdpHeroCTA = new PDPHeroActionCTA(driver);
+        Waits.pollingWait(() -> pdpHeroCTA.verifyBuyButtonVisible());
+        pdpHeroCTA.clickBuyButton();
+        if (MacroPurchase.completePurchaseAndCloseThankYouPage(driver)) {
+            logPass("Successfully purchased the game");
+        } else {
+            logFailExit("Failed to purchase the game");
+        }
+
+        if (MacroGameLibrary.verifyGameInLibrary(driver, battlefield4Entitlement.getName())) {
+            logPass("Successfully added to game library");
+        } else {
+            logFailExit("Game not available in library after purchase");
+        }
+
+        //5
+        boolean loadedPage = MacroPDP.loadPdpPage(driver, battlefield4BronzeName,
+                battlefield4BronzeOfferID, battlefield4BronzePartialPDP);
+        if (loadedPage) {
+            logPass("Successfully navigated to PDP add on page");
+        } else {
+            logFailExit("Could not navigate to the Product Description Page");
+        }
+
+        //6
+        PDPHeroActionCTA battlefield4BronzePackHeroCTA = new PDPHeroActionCTA(driver);
+        if (Waits.pollingWait(() -> battlefield4BronzePackHeroCTA.verifyBuyButtonEnabled())) {
+            logPass("CTA indicates its purchasable");
+        } else {
+            logFailExit("CTA does not indicate is not purchasable");
+        }
+
+        //7
+        battlefield4BronzePackHeroCTA.clickBuyButton();
+        if (MacroPurchase.completePurchaseAndCloseThankYouPage(driver)) {
+            logPass("Battlepack purchased successfully");
+        } else {
+            logFailExit("Battlepack not purchased successfully");
+        }
+
+        //8
+        if (battlefield4BronzePackHeroCTA.verifyBuyButtonEnabled()) {
+            logPass("CTA indicates its still purchasable");
+        } else {
+            logFailExit("CTA does not indicate is not purchasable");
+        }
+
+        //9
+        battlefield4BronzePackHeroCTA.clickBuyButton();
+        if (MacroPurchase.completePurchaseAndCloseThankYouPage(driver)) {
+            logPass("Battlepack purchased successfully");
+        } else {
+            logFailExit("Battlepack not purchased successfully");
+        }
+
+        //10
+        PDPHeroActionDescriptors battlefield4BronzePackHeroDescriptors = new PDPHeroActionDescriptors(driver);
+        if (Waits.pollingWait(() -> battlefield4BronzePackHeroDescriptors.verifyBaseGameRequiredMessageVisible())) {
+            logPass("Message indicating user requires a base game to purchase this product is visible");
+        } else {
+            logFailExit("Message indicating user requires a base game is not visible");
+        }
+
+        //11
+        loadedPage = MacroPDP.loadPdpPage(driver, battlefield4BronzeName,
+                battlefield4BronzeOfferID, battlefield4BronzePartialPDP);
+        if (loadedPage) {
+            logPass("Successfully navigated to PDP add on page");
+        } else {
+            logFailExit("Could not navigate to the Product Description Page");
+        }
+
+        //12
+        boolean legalNoticesPageOpen, termsOfSalesPageOpen, termsOfServicePageOpen, corportateInformationPageOpen, privacyCookiePolicyPageOpen;
+        GlobalFooter globalFooter = new GlobalFooter(driver);
+        if (isClient) {
+            globalFooter.scrollToClickLegalNoticesLink();
+            legalNoticesPageOpen = Waits.pollingWaitEx(() -> TestScriptHelper.verifyBrowserOpen(client));
+            TestScriptHelper.killBrowsers(client);
+
+            globalFooter.scrollToClickTermsOfSalesLink();
+            termsOfSalesPageOpen = Waits.pollingWaitEx(() -> TestScriptHelper.verifyBrowserOpen(client));
+            TestScriptHelper.killBrowsers(client);
+
+            globalFooter.scrollToClickUserAgreementLink();
+            termsOfServicePageOpen = Waits.pollingWaitEx(() -> TestScriptHelper.verifyBrowserOpen(client));
+            TestScriptHelper.killBrowsers(client);
+
+            globalFooter.scrollToClickCorportateInformationLink();
+            corportateInformationPageOpen = Waits.pollingWaitEx(() -> TestScriptHelper.verifyBrowserOpen(client));
+            TestScriptHelper.killBrowsers(client);
+
+            globalFooter.scrollToClickPrivacyCookiePolicyLink();
+            privacyCookiePolicyPageOpen = Waits.pollingWaitEx(() -> TestScriptHelper.verifyBrowserOpen(client));
+            TestScriptHelper.killBrowsers(client);
+
+        } else {
+            String originWindowhandle = driver.getWindowHandle();
+            int oldTabsCount = driver.getWindowHandles().size();
+
+            globalFooter.scrollToClickLegalNoticesLink();
+            int newTabsCount = driver.getWindowHandles().size();
+            boolean newTabOpen = newTabsCount == oldTabsCount + 1;
+            legalNoticesPageOpen = newTabOpen && Waits.waitIsPageThatMatchesOpen(driver, OriginClientData.LEGAL_NOTICES_URL_REGEX, 10);
+
+            driver.switchTo().window(originWindowhandle);
+            globalFooter.scrollToClickTermsOfSalesLink();
+            newTabsCount = driver.getWindowHandles().size();
+            newTabOpen = newTabsCount == oldTabsCount + 2;
+            termsOfSalesPageOpen = newTabOpen && Waits.waitIsPageThatMatchesOpen(driver, OriginClientData.TERMS_OF_SALE_URL_REGEX, 10);
+
+            driver.switchTo().window(originWindowhandle);
+            globalFooter.scrollToClickUserAgreementLink();
+            newTabsCount = driver.getWindowHandles().size();
+            newTabOpen = newTabsCount == oldTabsCount + 3;
+            termsOfServicePageOpen = newTabOpen && Waits.waitIsPageThatMatchesOpen(driver, OriginClientData.TERMS_OF_SERVICE_URL_REGEX, 10);
+
+            driver.switchTo().window(originWindowhandle);
+            globalFooter.scrollToClickCorportateInformationLink();
+            newTabsCount = driver.getWindowHandles().size();
+            newTabOpen = newTabsCount == oldTabsCount + 4;
+            corportateInformationPageOpen = newTabOpen && Waits.waitIsPageThatMatchesOpen(driver, OriginClientData.CORPORATE_INFORMATION_URL_REGEX, 10);
+
+            driver.switchTo().window(originWindowhandle);
+            globalFooter.scrollToClickPrivacyCookiePolicyLink();
+            newTabsCount = driver.getWindowHandles().size();
+            newTabOpen = newTabsCount == oldTabsCount + 5;
+            privacyCookiePolicyPageOpen = newTabOpen && Waits.waitIsPageThatMatchesOpen(driver, OriginClientData.PRIVACY_COOKIE_POLICY_URL_REGEX, 10);
+
+        }
+
+        if (legalNoticesPageOpen && termsOfSalesPageOpen && termsOfServicePageOpen && corportateInformationPageOpen && privacyCookiePolicyPageOpen) {
+            logPass("Legal links direct the user to the appropriate legal pages");
+        } else {
+            logFail("Failed: Legal links does not direct the user to the appropriate legal pages");
+        }
+        softAssertAll();
+    }
+
+}

@@ -1,0 +1,146 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+     
+===============================================================================
+eaconfig.build
+
+NAnt build file for the eaconfig package.
+
+eaconfig is the standard Framework2 configuration package.
+
+See http://globaltechdocs.ea.com/Framework2 for more info.
+
+===============================================================================
+
+Eaconfig binaries are included in the package.
+Usually there is no need to build eaconfig.
+
+Targets:
+
+   nant build   - builds bin/eaconfig.dll
+   nant csproj  - creates Visual Studio project in build/vsproject/eaconfig.csproj
+   nant clean - deletes bin and build folders
+
+NOTE. Since this is a Framework 1 package you need to place "PackageRoot.xml" file
+      in your package root.
+      
+      Here is content of "PackageRoot.xml" file:
+           ___________________________________________________________________
+      
+           <?xml version="1.0" encoding="UTF-8"?>
+           <packageRoot>
+               <magicNumber>72c39985-ed5b-4f46-869f-0ed6424c726f</magicNumber>
+           </packageRoot>
+           ___________________________________________________________________
+
+      ===============================================================================
+      -->
+
+      <project>
+  
+  <!-- Versions of nantToVSTools and DotNet packages to use in eaconfig build -->
+
+  <property name="package.nantToVSTools.version" value="dev"/>
+  <property name="package.DotNet.version" value="3.5-SP1"/>
+  <property name="config-vs-version" value="9.0"/>
+  
+  <!-- Get the version number from current directory -->
+  <property name="currDir" value="@{PathGetFullPath('.')}"/>
+  <property name="my_version" value="@{PathGetFileName('${currDir}')}"/>
+
+  <package name="eaconfig" targetversion="${my_version}" excludetargets="clean cleanall"/>
+
+  <target name="eaconfig-dep-nantToVSTools" hidden="true">
+
+    <dependent name="nantToVSTools" version="${package.nantToVSTools.version}" initialize="false"/>
+
+    <nant buildfile="${package.nantToVSTools.dir}/nantToVSTools.build" target="build">
+      <property name="package.builddir" value="${package.builddir}/build" />
+    </nant>
+
+    <taskdef assembly="${build.dir}/nanttovstools.dll"/>
+    <property name="package.nantToVSTools.supportModules" value="true"/>
+    <property name="package.nantToVSTools.confignameHack" value="true"/>
+    <property name="package.nantToVSTools.support64bit" value="true"/>
+  </target>
+
+  <target name="build" depends="eaconfig-dep-nantToVSTools">
+
+    <dependent name="DotNet" version="${package.DotNet.version}"/>
+    <property name="__dotnet_bin_folder" value="${package.DotNet.appdir}"/>
+    <property name="__dotnet_bin_folder" value="${package.DotNet.bindir}" if="@{PropertyExists('package.DotNet.bindir')}" />
+
+    <property name="eaconfig.csc.args">
+      /noconfig
+      /unsafe-
+      /checked-
+      /optimize
+      /debug:pdbonly      
+    </property>
+
+    <mkdir dir="${package.builddir}/bin"/>
+    <delete file="${package.builddir}/bin/eaconfig.dll" />
+    <delete file="${package.builddir}/bin/eaconfig.pdb" />
+    <csc target="library"
+      debug="false"
+      output="${package.builddir}/bin/eaconfig.dll"
+      compiler="${__dotnet_bin_folder}\csc.exe"
+      >
+      <sources basedir="source">
+        <includes name="**/*.cs"/>
+      </sources>
+      <references>
+        <includes name="System.dll" asis="true"/>
+        <includes name="System.Xml.dll" asis="true"/>
+        <includes name="System.Windows.Forms.dll" asis="true"/>
+        <includes name="${nant.location}/NAnt.Core.dll"/>
+        <includes name='${nant.location}/EA.CPlusPlusTasks.dll'/>
+        <includes name='${nant.location}/EA.FrameworkTasks.dll'/>
+        <includes name='${nant.location}/EA.PackageCore.dll'/>
+        <includes name='${nant.location}/NAnt.PerforceTasks.dll'/>
+        <includes name='${nant.location}/NAnt.DotNetTasks.dll'/>
+        <includes name='${nant.location}/NAnt.Shared.dll'/>
+        <includes name='${build.dir}/nanttovstools.dll'/>
+      </references>
+      <arg value="${eaconfig.csc.args}"/>
+    </csc>
+  </target>
+  
+  
+  <target name="clean">
+    <delete dir="${build.dir}" failonerror='false'/>
+    <delete dir="${package.dir}/bin" failonerror='false'/>
+  </target>
+
+  <target name="cleanall" depends="clean"/>
+
+
+  <target name="csproj" depends="eaconfig-dep-nantToVSTools" description="Generate CSPROJ for master application." >
+
+    <nanttocsproj target="library"
+                  configname="Debug"
+                  configplatform="AnyCPU"
+                  output="${package.dir}/bin/eaconfig.dll"
+                  debug="true"
+                  projroot="${build.dir}/vsproject" name="${package.name}"
+        >
+      <sources basedir="source">
+        <includes name="**/*.cs"/>
+      </sources>
+      <references>
+        <includes name="System.dll" asis="true"/>
+        <includes name="System.XML.dll" asis="true"/>
+        <includes name="System.Windows.Forms.dll" asis="true"/>
+        <includes name="${nant.location}/NAnt.Core.dll"/>
+        <includes name='${nant.location}/EA.CPlusPlusTasks.dll'/>
+        <includes name='${nant.location}/EA.FrameworkTasks.dll'/>
+        <includes name='${nant.location}/EA.PackageCore.dll'/>
+        <includes name='${nant.location}/NAnt.PerforceTasks.dll'/>
+        <includes name='${nant.location}/NAnt.DotNetTasks.dll'/>
+        <includes name='${nant.location}/NAnt.Shared.dll'/>
+        <includes name='${build.dir}/nanttovstools.dll'/>
+      </references>
+    </nanttocsproj>
+  </target>
+
+</project>

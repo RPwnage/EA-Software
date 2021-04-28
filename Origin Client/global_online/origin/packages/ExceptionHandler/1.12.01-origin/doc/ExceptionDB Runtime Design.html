@@ -1,0 +1,368 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Exception Database Requirements </title>
+<style type="text/css">
+<!--
+.style1 {color: #0000FF}
+.style2 {color: #0033FF}
+-->
+</style>
+</head>
+
+<body>
+<h1>ExceptionDB Runtime Design</h1>
+<h2>Introduction</h2>
+<p>This document describes the current thinking on the runtime design of the UTF ExceptionDB (a.k.a. CrashManager, CrashBoard) system. It should be immediately noted that we would like the system to not be limited to catching and reporting exceptions but rather should be able to generate reports for a variety of situations which are identified below in the Use Cases. This document is a followup to the <a href="ExceptionDB%20Requirements.html">Requirements</a> document.</p>
+<h2>Use Cases </h2>
+<p>The use cases we present here are copied from the <a href="ExceptionDB%20Requirements.html">Requirements</a> document.</p>
+<ul>
+  <li>A tester is testing a game and the game crashes. We want to know how the game crashed so a programmer can look at it later. The programmer should be able to acquire a report crash and the game debug files necessary to diagnose the crash.</li>
+  <li>A game scripting programmer (who writes scripts for in-game AI) is developing some script and the scripting engine detects some kind of scripting system failure, though not a game crash. As with game crash reports, we want to be able to log a report which helps diagnose the scripting failure. </li>
+  <li>A user is running a debug build of a game and an assertion fails and displays an on-screen dialog box. It would be nice if the user could press a button on that on-screen box and log a report describing the application state at the time of the assertion failure.</li>
+  <li>A user is running the game and some event occurs which is not an exception or assertion failure of some sort, but is merely something that constitutes a hang, deadlock, or bug of some sort. Unless the game has crashed, the user should be able to take a snapshot of the game state so that it can be later diagnosed by a programmer.</li>
+  <li>A user is running the game and some event occurs which the user would like to take a screen capture of and save as a report which can be looked at at some later time by another development team member. The user should be able to take a graphical snapshot of the game screen which can be saved somewhere.</li>
+  <li>A user has a report file of some arbitrary sort which needs to be looked at by a development team member in the context of a specific build. The user should be able to manually add such a report to the report database. Similarly, as user who needs to find or read existing reports should be able to do so manually with minimal complexity. Minimal complexity means it can be done with something as simple as a web browser or a file system.</li>
+</ul>
+<h2>Flow Diagrams</h2>
+<p>We provide a few basic diagrams of runtime flow logic here for three primary use cases of this system. </p>
+<h3>Exception handler</h3>
+<p>This section demonstates what happens when an application is running by itself and encounters an exception and wants to automatically report it. </p>
+<ol>
+  <li>Application initializes the exception handler on startup.
+    <ul>
+      <li>Sets application info.</li>
+      <li>Enables the handler.</li>
+      <li>Initializes the ReportUserInfo.</li>
+    </ul>
+  </li>
+  <li>Application runs. </li>
+  <ul>
+    <li>Code possibly uses the ReportUserInfo to set data or push/pop data. See Paul Pedriana for a description of this.</li>
+  </ul>
+  <li>Application generates an exception.</li>
+  <li>ExceptionHandler catches the exception.</li>
+  <li>ReportCollector is called, which generates the requisite reports (particularly the exception report). </li>
+  <li>ReportUploader is called, which sends the reports to the server.
+    <ul>
+      <li>Possibly ReportUploader isn't called but instead the reports are left in a directory for somebody to get them manually or for a separate report uploading process to occur. </li>
+    </ul>
+  </li>
+  <li>The application at this point is usually dead and needs to be restarted.</li>
+</ol>
+<h3>Assertion failure</h3>
+<p>(this section is not yet implemented)<br>
+  (Similar to above but the report generation is triggered by the user) </p>
+<h3>Tester report</h3>
+<p>(this section is not yet implemented)</p>
+<h2>Code Interfaces</h2>
+<p>The primary runtime code involved in this is listed here. </p>
+<blockquote>
+  <table width="800" border="1">
+    <tr>
+      <td><strong>C++ class </strong></td>
+      <td><strong>Description</strong></td>
+    </tr>
+    <tr>
+      <td>EACallstack</td>
+      <td>Implements callstack utilities and code disassembly. </td>
+    </tr>
+    <tr>
+      <td>ExceptionHandler</td>
+      <td>Catches exceptions at runtime and automatically triggers report generation, possibly by calling ReportCollector. </td>
+    </tr>
+    <tr>
+      <td>ReportCollector</td>
+      <td>Implements report generation manually, as opposed to via an Exception. It would make an ExceptionReport (AppStateReport?), a LogReport, and possibly a screenshot. </td>
+    </tr>
+    <tr>
+      <td>ReportWriter</td>
+      <td>Writes an exception report, though not necessarily in reponse to a processor exception. Perhaps we should call this report an AppStateReport. </td>
+    </tr>
+    <tr>
+      <td>ReportCooker</td>
+      <td>Converts a report that is missing symbol information to one that has it. It turns out that the ReportWriter might not have access to symbol information when the report is written (as it may be in QA hands). The ReportCooker takes a report and symbol information and &quot;cooks&quot; the report to have it.</td>
+    </tr>
+    <tr>
+      <td>ReportUploader</td>
+      <td>Uploads one or more reports to a report server. </td>
+    </tr>
+    <tr>
+      <td>ReportUserInfo</td>
+      <td>Utilities for allowing users to specify information that is written by the ReportWriter.</td>
+    </tr>
+  </table>
+</blockquote>
+<h2>Report Files</h2>
+<p>We provide a list of some of the currently identified report file types. </p>
+<blockquote>
+  <table width="800" border="1">
+    <tr>
+      <td><strong>Type</strong></td>
+      <td><strong>Description</strong></td>
+    </tr>
+    <tr>
+      <td>Exception Report</td>
+      <td>Generated as a result of an application crash. Contains information about the application state at the time of the crash. </td>
+    </tr>
+    <tr>
+      <td>Assertion Failure Report</td>
+      <td>Generated as a result of an assertion failure. Format is same as ExceptionReport.</td>
+    </tr>
+    <tr>
+      <td>Hang Report</td>
+      <td>Generated as a result of an application hang (e.g. deadlock or livelock). Format is the same as ExceptionReport. </td>
+    </tr>
+    <tr>
+      <td>Heap Report</td>
+      <td>Generated on demand by any mechansim that generates other reports. Contains information about the memory heap(s) of the application.</td>
+    </tr>
+    <tr>
+      <td>System-specific exception report </td>
+      <td>Generated as a result of an application crash. This report is in parallel to our Exception Reports and is written by the exception ReportWriter at the same time it writes its regular exception report file. An example of it is the Microsoft MiniDump file, which is a core dump that a programmer can use with the VC++ debugger to diagnose crashes.</td>
+    </tr>
+    <tr>
+      <td>Log Report </td>
+      <td>Generated on demand by any mchanism that generates other reports. Contains the debug log of the application. </td>
+    </tr>
+    <tr>
+      <td>Screenshot</td>
+      <td>Generated on demand by any mechanism that generates other reports. This is simply a bitmap graphics file. We have code to generate a screenshot under RenderWare, but we should allow the application to supply its own mechanism for generating a screenshot. </td>
+    </tr>
+    <tr>
+      <td>User Report </td>
+      <td>This is an arbitrary report of some type generated by the user. An example might be a report regarding failure of a scripted AI system. We list it here so we remember that the system should be flexible enough to handle any kind of report. </td>
+    </tr>
+  </table>
+</blockquote>
+<h2>Report Contents</h2>
+<p>May be composed of multiple files (e.g. exception file, log file)</p>
+<ul>
+  <li>Exception / Assertion failure, Hang report
+    <ul>
+      <li>App info</li>
+      <li>System info</li>
+      <li>Custom user-supplied info. </li>
+      <li>Thread list
+        <ul>
+            <li>names</li>
+            <li>thread ids</li>
+            <li>call stacks</li>
+          </ul>
+      </li>
+      <li>Registers for crashed thread</li>
+      <li> Loaded modules (Windows)</li>
+      <li>Instructions in area of crash</li>
+    </ul>
+  </li>
+  <li>Heap report
+    <ul>
+      <li>There would be one report file per PPMalloc GeneralAllocator heap.</li>
+      <li> The report contains fundamental information about the heap.</li>
+    </ul>
+  </li>
+  <li>Log Report
+    <ul>
+      <li>Contains simply the primary EALog output contents.</li>
+    </ul>
+  </li>
+  <li>Screenshot file
+    <ul>
+      <li>Contains a screenshot of the game, usually generated from the game itself, but possibly generated externally, including via a camera.</li>
+    </ul>
+  </li>
+</ul>
+<h2>Layering </h2>
+<p>Here we provide a basic layering diagram of the components involved here. Note that while some items appear at a higher level than others, that doesn't mean that they depend on the others. </p>
+<table width="400"  border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="6%">&nbsp;</td>
+    <td width="88%">
+	  <table width="100%"  border="1" cellspacing="0">
+        <tr>
+          <td width="50%"><div align="center">EAExceptionHandler</div></td>
+        </tr>
+      </table>
+        <br>
+	  <table width="100%"  border="1" cellspacing="0">
+        <tr>
+          <td width="50%"><div align="center">ReportWriter</div></td>
+          <td width="50%"><div align="center">ReportCooker</div></td>
+        </tr>
+      </table>
+        <br>
+        <table width="100%"  border="1" cellspacing="0">
+          <tr>
+            <td width="33%"><div align="center">ReportUploader</div></td>
+            <td width="33%"><div align="center">EACallstack</div></td>
+          </tr>
+        </table>
+        <br>
+        <table width="100%"  border="1" cellspacing="0">
+          <tr>
+            <td width="18%"><div align="center">EAStream</div></td>
+            <td width="18%"><div align="center">EALog</div></td>
+          </tr>
+        </table>
+        <br>
+        <table width="100%"  border="1" cellspacing="0">
+          <tr>
+            <td width="70%"><div align="center">Foundation</div></td>
+          </tr>
+        </table>
+        <br>
+        <table width="100%"  border="1" cellspacing="0">
+          <tr>
+            <td width="20%"><div align="center">EAThread</div></td>
+            <td width="20%"><div align="center">PPMalloc</div></td>
+            <td width="20%"><div align="center">EASTL</div></td>
+          </tr>
+        </table>
+        <br>
+        <table width="100%"  border="1" cellspacing="0">
+          <tr>
+            <td width="100%"><div align="center">EABase</div></td>
+          </tr>
+      </table></td>
+    <td width="6%">&nbsp;</td>
+  </tr>
+</table>
+<h2>Current Status of ExceptionHandler </h2>
+<p>Currently we have an ExceptionHandler project in EADiagnostics. The general design of it is pretty good and it probably doesn't need to be changed except for what is identified below. It has a working exception handler for Windows and Xenon. The PS3 platform doesn't currently have support for catching exceptions at runtime; the only approach is to catch them externally via an app that acts like a debugger. </p>
+<p>What the existing Windows and Xenon exception handler does:</p>
+<ul>
+  <li>Provides a runtime exception handler.</li>
+  <li>Uses an internal mini version of EACallstack to generate callstack information.</li>
+  <li>Writes an exception report to a disk file specified by a path. </li>
+</ul>
+<p>What we want to change about the existing ExceptionHandler:</p>
+<ul>
+  <li>We want to kill its mini version of EACallstack and use EACallstack.</li>
+  <li>We want to make it so it can write its report to an arbitrary IStream.</li>
+  <li>The file format is not as easily parseable as we would like it. It should be easy to write a C or Python script to parse or modify it. This is important because we need to implement the ReportCooker, which replaces addresses with symbols.</li>
+  <li>We want to add additional information to the report which isn't currently there.
+    <ul>
+      <li>Add instruction disassembly to the instruction dump (via EADasm).</li>
+      <li>Add a thread list. It currently doesn't have this. </li>
+    </ul>
+  </li>
+  <li>We want to separate the report writing functionality from the exception handling functionality.
+    <ul>
+      <li>We need to be able to write a report externally from a launching app (though it might not have as much information).</li>
+      <li>We want to be able to write a report internally but triggered manually by the user instead of by an exception. </li>
+      <li>We want to be able to easily 'cook' a report to add symbol information where it wasn't previously. This can happen because a QA tester will not have access to symbol information, but the development team does. </li>
+    </ul>
+  </li>
+  <li>We want to be able to support Xenon's crash minidumps, though this likely would need to be handled outside of ExceptionHandler.</li>
+</ul>
+<h2>Current ExceptionReport Contents </h2>
+<p>Here's an example of what a Win32 exception report looks like as of May, 2006. Comments have been added to the contents in <span class="style1">blue</span>. </p>
+<blockquote>
+  <pre>[header]
+Exception time: 05/18/2006, at 18:28:41
+Exception code: ACCESS_VIOLATION writing address 0x00000000
+Location: 0x00405781 &quot;c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe&quot;:0x0001:0x00004781
+</pre>
+  <pre><span class="style2">We want an application information and system information section here
+We want a list of all current threads here, and probably want the stacks of each thread.<br></span><br>[stack]
+Call stack:<br><span class="style2">No need to report segment registers here (e.g. 0x0001:)
+We should report file/line information here instead of function/offset.
+We should not print the entire application module path here, but at most just the module file name alone.<br></span>0x0001:0x00004781 c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe, EA::Debug::Internal::CreateExceptionImpl()+0x00000061
+c:\projects\helios\ctg_ears\dl\utfdiagnostics\exceptionhandler\source\exceptionhandler.cpp: line 89
+0x0001:0x0000493c c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe, EA::Debug::CreateException()+0x0000005c
+c:\projects\helios\ctg_ears\dl\utfdiagnostics\exceptionhandler\source\exceptionhandler.cpp: line 178
+0x0001:0x0000020c c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe, TestAccessViolation()+0x0000000c
+c:\projects\helios\ctg_ears\dl\utfdiagnostics\exceptionhandler\test\source\exceptionhandlertest.cpp: line 17
+0x0001:0x000016c5 c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe, EA::Debug::ExceptionHandlerWin32::RunTrapped()+0x00000055
+c:\projects\helios\ctg_ears\dl\utfdiagnostics\exceptionhandler\source\win32\exceptionhandlerwin32.cpp: line 138
+0x0001:0x00004e49 c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe, EA::Debug::ExceptionHandler::RunTrapped()+0x00000039
+c:\projects\helios\ctg_ears\dl\utfdiagnostics\exceptionhandler\source\exceptionhandler.cpp: line 345
+0x0001:0x000002e0 c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe, main()+0x00000040
+c:\projects\helios\ctg_ears\dl\utfdiagnostics\exceptionhandler\test\source\exceptionhandlertest.cpp: line 53
+0x0001:0x00035fdc c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe, mainCRTStartup()+0x0000012c
+f:\vs70builds\3077\vc\crtbld\crt\src\crtexe.c: line 398
+0x0001:0x00015d4f C:\WINDOWS\system32\kernel32.dll, RegisterWaitForInputIdle()+0x00000049</pre>
+  <pre>Stack data: (ESP is 0012fa4c)
+<span class="style1">Might be useful to interpret pointers that appear in the stack
+</span>0012fa40 |                                    &lt;68&gt;ff 12 00 |             h... |
+0012fa50 | c4 fe 12 00 00 00 00 00 cc cc cc cc cc cc cc cc | ................ |
+0012fa60 | cc cc cc cc 00 00 00 00 cc cc cc cc cc cc cc cc | ................ |
+0012fa70 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fa80 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fa90 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012faa0 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fab0 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fac0 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fad0 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fae0 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012faf0 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb00 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb10 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb20 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb30 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb40 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb50 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb60 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb70 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb80 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fb90 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fba0 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fbb0 | cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc | ................ |
+0012fbc0 | cc cc cc cc cc cc cc cc cc cc cc cc             | ............     |</pre>
+  <pre>Instruction data: (EIP is 0x00405781)
+<span class="style1">We should provide a disassembly view here (via EADasm). Binary instructions are almost useless.
+</span>00405700 |    7a 65 00 6c 69 6e 65 43 6f 75 6e 74 00 73 79 |  ze.lineCount.sy |
+00405710 | 73 49 6e 66 6f 00 cc cc cc cc cc cc cc cc cc cc | sInfo........... |
+00405720 | 55 8b ec 81 ec 20 04 00 00 56 57 8d bd e0 fb ff | U.... ...VW..... |
+00405730 | ff b9 08 01 00 00 b8 cc cc cc cc f3 ab a1 f8 19 | ................ |
+00405740 | 45 00 89 45 fc 8b 45 08 89 85 e0 fb ff ff 8b 8d | E..E..E......... |
+00405750 | e0 fb ff ff 83 e9 01 89 8d e0 fb ff ff 83 bd e0 | ................ |
+00405760 | fb ff ff 04 0f 87 de 00 00 00 8b 95 e0 fb ff ff | ................ |
+00405770 | ff 24 95 8f 58 40 00 c7 85 f0 fb ff ff 00 00 00 | .$..X@.......... |
+00405780 | 00&lt;c6&gt;05 00 00 00 00 00 8b f4 6a 00 68 96 a6 44 | ..........j.h..D |
+00405790 | 00 8d 85 f8 fb ff ff 50 ff 15 40 36 45 00 83 c4 | .......P..@6E... |
+004057a0 | 0c 3b f4 e8 e8 14 03 00 0f 0b c7 85 ec fb ff ff | .;.............. |
+004057b0 | 01 00 00 00 8b 4d 08 89 8d e8 fb ff ff 8b 85 ec | .....M.......... |
+004057c0 | fb ff ff 99 f7 bd e8 fb ff ff 8b c8 b8 07 00 00 | ................ |
+004057d0 | 00 99 f7 f9 89 85 e4 fb ff ff 8b f4 8b 95 e4 fb | ................ |
+004057e0 | ff ff 52 8b 85 e8 fb ff ff 50 8b 8d ec fb ff ff | ..R......P...... |
+004057f0 | 51 68 96 a6 44 00 8d 95 f8 fb ff ff 52 ff 15 40 | Qh..D.......R..@ |
+00405800 | 36                                              | 6                |</pre>
+  <pre>[registers]
+<span class="style1">This would be more machine parseable if tehre was one line per register.
+Also, we want to report FPU registers (or at least the top of the FPU stack on x86). 
+</span>EAX: 00000001 EBX: 7ffde000 ECX: 00000000 EDX: 00000000
+ESI: 0012fec4 EDI: 0012fe74 EBP: 0012fe74 EFL: 00010297
+EIP: 00405781 ESP: 0012fa4c</pre>
+  <pre>[modules]
+base 00400000 size 00055000 entry 00436eb0 ExceptionHandlerTest_Win32.exe c:\projects\helios\ctg_ears\dl\out\win32 debug\exceptionhandlertest_win32\ExceptionHandlerTest_Win32.exe
+base 7c900000 size 000b0000 entry 7c913156 ntdll.dll C:\WINDOWS\system32\ntdll.dll
+base 7c800000 size 000f4000 entry 7c80b436 kernel32.dll C:\WINDOWS\system32\kernel32.dll
+base 10200000 size 00087000 entry 10202130 MSVCR71D.dll C:\WINDOWS\system32\MSVCR71D.dll
+base 77d40000 size 00090000 entry 77d4f538 USER32.dll C:\WINDOWS\system32\USER32.dll
+base 77f10000 size 00047000 entry 77f165ba GDI32.dll C:\WINDOWS\system32\GDI32.dll
+base 76bf0000 size 0000b000 entry 76bf10f1 psapi.dll C:\WINDOWS\system32\psapi.dll</pre>
+  <pre>[memory]
+<span class="style1">May want to make this a little more machine parseable.</span>
+EBX 7ffddffc | 00 00 00 00&lt;00&gt;00 01 00 ff ff ff ff 00 00 40 00 | ..............@. |
+7ffde00c     | a0 1e 24 00 00 00 02 00 00 00 00 00 00 00 14 00 | ..$............. |
+ESI 0012fec0 | 00 00 00 00&lt;68&gt;ff 12 00 40 00 00 00 00 e0 fd 7f | ....h...@....... |
+0012fed0     | cc cc cc cc 05 00 00 c0 cc cc cc cc 40 cc 94 00 | ............@... |
+EDI 0012fe70 | b9 a8 15 e7&lt;a8&gt;fe 12 00 3c 59 40 00 01 00 00 00 | ........&lt;Y@..... |
+0012fe80     | 68 ff 12 00 c4 fe 12 00 00 e0 fd 7f cc cc 00 01 | h............... |
+EBP 0012fe70 | b9 a8 15 e7&lt;a8&gt;fe 12 00 3c 59 40 00 01 00 00 00 | ........&lt;Y@..... |
+0012fe80     | 68 ff 12 00 c4 fe 12 00 00 e0 fd 7f cc cc 00 01 | h............... |</pre>
+</blockquote>
+<p>&nbsp;</p>
+<hr>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+</body>
+</html>

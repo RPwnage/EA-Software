@@ -1,0 +1,4 @@
+#ifndef ORIGINDEVELOPERTOOL_ORIGIN_COMMON
+#define ORIGINDEVELOPERTOOL_ORIGIN_COMMON
+#include <EABase/eabase.h>
+#endif

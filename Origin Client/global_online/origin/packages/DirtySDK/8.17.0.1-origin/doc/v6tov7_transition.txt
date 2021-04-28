@@ -1,0 +1,70 @@
+This document is intended to aid the process of transitioning user code built against the DirtySock V6 series
+of SDKs to the DirtySock V7 series of SDKs.  If there are items that should be in this document but are not,
+please write the "GOS dirtysock support" mailing list so those items can be added to future revisions of this
+document.
+
+Supported Platforms
+
+    PS2 and Xbox are no longer supported platforms.
+    
+API renaming or behavioral changes
+
+    The following APIs and/or functionalities have been deprecated.  Client code referencing these APIs should
+    be updated as follows:
+
+    DirtySock (All)
+        ConnApi
+            ConnApiHost, ConnApiConnect, ConnApiAddClient, ConnApiAddClient2 no longer taking a ConnApiRefT *pImport
+            parameter. The import is automatic. Just don't pass in anything to retain old behaviour.
+            
+            When using ConnApiHost, ConnApiConnect, ConnApiAddClient, or ConnApiAddClient2,
+            ConnApiUserInfoT.uClientFlags must now be set for all clients. To retain old behaviour, pass in 0. If 
+            you want to specify whether a public or private slot must be used by each user in the session, on 360, 
+            you can pass in CONNAPI_FLAG_PUBLICSLOT or CONNAPI_FLAG_PRIVATESLOT instead.
+
+        DirtyMem
+            The client of DirtySDK/LobbySDK must now define
+                void *DirtyMemAlloc(int32_t iSize, int32_t iMemModule, int32_t iMemGroup, void *pMemGroupUserData);
+                void DirtyMemFree(void *pMem, int32_t iMemModule, int32_t iMemGroup, void *pMemGroupUserData);
+            instead of the previous versions that missed the last param. Your function can freely discard the
+            last parameter if not interested. The same goes for DirtyMemDebugAlloc and DirtyMemDebugFree.
+            
+            void DirtyMemGroupEnter(int32_t iGroup, void *pMemGroupUserData);
+            Now takes an extra pMemGroupUserData value. To preserve old behaviour, simply pass in NULL.
+
+            void DirtyMemGroupQuery(int32_t *pMemGroup, void **ppMemGroupUserData);
+            Now takes a pointer to a pMemGroup instead of returning the value. Please pass in the address of the 
+            variable you wanted to read into instead of assigning the return value. You can pass NULL for the second
+            param to retain old behaviour.
+            
+        hlbudapi
+            HLBApiCreate, HLBApiCreate2, and HLBApiCreate3 now take an extra param void *pRefMemGroupUserData. If 
+            you pass in a value it will be passed to the memory allocator. If you don't care, please pass in NULL.
+        
+        NetGameDist
+            NetGameDistStreamInpT and NetGameDistStreamT member names changed to reflect coding standard. 
+            i.e. pInpData instead of inpdata.
+            
+            NetGameDistInputTweak replaced by NetGameDistControl. Same params.
+
+        NetGameLink    
+            NetGameLinkRecv now taking an extra param. Please pass in FALSE. TRUE is reserved for NetGameDist
+            internal use.
+
+        Voip
+            VoipStatus now taking an extra void *pBuf and int32_t iBufSize. For existing selectors, pass in
+            NULL and 0. Only the new selectors 'mgrp' and 'mgud' use the buffer, on PC.
+
+        VoipGroup
+            VoipGroupImport has been deprecated. Just don't call it. It's functionality is done automatically.
+            
+    DirtySock (xenon)
+        DirtySessionManagerXenon
+            DirtySessionManagerConnect now takes an extra slot to indicate whether a client should use a public 
+            or private slot. Please pass in 0 to maintain old behaviour, or 
+            DIRTYSESSIONMANAGER_FLAG_PUBLICSLOT or DIRTYSESSIONMANAGER_FLAG_PRIVATESLOT
+
+    LobbySDK (all)
+        LobbyApi
+            LobbyApiCreate now taking an extra void *pRefMemGroupUserData to pass back to the memory allocator.
+            To retain old behaviour, please pass in NULL.

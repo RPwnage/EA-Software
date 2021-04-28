@@ -1,0 +1,211 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <!--
+    task-generatemoduleinteropassemblies
+
+    Helper task to generate interop assemblies for a list of COM DLL's in a module.
+  -->
+  <createtask name="task-generatemoduleinteropassemblies">
+    <parameters>
+      <option name="module"  value="Required" />
+      <!-- eaconfig module name -->
+      <option name="group"  value="runtime" />
+      <!-- eaconfig group name (default "runtime") -->
+            <option name="generated-assemblies-fileset" />
+    </parameters>
+    <code>
+      <property name="group-module" value="${task-generatemoduleinteropassemblies.group}.${task-generatemoduleinteropassemblies.module}" />
+
+            <fileset name="${task-generatemoduleinteropassemblies.generated-assemblies-fileset}"/>
+
+      <foreach property="comref" in="${group-module}.comassemblies" item="Fileset">
+        <property name="comref-basename" value="@{PathGetFileNameWithoutExtension('${comref}')}" />
+        <property name="netref" value="${package.configbindir}/${comref-basename}.net.dll" />
+
+        <choose unless="@{PropertyExists('tlbimp.exe')}" >
+          <do  if="${package.VisualStudio.version} lt 9.0" >
+            <property name="tlbimp.exe" value="${package.VisualStudio.appdir}/SDK/v2.0/bin/tlbimp.exe" />
+            <do unless="@{FileExists('${tlbimp.exe}')}">
+              <!-- Windows SDK used to find tlbimp.exe. -->
+              <dependent name="WindowsSDK" />
+              <property name="tlbimp.exe" value="${package.WindowsSDK.appdir}/Bin/tlbimp.exe" />
+            </do>
+          </do>
+          <do>
+            <!-- Windows SDK used to find tlbimp.exe. -->
+            <dependent name="WindowsSDK" />
+            <property name="tlbimp.exe" value="${package.WindowsSDK.appdir}/Bin/tlbimp.exe" />
+          </do>
+        </choose>
+        <fail message="Unable to find tlbimp.exe in '${tlbimp.exe}'" unless="@{FileExists('${tlbimp.exe}')}" />
+
+        <!-- Generate .NET wrapper assembly. -->
+        <task name="slnruntime-generateinteropassembly"
+            message="Generating interop assembly for ${comref} ..."
+            comdll="${comref}"
+            interopdll="${netref}"
+            namespace="${comref-basename}" />
+
+        <!-- Add generated interop assembly to the build. -->
+        <fileset name="${group-module}.assemblies" append="true">
+          <includes name="${netref}" />
+        </fileset>
+
+                <fileset name="${task-generatemoduleinteropassemblies.generated-assemblies-fileset}" append="true">
+                    <includes name="${netref}" />
+                </fileset>
+
+        <!-- Copy the COM DLL to the build folder. -->
+                <do if="@{PropertyExists('${group-module}.copylocal')}">
+                    <do if="'${${group-module}.copylocal}' == 'true'">
+          <copy file="${comref}" todir="${package.configbindir}" />
+        </do>
+                </do>
+
+        <!--
+          TODO: should we "regsvr32 -s ${comref}" to register the COM assembly?
+          Pro: consistent with Visual Studio behaviour (I believe).
+          Con: This only solves the problem on the build machine, not client machines.
+          Decision: don't bother
+        -->
+
+      </foreach>
+    </code>
+  </createtask>
+
+  <!--
+  slnruntime-generateinteropassembly
+  
+  Generates a single interop assembly from a COM DLL. Dependency-checking is performed.
+  -->
+  <createtask name="slnruntime-generateinteropassembly">
+    <parameters>
+      <option name="comdll" value="Required" />
+      <option name="interopdll" value="Required" />
+      <option name="namespace" value="Required" />
+      <option name="keyfile" value="" />
+      <option name="message" value="" />
+    </parameters>
+    <code>
+      <choose unless="@{PropertyExists('tlbimp.exe')}" >
+        <do  if="${package.VisualStudio.version} lt 9.0" >
+          <property name="tlbimp.exe" value="${package.VisualStudio.appdir}/SDK/v2.0/bin/tlbimp.exe" />
+          <do unless="@{FileExists('${tlbimp.exe}')}">
+            <!-- Windows SDK used to find tlbimp.exe. -->
+            <dependent name="WindowsSDK" />
+            <property name="tlbimp.exe" value="${package.WindowsSDK.appdir}/Bin/tlbimp.exe" />
+          </do>
+        </do>
+        <do>
+          <!-- Windows SDK used to find tlbimp.exe. -->
+          <dependent name="WindowsSDK" />
+          <property name="tlbimp.exe" value="${package.WindowsSDK.appdir}/Bin/tlbimp.exe" />
+        </do>
+      </choose>
+      <fail message="Unable to find tlbimp.exe in '${tlbimp.exe}'" unless="@{FileExists('${tlbimp.exe}')}" />
+
+      <depends property="needs-generating">
+        <inputs>
+          <includes name="${slnruntime-generateinteropassembly.comdll}"/>
+        </inputs>
+        <outputs>
+          <includes name="${slnruntime-generateinteropassembly.interopdll}"/>
+        </outputs>
+      </depends>
+
+      <choose>
+        <do if="${needs-generating}">
+          <property name="silent" value="/silent" />
+          <property if="${nant.verbose}" name="silent" value="/verbose" />
+
+          <task name="GetComLibraryName" libpath="${slnruntime-generateinteropassembly.comdll}" Result="slnruntime-generateinteropassembly.namespace"/>
+
+          <!-- determine whether or not a keyfile has been specified -->
+          <property name="arg-keyfile" value="" />
+          <do unless="@{StrIsEmpty(${slnruntime-generateinteropassembly.keyfile})}">
+            <property name="arg-keyfile" value='"/keyfile:${slnruntime-generateinteropassembly.keyfile}"' />
+          </do>
+
+          <exec program="${tlbimp.exe}" >
+            <args>
+              <arg value='"${slnruntime-generateinteropassembly.comdll}"' />
+              <arg value='"/out:${slnruntime-generateinteropassembly.interopdll}"' />
+              <arg value='"/namespace:${slnruntime-generateinteropassembly.namespace}"' />
+              <arg value="/nologo" />
+              <arg value="${arg-keyfile}" />
+              <arg value="${silent}" />
+            </args>
+          </exec>
+
+        </do>
+
+        <do if="${nant.verbose}">
+          <echo>Interop DLL ${slnruntime-generateinteropassembly.interopdll} is up-to-date.</echo>
+        </do>
+      </choose>
+
+    </code>
+  </createtask>
+
+  <createtask name="GetComLibraryName" >
+    <parameters>
+      <option name="libpath" value="Required" />
+      <option name="Result" value="Required" />
+    </parameters>
+    <code>
+      <script language="c#" >
+        <code>
+          <![CDATA[
+                        private enum RegKind
+                        {
+                            RegKind_Default = 0,
+                            RegKind_Register = 1,
+                            RegKind_None = 2
+                        }
+
+
+                        [DllImport("oleaut32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
+                        private static extern void LoadTypeLibEx(string strTypeLibName, RegKind regKind, out System.Runtime.InteropServices.ComTypes.ITypeLib typeLib);
+                    
+              public static void ScriptMain(Project project)
+              {
+                            string fileName = project.Properties["GetComLibraryName.libpath"];
+                            if (!File.Exists(fileName))
+                            {
+                                string msg = String.Format("Unable to generate interop assembly for COM reference, file '{0}' not found", fileName);
+                                throw new BuildException(msg);
+                            }
+
+                            System.Runtime.InteropServices.ComTypes.ITypeLib typeLib = null;
+                            try
+                            {
+                                LoadTypeLibEx(fileName, RegKind.RegKind_None, out typeLib);
+                            }
+                            catch (Exception ex)
+                            {
+                                string msg = String.Format("Unable to generate interop assembly for COM reference '{0}'.", fileName, ex);
+                                new BuildException(msg);
+                            }
+                            if (typeLib == null)
+                            {
+                                string msg = String.Format("Unable to generate interop assembly for COM reference '{0}'.", fileName);
+                                new BuildException(msg);
+                            }
+                            
+                            project.Properties[project.Properties["GetComLibraryName.Result"]] = Marshal.GetTypeLibName(typeLib); 
+                }
+        ]]>
+        </code>
+        <imports>
+          <!-- Extra namespaces to use -->
+          <import name="System.Runtime.InteropServices"/>
+        </imports>
+
+      </script>
+    </code>
+  </createtask>
+
+</project>

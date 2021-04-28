@@ -1,0 +1,83 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.SelectOriginAccessPlanDialog;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessPage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test the Free Trial Plan Selection Modal for origin access
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeTrialPlanSelection extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 39570)
+    @Test(groups = {"originaccess", "full_regression"})
+    public void testFreeTrialPlanSelection(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+
+        logFlowPoint("Login as: " + username); //1
+        logFlowPoint("Navigate to the 'Origin Access' page and Verify there is a Start Your Trial CTA"); //2
+        logFlowPoint("Verify there is text to inform about free trial"); //3
+        logFlowPoint("Click 'Start Your Trial' on the Origin Access Page and Verify the select origin access plan appears"); //4
+        logFlowPoint("Verify that the dialog description indicates that user will have all the Origin Access benefits and user can cancel anytime"); //5
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged in with: " + username);
+        } else {
+            logFailExit("Could not log in with: " + username);
+        }
+
+        //2
+        OriginAccessPage accessPage = new NavigationSidebar(driver).gotoOriginAccessPage();
+        boolean verifyFreeTrialButton = accessPage.verifyFreeTrialHeroButtonExists();
+        if (verifyFreeTrialButton) {
+            logPass("Verified the 'Start Your Trial' CTA exists");
+        } else {
+            logFailExit("Failed: The 'Start Your Trial' CTA doesn't exist");
+        }
+
+        //3
+        boolean verifyFreeTrialText = accessPage.verifyFreeTrialTextExists();
+        if (verifyFreeTrialText) {
+            logPass("Verified there is a text to inform free trial exists");
+        } else {
+            logFailExit("Failed: There is no text to inform free trial exist");
+        }
+
+        //4
+        accessPage.clickJoinButton();
+        SelectOriginAccessPlanDialog selectOriginAccessPlanDialog = new SelectOriginAccessPlanDialog(driver);
+        if (selectOriginAccessPlanDialog.waitIsVisible()) {
+            logPass("Verified on clicking the 'Start Your Trial' CTA, the Origin Access Plan Selection Dialog appears");
+        } else {
+            logFailExit("Failed: On clicking the 'Start Your Trial' CTA, the Origin Access Plan Selection Dialog does not appear");
+        }
+
+        //5
+        if (selectOriginAccessPlanDialog.verifyCancelAnytimeDescription() && selectOriginAccessPlanDialog.verifyFreeTrialDurationDescription()) {
+            logPass("Verified the dialog description indicates that the user will have all the Origin Access benefits and user can cancel anytime");
+        } else {
+            logFailExit("Failed: the dialog description does not indicate that the user will have all the Origin Access benefits or user can cancel anytime");
+        }
+
+        softAssertAll();
+
+    }
+}

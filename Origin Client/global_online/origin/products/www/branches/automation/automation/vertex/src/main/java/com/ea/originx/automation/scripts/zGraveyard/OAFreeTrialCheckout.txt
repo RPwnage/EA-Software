@@ -1,0 +1,114 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.SystemUtilities;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.SelectOriginAccessPlanDialog;
+import com.ea.originx.automation.lib.pageobjects.store.PaymentInformationPage;
+import com.ea.originx.automation.lib.pageobjects.store.ReviewOrderPage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the checkout flow for origin access free trial - Payment and Review
+ * Order Page
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeTrialCheckout extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 39571)
+    @Test(groups = {"originaccess", "full_regression"})
+    public void testFreeTrialCheckout(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+
+        logFlowPoint("Login as a newly registered user"); //1
+        logFlowPoint("Navigate to the 'Origin Access' page and click the free trial CTA to open the plan selection dialog"); //2
+        logFlowPoint("Select the default plan(Yearly Plan) and navigate to the Payment Page by clicking next"); //3
+        logFlowPoint("In the Payment Page,verify the heading at the top indicates the correct trial duration and the cost and duration of the plan selected by the user"); //4
+        logFlowPoint("Verify the heading at the top indicates the correct end date and that the user can cancel anytime and won't be charged until the trial is completed"); //5
+        logFlowPoint("Enter the payment details and navigate to the review order Page by clicking next"); //6
+        logFlowPoint("In the Review Order Page,verify the page indicates the correct trial duration and cost and duration of the plan selected by the user"); //7
+
+        //1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully registered and logged in with: " + username);
+        } else {
+            logFailExit("Could not register/log in a new user " + username);
+        }
+
+        //2
+        new NavigationSidebar(driver).gotoOriginAccessPage().clickJoinButton();
+        SelectOriginAccessPlanDialog selectOriginAccessPlanDialog = new SelectOriginAccessPlanDialog(driver);
+        if (selectOriginAccessPlanDialog.waitIsVisible()) {
+            logPass("Verified on clicking the free trial CTA, the Origin Access Plan Selection Dialog appears");
+        } else {
+            logFailExit("Failed: On clicking the free trial CTA, the Origin Access Plan Selection Dialog does not appear");
+        }
+
+        //3
+        String selectedPlan = selectOriginAccessPlanDialog.getSelectedPlan(); // select the default plan and get the plan for further checks
+        selectOriginAccessPlanDialog.clickNext();
+        PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        if (paymentInformationPage.verifyPaymentInformationReached()) {
+            logPass("Verified on clicking next the Payment Information Page appears");
+        } else {
+            logFailExit("Failed: On clicking next the Payment Information Page does not appear");
+        }
+
+        //4
+        boolean isTrialDuration = paymentInformationPage.verifyTrialDurationHeader();
+        boolean isTrialPlan = paymentInformationPage.verifyPlanHeader(selectedPlan);
+        if (isTrialDuration && isTrialPlan) {
+            logPass("Verified the heading at the top indicates the correct trial duration and the cost and duration of the plan selected by the user");
+        } else {
+            logFailExit("Failed: the heading at the top does not indicate the correct trial duration or the cost and duration of the plan selected by the user");
+        }
+
+        //5
+        boolean isTrialEndDate = paymentInformationPage.verifyEndDateHeader();
+        boolean isTrialCancelAnytime = paymentInformationPage.verifyCancelAnytimeHeader();
+        boolean isTrialNoCharge = paymentInformationPage.verifyNoChargeHeader();
+        if (isTrialEndDate && isTrialCancelAnytime && isTrialNoCharge) {
+            logPass("Verified the heading at the top indicates the correct end date and that the user can cancel anytime and won't be charged until the trial is completed");
+        } else {
+            logFailExit("Failed: the heading at the top does not indicate the correct end date or that the user can cancel anytime and won't be charged until the trial is completed");
+        }
+
+        //6
+        paymentInformationPage.enterCreditCardDetails();
+        paymentInformationPage.clickOnProceedToReviewOrderButton();
+        ReviewOrderPage reviewOrderPage = new ReviewOrderPage(driver);
+        if (Waits.pollingWait(() -> reviewOrderPage.verifyReviewOrderPageReached())) {
+            logPass("Successfully entered the credit card details and navigated to Review Order Page");
+        } else {
+            logFailExit("Failed: Could not enter the credit card details or navigate to Review Order Page");
+        }
+
+        //7
+        boolean isPlanPrice = reviewOrderPage.verifyPlanTotalCost(selectedPlan);
+        boolean isPlanDuration = reviewOrderPage.verifyPlanDuration(selectedPlan);
+        if (isPlanPrice && isPlanDuration) {
+            logPass("Verified the page indicates the correct trial duration and cost and duration of the plan selected by the user");
+        } else {
+            logFailExit("Failed: the page does not indicates the correct trial duration or the cost and duration of the plan selected by the user");
+        }
+
+        softAssertAll();
+
+    }
+}

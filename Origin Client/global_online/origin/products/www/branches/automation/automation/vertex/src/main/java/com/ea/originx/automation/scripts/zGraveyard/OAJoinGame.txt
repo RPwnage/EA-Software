@@ -1,0 +1,131 @@
+package com.ea.originx.automation.scripts.gamelibrary;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.vx.originclient.utils.MiscUtilities;
+import com.ea.vx.originclient.utils.Waits;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.discover.DiscoverPage;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.vx.originclient.resources.games.EntitlementInfo.EntitlementIds;
+import com.ea.vx.originclient.resources.OriginClientConstants;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test for joining a friend's Game
+ *
+ * @author palui
+ */
+public class OAJoinGame extends EAXVxTestTemplate {
+
+    @Test(groups = {"client", "gamelibrary"})
+    public void testJoinGame(ITestContext context) throws Exception {
+
+        final OriginClient clientUser = OriginClientFactory.create(context);
+        final OriginClient clientFriend = OriginClientFactory.create(context);
+
+        // DiP small not joinable, use non-DiP small
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.NON_DIP_SMALL);
+        final String entitlementName = entitlement.getName();
+        final String entitlementOfferId = entitlement.getOfferId();
+        final String entitlementProcess = entitlement.getProcessName();
+
+        UserAccount userAccount = AccountManager.getEntitledUserAccount(entitlement);
+        final String username = userAccount.getUsername();
+        UserAccount friendAccount = AccountManager.getEntitledUserAccount(entitlement);
+        final String friendUsername = friendAccount.getUsername();
+
+        userAccount.cleanFriends();
+        friendAccount.cleanFriends();
+        userAccount.addFriend(friendAccount);
+
+        logFlowPoint("Launch Origin and login to user: " + username); //1
+        logFlowPoint("Launch another Origin instance and login to friend: " + friendUsername); //2
+        logFlowPoint(String.format("From user account, navigate to game library and locate '%s' game tile", entitlementName)); //3
+        logFlowPoint(String.format("From user account, download '%s' game from user", entitlementName)); //4
+        logFlowPoint(String.format("From user account, launch '%s' from user", entitlementName)); //5
+        logFlowPoint("From friend account, navigate to 'Discover Page'. Refresh the page"); //6
+        logFlowPoint(String.format("From friend account, locate '%s' under the 'What your Friends are Doing' area", entitlementName)); //7
+        logFlowPoint(String.format("From friend account, hover on '%s' game tile and click 'Play'", entitlementName)); //8
+
+        //1
+        WebDriver driverUser = startClientObject(context, clientUser);
+        if (MacroLogin.startLogin(driverUser, userAccount)) {
+            logPass("Verified login successful to user: " + userAccount.getUsername());
+        } else {
+            logFailExit("Failed: Cannot login to user: " + userAccount.getUsername());
+        }
+
+        //2
+        WebDriver driverFriend = startClientObject(context, clientFriend);
+        if (MacroLogin.startLogin(driverFriend, friendAccount)) {
+            logPass("Verified login successful to friend: " + friendAccount.getUsername());
+        } else {
+            logFailExit("Failed: Cannot login to friend: " + friendAccount.getUsername());
+        }
+
+        //3
+        new NavigationSidebar(driverUser).gotoGameLibrary();
+        GameTile gameTile = new GameTile(driverUser, entitlementOfferId);
+        if (gameTile.waitForDownloadable()) {
+            logPass(String.format("Verified user successfully navigated to 'Game Library' with '%s' game tile", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: User cannot navigate to 'Game Library' or locate '%s' game tile", entitlementName));
+        }
+
+        //4
+        boolean downloaded = MacroGameLibrary.downloadFullEntitlement(driverUser, entitlementOfferId);
+        if (downloaded) {
+            logPass(String.format("Verified user successful downloaded '%s'", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: User cannot download '%s'", entitlementName));
+        }
+
+        //5
+        gameTile.play();
+        if (MiscUtilities.pollingWaitEx(() -> entitlement.isLaunched(clientUser))) {
+            logPass(String.format("Verified user successful launches '%s'", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: User cannot launch '%s'", entitlementName));
+        }
+
+        //6
+        sleep(5000); // pause for friend's game tile update
+        new NavigationSidebar(driverFriend).clickDiscoverLink();
+        new MainMenu(driverFriend).selectRefresh();
+        Waits.waitForPageThatMatches(driverFriend, OriginClientConstants.MAIN_SPA_PAGE_URL, 60); // Go to SPA page. Required after using MainMenu
+        DiscoverPage discoverPageFriend = new DiscoverPage(driverFriend);
+        if (MiscUtilities.pollingWait(() -> discoverPageFriend.verifyDiscoverPageReached())) {
+            logPass("Verified friend navigates successfully to 'Discover Page'");
+        } else {
+            logFailExit("Failed: User cannot navigate to 'Discover page'");
+        }
+
+        //7
+        if (MiscUtilities.pollingWait(() -> discoverPageFriend.verifyWhatFriendsAreDoingGameTile(entitlementOfferId))) {
+            logPass(String.format("Verified '%s' game tile appears under 'What Your Friends Are Doing' section", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: '%s' game tile does not appear under 'What Your Friends Are Doing' section", entitlementName));
+        }
+
+        //8
+        discoverPageFriend.clickPlayButtonAtWhatFriendsAreDoingGameTile(entitlementOfferId);
+        if (MiscUtilities.pollingWaitEx(() -> ProcessUtil.getNumberOfProcessInstances(clientFriend, entitlementProcess) == 2)) {
+            logPass(String.format("Verified friend can join game by clicking 'Play' at the '%s' game tile", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: friend cannot join game by clicking 'Play' at the '%s' game tile", entitlementName));
+        }
+
+        softAssertAll();
+    }
+}

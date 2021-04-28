@@ -1,0 +1,129 @@
+<project> 
+	<property name="IGOLIB.module.name" value="IGOLIB" />
+
+  <property name="runtime.buildmodules" value="${property.value} IGOLIB" />
+
+  <property name="runtime.${IGOLIB.module.name}.outputdir" value="${package.OriginLegacyApp.dir}/lib" />
+  <property name="runtime.${IGOLIB.module.name}.outputname" value="${IGOLIB.module.name}${debug-suffix}" />
+	
+  <dependent name="OriginConfig" />
+  <dependent name="OriginVersion" />
+  <dependent name="Qt" />
+  
+  <property name="runtime.${IGOLIB.module.name}.usedependencies" >
+    Qt
+    EASTL
+	EAThread
+	coreallocator
+	EAIO
+    EABase
+    EATrace
+    TelemetryAPI
+    engine
+    services
+    uitoolkit
+	webWidget
+  </property>
+  
+	<!-- Add special compiler options and create new buidtype -->
+	<BuildType name="${IGOLIB.module.name}" from="OriginLibrary">
+    <option name="buildset.cc.defines">
+      ${option.value}
+      _M_IX86_X64
+      _M_IX86      
+    </option>
+    <option name="multithreadeddynamiclib"        value="on" />
+	</BuildType>
+	
+  <!-- ${IGOLIB.module.name} build properties -->
+	<property name="runtime.${IGOLIB.module.name}.buildtype" value="${IGOLIB.module.name}" />
+
+    <target name="IGOLIB-generate-code" >
+    <!-- get the options from the current config -->
+    <property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.${IGOLIB.module.name}.buildtype}','cc.defines')}"/>
+    <property name="runtime.moc_includedirs" value="${runtime.${IGOLIB.module.name}.includedirs}"/>
+    <fileset name="runtime.moc_sourcefiles" fromfileset="runtime.${IGOLIB.module.name}.moc_sourcefiles" />
+    <fileset name="runtime.ui_sourcefiles" fromfileset="runtime.${IGOLIB.module.name}.ui_sourcefiles" />
+    <call target="moc-compile" if="@{FileSetExists('runtime.moc_sourcefiles')}" />
+    <call target="ui-compile" if="@{FileSetExists('runtime.ui_sourcefiles')}" />
+  </target>
+  
+	<!-- PREBUILD TARGETS -->
+  <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+  <property name="runtime.${IGOLIB.module.name}.prebuildtarget" value="${IGOLIB.module.name}-generate-code" />
+  <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+  <do unless="${runtime.${IGOLIB.module.name}.prebuildtarget} == ''" >
+    <property name="runtime.${IGOLIB.module.name}.vcproj.pre-build-step">
+      ${nant.location}\nant.exe -buildfile:${nant.project.buildfile} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.${IGOLIB.module.name}.prebuildtarget}
+    </property>
+  </do>
+
+  <property name="runtime.${IGOLIB.module.name}.runtime.moduledependencies" value="MadCHook" />
+
+  <property name="runtime.${IGOLIB.module.name}.includedirs" >
+    ${property.value}
+    ${package.OriginLegacyApp.dir}/../../originClient/${origin.build.version}
+    ${package.OriginLegacyApp.dir}/../../originClient/${origin.build.version}/websupport/source
+    ${package.OriginLegacyApp.dir}/../../originClient/${origin.build.version}/common/source
+    ${module.IGOLIB.dir}/..
+    ${module.IGOLIB.dir}/../..
+    ${module.IGOLIB.dir}/../../ui
+    ${module.IGOLIB.dir}/../../EbisuCommon
+    ${module.IGOLIB.dir}/../IGOIPC
+    ${ui.output.dir}
+	</property>
+
+  <fileset name="runtime.${IGOLIB.module.name}.headerfiles" basedir="${module.${IGOLIB.module.name}.dir}" >
+    <includes name="**/*.h" />
+  </fileset>
+
+  <fileset name="runtime.${IGOLIB.module.name}.sourcefiles" basedir="${module.${IGOLIB.module.name}.dir}">
+		<includes name="../IGO/HookAPI.cpp" />
+		<includes name="IGONuxDisplay.cpp" />
+		<includes name="IGONuxSmall.cpp" />
+		<includes name="IGOQtContainer.cpp" />
+		<includes name="IGOQWidget.cpp" />
+		<includes name="IGOTopBar.cpp" />
+		<includes name="IGOBottomBar.cpp" />
+		<includes name="IGOWebBrowser.cpp" />
+    <includes name="IGOWebSslInfo.cpp" />
+    <includes name="IGOWebBrowserJsHelper.cpp" />
+		<includes name="IGOWindowManager.cpp" />
+		<includes name="IGOWindowManagerIPC.cpp" />
+		<includes name="../IGO/MHook/mhook.cpp" />
+		<includes name="../IGO/Disasm/cpu.c" />
+		<includes name="../IGO/Disasm/disasm.c" />
+		<includes name="../IGO/Disasm/disasm_x86.c" />
+		<includes name="../IGO/Disasm/misc.c" />
+  </fileset>
+
+	<fileset name="runtime.${IGOLIB.module.name}.moc_sourcefiles" basedir="${module.${IGOLIB.module.name}.dir}">
+		<includes name="IGONuxDisplay.h" />
+		<includes name="IGONuxSmall.h" />
+		<includes name="IGOQtContainer.h" />
+		<includes name="IGOQWidget.h" />
+		<includes name="IGOTopBar.h" />
+		<includes name="IGOBottomBar.h" />
+		<includes name="IGOWebBrowser.h" />
+    <includes name="IGOWebSslInfo.h" />
+    <includes name="IGOWebBrowserJsHelper.h" />
+		<includes name="IGOWindowManager.h" />
+  </fileset>
+
+	<!-- construct the paths to include the moc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.${IGOLIB.module.name}.moc_sourcefiles">
+		<property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.${IGOLIB.module.name}.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+    
+  <fileset name="runtime.${IGOLIB.module.name}.ui_sourcefiles" basedir="${module.${IGOLIB.module.name}.dir}/Forms" >
+    <includes name="*.ui" />
+  </fileset>
+  
+	<target name="cleanIGOLIB">
+		<delete dir="${package.configbuilddir}" />
+	</target>
+	
+</project>

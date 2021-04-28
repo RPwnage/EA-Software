@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="8790c2fb-bc08-4da1-b01b-17b045b006f6" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>
+        This section covers backwards compatibility issues and transition from <token>Framework2</token> to <token>Framework3</token>
+      </para>
+    </introduction>
+
+    <section address="Framework3BackwardsCompatibility">
+      <title>Backwards Compatibility</title>
+      <content>
+        <para>
+          Despite significant internal changes Framework 3 is highly backwards compatible.
+          Majority of the packages won’t need any changes in the build scripts. There are few cases when small changes may be needed,
+          mostly in C# tasks, and these changes should be very simple, there shouldn’t be need to re-architect scripts or tasks.
+        </para>
+        <para>XML syntax did not change and at script level Framework 3 is completely backwards compatible.</para>
+        <para>There are few changes in PackageMap C# interface and tasks that are using this interface might need some adjustments.</para>
+        <para>Concurrent execution may require changes in scripts tasks that are using shared resources.</para>
+      </content>
+    </section>
+
+    <section address="Framework3Transition">
+      <title>
+        Transition From Framework 2
+      </title>
+      <content>
+
+        <list class="bullet">
+          <listItem>
+            <para>
+              Framework 3 is built with .Net 4, while Framework 2 is using .Net 3.5. In addition there are changes that require rebuilding
+              task assemblies against Framework 2 DLLs.
+            </para>
+            <para>
+              Tasks that are built using <newTerm>&lt;taskbuiddef&gt;</newTerm> task will be rebuilt automatically by Framework 3,
+              when a package contains prebuilt dlls with the Framework C# tasks these need rebuilding against new Framework assemblies.
+              In most cases no changes in these tasks will be required.
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              There are few changes in Framework public interfaces. PackageMap interface does not have methods to retrieve master version and masterconfig
+              group that do not accept Project instance as a parameter. Masterconfig exceptions were probably added to framework as an afterthought and
+              Framework had two types of interfaces: one that takes exception into account and one that doesn’t. Using the interface that does not account
+              for exceptions in the masterconfig can lead to to incorrect builds. This interface was eliminated. All relevant methods in the PackageMap 
+              class now have Project instance as a second parameter.
+            </para>
+            <code language="c#" title=" ">
+              
+              public string GetMasterVersion(string packageName, Project project)
+              
+              public string GetMasterGroup(string packageName, Project project)
+
+            </code>
+            <alert class="note">
+              <para>
+                Framework now has many useful extension methods to invoke targets or tasks, perform operations on strings, optionsets and filesets
+              </para>
+            </alert>
+          </listItem>
+          <listItem>
+            <para>
+              As result of parallel processing Initialize.xml file can be loaded by multiple packages concurrently. 
+              If Initialize.xml contains code that is accessing shared files or static object it needs to be synchronized.  
+              Synchronization can be achieved by simply adding a  lock()  to the C# task, or using <link xlink:href="d571dbd4-edc9-b6e2-35e4-b823689d5a28">&lt;namedlock&gt; Task</link> in XML script
+            </para>
+          </listItem>
+
+          <listItem>
+            <para>
+              When transition to Framework 3 requires changes in build scripts and/or C# tasks and you want to keep your scripts working with both 
+              <token>Framework2</token> and Framework 3 you can use nant property <codeInline>nant.framework3</codeInline> in scripts or in masterconfig file. 
+            </para>
+            <code language="xml" title="Using nant.framework3 property to set exceptions in masterconfig file">
+              &lt;package name="eaconfig" version="dev"&gt;
+                &lt;exception propertyname="nant.framework3"&gt;
+                  &lt;condition value="true" version="3.01.00"/&gt;
+                &lt;/exception&gt;
+              &lt;/package&gt;
+            </code>
+
+            <code language="xml" title="Using nant.framework3 property in build scripts">
+
+              &lt;do if="${nant.framework3??false}"&gt;
+                . . . .
+              &lt;/do>
+              
+              &lt;do unless="${nant.framework3??false}"&gt;
+                . . . .
+              &lt;/do&gt;
+
+            </code>
+
+            <para>
+              If C# code needs conditional compilation based on the Framework version, <link xlink:href="f9f8dce9-4768-7794-2a82-e0affa1821ef">&lt;taskdef&gt; Task</link> in Framework 3 sets 
+              define <languageKeyword>FRAMEWORK3</languageKeyword> when compilation of task files is performed.
+            </para>
+            <code language="c#" title="Using FRAMEWORK3 define in C# tasks">
+              [TaskName("CheckAutoBuildClean")]
+              public class CheckAutoBuildClean : Task
+              {
+                  private string mPackageName;
+                  private string mPackageVersion;
+                  private string mPropertyName;
+
+                  protected override void ExecuteTask()
+                  {
+                      string val = String.Empty;
+                      #if FRAMEWORK3
+                          var info= NAnt.Core.PackageCore.PackageMap.Instance.Releases.FindByNameAndVersion(PackageName, PackageVersion);
+                          val = info.AutoBuildClean(Project).ToString().ToLowerInvariant();
+                      #else
+                          EA.PackageSystem.PackageCore.Release info = EA.PackageSystem.PackageCore.PackageMap.Instance.Releases.FindByNameAndVersion(PackageName, PackageVersion);
+                          val = info.AutoBuildClean;
+                      #endif
+
+                      if (val != null &amp;&amp; val == "true")
+                        Project.Properties[PropertyName] = "true";
+                      else
+                        Project.Properties[PropertyName] = "false";
+                  }
+              }
+            </code>
+            <code language="xml" title=" " source="ExampleFiles\Framework3\nant.framework3.example.xml"/>
+          </listItem>
+
+        </list>
+      </content>
+    </section>
+
+    <relatedTopics/>
+  </developerConceptualDocument>
+</topic>

@@ -1,0 +1,140 @@
+package com.ea.originx.automation.scripts.zGraveyard;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.Criteria;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.TakeOverPage;
+import com.ea.originx.automation.lib.pageobjects.store.HeroCarousel;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.ProductCarousel;
+import com.ea.originx.automation.lib.pageobjects.store.ProductPack;
+import com.ea.originx.automation.lib.pageobjects.store.StorePage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test to load the Store page and verify many expected elements exist, as well
+ * as verifying that they have the correct elements appearing.
+ *
+ * @author glivingstone
+ */
+public class OAStoreLoads extends EAXVxTestTemplate {
+
+    @Test(groups = {"browser", "client", "store", "full_regression"})
+    public void testStoreLoads(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        // Setup Friends
+        AccountManager accountManager = AccountManager.getInstance();
+        Criteria criteria = new Criteria.CriteriaBuilder().build();
+        UserAccount userAccount = accountManager.requestWithCriteria(criteria, 360);
+
+        final int PACK_SIZE = 6;
+        final String PRODUCT_PACK_TYPE = "six";
+        final String PACK_TITLE = "6 Pack Title";
+
+        logFlowPoint("Log into Origin with " + userAccount.getUsername()); // 1
+        logFlowPoint("Navigate to the Store Page"); //2
+        logFlowPoint("Verify the Hero Carousel, Product Pack and Product Carousel Exist"); //3
+        logFlowPoint("Verify the Hero Carousel Selection Indicator Function Correctly"); //4
+        logFlowPoint("Verify the Product Pack has a Title and the Correct Number of Items"); //5
+        logFlowPoint("Verify the Product Carousel Displays the Title Correctly"); //6
+        logFlowPoint("Verify all of the Tiles are Displaying Prices and Images"); //7
+        logFlowPoint("Click on an Entitlement in the Product Carousel"); //8
+        logFlowPoint("Verify the Social Buttons Appear on the Product Details Page"); //9
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        boolean isCorrectUser = MacroLogin.startLogin(driver, userAccount);
+        if (isCorrectUser) {
+            logPass("Successfully logged into Origin with the user.");
+        } else {
+            logFailExit("Could not log into Origin with the user.");
+        }
+        Thread.sleep(3000);
+
+        // 2
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        StorePage storePage = navBar.gotoStorePage();
+
+        //Sometimes takeover page does exist
+        new TakeOverPage(driver).closeIfOpen();
+
+        Thread.sleep(2000);
+        if (storePage.verifyStorePageReached()) {
+            logPass("Successfully navigated to the Store page.");
+        } else {
+            logFailExit("Could not navigate to the store page.");
+        }
+
+        // 3
+        HeroCarousel heroCarousel = new HeroCarousel(driver);
+        ProductPack productPack = new ProductPack(driver, PRODUCT_PACK_TYPE);
+        ProductCarousel productCarousel = new ProductCarousel(driver);
+        boolean foundHero = heroCarousel.verifyHeroCarousel();
+        boolean foundProdPack = productPack.verifyProductPack();
+        boolean foundProdCarousel = productCarousel.verifyProductCarousel();
+        if (foundHero && foundProdPack && foundProdCarousel) {
+            logPass("Hero Carousel, Product Pack, and Product Carousel all exist on the store page.");
+        } else {
+            logFailExit("One or more of the expected store items does not appear.");
+        }
+
+        // 4
+        heroCarousel.selectIndicator(1);
+        heroCarousel.selectIndicator(2);
+        boolean carouselCorrect = heroCarousel.verifyBannerIndicatorLocation(2);
+        if (carouselCorrect) {
+            logPass("Hero Carousel selection buttons are functioning correctly.");
+        } else {
+            logFail("Hero carousel buttons are not functioning correctly!");
+        }
+
+        // 5
+        if (productPack.verifyTitleExists(PACK_TITLE) && productPack.verifyPackSize(PACK_SIZE)) {
+            logPass("Title and number of items in the product pack are correct.");
+        } else {
+            logFail("Title or number of items are incorrect in the product pack.");
+        }
+
+        // 6
+        if (productCarousel.verifyTitleExists("Product Carousel - Merchandised")) {
+            logPass("Title for the product carousel is correct.");
+        } else {
+            logFail("Could not find the title for the Product Carousel");
+        }
+
+        // 7
+        boolean productTiles = productPack.verifyItemsHavePricesAndImages();
+        boolean carouselTiles = productCarousel.verifyItemsHavePricesAndImages();
+        if (productTiles && carouselTiles) {
+            logPass("Prices and images are there.");
+        } else {
+            logFail("Some prices and images do not appear.");
+        }
+
+        // 8
+        if (productCarousel.clickFirstNonFree() != -1) {
+            logPass("Successfully opened a product display page.");
+        } else {
+            logFailExit("Could not open a product display page.");
+        }
+
+        Thread.sleep(5000);
+
+        // 9
+        if (new PDPHeroDescription(driver).verifySocialButtons()) {
+            logPass("Successfully found social buttons in the PDP.");
+        } else {
+            logFail("Could not find social buttons in the PDP.");
+        }
+        softAssertAll();
+    }
+}

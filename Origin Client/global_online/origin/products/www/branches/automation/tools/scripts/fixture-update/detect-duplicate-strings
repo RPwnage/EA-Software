@@ -1,0 +1,228 @@
+#!/usr/bin/python
+
+"""Detect duplicate strings in CSV string update diles"""
+
+import csv
+import hashlib
+import os
+import sys
+import traceback
+
+
+reload(sys)
+sys.setdefaultencoding('utf8')
+
+# script folder - assume it is somewhere under tools path
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+
+# Location of update csv files - each should have two columns - old string, new
+# string.  All csv update files should be in this folder.
+UPDATE_CSV_DIR = '%(SCRIPT_DIR)s/updates' % locals()
+
+# eventual location of dupe file - this will list out the duplicated strings
+# and their originating file.  Duplicate original strings that have multiple
+# replacement strings should be rectified before running fixture-update.
+OUTPUT_DUPE_CSV_FILE = '%(SCRIPT_DIR)s/output/duplicates.csv' % locals()
+
+
+def ensure_path_exists(path):
+    """Ensure critical path exists
+    
+    Check if critical file or dir exists, and exit with an error if it doesn't.
+    
+    Arguments:
+        path {string} -- path of directory or file
+    """
+    if not os.path.exists(path):
+        print '! error, cannot find path:\n! %(path)s\n' % locals()
+        exit(0)
+
+
+def ensure_file_dir_exists(filename):
+    """Given a full file path, ensure its directory exists
+
+    Check if directory exists, and create it if it doesn't.  Should be used
+    before writing any files.
+
+    Arguments:
+        filename {string} -- path and name of file
+    """
+    directory = os.path.dirname(os.path.realpath(filename))
+
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+
+
+def get_update_dict(update_filename):
+    """Get update CSV file as dict object
+
+    Get the update CSV file, externally referred to as UPDATE_CSV_FILE, and 
+    load it into a dict object. The format of this CSV should be two columns,
+    the first column being old strings, and the second being new strings which
+    will replace old strings.
+
+    Arguments:
+        update_filename {string} -- full filename to update file
+
+    Returns:
+        dict -- updates data
+    """
+    ensure_path_exists(update_filename)
+
+    data = {}
+    with open(update_filename, 'rb') as csvfile:
+        csv_data = csv.reader(csvfile)
+
+        for row in csv_data:
+            placeholder = row[1].strip()
+            replacement = row[2].strip()
+            string_type = row[6].lower().strip()
+
+            ignore = False
+            try:
+                ignore = row[7].lower().strip()
+            except:
+                pass
+
+            if placeholder != '' and string_type == 'system' and ignore not in ['ignore', 'merch']:
+                data[placeholder] = replacement
+
+    return data
+
+
+def get_all_updates_dict(updates_dir):
+    """Compile all input CSVs into one updates data object
+
+    This will compile all CSV files in the updates_dir into one data object
+    with all strings.  In addition, a string_map will be created and returned
+    that will allow strings to be associated with their originating file later
+    on.
+
+    Arguments:
+        updates_dir {string} -- dfull path to CSV updates dir
+
+    Returns:
+        dict -- data - the updates data object
+        dict[] -- string_map - a list of objects that associate the strings
+                  with their originating file
+    """
+    ensure_path_exists(updates_dir)
+
+    data = {}
+    string_map = []
+
+    csv_files = []
+    for file in os.listdir(updates_dir):
+        if file.endswith(".csv"):
+            csv_files.append(file)
+
+    for file in csv_files:
+        updates_csv_file = '%(updates_dir)s/%(file)s' % locals()
+        csv_data = get_update_dict(updates_csv_file)
+        
+        data.update(csv_data)
+
+        for string in csv_data.keys():
+            repl_string = csv_data[string].strip()
+            hashkey = '%(file)s%(string)s%(repl_string)s' % locals()
+            hashval = hashlib.sha224(hashkey).hexdigest()
+            string_map.append({"old_string": string.strip(), "new_string": repl_string, "file": file, 'key': hashval})
+
+    return data, string_map
+
+
+def write_dupes_to_csv(data, dupe_filename):
+    """Write duplicate string data to CSV file
+    
+    Accept dupes data object and write the data out to a CSV file.  This file
+    should be analyzed and any duplicates dealt with before running the
+    fixture-update script.
+    
+    Arguments:
+        data {dict[][]} -- A list of lists of string data objects.  Each 
+            internal list contains two or more string data objects where the
+            old_string data matches, and the new_string data differs.
+        dupe_filename {string} -- full filename to dupes CSV file
+    """
+    if len(data) == 0:
+        print '+ No duplicates found!'
+        print
+
+    ensure_file_dir_exists(dupe_filename)
+
+    with open(dupe_filename, 'w') as fp:
+        csvw = csv.writer(fp)
+        csvw.writerow(['The following strings were found in multiple update files.'])
+        csvw.writerow([])
+        csvw.writerow(['Originating File', 'Old String', 'New String'])
+
+        for dupes in data:
+            for string in dupes:
+                csvw.writerow([string['file'], string['old_string'], string['new_string']])
+
+
+def get_string_dupes(string_map):
+    """Determine duplicate update strings
+    
+    Based on the string map created from multiple CSV files, determine if
+    there are any original strings that appear in multiple update files using
+    different replacement strings.  These duplicates will be returned with as
+    a data object with their file information.
+    
+    Arguments:
+        string_map {dict[]} -- A list of string data objects
+    
+    Returns:
+        dict[][] -- A list of lists of string data objects.  Each internal
+        list contains two or more string data objects where the old_string
+        data matches, and the new_string data differs.
+    """
+    dupes = []
+    collected = [] # list of data keys that have been processed
+
+    for s_current in string_map:
+        if s_current['key'] in collected:
+            # do not process previously processed strings
+            continue
+
+        current_matches = [s_current]
+        collected.append(s_current['key'])
+
+        # loop through string_map to find any unprocessed strings that match
+        # the old string in the s_current data
+        for s_compare in string_map:
+            if s_compare['key'] not in collected:
+                if (s_current['old_string'] == s_compare['old_string'] 
+                    and s_current['new_string'] != s_compare['new_string']
+                ):
+                    collected.append(s_compare['key'])
+                    current_matches.append(s_compare)
+
+        # if there were two or more matching strings, add to dupes
+        if len(current_matches) > 1:
+            dupes.append(current_matches)
+
+    return dupes
+
+
+def main():
+    """Main functionality
+    
+    Gets update CSV files, checks for dupes, then writes out a CSV file with
+    the duplicate strings and their associated originating files.
+    """
+    updates, string_map = get_all_updates_dict(UPDATE_CSV_DIR)
+    dupes = get_string_dupes(string_map)
+    write_dupes_to_csv(dupes, OUTPUT_DUPE_CSV_FILE)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if '%s' % exc_value not in ['0', '', None]:
+            print 'An exception occurred. (%(exc_value)s)\n' % locals()
+            print traceback.format_exc()
+        else:
+            pass

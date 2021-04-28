@@ -1,0 +1,157 @@
+<project>
+
+	<property name="sonar.config.file" value="${package.OriginBootstrap.dir}/../../../sonar-project.properties"/>
+	<property name="sonar.projectKey" value="cpp.originclient.main"/>
+	<property name="sonar.projectName" value="OriginClient"/>
+	<property name="sonar.projectVersion" value="9.6.0"/>
+	<property name="sonar.projectDescription" value="Origin Client"/>
+	<property name="sonar.sources" value="@{PathGetFullPath('${package.OriginBootstrap.dir}/../..')}"/>
+	<property name="sonar.exclusions" value="${origin.branch}/Sonar/**, ${origin.branch}/IGO/madCodeHook3/**"/>
+	<property name="cppcheck.exclusions" value="${origin.branch}\Sonar, ${origin.branch}\IGO\madCodeHook3"/>
+	<property name="sonar.lang" value="c++" unless="@{PropertyExists('sonar.lang')}"/>
+	<property name="origin.root.dir" value="${package.OriginBootstrap.dir}/../../.."/>
+
+	<optionset name="sonar.env">
+		<option name="SONAR_RUNNER_OPTS" value="-Xmx2048m -XX:MaxPermSize=1024m -XX:ReservedCodeCacheSize=512m"/>
+	</optionset>
+	<!-- Run SonarQube static code analysis -->
+    <target name="sonarqube" >
+      <dependent name="SonarRunner" />
+			<dependent name="CppCheck" />
+			<property name="cppcheck.output.path" value="@{PathGetFullPath('${package.OriginBootstrap.dir}/../../../cppcheck-reports/cppcheck-result-99.xml')}"/>
+			<mkdir dir="@{PathGetDirectoryName(${cppcheck.output.path})}" unless="@{DirectoryExists(@{PathGetDirectoryName(${cppcheck.output.path})})}"/>
+			<do if="${sonar.lang} == 'c++'">
+				<property name="cppcheck.bat" value="${package.builddir}/cppcheck.bat"/>
+				<mkdir dir="@{PathGetDirectoryName(${cppcheck.bat})}" unless="@{DirectoryExists(@{PathGetDirectoryName(${cppcheck.bat})})}"/>
+				<property name="cppcheck.cmd" value="${package.CppCheck.exe} -j 4 --xml-version=1 --enable=all --inline-suppr"/>
+				<foreach property="exclude.path" item="String" in="${cppcheck.exclusions}" delim=",">
+					<property name="cppcheck.cmd" value="${property.value} -i${exclude.path}" />
+				</foreach>
+				<property name="cppcheck.cmd" value="${property.value} ${origin.branch} 2&gt;${cppcheck.output.path}"/>
+				<echo message="${cppcheck.cmd}" file="${cppcheck.bat}"/>
+				<exec program="${cppcheck.bat}" workingdir="${origin.root.dir}" redirectout="False"/>
+			</do>
+			<property name="isSandbox" value="False"/>
+			<property name="isSandbox" value="True" if="@{PathGetFileName(@{PathGetFullPath('${package.OriginBootstrap.dir}/../../..')})} eq 'sandboxes'"/>
+			<property name="sonar.projectName" value="${property.value}-Sandboxes-${origin.branch}" if="${isSandbox}"/>
+			<property name="sonar.projectKey" value="cpp.originclient.sandboxes.${origin.branch}" if="${isSandbox}"/>
+			<nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+				<property name="config" value="${config}" />
+			</nant>
+			<property name="sonar.projectVersion" fromfile="${package.OriginVersion.version.file}"/>
+			<property name="sonar.projectVersion" value="${origin.branch}-${property.value}"/>
+			<task name="sonar-config" key="${sonar.projectKey}" projName="${sonar.projectName}" version="${sonar.projectVersion}" desc="${sonar.projectDescription}" branch="${origin.branch}" exclusions="${sonar.exclusions}" lang="${sonar.lang}"/>
+			<mkdir dir="logs/sonarqube.log" unless="@{DirectoryExists('logs/sonarqube.log')}"/>
+			<echo message="Running SonarRunner..."/>
+			<exec program="${package.SonarRunner.exe}" workingdir="${origin.root.dir}" output="logs/sonarqube.log">
+				<env fromoptionset="sonar.env"/>
+				<args>
+					<arg value="-X"/>
+					<arg value="-e"/>
+				</args>
+			</exec>
+    </target>
+	
+	<createtask name="sonar-config">
+		<parameters>
+			<option name="key" value="Required"/>
+			<option name="projName" value="Required"/>
+			<option name="version" value="Required"/>
+			<option name="desc" value="Required"/>
+			<option name="branch" value="Required"/>
+			<option name="exclusions" value=""/>
+			<option name="lang" value="c++"/>
+		</parameters>
+		<code>
+			<dependent name="CppCheck" />
+			<!-- Sonar project keys don't like the ++ -->
+			<property name="key.lang" value="cplusplus" if="${sonar-config.lang} == 'c++'"/>
+			<property name="key.lang" value="${sonar-config.lang}" unless="${sonar-config.lang} == 'c++'"/>
+			<property name="sonar.exclusions" value="${property.value}, *.min.js" if="${key.lang} == 'js'"/>
+			<delete file="${sonar.config.file}"/>
+			<echo file="${sonar.config.file}">
+sonar.projectKey=${sonar-config.key}.${key.lang}
+sonar.projectName=${sonar-config.projName}-${sonar-config.lang}
+sonar.projectVersion=${sonar-config.version}
+sonar.projectDescription=${sonar-config.desc}
+sonar.sources = ${sonar-config.branch}
+sonar.exclusions= ${sonar-config.exclusions}
+sonar.language=${sonar-config.lang}
+sonar.cpp.cppcheck.path=${package.CppCheck.exe}
+sonar.sourceEncoding=UTF-8
+sonar.forceAnalysis=true
+sonar.dynamicAnalysis=false
+			</echo>
+		</code>
+	</createtask>
+	
+	<createtask name="find-substring">
+		<parameters>
+			<option name="filename" value="Required" />
+			<option name="substring" value="Required" />
+		</parameters>
+		<code>
+			<property name="substring.found" value="False" />
+			<exec program="findstr" message="Searching ${find-substring.filename}." workingdir="." stdout="False" failonerror="false" >
+				<args>
+					<arg value="/m" />
+					<arg value="/C:&quot;${find-substring.substring}&quot;" />
+					<arg value="&quot;${find-substring.filename}&quot;" />
+				</args>
+			</exec>
+			<do if="${exec.exitcode} == '0'" >
+				<echo message="Found substring" />
+				<property name="substring.found" value="True" />
+			</do>
+		</code>
+	</createtask>
+	
+	<!-- Check for GPL comments in source code -->
+	<target name="gpl-check" >
+		<property name="bad.files" value="" />
+		<property name="gpl.found" value="False" />
+		<echo message="* Checking for GPL content in source files *" />
+		<fileset name="source-code-files" basedir="../..">
+			<includes name="**/*.cpp" />
+			<includes name="**/*.c" />
+			<includes name="**/*.h" />
+			<excludes name="**/generated/**" />
+			<excludes name="**/source/IGO/twitchsdk/x264/include/x264.h" />
+		</fileset>
+		<fileset name="source-code-files" basedir="../../../packages" append="true" >
+			<includes name="**/*.cpp" />
+			<includes name="**/*.c" />
+			<includes name="**/*.h" />
+			<excludes name="**/generated/**" />
+			<excludes name="twitch/**" />
+			<excludes name="Qt/**" />
+		</fileset>
+		<foreach property="file" in="source-code-files" item="FileSet">
+			<task name="find-substring" filename="${file}" substring="GNU General Public License"/>
+			<property name="bad.files" value="${property.value}${file}&#10;" if="${substring.found}" />
+			<property name="gpl.found" value="True" if="@{PropertyTrue('substring.found')} AND !@{PropertyTrue('gpl.found')}" />
+		</foreach>
+		<property name="gpl-check.output" >
+		
+		
+* Files with GPL reference found *
+==================================
+${bad.files}
+		</property>
+		<mkdir dir="${package.builddir}" unless="@{DirectoryExists(${package.builddir})}" />
+		<echo message="${gpl-check.output}" file="${package.builddir}/gpl-check-output.txt" />
+		<echo message="${gpl-check.output}" />
+		<fail message="GPL check failed. Found GPL reference in files." if="${gpl.found}" />
+	</target>
+	
+	<target name="copy-to-runtime" >
+        <copy file="${package.OriginCrashReporter.dir}/bin/OriginCrashReporter.exe" todir="${package.originClient.dir}/runtime" />
+	</target>
+	
+	<target name="test-ob">
+			<property name="isSandbox" value="False"/>
+			<property name="isSandbox" value="True" if="@{PathGetFileName(@{PathGetFullPath('${package.OriginBootstrap.dir}/../../..')})} eq 'sandboxes'"/>
+			<property name="sonar.projectName" value="${property.value}-Sandboxes" if="${isSandbox}"/>
+			<echo message="${isSandbox} ${sonar.projectName} @{PathGetFileName(@{PathGetFullPath('${package.OriginBootstrap.dir}/../../..')})}"/>
+	</target>
+</project>

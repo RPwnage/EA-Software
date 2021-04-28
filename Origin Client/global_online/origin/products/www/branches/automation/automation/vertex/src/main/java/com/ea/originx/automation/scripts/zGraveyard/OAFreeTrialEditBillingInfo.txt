@@ -1,0 +1,106 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.account.AccountSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.dialog.EditPaymentDialog;
+import com.ea.originx.automation.lib.pageobjects.account.OriginAccessSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.account.OriginAccessSettingsPage.ORIGIN_ACCESS_PLAN;
+import com.ea.originx.automation.lib.resources.OriginClientData;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.webdrivers.BrowserType;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the billing info in My-Account-Origin Access Tab
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeTrialEditBillingInfo extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 39645)
+    @Test(groups = {"originaccess", "full_regression", "int_only"})
+    public void testFreeTrialMyAccountAppearance(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+
+        logFlowPoint("Login as a newly registered user"); //1
+        logFlowPoint("Purchase Origin Access Free Trial"); //2
+        logFlowPoint("Navigate to My-Account: Origin Access Page and verify there is a edit link"); //3
+        logFlowPoint("Click the 'Edi't link and verify the 'Edit Payment' dialog appears"); //4
+        logFlowPoint("In the 'Edit Payment' dialog verify there is a text stating that the billing information will be updated at the next bill date"); //5
+        logFlowPoint("Enter a valid payment details, click save and verify the billing info is updated on the My Account: Origin Access page"); //6
+
+        WebDriver driver = startClientObject(context, client);
+        //1
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged in as a newly registered user(" + username + ")");
+        } else {
+            logFailExit("Could not log in as a newly registered user(" + username + ")");
+        }
+
+        //2
+        if (MacroOriginAccess.purchaseOriginAccess(driver)) {
+            logPass("Successfully purchased origin access free-trial for the user");
+        } else {
+            logFailExit("Could not purchase origin access free-trial for the user");
+        }
+
+        //3
+        driver = client.getAnotherBrowserWebDriver(BrowserType.CHROME);
+        AccountSettingsPage accountSettingsPage = new AccountSettingsPage(driver);
+        accountSettingsPage.navigateToIndexPage();
+        accountSettingsPage.login(userAccount);
+        accountSettingsPage.gotoOriginAccessSection();
+        OriginAccessSettingsPage originAccessSettingsPage = new OriginAccessSettingsPage(driver);
+        boolean isEditPaymentLink = originAccessSettingsPage.verifyEditPaymentLinkVisible();
+        if (isEditPaymentLink) {
+            logPass("Verified the 'Edit' Link is visible in My-Account: Origin Access tab");
+        } else {
+            logFailExit("Failed: the 'Edit' Link is not visible in My-Account: Origin Access tab");
+        }
+
+        //4
+        originAccessSettingsPage.clickEditPaymentLink();
+        EditPaymentDialog editPaymentDialog = new EditPaymentDialog(driver);
+        editPaymentDialog.waitAndSwitchToEditPaymentDialog();
+        boolean isEditPaymentDialog = editPaymentDialog.verifyEditPaymentDialogReached();
+        if (isEditPaymentDialog) {
+            logPass("Verified on clicking the 'Edit' Link the 'Edit Payment' dialog appears");
+        } else {
+            logFailExit("Failed: on clicking the 'Edit' Link the 'Edit Payment' dialog did not appear");
+        }
+
+        //5
+        boolean isBillingDate = editPaymentDialog.verifyBillingDateSubInfo(ORIGIN_ACCESS_PLAN.TRIAL);
+        boolean isSubInfo = editPaymentDialog.verifySubInfo();
+        if (isBillingDate && isSubInfo) {
+            logPass("Verified there is a text indicating that the billing information will be updated at the next bill date");
+        } else {
+            logFailExit("Failed: there is no text indicating that the billing information will be updated at the next bill date");
+        }
+
+        //6
+        editPaymentDialog.enterCreditCardDetailsDefaultValues(OriginClientData.ALTERNATE_CREDIT_CARD_NUMBER);
+        driver.get(driver.getCurrentUrl()); // refresh the page to see the changes
+        boolean isCreditCardDetails = originAccessSettingsPage.verifyCreditCardNumber(OriginClientData.ALTERNATE_CREDIT_CARD_NUMBER);
+        if (isCreditCardDetails) {
+            logPass("Successfully entered and saved the credit card details and verified the credit card details is updated in the Origin Access Page");
+        } else {
+            logFailExit("Failed: Could not enter/save the credit card details or the details were not updated in the Origin Access Page");
+        }
+
+        softAssertAll();
+
+    }
+}

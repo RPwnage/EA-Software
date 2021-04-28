@@ -1,0 +1,112 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.common.GlobalSearch;
+import com.ea.originx.automation.lib.pageobjects.common.GlobalSearchResults;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.PDPSections;
+import com.ea.originx.automation.lib.resources.games.Battlefield4;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.Criteria;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests that the PDP correctly shows which edition of a game is owned by a user
+ * and whether it is downloadable or purchasable. Includes checking the edition
+ * comparison table on the PDP
+ *
+ * @author lscholte
+ */
+public class OAPDPOwnedEntitlement extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12304)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testPDPOwnedEntitlement(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_STANDARD);
+        final String entitlementName = entitlement.getName();
+
+        //These are used just in case the global search decides to display
+        //something other than the standard edition
+        final String premiumEntitlementName = entitlementName + " Premium Edition";
+        final String deluxeEntitlementName = entitlementName + " Digital Deluxe";
+
+        final String standardEdition = Battlefield4.BF4_STANDARD_EDITION_NAME;
+        final String deluxeEdition = Battlefield4.BF4_DIGITAL_DELUXE_EDITION_NAME;
+        final String premiumEdition = Battlefield4.BF4_PREMIUM_EDITION_NAME;
+
+        UserAccount user = AccountManager.getEntitledUserAccount(entitlement);
+
+        logFlowPoint("Log into Origin with an account that owns the " + standardEdition + " of " + entitlementName); //1
+        logFlowPoint("Open the PDP for " + entitlementName); //2
+        logFlowPoint("Select the " + standardEdition + " and verify it is downloadable from the PDP Hero"); //3
+        logFlowPoint("Select the " + deluxeEdition+ " and verify it is purchasable from the PDP Hero"); //4
+        logFlowPoint("Select the " + premiumEdition + " and verify it is purchasable from the PDP Hero"); //5
+        logFlowPoint("Scroll to the edition comparison table"); //6
+        logFlowPoint("Verify that the edition comparison table indicates that the " + standardEdition + " is already owned and not purchasable"); //7
+        logFlowPoint("Verify that the " + deluxeEdition + " is purchaseable from the comparison table"); //8
+        logFlowPoint("Verify that the " + premiumEdition + " is purchasable from the comparison table"); //9
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, user), true);
+
+        //2
+        logPassFail(MacroPDP.loadPdpPage(driver, entitlementName, entitlement.getOfferId(), entitlement.getPartialPdpUrl()), true);
+
+        //3
+        PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+        pdpHeroDescription.waitForPdpHeroToLoad();
+        pdpHeroDescription.hoverOnEdition(standardEdition);
+        pdpHeroDescription.verifyGameTitle(entitlementName);
+        PDPHeroActionCTA pdpHeroCTA = new PDPHeroActionCTA(driver);
+        logPassFail(pdpHeroCTA.verifyDownloadButtonVisible(), false);
+
+        //4
+        pdpHeroDescription.selectEdition(deluxeEdition);
+        pdpHeroDescription.waitForPdpHeroToLoad();
+        pdpHeroDescription.hoverOnEdition(deluxeEdition);
+        pdpHeroDescription.verifyGameTitle(deluxeEntitlementName);
+        logPassFail(pdpHeroCTA.verifyBuyButtonVisible(), false);
+
+        //5
+        pdpHeroDescription.selectEdition(premiumEdition);
+        pdpHeroDescription.waitForPdpHeroToLoad();
+        pdpHeroDescription.hoverOnEdition(premiumEdition);
+        pdpHeroDescription.verifyGameTitle(premiumEntitlementName);
+        logPassFail(pdpHeroCTA.verifyBuyButtonVisible(), false);
+
+        //6
+        PDPSections pdpSections = new PDPSections(driver);
+        pdpSections.scrollToCompareEditionsSection();
+        logPassFail(pdpSections.verifyEditionComparisonTableVisible(), true);
+
+        //7
+        boolean comparisonTableSEIsOwned = pdpSections.verifyEditionOwned(standardEdition);
+        boolean comparisonTableSEIsNotPurchasable = !pdpSections.verifyEditionPurchasable(standardEdition);
+        logPassFail(comparisonTableSEIsOwned && comparisonTableSEIsNotPurchasable, false);
+
+        //8
+        logPassFail(pdpSections.verifyEditionPurchasable(deluxeEdition), false);
+
+        //9
+        logPassFail(pdpSections.verifyEditionPurchasable(premiumEdition), false);
+
+        softAssertAll();
+    }
+}

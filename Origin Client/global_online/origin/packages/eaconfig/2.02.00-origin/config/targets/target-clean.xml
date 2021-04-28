@@ -1,0 +1,159 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'clean')}' == 'exclude'">
+    <target name="clean" description="Clean the specific configuration">
+      <call target="clean-default"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-clean" hidden="true" >
+    <echo message="WARNING: The 'eaconfig-clean' target is deprecated.  Please use 'clean-default' instead."/>
+    <call target="clean-default"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'cleanall')}' == 'exclude'">
+    <target name="cleanall" description="Clean all configurations" >
+
+      <do.once key="eaconfig.clean.top.level.package" context="global">
+        <property name="eaconfig.clean.top.level.package" value="false"/>
+      </do.once>
+
+      <property name="eaconfig.build.configs" value ="@{DistinctItems('${config} ${eaconfig.build.configs??${package.configs}}')}"/>
+
+      <parallel.foreach item="String" in="${eaconfig.build.configs}" property="clean-config-name">
+        <choose>
+          <do if="${clean-config-name} == ${config}">
+            <call target="clean" force="true" />
+          </do>
+          <do>
+            <nant buildfile="${nant.project.buildfile}"
+                  target="clean"
+                  optionset="nant.commadline.properties"
+                  global-properties-action="initialize"
+                  start-new-build="false">
+              <property name="config" value="${clean-config-name}"/>
+              <property name="eaconfig.clean.top.level.package" value="${eaconfig.clean.top.level.package??false}"/>
+            </nant>
+          </do>
+        </choose>
+      </parallel.foreach>
+
+      <property name="eaconfig.clean.top.level.package" value="true"/>
+      <call target="clean-top-level-package"/>
+
+      <!-- Not safe to do this.  Default builddir is the package directory and clients could
+        specify any directory as the build root and it would be deleted
+      <delete dir="${package.builddir}"/>
+      -->
+    </target>
+  </do>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'clean-default')}' == 'exclude'">
+    <target name="clean-default" description="Default implementation of 'clean' target.">
+
+    <!-- 
+    Clean up which module groups? For top package, runtime plus included tool, example,
+    and test; for dependents, only runtime.
+    -->
+
+    <property name="eaconfig.clean.groups" value="runtime"/>
+    <do unless="@{PropertyExists('package.${package.name}.parent')}">
+      <property name="eaconfig.clean.groups" value="${property.value} tool"
+        if="@{TargetExists('tool-build')}"/>
+      <property name="eaconfig.clean.groups" value="${property.value} example"
+        if="@{TargetExists('example-build')}"/>
+      <property name="eaconfig.clean.groups" value="${property.value} test"
+        if="@{TargetExists('test-build')}"/>
+    </do>
+
+      <do.once key="eaconfig.clean.top.level.package" context="global">
+        <property name="eaconfig.clean.top.level.package" value="true"/>
+      </do.once>
+
+      <load-package
+        build-group-names="${eaconfig.clean.groups}"
+        autobuild-target="clean"/>
+
+      <call target="__private_clean_default_implementation"/>
+    </target>
+            </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="__private_clean_default_implementation" hidden="true" >
+
+    <foreach item="String" in="@{GetModuleGroupnames('${eaconfig.clean.groups}')}" property="groupname">
+    <!-- Check make style modules -->
+    <do if="@{PropertyExists('${groupname}.MakeCleanCommand')}">
+      <property name="temp-batch" value="@{PathGetTempFileName()}.bat" />
+        <choose>
+          <do if="@{PlatformIsWindows()}">
+      <echo file="${temp-batch}" append="false" >
+@echo off
+              ${${groupname}.MakeCleanCommand}
+            </echo>
+      <exec program="${temp-batch}" message="Executing MakeStyle clean command"/>
+      <!-- Didn't bother to delete the temp file because sometimes, Windows seems to hold onto the file make causes build error during the delete!" -->
+    </do>
+          <do>
+            <property name="UnixMakeCleanCommand" value="@{StrReplace('${${groupname}.MakeCleanCommand}', '\r\n', '\n')}"/>
+
+            <!-- 
+                    Don't try combining these into one echo statement with newlines.
+                    The resulting shell file will have invalid newlines which will catch it to fail
+                    -->
+            <echo file="${temp-batch}" append="false" message="#!/bin/bash" />
+            <echo file="${temp-batch}" append="true" message="${${groupname}.MakeCleanCommand}" />
+
+            <exec program="chmod" message="Modifying permissions">
+              <args>
+                <arg value="777"/>
+                <arg value="${temp-batch}"/>
+              </args>
+            </exec>
+            <exec program="bash" workingdir="${package.builddir}" message="Executing MakeStyle clean command">
+              <args>
+                <arg value="${temp-batch}"/>
+              </args>
+            </exec>
+          </do>
+        </choose>
+      </do>
+    </foreach>
+
+    <delete dir="${package.builddir}/${config}" if="@{DirectoryExists('${package.builddir}/${config}')}"/>
+
+    <call target="clean-top-level-package"/>
+
+  </target>
+
+
+  <target name="clean-top-level-package">
+<!--
+    <do if="${eaconfig.clean.top.level.package??false}">
+      -->
+    <do if="false">
+      <trycatch>
+        <try>
+          <delete dir="${nant.project.temproot}" if="@{DirectoryExists('${nant.project.temproot}')}"/>
+        </try>
+        <catch>
+          <echo message="
+                Can not delete '${nant.project.temproot}'
+                ----------------------------------------------
+                     ${trycatch.error}
+                ----------------------------------------------"/>
+        </catch>
+      </trycatch>
+  </do>
+
+    </target>
+
+</project>

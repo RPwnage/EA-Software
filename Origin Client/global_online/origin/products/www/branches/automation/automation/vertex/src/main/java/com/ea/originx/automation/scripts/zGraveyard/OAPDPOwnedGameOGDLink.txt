@@ -1,0 +1,113 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameSlideout;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test to verify PDP Page for owned game has the expected message and a link to
+ * the owned game's OGD (Origin Game Details) 'Game Slideout'
+ *
+ * @author palui
+ */
+public class OAPDPOwnedGameOGDLink extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12310)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testPDPOwnedGameOGDLink(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_STANDARD);
+        String entitlementName = entitlement.getName();
+        String offerId = entitlement.getOfferId();
+
+        UserAccount userAccount = AccountManager.getEntitledUserAccount(entitlement);
+        String username = userAccount.getUsername();
+
+        logFlowPoint(String.format("Login as user %s entitled to '%s'", username, entitlementName)); //1
+        logFlowPoint(String.format("Navigate to game library and verify it has '%s'", entitlementName)); //2
+        logFlowPoint(String.format("Load PDP page for '%s'", entitlementName)); //3
+        logFlowPoint(String.format("Verify PDP page has product status message indicating user owns '%s'", entitlementName)); //4
+        logFlowPoint(String.format("Verify PDP page has link to OGD (Origin Game Details) page for '%s'", entitlementName)); //5
+        logFlowPoint("Verify clicking the link navigates to the 'Game Library' page"); //6
+        logFlowPoint(String.format("Verify the OGD 'Game Slideout' for '%s' opens", entitlementName)); //7
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Verified login successful as user " + username);
+        } else {
+            logFailExit("Failed: Cannot login as user " + username);
+        }
+
+        //2
+        new NavigationSidebar(driver).gotoGameLibrary();
+        boolean foundGame = new GameTile(driver, offerId).isGameTileVisible();
+        if (foundGame) {
+            logPass(String.format("Verified successful navigation to Game Library showing '%s'", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot navigate to Game Library, or '%s' not shown", entitlementName));
+        }
+
+        //3
+        if (MacroPDP.loadPdpPage(driver, entitlement)) {
+            logPass(String.format("Verified PDP page for '%s' opens", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot open PDP page for '%s'", entitlementName));
+        }
+
+        //4
+        PDPHeroActionDescriptors pdpHeroDescriptors = new PDPHeroActionDescriptors(driver);
+        pdpHeroDescriptors.waitForPdpHeroToLoad();
+        if (pdpHeroDescriptors.verifyOwnedProductStatusMessage()) {
+            logPass(String.format("Verified PDP page has product status message indicating user owns '%s'", entitlementName));
+        } else {
+            logFail(String.format("Failed: PDP page does not have product status indicating user owns '%s'", entitlementName));
+        }
+
+        //5
+        if (pdpHeroDescriptors.verifyOGDLinkVisible()) {
+            logPass(String.format("Verified PDP page has link to OGD page for '%s'", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: PDP page does not have link to OGD page for '%s'", entitlementName));
+        }
+
+        //6
+        pdpHeroDescriptors.clickOGDLink();
+        GameLibrary gameLibrary = new GameLibrary(driver);
+        if (gameLibrary.verifyGameLibraryPageReached()) {
+            logPass("Verified 'Game Library' page opens");
+        } else {
+            logFailExit("Failed: 'Game Library' page does not open");
+        }
+
+        //7
+        GameSlideout gameSlideout = new GameSlideout(driver);
+        gameSlideout.waitForSlideout();
+        if (gameSlideout.verifyGameTitle(entitlementName)) {
+            logPass(String.format("Verified OGD 'Game Slideout' opens with matching title for '%s'", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: OGD 'Game Slideout' does not open for '%s'", entitlementName));
+        }
+
+        softAssertAll();
+    }
+
+}

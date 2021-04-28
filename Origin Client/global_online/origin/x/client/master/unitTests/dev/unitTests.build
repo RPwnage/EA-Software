@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+	
+	<!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.unitTests.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.unitTests.version"  value="@{PathGetFileName('${package.unitTests.dir}')}"/>
+    <package name="unitTests" targetversion="${package.unitTests.version}"/>
+
+	<!-- ******************** -->
+    <!-- Package dependencies -->
+    <!-- ******************** -->
+	<dependent name="OriginVersion" />
+	<dependent name="OriginConfig" />
+	<dependent name="OriginLegacyApp" />
+	<dependent name="Qt" />
+	<dependent name="QtWebkit" />
+	<dependent name="openSSL" />
+	<dependent name="EAIO" />
+	<dependent name="engine" />
+		
+	<!-- ***************************** -->
+    <!-- Build Configuration properties-->
+    <!-- ***************************** -->
+	<property name="runtime.buildtype" value="origin-${config-type}" />
+
+	<property name="runtime.outputdir" value="${package.dir}/runtime"/>
+	<property name="qt.imageformats.dir" value="${runtime.outputdir}\imageformats" />
+	<property name="qt.sqldrivers.dir" value="${runtime.outputdir}\sqldrivers" />	
+	
+	<!-- ************************* -->
+    <!-- Prebuild property targets -->
+    <!-- ************************* -->
+	
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<target name="generate-code" depends="moc-compile ui-compile qt-rc-compile" />
+	<property name="runtime.prebuildtarget" value="generate-code" />
+	
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.vcproj.pre-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.prebuildtarget}
+	</property>
+
+	<!-- ************************** -->
+    <!-- Postbuild property targets -->
+    <!-- ************************** -->
+	
+	<!-- NANT POSTBUILD target. Will execute this first before any compiling happens. -->
+	<property name="runtime.postbuildtarget" value="copy-to-runtime" />
+  
+	<!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+	<property name="runtime.vcproj.post-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.postbuildtarget}
+	</property>
+
+	<!-- ********************************************************** -->
+    <!-- Package USE dependencies 									-->
+    <!-- inclusion into the project but does not affect build order -->
+    <!-- ********************************************************** -->
+	<property name="runtime.usedependencies">
+    OriginConfig
+		OriginVersion
+		openSSL
+		Qt
+	</property>
+	
+	<!-- ********************************************************** -->
+    <!-- Package BUILD dependencies 								-->
+    <!-- inclusion into the project, affects build order 			-->
+    <!-- ********************************************************** -->
+	<property name="runtime.builddependencies">
+		EAIO
+		EAStdC
+		OriginConfig
+		coreallocator
+		EATrace
+		EABase
+		EAAssert
+		EAThread
+		EASTL
+		BugSentry
+		DirtySDK
+		EACallstack
+		PPMalloc
+		ExceptionHandler
+		eajpeg
+		TelemetryAPI
+		engine
+		libarchive
+		services
+		webWidget
+	</property>
+	
+	<!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+	<property name="runtime.includedirs" >
+		${package.unitTests.dir}
+		${package.unitTests.dir}/rest
+	</property>
+
+	<!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+	<fileset name="runtime.sourcefiles" basedir="${package.dir}">
+	<includes name="${package.unitTests.dir}\rest\source\**\*.cpp" />
+	</fileset>
+
+  <fileset name="runtime.libs" >
+    <includes name="${package.openSSL.libdir}/libeay32${debug-suffix}.lib"/>
+    <includes name="${package.openSSL.libdir}/ssleay32${debug-suffix}.lib"/>
+    <includes name="${package.OriginLegacyApp.libdir}/EbisuCommon${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\qtmain${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5Sql${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5XmlPatterns${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5Designer${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5DesignerComponents${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5WebKit${debug-suffix}.lib"/>
+	<includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.lib"/>
+    <includes name="${package.Qt.libdir}\Qt5Test${debug-suffix}.lib"/>
+    <includes name="${package.WindowsSDK.appdir}\Lib\Crypt32.Lib"/>
+    <includes name="${package.WindowsSDK.appdir}\Lib\WtsApi32.Lib"/>
+  </fileset>
+
+  <fileset name="runtime.headerfiles" basedir="${package.dir}">
+    <includes name="${package.unitTests.dir}/**/*.h" />
+  </fileset>
+      
+	<property name="runtime.res.includedirs">
+	</property>
+
+	<fileset name="runtime.resourcefiles">
+	</fileset>
+
+	<fileset name="runtime.ui_sourcefiles" basedir="${package.unitTests.dir}" append="true">
+	</fileset>
+	
+	<!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+	<fileset name="runtime.moc_sourcefiles" basedir="${package.unitTests.dir}" append="true">
+		<includes name="rest/MockHttpReplyTest.h" />
+		<includes name="rest/MockHttpReply.h" />
+		<includes name="rest/FriendServiceClientTest.h" />
+		<includes name="rest/PrivacyServiceClientTest.h" />
+		<includes name="rest/AvatarServiceClientTest.h" />
+		<includes name="rest/LoginRegistrationServiceClientTest.h" />
+		<includes name="rest/AuthenticationServiceClientTest.h" />
+		<includes name="rest/EntitlementsServiceClientTest.h" />
+    </fileset>
+
+	<!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+	<fileset name="runtime.qrc_sourcefiles" basedir="${package.unitTests.dir}" append="true">
+	</fileset>
+
+	<!-- construct the paths to include the qrc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.qrc_sourcefiles">
+		<property name="sourcefile" value="${rc.output.dir}\qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+	
+	<!-- construct the paths to include the moc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+		<property name="sourcefile" value="${moc.output.dir}\moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+	
+	<!-- get the options from the current config -->
+	<property name="runtime.moc_defines" value="@{OptionSetGetValue('origin-config-options-program-${config-type}','buildset.cc.defines')}"/>
+	<property name="runtime.moc_includedirs" value="${runtime.includedirs}"/>
+	
+  <target name="copy-to-runtime">
+  	<mkdir dir="${qt.imageformats.dir}" unless="@{DirectoryExists(${qt.imageformats.dir})}" />
+  	<copy todir="${qt.imageformats.dir}" flatten="true">
+  		<fileset>
+			<includes name="${package.Qt.dir}\plugins\imageformats\*.dll"/>
+		</fileset>
+  	</copy>
+  	
+	<mkdir dir="${qt.sqldrivers.dir}" unless="@{DirectoryExists(${qt.sqldrivers.dir})}" />
+  	<copy todir="${qt.sqldrivers.dir}" flatten="true">
+  		<fileset>
+			<includes name="${package.Qt.dir}\plugins\sqldrivers\qsqlite${debug-suffix}.dll"/>
+		</fileset>
+  	</copy>
+	
+	<copy todir="${runtime.outputdir}" flatten="true">
+		<fileset>
+			<includes name="${package.Qt.libdir}\Qt5Sql${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5XmlPatterns${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5Designer${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5DesignerComponents${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5WebKit${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5OpenGL${debug-suffix}.dll"/>
+			<includes name="${package.Qt.libdir}\Qt5Multimedia${debug-suffix}.dll"/> <!-- HACK - NOT SURE YET -->
+			<!--includes name="${package.Qt.libdir}\Qt5Sensors${debug-suffix}1.dll"/--> <!-- HACK - NOT SURE YET -->
+			<includes name="${package.openSSL.bindir}\libeay32.dll"/>
+			<includes name="${package.openSSL.bindir}\ssleay32.dll"/>
+
+			<includes name="${package.Qt.libdir}\Qt5Sql${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5XmlPatterns${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5Designer${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5DesignerComponents${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5WebKit${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5OpenGL${debug-suffix}.pdb"/>
+			<includes name="${package.Qt.libdir}\Qt5Multimedia${debug-suffix}.pdb"/> <!-- HACK - NOT SURE YET -->
+			<includes name="${package.Qt.libdir}\Qt5Sensors${debug-suffix}1.pdb"/> <!-- HACK - NOT SURE YET -->
+		</fileset>
+	</copy>
+  </target>
+  
+</project>

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build"> 
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+  <optionset name="config.targetoverrides" >
+    <option name="clean" value="exclude"/>
+  </optionset>
+
+  <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.LocalHost.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.LocalHost.version"  value="@{PathGetFileName('${package.LocalHost.dir}')}"/>
+    <package name="LocalHost" targetversion="${package.LocalHost.version}"/>
+  
+  <!-- ******************** -->
+    <!-- Package dependencies -->
+    <!-- ******************** -->
+  <dependent name="OriginVersion" />
+  <dependent name="OriginConfig" />
+  <dependent name="Qt" />
+  
+    <!-- ***************************** -->
+	<!-- Build Configuration properties-->
+	<!-- ***************************** -->
+	<BuildType name="LocalHost.buildtype" from="OriginLibrary">
+		<option name="buildset.cc.defines">
+		  ${option.value}
+		</option>
+
+    <option name="buildset.cc.defines">
+      ${option.value}
+      _WINSOCKAPI_
+    </option>
+    <option name="buildset.cc.options" if="${config-system} == pc">
+      ${option.value}
+      /FI ${package.LocalHost.dir}/include/Common/OriginCommon.h
+    </option>
+	</BuildType>	
+    <property name="runtime.buildtype" value="LocalHost.buildtype" />
+
+  <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+  <property name="runtime.prebuildtarget" value="moc-compile" />
+  
+  <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+  <property name="runtime.vcproj.pre-build-step">
+    ${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.prebuildtarget}
+  </property>
+  
+  <property name="runtime.builddependencies">
+	LSXWrapper
+  </property>
+
+  <property name="runtime.usedependencies">
+    OriginConfig
+    OriginVersion
+    services
+    BugSentry
+    coreallocator
+    openSSL
+    DirtySDK
+    EABase
+    EACallstack
+    EAIO
+    EAStdC
+    EASTL
+    EAThread
+    EATrace
+    Qt
+    TelemetryAPI
+  </property>  
+    
+  <property name="osx-extra-frameworks" value="-framework AppKit -framework Carbon -framework IOKit -framework SystemConfiguration -framework ${package.Qt.libdir}/QtCore -framework ${package.Qt.libdir}/QtGui -framework ${package.Qt.libdir}/QtNetwork  -framework ${package.Qt.libdir}/QtOpenGL -framework ${package.Qt.libdir}/QtWebKit  -framework ${package.Qt.libdir}/QtXml  -framework ${package.Qt.libdir}/QtXmlPatterns -framework Security -framework ServiceManagement -framework Foundation" />
+  
+  <property name="runtime.includedirs" >
+    ${package.LocalHost.dir}/include
+    ${package.LocalHost.dir}/source
+  </property>
+    
+  <!-- common source files -->
+  <fileset name="runtime.sourcefiles" basedir="${package.dir}">
+    <includes name="${package.LocalHost.dir}/source/**/*.cpp" />
+  </fileset>
+
+  <fileset name="runtime.libs" >
+    <group if="${config-system} == 'pc'">
+      <includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/QtSql${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtXml${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtGui${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtNetwork${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtCore${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtDesigner${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtDesignerComponents${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtWebKit${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtDesigner${debug-suffix}4.lib"/>
+      <includes name="${package.Qt.libdir}/QtDesignerComponents${debug-suffix}4.lib"/>
+     </group>
+  </fileset>
+
+  <target name="dumpsources">
+    <foreach property="fname" item="FileSet" in="runtime.sourcefiles">
+      <echo message="source ${fname}" />
+    </foreach>
+  </target>
+  
+  <fileset name="runtime.headerfiles" basedir="${package.dir}">
+    <includes name="${package.LocalHost.dir}/**/*.h" />
+  </fileset>
+  
+  <!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+  <fileset name="runtime.moc_sourcefiles" basedir="${package.LocalHost.dir}" append="true"> 
+    <includes name="${package.dir}/source/LocalHostServer.h" />
+    <includes name="${package.dir}/include/LocalHost/LocalHostServiceHandler.h" />
+    <includes name="${package.dir}/include/LocalHost/LocalHostConfig.h" />
+    <includes name="${package.dir}/include/LocalHost/LocalHostServiceConfig.h" />
+    <includes name="${package.dir}/source/HttpRequestHandler.h" />
+    <includes name="${package.dir}/include/LocalHost/LocalHostServices/IService.h" />
+    <includes name="${package.dir}/source/LocalHostSecurity.h" />  
+  </fileset>
+
+  <!-- construct the paths to include the moc files into the build after generating. -->
+  <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+    <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+    <fileset name="runtime.sourcefiles" append="true">
+      <includes name="${sourcefile}" asis="true"/>
+    </fileset>
+  </foreach>
+  
+  <!-- get the options from the current config -->
+	<property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.buildtype}','cc.defines')}"/>
+  <property name="runtime.moc_includedirs" value="${runtime.includedirs}"/>
+  
+</project>

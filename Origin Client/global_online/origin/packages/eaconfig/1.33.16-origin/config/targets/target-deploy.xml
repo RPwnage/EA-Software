@@ -1,0 +1,44 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'deploy')}' == 'exclude'">
+    <target name="deploy" description="Deploys contents based on platform">
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig-run-target-name" value="eaconfig-deploy" />
+      <call target="eaconfig-run-caller" force="true"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-deploy.android')}">
+    <target name="eaconfig-deploy.android" description="Deploys the current component on Android (device)" hidden="true">
+      <!--
+      Mobile wants a way to deploy packages that have no associated deploy-contents-filesets...
+      -->
+      <choose>
+        <do if="${deploy-fileset}">
+          <DeployTask buildmodule="${modulename}" groupname="${groupname}" configsystem="${config-system}"/>
+        </do>
+        <do>
+          <task name="DeployAndroidPackage" PackageName="${modulename}"/>
+        </do>
+      </choose>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-deploy" description="Deploy the current component" hidden="true">
+    <property name="deploy-fileset" value="false"/>
+    <property name="deploy-fileset" value="true" if="@{FileSetExists('${groupname}.deploy-contents-fileset')}"/>
+    <do unless="${deploy-fileset}">
+      <property name="deploy-fileset" value="true" if="@{FileSetExists('${groupname}.deploy-contents-fileset.${config-system}')}"/>
+    </do>
+    <call target="eaconfig-deploy.${config-system}" force="true" if="@{TargetExists('eaconfig-deploy.${config-system}')}" />
+    <fail message="Deploying on platform '${config-system}' is not supported" unless="@{TargetExists('eaconfig-deploy.${config-system}')}" />
+  </target>
+
+
+</project>
+

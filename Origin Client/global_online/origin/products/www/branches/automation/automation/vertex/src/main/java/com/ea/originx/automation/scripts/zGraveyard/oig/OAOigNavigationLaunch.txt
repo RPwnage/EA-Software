@@ -1,0 +1,194 @@
+package com.ea.originx.automation.scripts.zGraveyard.oig;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.DownloadManager;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.oig.OigHelp;
+import com.ea.originx.automation.lib.pageobjects.oig.OigNavigationPage;
+import com.ea.originx.automation.lib.pageobjects.dialog.OigUnableToBroadcastDialog;
+import com.ea.originx.automation.lib.pageobjects.oig.OIGWindow;
+import com.ea.originx.automation.lib.pageobjects.oig.OigWebBrowser;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileHeader;
+import com.ea.originx.automation.lib.pageobjects.settings.AppSettings;
+import com.ea.originx.automation.lib.pageobjects.social.ChatWindow;
+import com.ea.originx.automation.lib.pageobjects.social.SocialHub;
+import com.ea.originx.automation.lib.resources.games.OADipSmallGame;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Test basic features for OIG
+ *
+ * @author mkalaivanan, jmittertreiner
+ */
+public class OAOigNavigationLaunch extends EAXVxTestTemplate {
+
+    public void testOigNavigationLaunch(ITestContext context, boolean isSmoke) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final OADipSmallGame entitlement = new OADipSmallGame();
+        final String entitlementName = entitlement.getName();
+        final String entitlementOfferId = entitlement.getOfferId();
+
+        UserAccount userAccount = AccountManager.getEntitledUserAccount(entitlement);
+        UserAccount friendAccount = AccountManager.getRandomAccount();
+
+        //Clean & add friends
+        userAccount.cleanFriends();
+        friendAccount.cleanFriends();
+        userAccount.addFriend(friendAccount);
+
+        logFlowPoint("Login to Origin:" + userAccount.getUsername()); //1
+        logFlowPoint("Navigate to Game Library"); //2
+        logFlowPoint("Download " + entitlementName); //3
+        logFlowPoint("Launch " + entitlementName); //4
+        logFlowPoint("Verify the Web Browser can be launched inside OIG"); //5
+        logFlowPoint("Verify the Achievement window can be launched inside OIG"); //6
+        logFlowPoint("Verify the Application Settings page can be launched inside OIG "); //7
+        logFlowPoint("Verify the Social Hub window can be launched inside OIG"); //8
+        if (!isSmoke) {
+            logFlowPoint("Verify the Unable to Broadcast window can be launched inside OIG"); //9a
+            logFlowPoint("Verify the Download Queue window can be launched inside OIG"); //10a
+            logFlowPoint("Verify the Help Window can be launched inside OIG"); //11a
+        } else {
+            logFlowPoint("Verify a chat window appears when you click on your friend in the Social Hub"); //9b
+        }
+
+        // 1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with the user.");
+        } else {
+            logFailExit("Could not log into Origin with the user.");
+        }
+
+        // 2
+        if (new NavigationSidebar(driver).gotoGameLibrary().verifyGameLibraryPageReached()) {
+            logPass("Navigated to Game Library.");
+        } else {
+            logFailExit("Could not navigate to Game Library.");
+        }
+
+        // 3
+        if (MacroGameLibrary.downloadFullEntitlement(driver, entitlementOfferId)) {
+            logPass("Successfully downloaded " + entitlementName);
+        } else {
+            logFailExit("Failed to download " + entitlementName);
+        }
+
+        // 4
+        new GameTile(driver, entitlement.getOfferId()).play();
+        if (entitlement.waitForGameLaunch(client)) {
+            logPass("Successfully launched " + entitlementName);
+        } else {
+            logFailExit("Failed to launch " + entitlementName);
+        }
+
+        //5
+        final OigNavigationPage oigNavigationPage = new OigNavigationPage(driver);
+        oigNavigationPage.switchToOIG();
+        oigNavigationPage.clickWebBrowser();
+        sleep(2000); //gives window time to load before verification
+        OigWebBrowser oigWebBrowser = new OigWebBrowser(driver);
+        if (oigWebBrowser.verifyOigWebBrowserOpen()) {
+            logPass("OIG Web Browser successfully launched");
+        } else {
+            logFailExit("OIG Web Browser not launched successfully");
+        }
+
+        //6
+        oigWebBrowser.closeWebBrowser();
+        oigNavigationPage.switchToOIG();
+        oigNavigationPage.clickAchievements();
+        OIGWindow oigWindow = new OIGWindow(driver);
+        oigWindow.switchToOIGWindow();
+        ProfileHeader achievementsProfile = new ProfileHeader(driver);
+        if (achievementsProfile.verifyAchievementsTabActive()) {
+            logPass("OIG Achievements Page successfully launched");
+        } else {
+            logFailExit("OIG Achievements Page not launched successfully");
+        }
+
+        //7
+        oigWindow.closeOIGWindow();
+        oigNavigationPage.switchToOIG();
+        oigNavigationPage.clickSettings();
+        oigWindow.switchToOIGWindow();
+        AppSettings appSettings = new AppSettings(driver);
+        appSettings.waitForPageToLoad();
+        if (appSettings.verifySettingsPageLoaded()) {
+            logPass("Application Settings page launched successfully");
+        } else {
+            logFailExit("Application Settings page did not launch successfully");
+        }
+
+        //8
+        oigWindow.closeOIGWindow();
+        oigNavigationPage.switchToOIG();
+        oigNavigationPage.clickFriendsList();
+        oigWindow.switchToOIGWindow();
+        SocialHub socialHub = new SocialHub(driver);
+        socialHub.waitForPageToLoad();
+        if (socialHub.verifySocialHubVisible()) {
+            logPass("Social Hub window Launched successfully");
+        } else {
+            logFailExit("Social Hub window did not launch successfully");
+        }
+
+        if (!isSmoke) {
+            //9a
+            oigWindow.closeOIGWindow();
+            oigNavigationPage.switchToOIG();
+            oigNavigationPage.clickBroadcastGameplay();
+            oigWindow.switchToOIGWindow();
+            OigUnableToBroadcastDialog broadcastDialog = new OigUnableToBroadcastDialog(driver);
+            if (broadcastDialog.waitIsVisible()) {
+                logPass("Broadcast not supported message successfully launched");
+            } else {
+                logFailExit("Broadcast not support message launch failed");
+            }
+
+            //10a
+            broadcastDialog.close();
+            oigNavigationPage.switchToOIG();
+            oigNavigationPage.clickDownloadManager();
+            oigWindow.switchToOIGWindow();
+            DownloadManager downloadManager = new DownloadManager(driver);
+            if (downloadManager.verifyOfferHasCompletedDownloadOIG(entitlement.getOfferId())) {
+                logPass("Download Manager launched successfully");
+            } else {
+                logFailExit("Download Manager did not launch");
+            }
+
+            //11a
+            oigWindow.closeOIGWindow();
+            oigNavigationPage.switchToOIG();
+            oigNavigationPage.clickHelp();
+            if (new OigHelp(driver).verifyOigHelpTitle()) {
+                logPass("Help dialog launched successfully");
+            } else {
+                logFailExit("Help Dialog did not launch");
+            }
+        } else {
+            //9b
+            socialHub.getFriend(friendAccount.getUsername()).openChat(true);
+            ChatWindow chatWindow = new ChatWindow(driver);
+            if (chatWindow.verifyOIGChatOpen()) {
+                logPass("Chat Window opened successfully");
+            } else {
+                logFailExit("Chat Window did not launch");
+            }
+        }
+
+        softAssertAll();
+    }
+}

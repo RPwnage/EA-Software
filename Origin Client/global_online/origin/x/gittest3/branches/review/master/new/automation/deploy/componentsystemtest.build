@@ -1,0 +1,203 @@
+<project name="ComponentSystemTest" default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides">
+        <option name="clean" value="exclude"/>
+        <option name="build" value="exclude"/>
+    </optionset>
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.ComponentSystemTest.dir"  value="@{PathGetFullPath('.')}"/>
+    <echo message="package.ComponentSystemTest.dir=${package.ComponentSystemTest.dir}" />
+    <property name="package.ComponentSystemTest.version"  value="@{PathGetFileName('${package.ComponentSystemTest.dir}')}"/>
+    <echo message="package.ComponentSystemTest.version=${package.ComponentSystemTest.version}" />
+    <package name="ComponentSystemTest" targetversion="${package.ComponentSystemTest.version}"/>
+
+    <!-- dependency -->
+    <dependent name="OriginUtils"/>
+    <dependent name="wget"/>
+    <dependent name="ActivePython" />
+    <property name="python.executable" value="${package.ActivePython.exe}" />
+    <echo message="python.executable=${python.executable}" />
+
+    <!-- build directory -->
+    <property name="package.ComponentSystemTest.build" value="/originx_automation_minispa" />
+    <echo message="package.ComponentSystemTest.build=${package.ComponentSystemTest.build}" />
+
+    <!-- local tool direcotry -->
+    <property name="package.ComponentSystemTest.bin" value="${package.ComponentSystemTest.dir}/bin"/>
+    <echo message="package.ComponentSystemTest.bin=${package.ComponentSystemTest.bin}" />
+
+    <!-- maven base url -->
+    <property name="maven.repo.url.base" value="http://maven.dm.origin.com/maven/com/ea/origin/x/sandboxes" />
+
+    <!-- script to get maven package released version -->
+    <property name="maven.version.script" value="${package.OriginUtils.dir}/source/python/get_latest_maven_version.py" />
+    <echo message="maven.version.script=${maven.version.script}" />
+
+    <!-- local 7z for handling unicode file name -->
+    <property name="7z" value="${package.ComponentSystemTest.bin}/7za.exe" />
+    <echo message="7z=${7z}" />
+    
+    <!-- local TarTool for handling .tar.gz package -->
+    <property name="TarTool" value="${package.ComponentSystemTest.bin}/TarTool/TarTool.exe" />
+    <echo message="TarTool=${TarTool}" />
+
+    <!-- originwebapp package version file -->
+    <property name="originwebapp.version.file" value="${package.ComponentSystemTest.build}/originwebapp_version.txt" />
+    <echo message="originwebapp.version.file=${originwebapp.version.file}" />
+
+    <!-- originwebappmockup package version file -->
+    <property name="originwebappmockup.version.file" value="${package.ComponentSystemTest.build}/originwebappmockup_version.txt" />
+    <echo message="originwebappmockup.version.file=${originwebappmockup.version.file}" />
+
+    <!-- originwebminispa package version file -->
+    <property name="originwebminispa.version.file" value="${package.ComponentSystemTest.build}/originwebminispa_version.txt" />
+    <echo message="originwebminispa.version.file=${originwebminispa.version.file}" />
+
+    <!-- clean build direcotry -->
+    <target name="clean">
+        <!-- delete build directory -->
+        <delete dir="${package.ComponentSystemTest.build}" if="@{DirectoryExists('${package.ComponentSystemTest.build}')}"/>
+    </target>
+
+    <!-- main target, calling sub-target(s) -->
+    <target name="build">
+        <call target="get-version"/>
+        <call target="download-package"/>
+    </target>
+
+    <!-- set package version properties -->
+    <target name="get-version">
+        <fail message="Property 'originx.maven.branch' not defined. Use -D:originx.maven.branch=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('originx.maven.branch')}" />
+
+        <mkdir dir="${package.ComponentSystemTest.build}" unless="@{DirectoryExists(${package.ComponentSystemTest.build})}"/>
+
+        <!-- update originwebapp version file -->
+        <do unless="@{PropertyExists('originwebapp.version')}">
+            <exec program="${package.wget.dir}/bin/pc/wget.exe">
+                <args>
+                    <arg value="${maven.repo.url.base}/${originx.maven.branch}/originwebapp/latest.txt" />
+                    <arg value="-O ${originwebapp.version.file}" />
+                </args>
+            </exec>
+            <property name="originwebapp.version" fromfile="${originwebapp.version.file}"/>
+            <property name="originwebapp.version" value="@{StrTrim(${originwebapp.version})}"/>
+        </do>
+        <do if="@{PropertyExists('originwebapp.version')}">
+            <echo message="Updating ${originwebapp.version.file} to ${originwebapp.version}" />
+            <echo message="${originwebapp.version}" file="${originwebapp.version.file}"/>
+        </do>
+        <!-- end of update originwebapp version file -->
+
+        <!-- update originwebappmockup version file -->
+        <do unless="@{PropertyExists('originwebappmockup.version')}">
+            <exec program="${python.executable}">
+                <args>
+                    <arg value="${maven.version.script}" />
+                    <arg value="${maven.repo.url.base}/${originx.maven.branch}/originwebappmockup/maven-metadata.xml" />
+                    <arg value="${originwebappmockup.version.file}" />
+                </args>
+            </exec>
+            <property name="originwebappmockup.version" fromfile="${originwebappmockup.version.file}"/>
+        </do>
+        <do if="@{PropertyExists('originwebappmockup.version')}">
+            <echo message="Updating ${originwebappmockup.version.file} to ${originwebappmockup.version}" />
+            <echo message="${originwebappmockup.version}" file="${originwebappmockup.version.file}"/>
+        </do>
+        <!-- end of update originwebappmockup version file -->
+
+        <!-- update originwebminispa version file -->
+        <do unless="@{PropertyExists('originwebminispa.version')}">
+            <exec program="${python.executable}">
+                <args>
+                    <arg value="${maven.version.script}" />
+                    <arg value="${maven.repo.url.base}/${originx.maven.branch}/originwebminispa/maven-metadata.xml" />
+                    <arg value="${originwebminispa.version.file}" />
+                </args>
+            </exec>
+            <property name="originwebminispa.version" fromfile="${originwebminispa.version.file}"/>
+        </do>
+        <do if="@{PropertyExists('originwebminispa.version')}">
+            <echo message="Updating ${originwebminispa.version.file} to ${originwebminispa.version}" />
+            <echo message="${originwebminispa.version}" file="${originwebminispa.version.file}"/>
+        </do>
+        <!-- end of update originwebminispa version file -->
+    </target>
+
+    <!-- download and deploy -->
+    <target name="download-package">
+        <fail unless="@{PropertyExists('originx.maven.branch')}" message="Property 'originx.maven.branch' not defined. Use -D:originx.maven.branch=&quot;YOUR_CLIENTSPEC&quot; to define" />
+        <fail unless="@{PropertyExists('originwebapp.version')}" message="Property 'originwebapp.version' not defined. Unsure what to download. Use -D:originwebapp.version to define" />
+        <fail unless="@{PropertyExists('originwebappmockup.version')}" message="Property 'originwebappmockup.version' not defined. Unsure what to download. Use -D:originwebappmockup.version to define" />
+        <fail unless="@{PropertyExists('originwebminispa.version')}" message="Property 'originwebminispa.version' not defined. Unsure what to download. Use -D:originwebminispa.version to define" />
+        <mkdir dir="${package.ComponentSystemTest.build}" unless="@{DirectoryExists(${package.ComponentSystemTest.build})}"/>
+
+        <!-- download and deploy originwebapp package -->
+        <exec program="${package.wget.dir}/bin/pc/wget.exe">
+            <args>
+                <arg value="${maven.repo.url.base}/${originx.maven.branch}/originwebapp/${originwebapp.version}/originwebapp-${originwebapp.version}.tar.gz" />
+                <arg value="-O ${package.ComponentSystemTest.build}/originwebapp.tar.gz" />
+            </args>
+        </exec>
+        <!-- need to use TarTool to handle .tar.gz -->
+        <exec program="${TarTool}">
+            <args>
+                <arg value="${package.ComponentSystemTest.build}/originwebapp.tar.gz" />
+                <arg value="${package.ComponentSystemTest.build}/app" />
+            </args>
+        </exec>
+
+        <!-- remove js/css filename hash -->
+        <fileset name="app_vendor_js">
+            <includes name="${package.ComponentSystemTest.build}/app/scripts/vendor.*.js"/>
+        </fileset>
+        <foreach property="fname" item="FileSet" in="app_vendor_js">
+            <move file="${fname}" tofile="${package.ComponentSystemTest.build}/app/scripts/vendor.js"/>
+        </foreach>
+        <fileset name="app_vendor_css">
+            <includes name="${package.ComponentSystemTest.build}/app/styles/vendor.*.css"/>
+        </fileset>
+        <foreach property="fname" item="FileSet" in="app_vendor_css">
+            <move file="${fname}" tofile="${package.ComponentSystemTest.build}/app/styles/vendor.css"/>
+        </foreach>
+        <!-- end of download and deploy originwebapp package -->
+
+        <!-- download and deploy originwebappmockup package -->
+        <exec program="${package.wget.dir}/bin/pc/wget.exe">
+            <args>
+                <arg value="${maven.repo.url.base}/${originx.maven.branch}/originwebappmockup/${originwebappmockup.version}/originwebappmockup-${originwebappmockup.version}.tar.gz" />
+                <arg value="-O ${package.ComponentSystemTest.build}/originwebappmockup.tar.gz" />
+            </args>
+        </exec>
+        <!-- need to use TarTool to handle .tar.gz -->
+        <exec program="${TarTool}">
+            <args>
+                <arg value="${package.ComponentSystemTest.build}/originwebappmockup.tar.gz" />
+                <arg value="${package.ComponentSystemTest.build}/mockup" />
+            </args>
+        </exec>
+        <!-- end of download and deploy originwebappmockup package -->
+
+        <!-- download and deploy originwebminispa package -->
+        <exec program="${package.wget.dir}/bin/pc/wget.exe">
+            <args>
+                <arg value="${maven.repo.url.base}/${originx.maven.branch}/originwebminispa/${originwebminispa.version}/originwebminispa-${originwebminispa.version}.tar.gz" />
+                <arg value="-O ${package.ComponentSystemTest.build}/originwebminispa.tar.gz" />
+            </args>
+        </exec>
+        <!-- need to use TarTool to handle .tar.gz -->
+        <exec program="${TarTool}">
+            <args>
+                <arg value="${package.ComponentSystemTest.build}/originwebminispa.tar.gz" />
+                <arg value="${package.ComponentSystemTest.build}/app" />
+            </args>
+        </exec>
+        <!-- end of download and deploy originwebminispa package -->
+    </target>
+
+</project>
+

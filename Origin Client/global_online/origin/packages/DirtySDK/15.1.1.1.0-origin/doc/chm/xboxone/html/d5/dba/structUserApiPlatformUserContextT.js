@@ -1,0 +1,27 @@
+var structUserApiPlatformUserContextT =
+[
+    [ "bConnectedToRTA", "d5/dba/structUserApiPlatformUserContextT.html#ac5341532b6c8cb324dd128029b99bbe9", null ],
+    [ "bSignUpAsyncFree", "d5/dba/structUserApiPlatformUserContextT.html#a359bb4029caed4f6a0e1643ea6f0a243", null ],
+    [ "eResultRichPresencePost", "d5/dba/structUserApiPlatformUserContextT.html#a4c94cf7646e245659d095df539da4b8e", null ],
+    [ "eType", "d5/dba/structUserApiPlatformUserContextT.html#ac0da42eb18b59e432a53393d2914bb7c", null ],
+    [ "NotificationSignUpState", "d5/dba/structUserApiPlatformUserContextT.html#a675831925de12f0a1b66401449899c76", null ],
+    [ "refAsyncOpFriend", "d5/dba/structUserApiPlatformUserContextT.html#a12fce0b1bd08f47491f09a2bf6fbc962", null ],
+    [ "refAsyncOpNotifyPresence", "d5/dba/structUserApiPlatformUserContextT.html#ae6b330d5fac7e7a12b5bcb8f96c1de22", null ],
+    [ "refAsyncOpNotifyTitle", "d5/dba/structUserApiPlatformUserContextT.html#a041004fe2a1d9cfd54cfb3f6ef1874f0", null ],
+    [ "refAsyncOpPostRichPresence", "d5/dba/structUserApiPlatformUserContextT.html#a96100a19d07def624ae6932ef3ab6b06", null ],
+    [ "refAsyncOpPresence", "d5/dba/structUserApiPlatformUserContextT.html#a7bf95ff40c1570f20d26bf335db40d37", null ],
+    [ "refAsyncOpProfile", "d5/dba/structUserApiPlatformUserContextT.html#ad6e56557bdb5ef7fb20cea287bf690f4", null ],
+    [ "refFriendResult", "d5/dba/structUserApiPlatformUserContextT.html#a3b75f90370ae847e327c767f5d0a2be4", null ],
+    [ "refResultsPresence", "d5/dba/structUserApiPlatformUserContextT.html#a033426dd8b0d6f3766cccbb8cd451b3f", null ],
+    [ "refResultsProfiles", "d5/dba/structUserApiPlatformUserContextT.html#a716e03790e44a38f5a0afad623dea213", null ],
+    [ "refXblUserContext", "d5/dba/structUserApiPlatformUserContextT.html#adc9ee73c595efa5682e645625a865530", null ],
+    [ "uExpectedNotificationResults", "d5/dba/structUserApiPlatformUserContextT.html#a6fb9d636aedf3e00ab4ff9db0c971e72", null ],
+    [ "uOpFriendTimer", "d5/dba/structUserApiPlatformUserContextT.html#ac7dcbcf383fa6e2114bcf3e77a028c0d", null ],
+    [ "uOpNotifyPresenceTimer", "d5/dba/structUserApiPlatformUserContextT.html#a2210e7a60dd7deda867774f220318377", null ],
+    [ "uOpNotifyTitleTimer", "d5/dba/structUserApiPlatformUserContextT.html#a9ff709f8453e5cbe20d523d0a893a2a8", null ],
+    [ "uOpPostRichPresenceTimer", "d5/dba/structUserApiPlatformUserContextT.html#a0683957a6e398db825358d8a7c7f5038", null ],
+    [ "uOpPresenceTimer", "d5/dba/structUserApiPlatformUserContextT.html#a77d48b12b841394a1d5e1c24b95d6491", null ],
+    [ "uOpProfileTimer", "d5/dba/structUserApiPlatformUserContextT.html#a536628cf1b2325b7d73395b9008ec86c", null ],
+    [ "uReceivedNotificationResults", "d5/dba/structUserApiPlatformUserContextT.html#a16f7221a6b3ca78ddf83c881fe0e2319", null ],
+    [ "uRtaConnectionTimer", "d5/dba/structUserApiPlatformUserContextT.html#aca99b2f01696c972a03448367e48f63a", null ]
+];

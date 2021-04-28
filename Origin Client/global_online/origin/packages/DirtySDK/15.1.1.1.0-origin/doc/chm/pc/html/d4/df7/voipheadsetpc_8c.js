@@ -1,0 +1,35 @@
+var voipheadsetpc_8c =
+[
+    [ "VoipHeadsetWaveDataT", "d3/dcf/structVoipHeadsetWaveDataT.html", "d3/dcf/structVoipHeadsetWaveDataT" ],
+    [ "VoipHeadsetWaveCapsT", "d4/d9b/structVoipHeadsetWaveCapsT.html", "d4/d9b/structVoipHeadsetWaveCapsT" ],
+    [ "VoipHeadsetDeviceInfoT", "d1/d3b/structVoipHeadsetDeviceInfoT.html", "d1/d3b/structVoipHeadsetDeviceInfoT" ],
+    [ "VoipHeadsetRefT", "db/d44/structVoipHeadsetRefT.html", "db/d44/structVoipHeadsetRefT" ],
+    [ "DRVM_MAPPER", "d4/df7/voipheadsetpc_8c.html#aae53e254a2c89422b2d6003cd2cf2bf4", null ],
+    [ "DRVM_MAPPER_CONSOLEVOICECOM_GET", "d4/df7/voipheadsetpc_8c.html#a63392aeda121c465302315c8d1f3b8bc", null ],
+    [ "VOIP_HEADSET_BITRATE", "d4/df7/voipheadsetpc_8c.html#a84338ddd5c20f9a9cd0a75d4814de4a6", null ],
+    [ "VOIP_HEADSET_FRAMESAMPLES", "d4/df7/voipheadsetpc_8c.html#aff68b542a2480181d392201f794435dd", null ],
+    [ "VOIP_HEADSET_FRAMESIZE", "d4/df7/voipheadsetpc_8c.html#abac90112b9732769dde4ae6deac597e4", null ],
+    [ "VOIP_HEADSET_MAXDEVICES", "d4/df7/voipheadsetpc_8c.html#ab5730b3713a0da5820b25b9854811992", null ],
+    [ "VOIP_HEADSET_NUMWAVEBUFFERS", "d4/df7/voipheadsetpc_8c.html#a1e131f11b75b880fe5f3ca925c4c6038", null ],
+    [ "VOIP_HEADSET_PREBUFFERBLOCKS", "d4/df7/voipheadsetpc_8c.html#a04ed5048c658b60d483fb235247e1b91", null ],
+    [ "VOIP_HEADSET_SAMPLEWIDTH", "d4/df7/voipheadsetpc_8c.html#a1c06cb8ff8670d176bd6f8a230c22396", null ],
+    [ "VOIP_HEADSET_WAVE_MAPPER", "d4/df7/voipheadsetpc_8c.html#a2ea19469c59943f99d0d5157e714ed90", null ],
+    [ "VOIP_HEADSET_WAVEFORMAT", "d4/df7/voipheadsetpc_8c.html#a89f65d9be4cd7d7bd96f424d3c0c0c49", null ],
+    [ "VoipHeadsetDeviceInfoT", "d4/df7/voipheadsetpc_8c.html#a5a18d178a6e80ce7663301c98de1d8ee", null ],
+    [ "VoipHeadsetDeviceTypeE", "d4/df7/voipheadsetpc_8c.html#a6a2805c2a7846b905e9e661f82880685", null ],
+    [ "VoipHeadsetWaveCapsT", "d4/df7/voipheadsetpc_8c.html#ab9bd17206d456bf7a8484838c5048dd5", null ],
+    [ "VoipHeadsetWaveDataT", "d4/df7/voipheadsetpc_8c.html#abb3bf18a01afc16857f4650396cd1575", null ],
+    [ "VoipHeadsetDeviceTypeE", "d4/df7/voipheadsetpc_8c.html#ac247dc8ca8c0c07679b085722a6a4f08", [
+      [ "VOIP_HEADSET_INPDEVICE", "d4/df7/voipheadsetpc_8c.html#ac247dc8ca8c0c07679b085722a6a4f08a39db43409199d1eb16ca9c37db6441ed", null ],
+      [ "VOIP_HEADSET_OUTDEVICE", "d4/df7/voipheadsetpc_8c.html#ac247dc8ca8c0c07679b085722a6a4f08a7169067fb5c422c9a10d8badd87b2939", null ]
+    ] ],
+    [ "VoipHeadsetControl", "d4/df7/voipheadsetpc_8c.html#aaaf6ee658ec0ea71d80e306e28891d98", null ],
+    [ "VoipHeadsetCreate", "d4/df7/voipheadsetpc_8c.html#ac52e6d0e8c9cd9c19038ff42770596d8", null ],
+    [ "VoipHeadsetDestroy", "d4/df7/voipheadsetpc_8c.html#a9498bf3a53795febd7c9e322e7153471", null ],
+    [ "VoipHeadsetProcess", "d4/df7/voipheadsetpc_8c.html#a8a6fe7a70f57dc22b61af43717d12fa8", null ],
+    [ "VoipHeadsetReceiveVoiceDataCb", "d4/df7/voipheadsetpc_8c.html#ad5eb96c0265d7a53cd782f78a1246403", null ],
+    [ "VoipHeadsetRegisterUserCb", "d4/df7/voipheadsetpc_8c.html#a3c834ba390a47b4d627699e92d53e6dd", null ],
+    [ "VoipHeadsetSetVolume", "d4/df7/voipheadsetpc_8c.html#a9213d20e455175fe8d23a2e5f8f3184a", null ],
+    [ "VoipHeadsetSpkrCallback", "d4/df7/voipheadsetpc_8c.html#a5215825f3ca2a03fd9bb3e06eee402ba", null ],
+    [ "VoipHeadsetStatus", "d4/df7/voipheadsetpc_8c.html#a8065c4e174b9083d419cffc6732f13cb", null ]
+];

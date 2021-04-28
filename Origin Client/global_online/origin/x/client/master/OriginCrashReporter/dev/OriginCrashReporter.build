@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="OriginCrashReporter" default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="clean" value="exclude"/>
+    </optionset>
+    
+    <property name="xcode-postprocessing-strip" value="false" />
+    <property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+    
+    <!-- Package declaration -->
+    <!-- Get the version number from current directory -->
+    <property name="currDir" value="@{PathGetFullPath('.')}" />
+    <property name="currVer" value="@{PathGetFileName('${currDir}')}" />
+    <package name="OriginCrashReporter" targetversion="${currVer}" />
+    
+    <dependent name="OriginConfig" />
+    <dependent name="OriginVersion" />
+    <dependent name="openSSL" />
+    <dependent name="Qt" />
+    
+    <dependent name="services" />
+    
+    <property name="eaconfig.rtti" value="on" />
+    <property name="at" value='@' />
+    
+    <!-- ********************* -->
+    <!-- Runtime configuration -->
+    <!-- ********************* -->
+    
+    <property name="runtime.buildmodules" value="OriginCrashReporter" />
+    <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+    <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+    <!--property name="runtime.OriginCrashReporter.xcodedir" value="${package.${package.name}.dir}/build/XCodeOSX" /-->
+    <property name="runtime.OriginCrashReporter.xcodedir" value="${package.builddir}/build/XCodeOSX" />
+    <property name="runtime.OriginCrashReporter.xcodebuilddir" value="${runtime.${package.name}.xcodedir}/build" />
+    <property name="runtime.OriginCrashReporter.xcodeprojfile" value="${runtime.${package.name}.xcodedir}/${package.name}.xcodeproj" />
+    <property name="runtime.OriginCrashReporter.bundledir" value="${runtime.${package.name}.xcodedir}/build/${config-xcode-type}/OriginCrashReporter.app"/>
+    <property name="runtime.OriginCrashReporter.outputdir" value="${runtime.OriginCrashReporter.bundledir}/Contents/MacOS" />
+    <property name="runtime.OriginCrashReporter.outputdir" value="${package.OriginCrashReporter.dir}/bin" if="${config-system} == 'pc'"/>
+    <property name="runtime.OriginCrashReporter.targetdir" value="${package.dir}/target" />
+    <property name="runtime.OriginCrashReporter.outputname" value="OriginCrashReporter" />
+    <property name="runtime.OriginCrashReporter.osx-xcode-postprocessing-strip" value="false" />
+    <property name="runtime.OriginCrashReporter.xcode-osx-template-dir" value="${package.OriginCrashReporter.dir}/XCodeTemplate/OriginCrashReporter-xcode.template" />
+    <property name="runtime.OriginCrashReporter.osx-extra-link-options" value="-stdlib=libc++"/>
+    
+    <BuildType name="OriginCrashReporter.ObjC.buildtype" from="OriginProgram">
+        <option name="clanguage" value="on"/>
+
+    </BuildType>
+    
+    <BuildType name="OriginCrashReporter.buildtype" from="OriginProgram">
+      <option name="buildset.cc.options" if="${config-system} == pc">
+        ${option.value}
+        /FI ${currDir}/source/OriginCommon.h
+      </option>
+    </BuildType>
+    <property name="runtime.OriginCrashReporter.buildtype" value="OriginCrashReporter.buildtype"/>
+    
+    <property name="runtime.OriginCrashReporter.usedependencies">
+        OriginVersion
+        Qt
+    </property>
+    
+    <property name="runtime.OriginCrashReporter.builddependencies">
+        EAIO
+        EATrace
+        eajpeg
+        EAAssert
+        EABase
+        EACallstack
+        EAStdC
+        EASTL
+        TelemetryAPI
+        coreallocator
+        BugSentry
+        DirtySDK <!-- for lobbybase64 -->
+        zlib
+        services <!-- for SettingsManager -->
+    </property>
+    
+    <property name="runtime.OriginCrashReporter.buildonlydependencies">
+    </property>
+    
+    <do if="${config-system} == 'osx'" >
+        <property name="runtime.OriginCrashReporter.osx-frameworks" >
+            -framework Cocoa
+            -framework Carbon
+            -framework QuickTime
+            -framework AppKit
+            -framework CoreAudio
+            -framework IOKit
+            -framework ${package.Qt.libdir}/QtCore
+            -framework ${package.Qt.libdir}/QtGui
+            -framework ${package.Qt.libdir}/QtNetwork
+            -framework ${package.Qt.libdir}/QtOpenGL
+            -framework ${package.Qt.libdir}/QtWebKit
+            -framework ${package.Qt.libdir}/QtWidgets
+            -framework ${package.Qt.libdir}/QtXml
+            -framework ${package.Qt.libdir}/QtXmlPatterns
+        </property>
+    </do>
+    
+    <property name="runtime.OriginCrashReporter.includedirs" >
+        ${package.dir}/include
+        ${package.dir}/source
+        ${moc.output.dir}
+        ${ui.output.dir}
+    </property>
+    
+    <fileset name="runtime.OriginCrashReporter.libs" >
+        <group if="${config-system} =='pc'" >
+            <includes name="${package.openSSL.libdir}/libeay32${debug-suffix}.lib"/>
+            <includes name="${package.openSSL.libdir}/ssleay32${debug-suffix}.lib"/>
+            
+            <includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Xml${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5XmlPatterns${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Gui${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Network${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Core${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5WebKit${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Widgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Test${debug-suffix}.lib"/>
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/DbgHelp.Lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/userenv.lib" />
+        </group>
+        <group if="${config-system} == 'osx'" >
+        </group>
+    </fileset>
+    
+    <!--
+     <fileset name="runtime.OriginCrashReporter.headerfiles" basedir="${package.dir}">
+     <includes name="**/*.h" />
+     </fileset>
+     -->
+    
+    <!-- Resource files that require the Qt Resource Compiler (QRC) -->
+    <fileset name="runtime.qrc_sourcefiles" basedir="${package.dir}/resources">
+        <includes name="**/*.qrc" />
+    </fileset>
+    
+    <!-- Header files that require the Qt Meta Object Compiler (MOC) -->
+    <fileset name="runtime.moc_sourcefiles" basedir="${package.dir}/source">
+        <includes name="**/*.h" />
+        <excludes name="CrashReportData.h"/>
+        <excludes name="MacNativeSupport.h"/>
+		<excludes name="OriginCommon.h"/>
+    </fileset>
+    
+    <!-- User interface files that require the Qt UI Compiler (UIC) -->
+    <fileset name="runtime.ui_sourcefiles" basedir="${package.dir}/source">
+        <group if="${config-system} =='pc'" >
+            <includes name="crashreportwindow.ui" />
+        </group>
+        <group if="${config-system} == 'osx'" >
+            <includes name="crashreportwindow_mac.ui" />
+        </group>
+    </fileset>
+    
+    <!-- Normal source files -->
+    <fileset name="runtime.OriginCrashReporter.sourcefiles" basedir="${package.dir}/source">
+        <group if="${config-system} =='pc'" >
+            <includes name="**/*.cpp"/>
+    </group>
+        <group if="${config-system} == 'osx'" >
+        <includes name="**/*.xib" />
+        <includes name="**/*.m" optionset="OriginCrashReporter.ObjC.buildtype" />
+        <includes name="**/*.mm"/>
+        <includes name="**/*.cpp"/>
+        </group>
+    </fileset>
+    
+    <!-- construct the paths to include the qrc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.qrc_sourcefiles">
+        <property name="sourcefile" value="${rc.output.dir}/qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.OriginCrashReporter.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+    
+    <!-- construct the paths to include the moc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+        <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.OriginCrashReporter.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+    
+    <fileset name="runtime.OriginCrashReporter.resourcefiles">
+    </fileset>
+    
+    <fileset name="runtime.OriginCrashReporter.bundleresources">
+    </fileset>
+    
+    <property name="runtime.OriginCrashReporter.res.includedirs">
+        ${package.OriginVersion.dir}/include
+    </property>
+    
+    <do if="${config-system} == 'pc'">      
+        <fileset name="runtime.OriginCrashReporter.resourcefiles">
+            <includes name="${package.OriginCrashReporter.dir}/resources/OriginCrashReporter.rc" />
+        </fileset>
+    </do>
+    
+    <!-- get the options from the current config -->
+    <property name="runtime.moc_defines" value=""/>
+    <property name="runtime.moc_includedirs" value="${runtime.OriginCrashReporter.includedirs}"/>
+    
+    <property name="qtlibs">
+        QtCore
+        QtGui
+        QtNetwork
+        QtWebKit
+        QtWidgets
+        QtXml
+        QtXmlPatterns
+    </property>
+    
+    <!-- OS X wants OpenGL accerated WebKit -->
+    <property name="qtlibs" if="${config-system} == 'osx'">
+        ${property.value}
+        QtOpenGL
+    </property>
+    
+    <!-- ************************** -->
+    <!-- Prebuild property targets -->
+    <!-- ************************** -->
+    
+    <property name="prebuild.target.list">
+        create-dirs
+        ui-compile
+        moc-compile
+        qt-rc-compile
+    </property>
+    
+    <target name="pre-build-tasks">
+        <foreach property="runtarget" item="String" in="${prebuild.target.list}">
+            <call target="${runtarget}" />
+        </foreach>
+    </target>
+    
+    <property name="runtime.OriginCrashReporter.preprocess" value="update-plist" />
+    <!-- NANT prebuild target. Will execute this after compiling happens. -->
+    <property name="runtime.OriginCrashReporter.prebuildtarget" value="pre-build-tasks" />
+    
+    <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+    <property name="runtime.OriginCrashReporter.vcproj.pre-build-step">
+        ${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.OriginCrashReporter.prebuildtarget}
+    </property>
+    
+    <!-- ************************** -->
+    <!-- postbuild property targets -->
+    <!-- ************************** -->
+    
+    <property name="postbuild.target.list">
+        sign-exe
+        fix-rpaths
+    </property>
+    
+    <target name="post-build-tasks">
+        <foreach property="runtarget" item="String" in="${postbuild.target.list}">
+            <call target="${runtarget}" />
+        </foreach>
+    </target>
+    
+    <target name="sign-exe">
+        <property name="cert.name" value="OriginDev" />
+        <property name="cert.name" value="Developer ID Application: Electronic Arts Inc." if="@{PropertyExists('jenkins')}"/>
+        <property name="signfile" value="${runtime.OriginCrashReporter.outputdir}/${runtime.OriginCrashReporter.outputname}"/>
+        
+        <exec program="codesign" message="Signing ${signfile}" failonerror="false" if="@{FileExists('${signfile}')}==true" >
+            <args>
+                <arg value="-f" />
+                <arg value="-s" />
+                <arg value="&quot;${cert.name}&quot;" />
+                <arg value="${signfile}" />
+            </args>
+        </exec>
+    </target>
+    
+    <!-- NANT postbuild target. Will execute this after compiling happens. -->
+    <property name="runtime.OriginCrashReporter.postbuildtarget" value="post-build-tasks" />
+    
+    <target name="create-dirs">
+        <mkdir dir="${runtime.OriginCrashReporter.outputdir}" unless="@{DirectoryExists(${runtime.OriginCrashReporter.outputdir})}" />
+    </target>
+    
+    <target name="clean-custom">
+        <delete dir="${runtime.OriginCrashReporter.outputdir}" />
+        <do if="${config-system}=='osx'" >
+            <echo message="Cleaning ${config-xcode-type} XCode project." />
+            <exec program="xcodebuild" workingdir="@{PathGetDirectoryName(${runtime.${package.name}.xcodeprojfile})}" if="@{FileExists(${runtime.${package.name}.xcodeprojfile})}" >
+                <args>
+                    <arg value="-configuration" />
+                    <arg value="${config-xcode-type}" />
+                    <arg value="clean" />
+                </args>
+            </exec>
+        </do>
+        <delete dir="${nant.project.buildroot}" />
+    </target>
+    
+    
+    <target name="fix-rpaths">
+    <!-- CURRENTLY NOT USED - SAFE TO REMOVE? - HACK, NOT SURE YET -->
+        <property name="old.Qt.libroot" value="/usr/local/Trolltech/Qt-5.0.2/lib" />
+        <do if="${config-platform} == 'osx-gcc'">
+            <echo message="Fixing rpaths" />
+            <!--            <exec program="install_name_tool" commandline="-add_rpath @executable_path/../Frameworks ${runtime.OriginCrashReporter.outputdir}/${runtime.OriginCrashReporter.outputname}" failonerror="false" /> -->
+            <exec program="install_name_tool" if="@{FileExists('${runtime.OriginCrashReporter.outputdir}/${runtime.OriginCrashReporter.outputname}')}" >
+                <args>
+                    <arg value="-change" />
+                    <arg value="${old.Qt.libroot}/${lib}.framework/Versions/5/${lib}" />
+                    <arg value="${at}rpath/${lib}.framework/Versions/5/${lib}${package.Qt.debugsuffix}" />
+                    <arg value="${runtime.originClient.outputdir}/${runtime.originClient.outputname}" />
+                </args>
+            </exec>
+        </do>
+    </target>
+</project>

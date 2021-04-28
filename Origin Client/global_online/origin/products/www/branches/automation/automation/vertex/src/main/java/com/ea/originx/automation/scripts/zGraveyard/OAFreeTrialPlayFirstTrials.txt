@@ -1,0 +1,107 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.vx.originclient.utils.Waits;
+import com.ea.vx.originclient.utils.OriginAccessService;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.originaccess.PlayFirstTrialsPage;
+import com.ea.originx.automation.lib.pageobjects.store.TrialTile;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests a Play First trials works even when the user has a origin access
+ * expired (client only as the test involves downloading, installing and playing
+ * a game)
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeTrialPlayFirstTrials extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 14214)
+    @Test(groups = {"originaccess", "client_only", "full_regression", "int_only"})
+    public void testFreeTrialPlayFirstTrials(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+
+        logFlowPoint("Login as a newly registered user"); //1
+        logFlowPoint("Purchase 'Origin Access free Trial'"); //2
+        logFlowPoint("Navigate to the 'Free Games Trial Page' and add a trial to the game library"); //3
+        logFlowPoint("Download and install the game and verify it is playable"); //4
+        logFlowPoint("Cancel the subscription immedietly to expire the subscription and verify the game is still playable"); //5
+
+        //1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully registered and logged in with: " + username);
+        } else {
+            logFailExit("Could not register/log in a new user " + username);
+        }
+
+        //2
+        boolean purchaseOriginAccess = MacroOriginAccess.purchaseOriginAccess(driver);
+        if (purchaseOriginAccess) {
+            logPass("Successfully Purchased Origin Access.");
+        } else {
+            logFailExit("Could not Purchase Origin Access.");
+        }
+
+        //3
+        new NavigationSidebar(driver).clickOriginAccessTrialLink();
+        PlayFirstTrialsPage playFirstTrialsPage = new PlayFirstTrialsPage(driver);
+        playFirstTrialsPage.verifyPlayFirstTrialPageReached();
+        TrialTile trialTile = playFirstTrialsPage.getAllAllPlayFirstTrialTiles().get(0); // grabbing the first game to add to the game library
+        String trialOfferId = trialTile.getOfferId();
+        String trialName = trialTile.getTrialEntitlementName();
+        String processName = trialTile.getProcessName();
+        playFirstTrialsPage.addTrialGameToLibrary(trialOfferId);
+        new NavigationSidebar(driver).gotoGameLibrary();
+        if (new GameLibrary(driver).isGameTileVisibleByOfferID(trialOfferId)) {
+            logPass("Successfully added " + trialName + " trial game to the game library");
+        } else {
+            logFailExit("Could not add " + trialName + " trial game to the game library");
+        }
+
+        //4
+        boolean isDownload = MacroGameLibrary.downloadFullEntitlement(driver, trialOfferId);
+        boolean isLaunched = Waits.pollingWait(() -> playFirstTrialsPage.launchTrial(trialOfferId, trialName, processName));
+        if (isDownload && isLaunched) {
+            logPass("Successfully added " + trialName + " trial game to the game library and verified the game is downloadable, can be installed and playable");
+        } else {
+            logFailExit("Could not add " + trialName + " trial game to the game library or could not download/install or play");
+        }
+        sleep(10000); // added this sleep to wait for the game to start playing
+        ProcessUtil.killProcess(client, processName);
+
+        //5
+        sleep(30000); // This sleep is required as in between purchase and cancellation there should be a time gap to get the cancellation done
+        OriginAccessService.immediateCancelSubscription(userAccount);
+        Waits.sleepMinutes(2); // This sleep is added to wait for a while to get the cancellation updated
+        driver.get(driver.getCurrentUrl()); // To refresh to make sure the game library is updated to check when a user's subscription has expired
+        new GameTile(driver, trialOfferId).play();
+        boolean isLaunchedExpired = ProcessUtil.isEntitlementLaunched(client, processName);
+        if (isLaunchedExpired) {
+            logPass("Verified the game is downloadable, can be installed and playable even after the user is an expired user");
+        } else {
+            logFailExit("Could not download/install or play after the user is an expired user");
+        }
+
+        softAssertAll();
+
+    }
+}

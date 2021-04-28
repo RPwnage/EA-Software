@@ -1,0 +1,57 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.originaccess.PlayFirstTrialsPage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests play first trials get added to game library for an Origin Access subscriber
+ *
+ * @author caleung
+ */
+public class OAPlayFirstTrial extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 1016691)
+    @Test(groups = {"release_smoke", "originaccess", "int_only"})
+    public void testPlayFirstTrial(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        logFlowPoint("Create an account and log in to Origin."); // 1
+        logFlowPoint("Purchase an Origin Access subscription."); // 2
+        logFlowPoint("Navigate to the 'Play First Trials' page, click on the 'Add to Game Library' entitlement, and " +
+                "verify the 'Added to Game Library' dialog appears."); // 3
+        logFlowPoint("Navigate to  the 'Game Library' and verify the entitlement appears."); // 4
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+
+        // 2
+        logPassFail(MacroOriginAccess.purchaseOriginAccess(driver), true);
+
+        // 3
+        new NavigationSidebar(driver).clickOriginAccessTrialLink();
+        PlayFirstTrialsPage playFirstTrialsPage = new PlayFirstTrialsPage(driver);
+        String offerId = playFirstTrialsPage.getFirstGetItNowTrialTile().getOfferId();
+        logPassFail(playFirstTrialsPage.addTrialGameToLibrary(offerId), true);
+
+        // 4
+        GameLibrary gameLibrary = new NavigationSidebar(driver).gotoGameLibrary();
+        logPassFail(gameLibrary.isGameTileVisibleByOfferID(offerId), true);
+
+        softAssertAll();
+    }
+}

@@ -1,0 +1,172 @@
+<project>
+    <fileset name="dirtybuild-fileset-c" basedir="${package.dir}">
+        <includes fromfile="${package.dir}/scripts/project/${dirtyplat}/source.txt" unless="${dirtysdk-novoip??false} and @{FileExists('${package.dir}/scripts/project/${dirtyplat}/source-novoip.txt')}"/>
+        <includes fromfile="${package.dir}/scripts/project/${dirtyplat}/source-novoip.txt" if="${dirtysdk-novoip??false} and @{FileExists('${package.dir}/scripts/project/${dirtyplat}/source-novoip.txt')}"/>
+        <includes fromfile="${package.dir}/scripts/project/source.txt"/>
+    </fileset>
+
+    <fileset name="dirtybuild-fileset-cpp" basedir="${package.dir}">
+        <includes fromfile="${package.dir}/scripts/project/${dirtyplat}/sourcecpp.txt" if="@{FileExists('${package.dir}/scripts/project/${dirtyplat}/sourcecpp.txt')}"/>
+    </fileset>
+
+    <fileset name="dirtybuild-fileset-c-optimized" basedir="${package.dir}">
+        <includes fromfile="${package.dir}/scripts/project/sourceopt.txt"/>
+    </fileset>
+
+    <fileset name="dirtybuild-fileset-objc" basedir="${package.dir}">
+        <includes fromfile="${package.dir}/scripts/project/${dirtyplat}/sourceobjc.txt" if="@{FileExists('${package.dir}/scripts/project/${dirtyplat}/sourceobjc.txt')}"/>
+    </fileset>
+
+    <Library name="dirtysock" frompartial="DSLibrary">
+        <sourcefiles basedir="${package.dir}">
+            <do if="${config-system} == 'capilano'">
+                <includes fromfileset="dirtybuild-fileset-cpp" unless="${Dll??false}" optionset="WinRTCppLibrary"/>
+                <includes fromfileset="dirtybuild-fileset-cpp" if="${Dll??false}" optionset="WinRTRuntimeComponent"/>
+            </do>
+            <do unless="${config-system} == 'capilano'">
+                <includes fromfileset="dirtybuild-fileset-cpp" optionset="Library"/>
+            </do>
+
+            <includes fromfileset="dirtybuild-fileset-c"/>
+            <includes fromfileset="dirtybuild-fileset-c-optimized" optionset="DSOptimized"/>
+            <includes fromfileset="dirtybuild-fileset-objc" optionset="ObjectiveCLibrary"/>
+        </sourcefiles>
+
+        <includedirs>
+            <!-- public include directories -->
+            ${package.DirtySDK.dirtysock.includedirs}
+
+            <!-- private include directories -->
+            ${package.dir}/source/dirtysock
+            ${package.dir}/source/misc
+            ${package.dir}/source/voip
+        </includedirs>
+
+        <headerfiles>
+            <includes name="${package.dir}/include/DirtySDK/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/comm/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/crypt/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/dirtysock/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/dirtysock/${dirtyplat}/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/game/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/graph/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/misc/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/misc/${dirtyplat}/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/proto/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/voip/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/xml/*.h"/>
+            <includes name="${package.dir}/source/**/${dirtyplat}/*.h"/>
+        </headerfiles>
+
+        <sdkreferences if="${config-system} == 'capilano'">
+            Xbox Services API, Version=8.0
+        </sdkreferences>
+
+        <dependencies>
+            <auto>
+                EABase
+
+                <do if="${config-system} == 'kettle'">
+                    EAAssert
+                    EAMessage
+                    EASTL
+                    coreallocator
+                    EAThread
+                    PPMalloc
+                    EASystemEventMessageDispatcher
+                    IEASystemEventMessageDispatcher
+                    IEAUser
+                </do>
+
+                <do if="${config-system} == 'capilano'" >
+                    EASTL
+                    IEAUser
+                    EAUser
+                    coreallocator
+                    EAThread
+                </do>
+            </auto>
+        </dependencies>
+
+        <libraries if="${Dll??false}" append="true">
+            <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                <includes name="iphlpapi.lib" asis="true"/>
+                <includes name="ws2_32.lib" asis="true"/>
+            </do>
+
+            <do if="${config-system} == 'capilano'">
+                <includes name="bcrypt.lib" asis="true"/>
+            </do>
+        </libraries>
+
+        <config>
+            <defines>
+                <do if="${dirtysdk_debug_enable??false}">
+                    DIRTYCODE_LOGGING=1
+                </do>
+
+                <do if="${dirtysdk_debug_disable??false}">
+                    DIRTYCODE_LOGGING=0
+                </do>
+
+                <!-- If we don't define it, the netgamedist code will set its own default -->
+                <do if="@{PropertyExists('dirtysdk-distpktwindow-size')}">
+                    PACKET_WINDOW=${dirtysdk-distpktwindow-size}
+                </do>
+
+                <do if="${config-system} == 'android' or ${config-system} == 'kettle' or ${config-system} == 'unix' or ${config-system} == 'unix64'">
+                    _GNU_SOURCE
+                    LINUX
+                </do>
+
+                <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                    WINSOCK_API_LINKAGE=
+                </do>
+            </defines>
+
+            <warningsuppression>
+                <!-- ================= Common Clang & GCC  =================== -->
+                <do if="${config-compiler} == 'clang' or ${config-compiler} == 'gcc'">
+                    -Wno-unused-parameter
+                </do>
+
+                <!-- ================= GCC  =================== -->
+                <do if="${config-compiler} == 'gcc'">
+                    -Wno-unused-but-set-variable
+                </do>
+
+                <!-- ================= Common Clang OSX  =================== -->
+                <do if="${config-system} == 'iphone' or ${config-system} == 'osx'">
+                    -Wno-pointer-sign
+                    -Wno-deprecated-declarations
+                </do>
+
+                <!-- ================= Common MSVC  =================== -->
+                <do if="${config-compiler} == 'vc'">
+                    -wd4054     <!-- type cast from function pointer to void pointer -->
+                    -wd4055     <!-- data/void pointer cast to function pointer (type casting does *not* suppress this warning) -->
+                    -wd4127     <!-- conditional expression is constant -->
+                    -wd4255     <!-- no function prototype given: converting () to (void) [disabled for VC++ headers] -->
+                    -wd4295     <!-- array is too small to include terminating null character -->
+                    -wd4310     <!-- cast truncates constant value -->
+                    -wd4548     <!-- expression before comma has no effect (required because FD_SET macro generates this warning) -->
+                </do>
+
+                <!-- =================  PC & PC64 =================== -->
+                <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                    -wd4201     <!-- nonstandard extension used : nameless struct/union (some windows headers generate this warning) -->
+                </do>
+
+                <!-- ================= CAPILANO =================== -->
+                <do if="${config-system} == 'capilano'">
+                    -wd4265     <!-- class has virtual functions, but destructor is not virtual -->
+                    -wd4625     <!-- copy constructor could not be generated because a base class copy constructor is inaccessible -->
+                    -wd4626     <!-- assignment operator could not be generated because a base class assignment operator is inaccessible -->
+                    -wd4628     <!-- digraphs not supported with -Ze. Character sequence 'digraph' not interpreted as alternate token for 'char' -->
+                    -wd4986     <!-- exception specification does not match previous declaration -->
+                    -wd4555     <!-- expression has no effect; expected expression with side-effect -->
+                </do>
+            </warningsuppression>
+        </config>
+    </Library>
+</project>

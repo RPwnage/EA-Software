@@ -1,0 +1,27 @@
+var structDirtyWebApiRefT =
+[
+    [ "abortCrit", "dc/d91/structDirtyWebApiRefT.html#a3d4e5e91e2cb2f74ba885172cd234321", null ],
+    [ "aReadBuffer", "dc/d91/structDirtyWebApiRefT.html#ab8a952a96fe019e51a39ece50a34eec8", null ],
+    [ "bQueueCallback", "dc/d91/structDirtyWebApiRefT.html#a07e4e10df2e3e8c9346ae88d68f0d3b2", null ],
+    [ "crit", "dc/d91/structDirtyWebApiRefT.html#a2ef7b2093c9181f5492834bd2c1b8aa6", null ],
+    [ "DeferredDeleteList", "dc/d91/structDirtyWebApiRefT.html#a86ba1665f7e4117c1197fdd08135b3cc", null ],
+    [ "dirtyWebApiThreadMutex", "dc/d91/structDirtyWebApiRefT.html#a00395bb29e5602e37632c6e6b7bb45fd", null ],
+    [ "dirtyWepApiThreadCond", "dc/d91/structDirtyWebApiRefT.html#a0ab885352b30b1cf6b3406298ddd7564", null ],
+    [ "iHttpCtxId", "dc/d91/structDirtyWebApiRefT.html#adadbeaa57aed97d6a420b8e1a1694f5d", null ],
+    [ "iMemGroup", "dc/d91/structDirtyWebApiRefT.html#a9c9bd7ba6ffcd99b8b0502f8c0b09968", null ],
+    [ "iNetPoolCtxId", "dc/d91/structDirtyWebApiRefT.html#a6e13e9c0a753ca8a729eb9e49408671f", null ],
+    [ "iSslCtxId", "dc/d91/structDirtyWebApiRefT.html#ac3b3107cfce81e4a333662def80339b8", null ],
+    [ "iThreadLife", "dc/d91/structDirtyWebApiRefT.html#ad1218bbc50f61e3cca88fe2075a0381e", null ],
+    [ "iWebApiCtxId", "dc/d91/structDirtyWebApiRefT.html#a0032f9fe0cbd2c88ca2c28a7d389dc67", null ],
+    [ "pCallbackListBack", "dc/d91/structDirtyWebApiRefT.html#a89aa79020f61be4fe4f8021961671f5a", null ],
+    [ "pCallbackListFront", "dc/d91/structDirtyWebApiRefT.html#aa923b9d322c935fd700a791d21a77f95", null ],
+    [ "pCurrentWebRequest", "dc/d91/structDirtyWebApiRefT.html#aff3f0e74230278f70d1effbeafaee574", null ],
+    [ "PendingAddPushEvents", "dc/d91/structDirtyWebApiRefT.html#a9306fa7b33a0d635aa61dd01d1ce25b2", null ],
+    [ "pMemGroupUserData", "dc/d91/structDirtyWebApiRefT.html#adaf77a54d42eb0bdcad8b2812ac9421b", null ],
+    [ "pRequestListBack", "dc/d91/structDirtyWebApiRefT.html#a83e5c57ca3cdec583c5db9cd0f0f0c27", null ],
+    [ "pRequestListFront", "dc/d91/structDirtyWebApiRefT.html#a6f14d672b8b52cf5e4b34a0e816282ef", null ],
+    [ "PushEvents", "dc/d91/structDirtyWebApiRefT.html#ad410549348946e3dac71adcb16419d4d", null ],
+    [ "uReadBufferSize", "dc/d91/structDirtyWebApiRefT.html#a819691f63f6eaa4985a6508dafc68ec0", null ],
+    [ "WebApiThread", "dc/d91/structDirtyWebApiRefT.html#a5a81d1942f414266e88b52703a6e18f3", null ],
+    [ "WebApiUsers", "dc/d91/structDirtyWebApiRefT.html#a3188f5bebc9986a857b0ecf5c23c5a89", null ]
+];

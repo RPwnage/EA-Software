@@ -1,0 +1,38 @@
+	OriginErrorT OriginIGORenderer::updateTexture2D(const OriginIGORenderingTexture2D_T* input)
+	{
+		if (input != nullptr && input->texID != enumOriginIGOTextureID::ORIGINIGOTEXTUREID_INVALID)
+		{
+			if (!input->dataSize)	// no data, no texture update!
+				return ORIGIN_SUCCESS_IGOAPI;
+
+			TextureCreateDesc::SubData subData;
+			subData.ptr = input->data;
+			subData.pitch = static_cast<uint32_t>(input->width * 4);
+
+			if (input->dataSize != subData.pitch * input->height)		// invalid texture properties?
+				return ORIGIN_SUCCESS_IGOAPI;
+
+			TextureMap::iterator it = m_textures.find(input->texID);
+			if (it != m_textures.end())
+			{
+				m_textures.erase(it);
+			}
+
+			TextureCreateDesc desc;
+			desc.name << "OIG_Texture_" << input->texID;
+			desc.type = TextureType_2d;
+			desc.width = input->width;
+			desc.height = input->height;
+			desc.format = m_isSRGB ? RenderFormat_B8G8R8A8_SRGB : RenderFormat_B8G8R8A8_UNORM;
+			desc.subResourceData = &subData;
+			shared_ptr<ITexture> sourceTexture = m_renderer->createYourTexture(desc);
+
+			m_textures[input->texID] = sourceTexture;
+			return ORIGIN_SUCCESS_IGOAPI;
+		}
+		else
+			ASSERT("OriginIGORenderer::updateTexture2D: Texture id is unknown.");
+
+
+		return ORIGIN_SUCCESS_IGOAPI;
+	}

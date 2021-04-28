@@ -1,0 +1,26 @@
+var structVoipHeadsetRefT =
+[
+    [ "_pad", "db/d44/structVoipHeadsetRefT.html#a10f983e9f442060931d0aa7bb2093bbd", null ],
+    [ "bLoopback", "db/d44/structVoipHeadsetRefT.html#a61ecbc0c95f7a14ce80e4a3378ce4b41", null ],
+    [ "bMicOn", "db/d44/structVoipHeadsetRefT.html#a0e03f1567d3306e6e9308c1e46c6a02a", null ],
+    [ "bParticipating", "db/d44/structVoipHeadsetRefT.html#a22ec170bcc11f01f61dbff542b4d079f", null ],
+    [ "DevChangeCrit", "db/d44/structVoipHeadsetRefT.html#a6fd8aa74f7511759e1329369cd416e0f", null ],
+    [ "iCmpFrameSize", "db/d44/structVoipHeadsetRefT.html#a7ebc132e3d4bbd10eaeb70b5a6d78264", null ],
+    [ "iMaxConduits", "db/d44/structVoipHeadsetRefT.html#ac080ae7d5a2c3e87b93cc590fc96739c", null ],
+    [ "iPlayerActive", "db/d44/structVoipHeadsetRefT.html#a33eda845e5f7f6ce636142bd1325c182", null ],
+    [ "iPlayerFirstUse", "db/d44/structVoipHeadsetRefT.html#a3a0e6199ffa6570e8d90491f0d67d2b5", null ],
+    [ "MicrInfo", "db/d44/structVoipHeadsetRefT.html#aa252a8ee5f122b0c0bbe07be86af0924", null ],
+    [ "pCbUserData", "db/d44/structVoipHeadsetRefT.html#a85344ee444182ac1402f5631eb576f99", null ],
+    [ "pConduitRef", "db/d44/structVoipHeadsetRefT.html#af74559c11291dce871516ceb6abdbd5c", null ],
+    [ "pMicDataCb", "db/d44/structVoipHeadsetRefT.html#a55e12dd164917c4a4a9fc5057a181add", null ],
+    [ "pMixerRef", "db/d44/structVoipHeadsetRefT.html#af2805b2a0b2b544c3a40a6f1d11c74da", null ],
+    [ "pPlayerBuffer", "db/d44/structVoipHeadsetRefT.html#a6aff520175a0de67cbecad6cb55b10ef", null ],
+    [ "pSpkrCbUserData", "db/d44/structVoipHeadsetRefT.html#abef288b6054c2055ea4f7a06f4be0793", null ],
+    [ "pSpkrDataCb", "db/d44/structVoipHeadsetRefT.html#a1b00ad120612465b9a3ba7c1926f7d71", null ],
+    [ "pStatusCb", "db/d44/structVoipHeadsetRefT.html#a577538a053a7fffa879f26291dbd0c8f", null ],
+    [ "SpkrInfo", "db/d44/structVoipHeadsetRefT.html#a7bb5a9858078c2609b1cf4a7414abc26", null ],
+    [ "uPlayerBufferFrameCurrent", "db/d44/structVoipHeadsetRefT.html#a811e8decd08cbf32f4d3c90dbd840901", null ],
+    [ "uPlayerBufferFrames", "db/d44/structVoipHeadsetRefT.html#a89b6ffe5d5b02c9912d9f0e79446eb22", null ],
+    [ "uPlayerFirstTime", "db/d44/structVoipHeadsetRefT.html#ad8f0af0a6e23bbd162616edab2d93487", null ],
+    [ "uSendSeq", "db/d44/structVoipHeadsetRefT.html#ada873a8b2bd6518230beb4e00e5b044e", null ]
+];

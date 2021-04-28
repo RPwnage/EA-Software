@@ -1,0 +1,154 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+
+  <createtask name="eaconfig.spu-strip">
+    <parameters>
+      <option name="currBuildDir"  value="Required"/>
+      <option name="filename"  value="Required"/>
+    </parameters>
+    <code>
+      <!-- Strip symbols from the normal version to reduce code size -->
+      <exec program="${package.${PlayStation3Package}.appdir}/host-win32/spu/bin/spu-lv2-strip.exe"
+        clearenv="True"
+        workingdir="${eaconfig.spu-strip.currBuildDir}">
+        <args>
+          <arg value="--strip-debug ${eaconfig.spu-strip.filename}"/>
+        </args>
+        <env>
+          <option name="CELL_SDK" value="${package.${PlayStation3Package}.appdir}"/>
+        </env>
+      </exec>
+    </code>
+  </createtask>
+
+
+  <createtask name="eaconfig.spu-objcopy">
+    <parameters>
+      <option name="currBuildDir"  value="Required"/>
+      <option name="filename"  value="Required"/>
+    </parameters>
+    <code>
+      <property name="eaconfig.spu-objcopy.filename" value="@{PathGetFileNameWithoutExtension('${eaconfig.spu-objcopy.filename}')}"/>
+
+      <!-- Convert SPU elf to PPU o -->
+      <exec program="${package.${PlayStation3Package}.appdir}/host-win32/ppu/bin/ppu-lv2-objcopy"
+        clearenv="true"
+        workingdir="${eaconfig.spu-objcopy.currBuildDir}">
+        <args>
+          <arg value="-I binary -O elf64-powerpc -B powerpc --rename-section .data=.elf_obj.spu/${eaconfig.spu-objcopy.filename} --set-section-align .data=4 ${eaconfig.spu-objcopy.filename}.elf ${eaconfig.spu-objcopy.filename}.o"/>
+        </args>
+        <env>
+        </env>
+      </exec>
+    </code>
+  </createtask>
+
+  <!-- 
+    Called inside eaconfig-build 
+  
+    If you want to override the default modules_to_embed_target, just copy the code below and modify it to your needs
+  -->
+  <target name="eaconfig.spu-elfs_to_embed_target" hidden="true">
+    <do if="'${config-system}' == 'ps3'">
+
+      <property name="eaconfig.spu-elfs_to_embed_target.currBuildDir" value="${package.configbuilddir}${eaconfig.${eaconfig.build.group}.outputfolder}\${build.module}"/>
+
+      <property name="eaconfig.spu-elfs_to_embed_target.isRunningNantToVsTools" value="false" unless="@{PropertyExists('eaconfig.spu-elfs_to_embed_target.isRunningNantToVsTools')}"/>
+      <choose>
+        <do if="${eaconfig.spu-elfs_to_embed_target.isRunningNantToVsTools}">
+
+          <!-- If user already specify ${groupname}.vcproj.pre-build-step, then the user
+               is repsonsible for doing the stuff below themselves.  The reason for this is
+               so that the user can put custom steps before and after the code below -->
+          <do unless="@{PropertyExists('${groupname}.vcproj.pre-build-step')}">
+            <property name="${groupname}.vcproj.pre-build-step" value=""/>
+
+            <!-- creating a fileset that failonmissing="false" since the elf files may not have been created yet -->
+            <fileset name="eaconfig.spu-elfs_to_embed_target.tmpFS" failonmissing="false" fromfileset="build.elfs_to_embed"/>
+
+            <foreach item="FileSet" in="eaconfig.spu-elfs_to_embed_target.tmpFS" property="eaconfig.spu-elfs_to_embed_target.filepath">
+              <property name="eaconfig.spu-elfs_to_embed_target.filename" value="@{PathGetFileName('${eaconfig.spu-elfs_to_embed_target.filepath}')}"/>
+              <property name="eaconfig.spu-elfs_to_embed_target.filenameWithoutExtension" value="@{PathGetFileNameWithoutExtension('${eaconfig.spu-elfs_to_embed_target.filename}')}"/>
+
+              <!-- objcopy requires magic environment to work properly, or else it will:
+              
+                  1) Generate an object that doesn't work
+                  2) Crashes
+                  3) Generate a really really big object
+              -->
+              <property name="${groupname}.vcproj.pre-build-step">
+                ${property.value}
+                set LIB=
+                set INCLUDE=
+                set CELL_SDK=${package.${PlayStation3Package}.appdir}
+                copy "${eaconfig.spu-elfs_to_embed_target.filepath}" "${eaconfig.spu-elfs_to_embed_target.currBuildDir}/${eaconfig.spu-elfs_to_embed_target.filename}"
+                cd "${eaconfig.spu-elfs_to_embed_target.currBuildDir}"
+                "${package.${PlayStation3Package}.appdir}\host-win32\spu\bin\spu-lv2-strip.exe"  --strip-debug ${eaconfig.spu-elfs_to_embed_target.filename}
+                "${package.${PlayStation3Package}.appdir}\host-win32\ppu\bin\ppu-lv2-objcopy"  -I binary -O elf64-powerpc -B powerpc --rename-section .data=.elf_obj.spu/${eaconfig.spu-elfs_to_embed_target.filenameWithoutExtension} --set-section-align .data=4 "${eaconfig.spu-elfs_to_embed_target.filename}" "${eaconfig.spu-elfs_to_embed_target.filenameWithoutExtension}.o"
+              </property>
+
+              <property name="eaconfig.spu-elfs_to_embed_target.filename" value="@{PathGetFileNameWithoutExtension('${eaconfig.spu-elfs_to_embed_target.filename}')}"/>
+              <fileset name="build.objects" append="true" failonmissing="false">
+                <includes name="${eaconfig.spu-elfs_to_embed_target.currBuildDir}\${eaconfig.spu-elfs_to_embed_target.filename}.o"/>
+              </fileset>
+            </foreach>
+          </do>
+
+
+        </do>
+        <do>
+          <foreach item="FileSet" in="build.elfs_to_embed" property="eaconfig.spu-elfs_to_embed_target.filepath">
+            <property name="eaconfig.spu-elfs_to_embed_target.filename" value="@{PathGetFileName('${eaconfig.spu-elfs_to_embed_target.filepath}')}"/>
+
+            <fail message="Cannot find ${eaconfig.spu-elfs_to_embed_target.filepath}.  Please make sure the file is built before the ${build.module} module" unless="@{FileExists('${eaconfig.spu-elfs_to_embed_target.filepath}')}"/>
+
+            <!-- Check to see if we need to strip and objcopy again -->
+            <property name="eaconfig.spu-elfs_to_embed_target.IsNeedBuilding" value="true"/>
+            <do if="@{FileExists('${eaconfig.spu-elfs_to_embed_target.currBuildDir}/${eaconfig.spu-elfs_to_embed_target.filename}')}">
+              <property name='eaconfig.spu-elfs_to_embed_target.t1' value="@{FileGetLastWriteTime('${eaconfig.spu-elfs_to_embed_target.currBuildDir}/${eaconfig.spu-elfs_to_embed_target.filename}')}" />
+              <property name='eaconfig.spu-elfs_to_embed_target.t2' value="@{FileGetLastWriteTime('${eaconfig.spu-elfs_to_embed_target.filepath}')}" />
+              <property name="eaconfig.spu-elfs_to_embed_target.IsNeedBuilding" value="false" if="@{DateTimeCompare('${eaconfig.spu-elfs_to_embed_target.t1}', '${eaconfig.spu-elfs_to_embed_target.t2}')} gte 0"/>
+            </do>
+
+            <do if="${eaconfig.spu-elfs_to_embed_target.IsNeedBuilding}">
+
+              <!-- copy the elfs so that the user still has elfs with debug symbols for debugging-->
+              <copy file="${eaconfig.spu-elfs_to_embed_target.filepath}" tofile="${eaconfig.spu-elfs_to_embed_target.currBuildDir}/${eaconfig.spu-elfs_to_embed_target.filename}"/>
+
+              <task name="eaconfig.spu-strip" currBuildDir="${eaconfig.spu-elfs_to_embed_target.currBuildDir}" filename="${eaconfig.spu-elfs_to_embed_target.filename}"/>
+              <task name="eaconfig.spu-objcopy" currBuildDir="${eaconfig.spu-elfs_to_embed_target.currBuildDir}" filename="${eaconfig.spu-elfs_to_embed_target.filename}"/>
+
+            </do>
+
+
+            <property name="eaconfig.spu-elfs_to_embed_target.filename" value="@{PathGetFileNameWithoutExtension('${eaconfig.spu-elfs_to_embed_target.filename}')}"/>
+
+            <fileset name="build.objects" append="true">
+              <includes name="${eaconfig.spu-elfs_to_embed_target.currBuildDir}\${eaconfig.spu-elfs_to_embed_target.filename}.o"/>
+            </fileset>
+          </foreach>
+        </do>
+      </choose>
+
+    </do>
+  </target>
+
+
+  <target name="eaconfig.spu-strip" hidden="true">
+
+    <property name="__private_linkoutputname" value="@{OptionSetGetValue('${build.buildtype}', 'linkoutputname')}"/>
+    <property name="__private_linkoutputname" value="@{StrReplace('${__private_linkoutputname}', '%outputdir%', '${package.configbuilddir}${eaconfig.${eaconfig.build.group}.outputfolder}\${build.outputname}')}"/>
+    <property name="__private_linkoutputname" value="@{StrReplace('${__private_linkoutputname}', '%outputname%', '${build.module}')}"/>
+
+    <!--  Strip symbols from the normal version to reduce code size -->
+    <exec program="${package.${PlayStation3Package}.appdir}/host-win32/spu/bin/spu-lv2-strip.exe" clearenv="True" workingdir="${package.configbuilddir}${eaconfig.${eaconfig.build.group}.outputfolder}\${build.module}">
+      <args>
+        <arg value="--strip-debug ${__private_linkoutputname}" />
+      </args>
+    </exec>
+  </target>
+
+</project>

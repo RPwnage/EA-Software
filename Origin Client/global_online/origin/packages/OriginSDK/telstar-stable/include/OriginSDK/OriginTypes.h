@@ -1,0 +1,835 @@
+#ifndef __ORIGIN_TYPES_H__
+#define __ORIGIN_TYPES_H__
+
+#include "Origin.h"
+
+// Get the definitions for our integers. This is supported on MAC, PC, and XBOX
+#if !defined(INCLUDED_eabase_H)
+
+#if _MSC_VER>=1600
+#include <stdint.h>
+#include <stddef.h>
+#include <yvals.h>
+#elif defined ORIGIN_MAC
+#include <stdint.h>
+#include <stddef.h>
+#else
+#define _STDINT
+#include "OriginIntTypes.h"
+#endif
+
+#endif
+
+// Include definitions of language strings.
+#include "OriginEnums.h"
+#include "OriginLanguage.h"
+#include "OriginBaseTypes.h"
+
+#if defined ORIGIN_PC
+#include "windows/OriginWinTypes.h"
+#elif defined ORIGIN_MAC
+#include "mac/OriginMacTypes.h"
+#endif
+
+#pragma pack(push, 8)
+
+
+/// \ingroup types
+/// \brief A structure input to \ref OriginStartup that gives information about the game.
+struct OriginStartupInputT
+{
+    OriginStartupInputT() {
+        ContentId = NULL;
+        Title = NULL;
+        MultiplayerId = NULL;
+        Language = NULL;
+        SdkVersionOverride = NULL;
+		
+#if defined (ORIGIN_DEVELOPMENT)
+        OriginLaunchSetting = OriginLaunchSetting_Detect;
+        OverrideOriginExecutable = NULL;
+        OverrideOriginCommandLine = NULL;
+        OverrideLsxPort = 0;
+#endif		
+
+        OriginLaunchRetryCount = 0;
+        OriginLaunchChallengeTimeoutSecs = 0;
+        OriginLaunchRetrySleepTime = 0;		
+    }
+
+    const OriginCharT*	ContentId;		    ///< The content ID of this product. If the game is started through Origin an environment variable will be set with the content Id of the game. eg ContentId=71055 for FIFA12. If your executable has multiple version you can use this to know what version is started. [This is not a DRM solution.]
+    const OriginCharT*	Title;			    ///< The title of the Game. Origin will use the ContentId to look up the actual name of the game in its list of entitlements. This title is only used when Origin cannot find an account matching the contentId.
+    const OriginCharT*	MultiplayerId;	    ///< Identifies games that can play together. This id is also used to find a fitting entitlement in Origins entitlement list, if ContentId doesn't match any entitlement in Origins entitlement list.
+    const OriginCharT*	Language;		    ///< The ISO IETF language setting. See <a href="http://online.ea.com/confluence/display/nucleus/EA+Locale">http://online.ea.com/confluence/display/nucleus/EA+Locale</a>. [Not used.]
+    const OriginCharT*  SdkVersionOverride; ///< An override for the SDK version. 
+	
+#if defined (ORIGIN_DEVELOPMENT)
+    enum OriginLaunchSettingType
+    {
+        OriginLaunchSetting_Detect,
+        OriginLaunchSetting_Never,
+        OriginLaunchSetting_Always
+
+    } OriginLaunchSetting;
+    const OriginCharT* OverrideOriginExecutable;
+    const OriginCharT* OverrideOriginCommandLine;
+    uint16_t OverrideLsxPort;
+#endif	
+
+    unsigned char OriginLaunchRetryCount;
+    unsigned char OriginLaunchChallengeTimeoutSecs;
+    uint32_t OriginLaunchRetrySleepTime;
+};
+
+/// \ingroup types
+/// \brief A structure indicating whether the user (index) is logged in or not.
+struct OriginLoginT
+{
+    // The login state.
+    bool IsLoggedIn;
+    // The index of the user.
+    int32_t UserIndex;
+    // One of ORIGIN_LOGINREASONCODE_XXX (see enumLoginReasonCode).
+    enumLoginReasonCode LoginReasonCode;
+};
+
+/// \ingroup types
+/// \brief A structure returned by \ref OriginStartup that gives information about the OriginSDK.
+struct OriginStartupOutputT
+{
+    const OriginCharT*	Version;		///< Origin version string.
+    const OriginCharT*  ContentId;      ///< The content Id associated with the game.
+	const OriginCharT*  ProductId;		///< The product Id (offerId) associated with the game.
+	OriginInstanceT     Instance;       ///< A handle to the Origin Instance.
+};
+
+/// \ingroup types
+/// \brief Detailed information about the user.
+struct OriginProfileT
+{
+    OriginUserT         UserId;             ///< The identity of the user. (The userid  currently maps to the Nucleus User Id, of the Origin User)
+    OriginPersonaT      PersonaId;          ///< The identity of the persona. (The personaId maps to the first Nucleus persona for the user in the cem_ea_id namespace.)
+    const OriginCharT   *PersonaName;       ///< The textual persona name.
+    const OriginCharT   *AvatarId;          ///< The ImageId to the Avatar.
+    const OriginCharT   *Country;           ///< The country code of the user.
+    bool                IsUnderAge;         ///< Indicates whether the user is under age.
+    bool                IsSubscriber;       ///< Indicates whether the user has subscribed to an Origin subscription, this may indicate more than one in the future.
+    bool                IsTrialSubscriber;  ///< Indication that the subscribed subscription is a free trial. Use this to still show upsell to the full subscription. 
+    enumSubscriberLevel SubscriberLevel;    ///< The Subscriber Level is a bit field for what the subscription the user owns. 0x1 = Access Basic, 0x2 = Access Premier.
+    bool                IsSteamSubscriber;  ///< Indicates whether the user has an active Steam subscription
+    const OriginCharT   *GeoCountry;        ///< The country the users IP is in.
+    const OriginCharT   *CommerceCountry;   ///< The country used for commerce transactions.
+    const OriginCharT   *CommerceCurrency;  ///< The currency commerce transactions will be in.
+};
+
+/// \ingroup types
+/// \brief Detailed information about the user's friend.
+struct OriginFriendT
+{
+    OriginUserT			UserId;			///< The identity of the friend.
+    OriginPersonaT		PersonaId;		///< The identity of the persona.
+    const OriginCharT	*Persona;		///< The textual persona name.
+    const OriginCharT	*AvatarId;		///< The ImageId to the Avatar.
+    const OriginCharT	*Group;		    ///< The group this friend belongs to.
+    const OriginCharT	*GroupId;		///< The party group id this friend belongs to.
+    enumPresence		PresenceState;	///< The online state (see \ref enumPresence).
+    enumFriendState		FriendState;	///< The friend's state (see \ref ORIGIN_FRIEND_DECLINED etc.).
+    const OriginCharT	*TitleId;		///< The title that the user is in.
+    const OriginCharT	*Title;			///< The localized title string.
+    const OriginCharT   *MultiplayerId;	///< An id to identify games that can play together.
+    const OriginCharT	*Presence;		///< The rich presence description string.
+    const OriginCharT	*GamePresence;	///< A game-specific presence string.
+};
+
+
+/// \ingroup types
+/// \brief Presence information.
+struct OriginPresenceT
+{
+    OriginUserT			UserId;			///< The identity of the user.
+    enumPresence		PresenceState;	///< The online state (see \ref enumPresence).
+    const OriginCharT *	TitleId;		///< The title the user is in.
+    const OriginCharT *	MultiplayerId;	///< An id to identify games that can play together.
+    const OriginCharT *	Title;			///< The localized title string.
+    const OriginCharT *	Presence;		///< The rich presence description string.
+    const OriginCharT *	GamePresence;	///< A game-specific presence string.
+    const OriginCharT	*Group;		    ///< The group this friend belongs to.
+    const OriginCharT	*GroupId;		///< The party group id this friend belongs to.
+};
+
+/// \ingroup types
+/// \brief Presence information.
+struct OriginGetPresenceT
+{
+    OriginUserT			UserId;			///< The identity of the user.
+    enumPresence		PresenceState;	///< The online state (see \ref enumPresence).
+    const OriginCharT *	TitleId;		///< The title the user is in.
+    const OriginCharT *	MultiplayerId;	///< An id to identify games that can play together.
+    const OriginCharT *	SessionInfo;	///< An information string about the current joinable multiplayer session.
+    const OriginCharT *	Title;			///< The localized title string.
+    const OriginCharT *	Presence;		///< The rich presence description string.
+    const OriginCharT *	GamePresence;	///< A game-specific presence string.
+    const OriginCharT	*Group;		    ///< The group this friend belongs to.
+    const OriginCharT	*GroupId;		///< The party group id this friend belongs to.
+};
+
+/// \ingroup types
+/// \brief Information about a friend's status.
+struct OriginIsFriendT
+{
+    OriginUserT			UserId;			///< The identity of the friend.
+    enumFriendState     FriendState;	///< The friend's state (see #ORIGIN_FRIEND_DECLINED etc.).
+};
+
+/// \ingroup types
+/// \brief Is Muted.
+struct OriginMuteStateT
+{
+	enumMuteState       State;	    ///< The friend's mute state.
+	OriginUserT			UserId;		///< The identity of the friend.
+};
+
+/// \ingroup types
+/// \brief A chat state update message
+struct OriginChatStateUpdateMessageT
+{
+    enumChatState State;    // The new chat state of the user.
+    OriginUserT UserId;     // The user for whom the chat state is updated.
+};
+
+struct OriginOpenSteamStoreT
+{
+    const OriginCharT* AppId;
+    const OriginCharT* OfferId;
+    bool IsBaseGame;
+    enumSteamStoreFlag Flag;
+};
+
+struct SteamAchievementT
+{
+    const OriginCharT* AchievementId;
+    int Points;
+};
+
+/// \ingroup types
+/// \brief A chat message.
+struct OriginChatMessageT
+{
+    const OriginCharT *  GroupId;   ///< The group id
+    OriginUserT          FromId;	///< The sender of the chat message.
+    const OriginCharT *  Thread;	///< The thread associated with this message.
+    const OriginCharT *  Message;	///< The message.
+};
+
+/// \ingroup types
+/// \brief Invite information.
+struct OriginInviteT
+{
+    char				bInitial;				///< Indicates whether the game is started because of this invite.
+    OriginUserT			FromId;					///< The user who sent the invitation.
+    const OriginCharT * GroupName;              ///< The group name associated with the group invite. If empty the invite didn't come from a group invite.
+    const OriginCharT * GroupId;                ///< The group id associated with the group invite. If empty the invite didn't come from a group invite.
+    const OriginCharT * MultiplayerId;	        ///< The multiplayerId of the invite.
+    const OriginCharT * SessionInformation;	    ///< The game session that the user is invited to. When this event occurs, make sure to check whether you are already in this session
+												///< as leaving the session and re-entering it will result in a bad user experience.
+};
+
+/// \ingroup types
+/// \brief Invite information.
+struct OriginInvitePendingT
+{
+    OriginUserT			FromId;					///< The user who sent the invitation.
+    const OriginCharT * GroupName;              ///< The group name associated with the group invite. If empty the invite didn't come from a group invite.
+    const OriginCharT * GroupId;                ///< The group id associated with the group invite. If empty the invite didn't come from a group invite.
+    const OriginCharT * MultiplayerId;          ///< Indicator for what game the invite is.
+};
+
+
+/// \ingroup types
+/// \brief Invite to enter a group.
+struct OriginEnterGroupPendingT
+{
+    OriginUserT			FromId;					///< The user who sent the invitation to join the group.
+    const OriginCharT * GroupId;                ///< The group id associated with the group to join. This groupId can be used to query the group member list, and group info.
+};
+
+
+/// \ingroup types
+/// \brief A struct to hold the download status of an item.
+struct OriginContentT
+{
+    const OriginCharT *         ItemId;		        ///< The item belonging to this notification.
+    const OriginCharT *         DisplayName;        ///< The name of the item.
+    float						Progress;	        ///< When a download is in progress this will indicate the progress of the download [0.0, 1.0].
+    enumContentState            State;		        ///< Simplified state of the content. It can be any of the states defined in enumContentState
+    const OriginCharT *         InstalledVersion;   ///< The installed version of the item. If -1 the item is not installed. When in development mode ignore this value. When using a local override for DLC installation, make sure that the version comes from the install manifest. (installerdata.xml)
+    const OriginCharT *         AvailableVersion;   ///< The available version of the item. This can be the version on the server, or the version in the installerdata.xml when using a download override.
+};
+
+
+/// \ingroup types
+/// \brief A structure that will be provided when an ORIGIN_EVENT_PROFILE event occurs.
+struct OriginProfileChangeT
+{
+    OriginUserT					UserId;		///< For what user did the profile change.
+    enumProfileChangeItem		Changed;	///< Enumeration to indicate what item of the profile has changed.
+};
+
+
+/// \ingroup types
+/// \brief A struct to hold the image.
+struct OriginImageT
+{
+    const OriginCharT * ImageId;			///< A string that identifies the image.
+    int32_t Width;						    ///< The width of the image
+    int32_t Height;						    ///< The height of the image
+    const OriginCharT * ResourcePath;		///< The path to the cached resource. \note The resource maybe have a different size or format than specified. The information is only used for image lookup.
+};
+
+/// \ingroup types
+/// \brief A struct to hold a data entitlement item.
+struct OriginItemT
+{
+    const OriginCharT *	Type;				///< The item type (not displayed).
+    const OriginCharT *	ItemId;				///< The item ID (not displayed).
+    const OriginCharT *	EntitlementId;		///< The entitlement ID uniquely defines the entitlement in the entitlement cache.
+    const OriginCharT *	EntitlementTag;		///< A game-specific string that unlocks the item in the game.
+    const OriginCharT *	Group;				///< The group this entitlement belongs to.
+    const OriginCharT * ResourceId;			///< A game-defined resource ID (not displayed).
+    OriginTimeT			TerminateDate;		///< The expiration date (zero indicates no expiration).
+    OriginTimeT         GrantDate;          ///< The date on which the entitlement was granted. For consumables this will indicate the date of first purchase.
+    OriginTimeT         LastModifiedDate;   ///< The date on which the entitlement was last modified. For consumables this will indicate the date of last consumption.
+    OriginSizeT			QuantityLeft;		///< The number of plays remaining: a negative number indicates infinite plays (non consumable); a positive value indicates the number of uses remaining.
+    int32_t             Version;            ///< The revision of the entitlement starting from 0.
+};
+
+/// \ingroup types
+/// \brief A struct that holds a commerce offer.
+struct OriginOfferT
+{
+    const OriginCharT *	Type;				///< The offer type (not displayed).
+    const OriginCharT *	OfferId;			///< The offer identifier (not displayed).
+    const OriginCharT *	Name;				///< The display name.
+    const OriginCharT *	Description;		///< The display description. This text is in html format. If your code doesn't support html rendering, please strip/replace the html tags.
+    const OriginCharT *	ImageId;			///< The image ID of the Offer.
+    const OriginCharT *	GameDistributionSubType;	///< Indicates information about the offers distribution.
+    char				bIsOwned;			///< Indicates that the item is already owned by the customer.
+    char				bIsHidden;			///< Indicates that the item is not to be displayed.
+    char				bCanPurchase;		///< Indicates that the item can be purchased.
+    OriginTimeT			PurchaseDate;		///< The earliest purchase date (non-zero).
+    OriginTimeT			DownloadDate;		///< The earliest download date (non-zero).
+    OriginTimeT			PlayableDate;		///< The earliest playable date (non-zero).
+    OriginTimeT			UseEndDate;			///< Indicates when the offer is expired.
+    uint64_t			DownloadSize;		///< The size in KB (non-zero).
+    const OriginCharT *	Currency;			///< The currency identifier (ISO currency).
+    bool                bIsDiscounted;      ///< Indicates that the current price is discounted.
+    double				Price;				///< The price in Currency units.
+    const OriginCharT *	RegularPrice;		///< The normal price (localized string).
+    double				OriginalPrice;		///< The original price in Currency units.
+    const OriginCharT *	LocalizedOriginalPrice;		///< The original price (localized string).
+    OriginSizeT			QuantityAllow;		///< The maximum sellable inventory (count up).
+    OriginSizeT			QuantitySold;		///< The amount of inventory sold (count up).
+    OriginSizeT			QuantityAvail;		///< The available inventory (count down).
+    OriginSizeT			EntitlementCount;	///< The number of entitlements associated with this offer.
+    OriginItemT *  		Entitlements;		///< The entitlements associated with this offer.
+};
+
+/// \ingroup types
+/// \brief A struct representing the available catalogs in a store.
+struct OriginCatalogT
+{
+    const OriginCharT	*	Name;			///< The name of the catalog.
+    const OriginCharT	*	Status;			///< The status of the catalog.
+    const OriginCharT	*	CurrencyType;	///< The currency type associated with this Catalog.
+    const OriginCharT	*	Group;			///< The group name of this catalog.
+
+    uint64_t				CatalogId;		///< The Id, associated with this catalog. Use this Id in the OriginSelectStore function.
+};
+
+/// \ingroup types
+/// \brief A struct representing the store.
+
+struct OriginStoreT
+{
+    const OriginCharT	*	Name;			///< The name of the store.
+    const OriginCharT	*	Title;			///< The store title.
+    const OriginCharT	*	Group;			///< The store group this store belongs to.
+    const OriginCharT	*	Status;			///< The status of the store.
+    const OriginCharT	*	DefaultCurrency;///< The default currency for this store.
+    uint64_t				StoreId;		///< The Id of the store. This is the same Id as specified in the OriginSelectStore function
+    char					bIsDemoStore;	///< Indicator whether this store is a real store.
+
+    const OriginCatalogT *	pCatalogs;		///< The catalogs in the store.
+    OriginSizeT				CatalogCount;	///< The Number of catalogs in the store.
+};
+
+
+/// \ingroup types
+/// \brief A struct representing a catalog category for commerce functions.
+struct OriginCategoryT
+{
+    const OriginCharT	*	Type;			///< The category type (not displayed).
+    const OriginCharT	*	CategoryId;		///< The category identifier (not displayed).
+    const OriginCharT	*	ParentId;		///< The parent category (not displayed).
+    const OriginCharT	*	Name;			///< The display name.
+    const OriginCharT	*	Description;	///< The display description.
+    char					bMostPopular;	///< The featured category.
+    const OriginCharT	*	ImageID;		///< The image name.
+    OriginSizeT				CategoryCount;	///< The number of sub categories.
+    const OriginCategoryT *	pCategories;	///< The subcategories of this category.
+    OriginSizeT				OfferCount;		///< The number of offers in this category.
+    const OriginOfferT	*	pOffers;		///< The offers in this category.
+};
+
+/// \ingroup types
+/// \brief A struct representing an achievement.
+struct OriginAchievementT
+{
+    const OriginCharT *     Id;             ///< The Achievement id.
+    int32_t Progress;                       ///< The progress in reaching the achievement. Limit defined in achievement definition.
+    int32_t Total;                          ///< The number of points to score to reach the achievement.
+    int32_t Count;                          ///< The number of times this achievement is achieved.
+    const OriginCharT *     Name;           ///< The localized name of the achievement
+    const OriginCharT *     Description;    ///< The localized description of the achievement
+    const OriginCharT *     HowTo;          ///< The localized instructions on how to get this achievement.
+    const OriginCharT *     ImageId;        ///< The image Id related to this achievement. Use OriginQueryImage to get a cached version of this image.
+    OriginTimeT             GrantDate;      ///< The date when you got this achievement awarded. (Only valid when bAwarded == true)
+    OriginTimeT             Expiration;     ///< The date when the achievement will expire. The achievment shouldn't be shown when expired.
+};
+
+
+/// \ingroup types
+struct OriginAchievementSetT
+{
+    const OriginCharT *     Name;               ///< The name of the achievement set.
+    const OriginCharT *     GameName;           ///< The localized game name where these achievements belong to.
+
+    OriginAchievementT *    pAchievements;      ///< The list of achievements.
+    OriginSizeT             AchievementCount;   ///< The number of achievements in the list.
+};
+
+
+/// \ingroup types
+struct OriginAchievementEventT
+{
+    OriginCharT *pEventId;                 ///< The event Id of this event
+    OriginSizeT AttributeCount;            ///< The number of attributes in the list.
+    OriginCharT **ppAttributeNames;        ///< The names of the attributes
+    OriginCharT **ppAttributeValues;       ///< The values of the attributes
+};
+
+
+/// \ingroup types
+struct OriginChunkStatusT
+{
+    const OriginCharT *     ItemId;		    ///< The item belonging to this notification. This is the offerId of the game for full game installation, and the DLC offerId for DLC progressive installation.
+    const OriginCharT *		Name;			///< The name associated with this chunk.
+    int32_t                 ChunkId;        ///< The chunk for which this update is.
+    enumChunkType			Type;			///< The type of the chunk.
+    enumChunkState          State;          ///< The state the chunk is currently in.
+    float					Progress;	    ///< When a download is in progress this will indicate the progress of the download [0.0, 1.0].
+    uint64_t				Size;			///< The byte size of the chunk. The game game can use this information to calculate the progress of multiple chunks at a time. SUM(p1*s1 + p2*s2 + p3*s3 + ...)/SUM(s1 + s2 + s3 + ...)
+    int						ChunkETA;		///< The estimated time it takes to download the chunk in milliseconds.
+    int						TotalETA;		///< The estimated time it takes to download the whole content including this chunk in milliseconds.
+};
+
+/// \ingroup types
+struct OriginIsProgressiveInstallationAvailableT
+{
+    const OriginCharT *     ItemId;		    ///< The item belonging to this notification. This is the offerId of the game for full game installation, and the DLC offerId for DLC progressive installation.
+    bool                    bAvailable;     ///< Is Progressive installation support available.
+};
+
+/// \ingroup types
+struct OriginAreChunksInstalledInfoT
+{
+    const OriginCharT *     ItemId;		    ///< The item belonging to this notification. This is the offerId of the game for full game installation, and the DLC offerId for DLC progressive installation.
+    int32_t *               ChunkIds;       ///< An array of chunk Ids
+    OriginSizeT             ChunkIdsCount;  ///< The number of elements in the chunk array.
+    bool                    bInstalled;     ///< Are the chunks installed.
+};
+
+/// \ingroup types
+struct OriginChunkPriorityInfoT
+{
+    const OriginCharT *     ItemId;		    ///< The item belonging to this notification. This is the offerId of the game for full game installation, and the DLC offerId for DLC progressive installation.
+    int32_t *               ChunkIds;       ///< An array of chunk Ids
+    OriginSizeT             ChunkIdsCount;  ///< The number of elements in the chunk array.
+};
+
+/// \ingroup types
+struct OriginDownloadedInfoT
+{
+    const OriginCharT *     ItemId;		    ///< The item belonging to this notification. This is the offerId of the game for full game installation, and the DLC offerId for DLC progressive installation.
+    const OriginCharT *     FilePath;       ///< The path for which you asked whether it was downloaded.
+    bool                    bDownloaded;    ///< Indicator on whether the file is downloaded.
+};
+
+/// \ingroup types
+struct OriginCreateChunkInfoT
+{
+    const OriginCharT *		ItemId;		    ///< The item belonging to this notification. This is the offerId of the game for full game installation, and the DLC offerId for DLC progressive installation.
+    uint32_t				ChunkId;		///< The Assigned Chunk Id.
+};
+
+/// \ingroup types
+/// \brief Information about the game
+struct OriginGameInfoT
+{
+    const OriginCharT *     Languages;          ///< The Languages the game supports
+    OriginTimeT             Expiration;         ///< The Expiration date of the game (or "no expiration", if none)
+    OriginTimeT             SystemTime;         ///< The Origin System time to measure the expiration against
+    bool                    HasExpiration;      ///< Whether the game can expire
+    bool                    UpToDate;           ///< Whether the game is up to date
+    bool                    FreeTrial;          ///< Whether the game is a free trial
+    bool                    FullGamePurchased;  ///< If the game is a free trial this will indicated whether the user purchased the full game.
+	bool					FullGameReleased;	///< If this game is a free trial and the user owns the full game, then this flag will indicate whether the full game is released.
+	OriginTimeT				FullGameReleaseDate;///< If this game is a free trial and the user owns the full game, then this flag will indicate when the full game is/will be released.
+    const OriginCharT *     InstalledVersion;   ///< The installed version of the item. If -1 the item is not installed. When in development mode ignore this value. When using a local override for DLC installation, make sure that the version comes from the install manifest. (installerdata.xml)
+    const OriginCharT *     InstalledLanguage;  ///< The language/locale the game is installed in.
+    const OriginCharT *     AvailableVersion;   ///< The available version of the item. This can be the version on the server, or the version in the installerdata.xml when using a download override.
+    const OriginCharT *     DisplayName;        ///< The name of the item.
+    int                     MaxGroupSize;       ///< The Maximum number of users that can join a group created by this game.
+    const OriginCharT*      EntitlementSource;  ///< indication where the game is purchased. Valid values are: ORIGIN, STEAM, EPIC, UPLAY, AMAZON, etc.
+};
+
+/// \ingroup types
+struct OriginSettingsT
+{
+    const OriginCharT *     Language;            ///< The Language of Origin
+    const OriginCharT *     Environment;         ///< The environment Origin is running in
+    bool                    IsIGOAvailable;      ///< If the IGO is available to the game
+    bool                    IsIGOEnabled;        ///< If the IGO is enabled by the user
+    bool                    IsTelemetryEnabled;  ///< If the Telemetry is enabled by the user (i.e. the user did not opt-out of telemetry)
+    bool                    IsManualOffline;     ///< If Origin is manually offline.
+};
+
+
+/// \ingroup types
+/// \brief A struct containing the game message from another connected game, or send from a web page connecting to Origin through the Origin SDK(JS)
+struct OriginGameMessageT
+{
+    const OriginCharT *     GameId;             ///< The game defined game Id. This can be the masterTitleId, multiplayerId, or some GUID, or anything that is unique enough to be identified by the receiver of the message.
+    const OriginCharT *     Message;            ///< The Message the can be JSON, XML or some other string. 
+};
+
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the \ref OriginGetPresence record.
+///
+/// A callback will receive a pointer to the presence information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param pPresence The returned presence information.
+/// \param size The size of the presence record.
+/// \param error An error code indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginGetPresenceCallback) (void * pContext, OriginGetPresenceT * pPresence, OriginSizeT size, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the \ref OriginGetPresence record.
+///
+/// A callback will receive a pointer to the presence information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param dummy This value can be ignored.
+/// \param count This value can be ignored.
+/// \param error An error code indicating whether the transaction completed successfully.
+typedef OriginErrorT(*OriginSetPresenceCallback) (void * pContext, void * dummy, OriginSizeT dummy_size, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the \ref OriginCatalogT record.
+///
+/// A callback will receive a pointer to the root list of catalogs in the store.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param ppCatalogs The returned store root catalogs.
+/// \param count The number of catalogs in the root folder.
+/// \param error An error code indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginStoreCallback) (void * pContext, OriginStoreT * pStore, OriginSizeT size, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the \ref OriginCategoryT record.
+///
+/// A callback will receive the pointer to the root list of categories of the catalog set in SelectStore.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param ppCategories The returned catalog root categories.
+/// \param count The number of categories in the root folder.
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginCatalogCallback) (void * pContext, OriginCategoryT ** ppCategories, OriginSizeT numberOfCategories, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the \ref OriginItemT record.
+///
+/// A callback will receive the link to the root list of categories of the catalog.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param item The returned catalog root categories.
+/// \param count The number of categories in the root folder.
+/// \param error An error code indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginEntitlementCallback) (void * pContext, OriginItemT * item, OriginSizeT count, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the \ref OriginAchievementT.
+///
+/// A callback will receive a list of achievement sets requested.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param pAchievement The achievement granted.
+/// \param size The size of the AchievementT structure.
+/// \param error An error code indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginAchievementCallback) (void * pContext, OriginAchievementT * pAchievement, OriginSizeT size, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the \ref OriginAchievementSetT list.
+///
+/// A callback will receive a list of achievement sets requested.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param ppAchievementSets The list of achievement sets returned.
+/// \param numberOfAchievementSets The number of achievement sets returned.
+/// \param error An error code indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginAchievementSetCallback) (void * pContext, OriginAchievementSetT ** ppAchievementSets, OriginSizeT numberOfAchievementSets, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the OriginTicketT record.
+///
+/// A function with this signature can be used to receive ticket information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param balance The returned balance.
+/// \param size This parameter can be ignored.
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginWalletCallback) (void * pContext, int64_t * balance, OriginSizeT size, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the OriginTicketT record.
+///
+/// A function with this signature can be used to receive ticket information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param ticket Receives an \ref OriginHandleT handle when the resource is received.
+/// \param length Receives the size of the resource.
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginTicketCallback) (void * pContext, const char ** ticket, OriginSizeT length, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the AuthCode string.
+///
+/// A function with this signature can be used to receive authcode information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param authcode Receives an \ref OriginHandleT handle when the resource is received.
+/// \param length Receives the size of the resource.
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginAuthCodeCallback) (void * pContext, const char ** authcode, OriginSizeT length, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for the OriginResourceT record.
+///
+/// A function with this signature can be used to receive ticket information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param resource Receives a pointer to the resource. Using it will require a typecast to the expected type.
+/// \param length Receives the size of the resource.
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginResourceCallback) (void * pContext, void * resource, OriginSizeT length, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for an info string.
+///
+/// A function with this signature can be used to receive ticket information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param info The info string
+/// \param length Receives the size of the resource.
+/// \param error An error code indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginSettingCallback) (void * pContext, const OriginCharT** info, OriginSizeT length, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for a settings blob.
+///
+/// A function with this signature can be used to receive ticket information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param settings the block of settings
+/// \param length Receives the size of the resource.
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginSettingsCallback) (void * pContext, OriginSettingsT* settings, OriginSizeT length, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for a game info blob.
+///
+/// A function with this signature can be used to receive ticket information.
+/// \param pContext The user-provided context to the callback system. This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param info the block of game info
+/// \param length Receives the size of the resource.
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginGameInfoCallback) (void * pContext, OriginGameInfoT* info, OriginSizeT length, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for incoming Origin events.
+///
+/// A function with this signature can be used to receive event information.
+/// \param eventId One (and only one, not a bitwise combination) of the ORIGIN_EVENT_* values (see \ref ORIGIN_EVENT_INVITE etc.).
+/// \param pContext The user-provided context to the callback system.  This context can contain anything.
+/// Most of the time it will be a pointer to an application's handler class.
+/// \param eventData The data associated with the event. The type depends on the eventId.
+/// \param count The number of items of eventData in this callback.
+typedef OriginErrorT (*OriginEventCallback) (int32_t eventId, void * pContext, void* eventData, OriginSizeT count);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for callbacks that are used to signal success or failure.
+///
+/// This is the signature of a function that will be called when the OriginXXX function completes. It doesn't return any data, only an error status.
+/// \param pContext The user-provided context to the callback system. This context can contain anything. Most of the time it will be a pointer to an application's handler class.
+/// \param pDummy This will be NULL.
+/// \param dummyCount This will receive 0
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT (*OriginErrorSuccessCallback) (void * pContext, void * pDummy, OriginSizeT dummyCount, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for callbacks for OriginGetPresenceVisibility
+///
+/// This is the signature of a function that will be called when the OriginXXX function completes. It doesn't return any data, only an error status.
+/// \param pContext The user-provided context to the callback system. This context can contain anything. Most of the time it will be a pointer to an application's handler class.
+/// \param pDummy This will be NULL.
+/// \param dummyCount This will receive 0
+/// \param error An errorcode indicating whether the transaction completed successfully.
+typedef OriginErrorT(*OriginGetPresenceVisibilityCallback) (void * pContext, bool * bVisibility, OriginSizeT size, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The asynchronous callback signature for reporting errors encountered by the Origin SDK.
+///
+/// A function with this signature can be registered to receive error reports with precise debug information directly
+/// during Origin code execution.
+///
+/// This callback may be called at any moment, either from Origin functions called by the user or from private Origin
+/// threads. The user is reponsible for synchronization.
+/// \param pcontext The user-provided context to the error callback.  This context can contain anything, it is only used to pass back to the user callback.
+/// \param error_code The Origin error code being reported.  This code will also generally be returned from the function that was executing.
+/// \param message_text Some errors are reported with additional message text.
+/// \param file The Origin source file that is reporting the error.
+/// \param line The line of the Origin source file that is reporting the error.
+typedef void (*OriginErrorCallback) (void * pcontext, OriginErrorT error_code, const char* message_text, const char* file, int line);
+
+
+typedef OriginErrorT (*OriginIsProgressiveInstallationAvailableCallback) (void * pContext, OriginIsProgressiveInstallationAvailableT * availableInfo, OriginSizeT dummy, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The signature for the OriginAreChunksInstalled callback.
+/// \param pContext The user-provided context to the callback system. This context can contain anything. Most of the time it will be a pointer to an application's handler class.
+/// \param bInstalled A pointer to a boolean that contains the result of the are chunk installed query.
+/// \param count this value can be ignored, it should contain 1 when the request successfully succeeds.
+/// \param error An error returned to the callback when the query couldn't complete. In the case error != ORIGIN_SUCCESS the bInstalled value is not valid.
+typedef OriginErrorT (*OriginAreChunksInstalledCallback) (void * pContext, OriginAreChunksInstalledInfoT * installInfo, OriginSizeT count, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The signature for the OriginAreChunksInstalled callback.
+/// \param pContext The user-provided context to the callback system. This context can contain anything. Most of the time it will be a pointer to an application's handler class.
+/// \param bInstalled A pointer to a boolean that contains the result of the are chunk installed query.
+/// \param count this value can be ignored, it should contain 1 when the request successfully succeeds.
+/// \param error An error returned to the callback when the query couldn't complete. In the case error != ORIGIN_SUCCESS the bInstalled value is not valid.
+typedef OriginErrorT (*OriginChunkStatusCallback) (void * pContext, OriginChunkStatusT * status, OriginSizeT count, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The signature for the OriginIsFileDownloaded callback.
+/// \param pContext The user-provided context to the callback system. This context can contain anything. Most of the time it will be a pointer to an application's handler class.
+/// \param bInstalled A pointer to a boolean that contains the result of the are chunk installed query.
+/// \param count this value can be ignored, it should contain 1 when the request successfully succeeds.
+/// \param error An error returned to the callback when the query couldn't complete. In the case error != ORIGIN_SUCCESS the bInstalled value is not valid.
+typedef OriginErrorT (*OriginIsFileDownloadedCallback) (void * pContext, struct OriginDownloadedInfoT * downloadInfo, OriginSizeT count, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The signature for the OriginGetChunkPriority callback.
+/// \param pContext The user-provided context to the callback system. This context can contain anything. Most of the time it will be a pointer to an application's handler class.
+/// \param chunkIds An array of chunkIds.
+/// \param count The number of chunks in the array of chunks.
+/// \param error An error returned to the callback when the query couldn't complete. In the case error != ORIGIN_SUCCESS the chunkIds value is not valid.
+typedef OriginErrorT (*OriginChunkPriorityCallback) (void * pContext, const OriginChunkPriorityInfoT * chunkIdInfo, OriginSizeT count, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The signature for the OriginGetChunkPriority callback.
+/// \param pContext The user-provided context to the callback system. This context can contain anything. Most of the time it will be a pointer to an application's handler class.
+/// \param chunkId The assigned chunkId.
+/// \param count a dummy parameter (always 1).
+/// \param error An error returned to the callback when the query couldn't complete. In the case error != ORIGIN_SUCCESS the chunkIds value is not valid.
+typedef OriginErrorT (*OriginCreateChunkCallback) (void * pContext, const int * chunkId, OriginSizeT count, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The callback signature for getting debug information from the SDK.
+///
+/// \param pContext This will receive a user-provided context.
+/// \param pText The debug text.
+typedef void (*PrintfHook)(void *pContext, const OriginCharT *pText);
+
+/// \ingroup types
+/// \brief The group meta data
+struct OriginGroupInfoT
+{
+    const OriginCharT * GroupName;  ///< An user readable name optionally provided by the user when creating the group
+    const OriginCharT * GroupId;    ///< An unique id assigned to the group on creation. 
+    enumGroupType       GroupType;       ///< Whether this group can be joined without and invite to it. 
+    bool bUserCanInviteNewMembers;  ///< If this is true the user can invite new members to the group.
+    bool bUserCanRemoveMembers;     ///< Has the privilege to remove members from the group.
+    bool bUserCanSendGameInvites;	///< Indicates whether the user is allowed to send group game invites to the group members.
+    int MaxGroupSize;               ///< The maximum number of players in the group
+};
+
+/// \ingroup types
+/// \brief The callback signature for the OriginGetGroupInfo function
+/// \param pContext The application passed in context.
+/// \param groupInfo The GroupInfo returned.
+/// \param dummy A dummy value that contains the count of the returned records. 
+/// \param error Whether the command was successful
+/// \return Pass the error code received in error back to the return value, or an alternate error if the processing of the data failed.
+typedef OriginErrorT (*OriginGroupInfoCallback) (void *pContext, const OriginGroupInfoT * groupInfo, OriginSizeT dummy, OriginErrorT error);
+
+
+/// \ingroup types
+/// \brief The Voip Status structure
+struct OriginVoipStatusT
+{
+    bool Available; ///< Indicates whether VOIP is possible for Origin. If false trying to enable VOIP will return an error.
+    bool Active;   ///< Indication whether VOIP is currently active.
+};
+
+/// \ingroup types
+/// \brief Event that gives informations about users in the group, and 
+struct OriginVoipStatusEventT
+{
+	enumVoipState Type;		///< What type of Voip Status update it is.
+	OriginUserT UserId;					///< To what user the status update applies. When 0 it applies to the channel.
+};
+
+
+/// \ingroup types
+/// \brief The callback signature for the OriginGetViopStatus function.
+/// \param pContext The application passed in context.
+/// \param voipStatus The OriginVoipStatus structure returned.
+/// \param dummy A dummy value that contains the count of the returned records. 
+/// \param error Whether the command was successful
+/// \return Pass the error code received in error back to the return value, or an alternate error if the processing of the data failed.
+typedef OriginErrorT(*OriginVoipStatusCallback)(void *pContext, const OriginVoipStatusT * voipStatus, OriginSizeT dummy, OriginErrorT error);
+
+/// \ingroup types
+/// \brief The group invite
+struct OriginGroupInviteT
+{
+    const OriginCharT * GroupName;  ///< An user readable name optionally provided by the user when creating the group
+    const OriginCharT * GroupId;    ///< An unique id assigned to the group on creation. 
+    enumGroupType       GroupType;       ///< Whether this group can be joined without and invite to it. 
+    OriginUserT         Inviter;    ///< The user in the group that invited you to join.
+};
+
+struct DLC
+{
+    const OriginCharT * Name;       ///< The human readable name of the DLC.
+    const OriginCharT * Id;         ///< The platform specific Id for the DLC
+    bool Installed;                 ///< The DLC installation state.
+};
+
+#pragma pack(pop)
+
+#endif //__ORIGIN_TYPES_H__

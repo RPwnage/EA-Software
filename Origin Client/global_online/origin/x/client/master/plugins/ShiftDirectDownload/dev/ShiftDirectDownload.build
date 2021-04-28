@@ -1,0 +1,559 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="ShiftDirectDownload" default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="clean" value="exclude"/>
+    </optionset>
+
+    <property name="package.ShiftDirectDownload.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.ShiftDirectDownload.version"  value="@{PathGetFileName('${package.ShiftDirectDownload.dir}')}"/>
+    <property name="package.ShiftDirectDownload.lang.res.dir" value="${package.ShiftDirectDownload.dir}/resources/lang" />
+    <package name="ShiftDirectDownload" targetversion="${package.ShiftDirectDownload.version}"/>
+
+    <!-- ******************** -->
+    <!-- Package dependencies -->
+    <!-- ******************** -->
+    <dependent name="ActivePython" />
+    <dependent name="libarchive" />
+    <dependent name="originClient" />
+    <dependent name="OriginConfig" />
+    <dependent name="OriginLegacyApp" />
+    <dependent name="OriginUtils" />
+    <dependent name="OriginVersion" />
+    <dependent name="Qt" unless="${noqt}"/>
+    <dependent name="openSSL" />
+    <dependent name="engine" />
+    <dependent name="services" />
+    <dependent name="TelemetryAPI" />
+    <dependent name="uitoolkit" />
+    <dependent name="webWidget" />
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="runtime.buildmodules" value="ShiftDirectDownload"/>
+
+    <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+    <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+
+    <property name="runtime.ShiftDirectDownload.outputdir" value="${package.originClient.dir}/runtime/plugins/ShiftDirectDownload" if="${config-system} == pc" />
+    <property name="runtime.ShiftDirectDownload.outputdir" value="${nant.project.buildroot}/OriginBootstrap/dev-mac/SubProjects/ShiftDirectDownload/dev/ShiftDirectDownload/build/${config-xcode-type}/ShiftDirectDownload.plugin" if="${config-system} == 'osx'" />
+    <property name="runtime.ShiftDirectDownload.eaigameprojdir" value="${runtime.ShiftDirectDownload.outputdir}" if="${config-system} == 'pc'" />
+    <property name="runtime.ShiftDirectDownload.eaigameprojdir" value="${nant.project.buildroot}/../../../../OriginBootstrap/dev-mac/build/OriginBootstrap/dev-mac/SubProjects/ShiftDirectDownload/dev/ShiftDirectDownload/build/${config-xcode-type}/ShiftDirectDownload.plugin" if="${config-system} == 'osx'" />
+    <property name="runtime.ShiftDirectDownload.xcode-osx-template-dir" value="${package.ShiftDirectDownload.dir}/XCodeTemplate/ShiftDirectDownload-xcode.template" />
+    <property name="runtime.ShiftDirectDownload.plist.template" value="${runtime.ShiftDirectDownload.xcode-osx-template-dir}/Info.plist.template" />
+    <property name="runtime.ShiftDirectDownload.plist" value="${runtime.ShiftDirectDownload.xcode-osx-template-dir}/Info.plist" />
+    <property name="runtime.ShiftDirectDownload.osx-extra-link-options" value="-sectcreate __TEXT __info_plist ${runtime.ShiftDirectDownload.plist} -ObjC -stdlib=libc++ -undefined dynamic_lookup" />
+    <property name="runtime.ShiftDirectDownload.outputname" value="ShiftDirectDownload" />
+    <property name="runtime.ShiftDirectDownload.outputfile" value="${runtime.ShiftDirectDownload.outputname}.dll" if="${config-system} == 'pc'" />
+    <property name="runtime.ShiftDirectDownload.outputfile" value="${runtime.ShiftDirectDownload.outputname}.dylib" if="${config-system} == 'osx'" />
+    <property name="package.ShiftDirectDownload.tempdir" value="${package.ShiftDirectDownload.dir}/temp" />
+    <property name="package.ShiftDirectDownload.targetdir" value="${package.ShiftDirectDownload.dir}/target" />
+    <property name="sign.basedir" value="${runtime.ShiftDirectDownload.outputdir}" if="${config-system} == 'osx'" />
+    <property name="dip.output.dir" value="${package.ShiftDirectDownload.targetdir}/IMAGE/DIP"/>
+    <property name="dirtysdk-samples" value="false" />
+    <!-- ************************** -->
+    <!-- Additional Include scripts -->
+    <!-- ************************** -->
+    <include file="${package.ShiftDirectDownload.dir}/scripts/targets/webwidget.xml" />
+
+    <!-- ***************************** -->
+    <!-- Build Configuration properties-->
+    <!-- ***************************** -->
+    <BuildType name="ShiftDirectDownload.buildtype" from="OriginDLL">
+        <!-- Remove unneeded default frameworks -->
+        <option name="buildset.cc.defines">
+            ${option.value}
+            ORIGIN_PLUGIN
+        </option>
+        <option name="buildset.cc.defines" if="${config-system} == pc">
+            ${option.value}
+            NOMINMAX
+        </option>
+        <option name="buildset.cc.options" if="${config-system} == 'pc'">
+          ${option.value}
+          /FI ${package.ShiftDirectDownload.dir}/source/OriginCommon.h
+        </option>
+    </BuildType>
+
+    <property name="runtime.ShiftDirectDownload.buildtype" value="ShiftDirectDownload.buildtype" />
+
+    <property name="runtime.ShiftDirectDownload.remove.defines" if="${config-system} == 'pc'">
+      EA_DLL
+    </property>
+
+    <property name="runtime.ShiftDirectDownload.remove.link.options" if="${config-system} == 'osx'">
+      -framework CoreServices
+      -framework AudioToolBox
+      -framework CoreServices
+    </property>
+
+    <!-- ********************* -->
+    <!-- Runtime configuration -->
+    <!-- ********************* -->
+    <property name="python.exe" value="python" if="${config-system} != 'pc'" />
+    <!-- Windows needs ActivePython -->
+    <property name="python.exe" value="${package.ActivePython.exe}" if="${config-system} == 'pc'" />
+
+    <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+    <property name="generate.code.targets" value="setup-generate-code moc-compile ui-compile webwidget-compile-all"/>
+    <property name="generate.code.targets" value="${property.value} qt-rc-compile" unless="${noqt}"/>
+    <target name="generate-code" depends="${generate.code.targets}" />
+    <property name="runtime.ShiftDirectDownload.prebuildtarget" value="generate-code" />
+
+    <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+    <property name="runtime.ShiftDirectDownload.vcproj.pre-build-step">
+        ${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.ShiftDirectDownload.prebuildtarget}
+    </property>
+
+    <property name="runtime.ShiftDirectDownload.builddependencies">
+        EABase
+        EAStdC
+        EATrace
+        EACallstack
+        zlib
+        coreallocator
+        EAIO
+        EATrace
+        EASTL
+        DirtySDK
+        PPMalloc
+        openSSL
+        LSXWrapper
+        libarchive
+    </property>
+
+    <property name="runtime.ShiftDirectDownload.builddependencies" if="${config-system} == pc">
+        ${property.value}
+        originClient
+    </property>
+    
+    <property name="runtime.ShiftDirectDownload.buildonlydependencies" if="${config-system} == 'osx'">
+        originClient
+    </property>
+
+    <property name="runtime.ShiftDirectDownload.usedependencies">
+        OriginConfig
+        OriginVersion
+    </property>
+    
+    <property name="runtime.ShiftDirectDownload.usedependencies" unless="${noqt}">
+        ${property.value}
+        Qt
+    </property>
+
+    <property name="sign.filelist" >
+      Contents/MacOS/${runtime.ShiftDirectDownload.outputfile}
+    </property>
+
+    <property name="sign.dirlist" >
+    </property>
+
+    <property name="runtime.ShiftDirectDownload.includedirs" >
+        ${package.ShiftDirectDownload.dir}/include
+        ${package.ShiftDirectDownload.dir}/jsinterface
+        ${package.ShiftDirectDownload.dir}/widgets
+        ${package.engine.includedirs}
+        ${package.engine.dir}/model/source
+        ${package.originClient.dir}
+        ${package.originClient.includedirs}
+        ${package.originClient.dir}/common/source
+        ${package.originClient.dir}/websupport/source
+        ${package.originClient.dir}/widgets/logoutExit/source
+        ${package.OriginLegacyApp.dir}/source/ui
+        ${package.TelemetryAPI.dir}/include
+        ${package.services.includedirs}
+        ${package.uitoolkit.includedirs}
+        ${package.webWidget.includedirs}
+        ${moc.output.dir}
+        ${ui.output.dir}
+    </property>
+
+    <!-- common source files -->
+    <fileset name="runtime.ShiftDirectDownload.sourcefiles" basedir="${package.ShiftDirectDownload.dir}">
+        <includes name="jsinterface/*.cpp" />
+        <includes name="source/*.cpp" />
+        <includes name="views/*.cpp" />
+        <includes name="widgets/*.cpp" />
+    </fileset>
+
+    <!-- strip out platform specific files -->
+    <fileset name="runtime.ShiftDirectDownload.sourcefiles" basedir="${package.ShiftDirectDownload.dir}" append="true">
+        <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+        <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    </fileset>
+
+    <fileset name="runtime.ShiftDirectDownload.libs">
+        <group if="${config-system} == 'pc'" unless="${noqt}">
+            <includes name="${package.openSSL.libdir}/libeay32${debug-suffix}.lib"/>
+            <includes name="${package.openSSL.libdir}/ssleay32${debug-suffix}.lib"/>
+            
+            <includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Xml${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5XmlPatterns${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Gui${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Network${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Core${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5WebKit${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5WebKitwidgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Widgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Test${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5PrintSupport${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Multimedia${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5MultimediaWidgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Sql${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/../plugins/platforms/qwindows${debug-suffix}.lib"/>
+            
+            <includes name="${package.libarchive.dir}/Lib/archive_static.Lib"/> 
+        </group>
+        <group if="${config-system} == 'osx'" >
+        </group>
+    </fileset>
+
+    <fileset name="runtime.ShiftDirectDownload.headerfiles" basedir="${package.ShiftDirectDownload.dir}">
+        <includes name="**/*.h" />
+    </fileset>
+
+    <property name="runtime.ShiftDirectDownload.res.includedirs">
+        ${package.ShiftDirectDownload.dir}/include
+        ${package.OriginVersion.dir}/include
+    </property>
+
+    <do if="${config-system} == 'pc'">      
+        <fileset name="runtime.ShiftDirectDownload.resourcefiles">
+            <includes name="${package.ShiftDirectDownload.dir}/resources/pc/ShiftDirectDownload.rc" />
+        </fileset>
+    </do>
+
+    <fileset name="runtime.ShiftDirectDownload.ui_sourcefiles" basedir="${package.ShiftDirectDownload.dir}" append="true">
+        <includes name="**/*.ui" />
+    </fileset>
+
+    <!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+    <fileset name="runtime.moc_sourcefiles" basedir="${package.ShiftDirectDownload.dir}" append="true">
+        <includes name="include/ShiftDirectDownload/*.h" />
+        <includes name="jsinterface/*.h" />
+        <includes name="views/*.h" />
+        <includes name="widgets/*.h" />
+    </fileset>
+
+    <!-- strip out platform specific files -->
+    <fileset name="runtime.moc_sourcefiles" basedir="${package.ShiftDirectDownload.dir}" append="true">
+        <excludes name="include/ShiftDirectDownload/Plugin.h"/>
+        <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+        <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    </fileset>
+
+    <!-- construct the paths to include the moc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+        <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.ShiftDirectDownload.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+
+    <!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+    <fileset name="runtime.qrc_sourcefiles" basedir="${package.ShiftDirectDownload.dir}">
+    </fileset>
+
+    <!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+    <foreach property="widget" item="String" in="${widget.list}" >
+        <fileset name="runtime.qrc_sourcefiles" fromfileset="runtime.qrc_sourcefiles">
+            <includes name="${webwidgets.outputdir}/${widget}/${widget}.qrc" asis="true" />
+        </fileset>
+    </foreach>
+
+    <!-- construct the paths to include the qrc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.qrc_sourcefiles">
+        <property name="sourcefile" value="${rc.output.dir}/qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.ShiftDirectDownload.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+
+    <target name="setup-generate-code">
+        <!-- get the options from the current config -->
+        <property name="runtime.ShiftDirectDownload.moc_defines" value="@{OptionSetGetValue('${runtime.ShiftDirectDownload.buildtype}','cc.defines')}"/>
+        <property name="runtime.ShiftDirectDownload.moc_includedirs" value="${runtime.ShiftDirectDownload.includedirs}"/>
+    </target>
+
+    <!-- ************************** -->
+    <!-- Prebuild property targets -->
+    <!-- ************************** -->
+    <property name="runtime.ShiftDirectDownload.preprocess" value="update-plist" if="${config-system} == 'osx'"/>
+
+    <target name="update-plist" >
+      <echo message="Updating versions in plist files"/>
+      <!-- Get the current version -->
+      <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+        <property name="config" value="${config}" />
+      </nant>
+      <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+      <!-- Get the current plugin version -->
+      <nant buildfile="${package.OriginVersion.dir}/version.build" target="getpluginversion" >
+        <property name="config" value="${config}" />
+      </nant>
+      <property name="plugin.version" fromfile="${package.OriginVersion.plugin.version.file}" />
+      
+      <!-- Update the plist with the new version number -->
+      <property name="plist" value="" />
+      <property name="version.nextline" value="false" />
+      <property name="plugin.version.nextline" value="false" />
+      
+      <foreach property="line" item="Line" in="${runtime.ShiftDirectDownload.plist.template}">
+        <!-- Check for OriginClientVersion in line and put the version in the next line -->
+        <do if="${version.nextline}" >
+          <property name="line" value="&lt;string&gt;${version}&lt;/string&gt;" />
+          <property name="version.nextline" value="false" />
+        </do>
+
+        <!-- Check for CFBundleVersion in line and put the version in the next line -->
+        <do if="${plugin.version.nextline}" >
+          <property name="line" value="&lt;string&gt;${plugin.version}&lt;/string&gt;" />
+          <property name="plugin.version.nextline" value="false" />
+        </do>
+
+        <do if="@{StrIndexOf(${line},'CFBundleVersion')} != -1 || @{StrIndexOf(${line},'CFBundleShortVersionString')} != -1">
+          <property name="plugin.version.nextline" value="true" />
+        </do>
+        <do if="@{StrIndexOf(${line},'OriginClientVersion')} != -1">
+          <property name="version.nextline" value="true" />
+        </do>
+        
+        <property name="plist" value="${property.value}&#10;${line}" />
+      </foreach>
+      <delete file="${runtime.ShiftDirectDownload.plist}" />
+      <echo message="${plist}" file="${runtime.ShiftDirectDownload.plist}" />
+    </target>
+    
+    <!-- ************************** -->
+    <!-- Postbuild property targets -->
+    <!-- ************************** -->
+    
+    <!-- NANT Postbuild target. Will execute this after compiling happens. -->
+	<property name="runtime.ShiftDirectDownload.postbuildtarget" value="ShiftDirectDownload-post-build-tasks" />
+    
+    <!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+	<property name="runtime.ShiftDirectDownload.vcproj.post-build-step">
+      ${nant.location}/nant.exe -buildfile:${nant.project.buildfile} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:codesign.timestamp=${codesign.timestamp} ${runtime.ShiftDirectDownload.postbuildtarget}
+	</property>
+    
+    <target name="ShiftDirectDownload-post-build-tasks">
+      <call target="obfuscate-strings-sdd" />
+      <do if="(${config-system} == 'pc') AND (${config-type} == 'opt')">
+        <call target="sign-exe" />
+      </do>
+      <do if="${config-system} == 'osx'">
+        <call target="copy-to-bundle" />
+        <call target="codesign" />
+      </do>
+    </target>
+
+    <target name="obfuscate-strings-sdd">
+      <dependent name="ObfuscateStrings" />
+
+      <property name="input.file" value="${runtime.ShiftDirectDownload.outputfile}" />
+      <property name="working.dir" value="${runtime.ShiftDirectDownload.outputdir}" if="${config-system} == 'pc'" />
+      <property name="working.dir" value="${runtime.ShiftDirectDownload.outputdir}/Contents/MacOS" if="${config-system} == 'osx'" />
+
+      <echo message="Obfuscating strings in ShiftDirectDownload.  Input file = ${input.file}.  Working dir = ${working.dir}"/>
+      <call target="obfuscate-strings" />
+    </target>
+
+    <target name="sign-exe">
+      <echo message="Signing ShiftDirectDownload DLL"/>
+      <fileset name="signing.files" basedir="${runtime.ShiftDirectDownload.outputdir}">
+        <includes name="${runtime.ShiftDirectDownload.outputfile}" />
+      </fileset>
+
+      <foreach property="signfile" item="FileSet" in="signing.files">
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="@{PathGetFileNameWithoutExtension('${signfile}')}" in="${signfile}" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+        <sleep seconds="2" />
+      </foreach>
+    </target>
+
+    <target name="codesign" >
+      <echo message="Signing ShiftDirectDownload plugin bundle"/>
+      <fail unless="@{PropertyExists('sign.basedir')}" message="You must specify a basedir to sign" />
+      <fail message="Property sign.filelist or sign.dirlist is not defined. You must define one of these properties for osx to tell us what to sign"
+        unless="@{PropertyExists('sign.filelist')} || @{PropertyExists('sign.dirlist')}" />
+
+      <property name="cert.name" value="OriginDev" />
+      <property name="cert.name" value="Developer ID Application: Electronic Arts Inc." if="@{PropertyExists('jenkins')}"/>
+
+      <foreach property="signfile" item="String" in="${sign.filelist}" if="@{PropertyExists('sign.filelist')}" >
+        <task name="codesign.exec" in="${sign.basedir}/${signfile}" public.cert="@{PropertyExists('jenkins')}" />
+      </foreach>
+
+      <foreach property="signdir" item="String" in="${sign.dirlist}" if="@{PropertyExists('sign.dirlist')}" >
+        <task name="codesign.exec" in="${sign.basedir}/${signdir}" public.cert="@{PropertyExists('jenkins')}" if="@{DirectoryExists('${sign.basedir}/${signdir}')}==true" />
+      </foreach>
+
+      <task name="codesign.exec" in="${sign.basedir}" public.cert="@{PropertyExists('jenkins')}" if="@{DirectoryExists('${sign.basedir}')}==true" />
+    </target>
+
+    <target name="copy-to-bundle" >
+      <echo message="Copying resources to ShiftDirectDownload plugin bundle"/>
+      <copy todir="${runtime.ShiftDirectDownload.outputdir}/Contents/Resources" flatten="true">
+        <fileset>
+          <includes name="${package.ShiftDirectDownload.dir}/resources/mac/Resources/*.*" />
+          <includes name="${package.ShiftDirectDownload.dir}/resources/mac/Resources/**/*.*" />
+        </fileset>
+      </copy>
+    </target>
+
+    <target name="ShiftDirectDownload-dip">
+      <property name="game.source.path" value="${runtime.ShiftDirectDownload.outputdir}"/>
+      <property name="game.source.path" value="@{PathGetDirectoryName(${plugin.path})}" if="(@{PropertyExists('plugin.path')}) AND (${config-system} == 'pc')"/>
+      <property name="game.source.path" value="${plugin.path}" if="(@{PropertyExists('plugin.path')}) AND (${config-system} == 'osx')"/>
+
+      <echo message="game.source.path is ${game.source.path}" />
+      <echo message="game.source.path exists" if="@{DirectoryExists('${game.source.path}')}==true"/>
+      <echo message="game.source.path DOES NOT exist" unless="@{DirectoryExists('${game.source.path}')}==true"/>
+
+      <choose>
+        <do if="(${plugin.version??''} != '') AND (${client.version??''} != '')">
+          <property name="version" value="${client.version}"/>
+          <property name="plugin.version" value="${plugin.version}"/>
+        </do>
+        <do>
+          <!-- get the current version of plugin and client -->
+          <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+            <property name="config" value="${config}" />
+          </nant>
+          <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+          <!-- Get the current plugin version -->
+          <nant buildfile="${package.OriginVersion.dir}/version.build" target="getpluginversion" >
+            <property name="config" value="${config}" />
+          </nant>
+          <property name="plugin.version" fromfile="${package.OriginVersion.plugin.version.file}" />
+        </do>
+      </choose>
+
+      <do unless="${config-system} == 'osx'">
+        <dependent name="EAInstaller"/>
+        <dependent name="SignTool"/>
+
+        <property name="dip.yaml.file" value="${package.ShiftDirectDownload.dir}\ShiftDirectDownload.yaml"/>
+        <property name="dip.childyaml.file" value="${package.ShiftDirectDownload.dir}\ShiftDirectDownload.yaml"/>
+        <property name="dip.yaml.template" value="${package.ShiftDirectDownload.dir}\ShiftDirectDownload_tmp.yaml"/>
+        <property name="gameproject.dir" value="${package.ShiftDirectDownload.dir}\resources\pc"/>
+              
+        <!-- create the yaml file for EAI with the correct versions -->
+        <property name="dip.yaml.text" fromfile="${dip.yaml.template}"/>        
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__PLUGIN_VERSION__',${plugin.version})}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__ZIPNAME__','ShiftDirectDownload_PC_${plugin.version}')}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__CLIENT_VERSION__',${version})}"/>
+
+        <property name="cert.args" value="/f ${package.SignTool.datadir}\ea_cert.pfx /p origin" unless="@{PropertyExists('jenkins')}"/>
+        <property name="cert.args" value="/sha1 ${cert.sha1}" if="@{PropertyExists('jenkins')}"/>
+        
+        <delete file="${dip.yaml.file}" />
+        <echo message="${dip.yaml.text}" file="${dip.yaml.file}"/>
+        
+        <!-- failonerror="false" because EAI 4.01.00 reports failure due to a python exception even though it succeeds -->
+        <exec program="${InstallerBuilder.exe}" workingdir="${package.ShiftDirectDownload.dir}" failonerror="false">
+            <args>
+                <arg value="-EAIPath ${package.EAInstaller.dir}"/>
+                <arg value="-YAMLFile ${dip.yaml.file}"/>
+                <arg value="-ChildYAML ${dip.childyaml.file}"/>
+                <arg value="-ProjectPath ${gameproject.dir}"/>
+                <arg value="-GameSourcePath ${game.source.path}"/>
+                <arg value="-OutputPath ${package.ShiftDirectDownload.dir}/target"/>
+                <arg value="-c &quot;${cert.args}&quot;"/>
+            </args>
+        </exec>
+      </do>
+        
+      <do if="${config-system} == 'osx'">
+        <dependent name="EAInstallerMac"/>
+
+        <property name="dip.yaml.file" value="${package.ShiftDirectDownload.dir}/ShiftDirectDownload_Mac.yaml"/>
+        <property name="dip.childyaml.file" value="${package.ShiftDirectDownload.dir}/ShiftDirectDownload_Mac.yaml"/>
+        <property name="dip.yaml.template" value="${package.ShiftDirectDownload.dir}\ShiftDirectDownload_Mac_tmp.yaml"/>
+        <property name="gameproject.dir" value="${runtime.ShiftDirectDownload.eaigameprojdir}"/>
+        <property name="gameproject.dir" value="${plugin.path}" if="@{PropertyExists('plugin.path')}"/>
+        
+        <property name="dip.yaml.text" fromfile="${dip.yaml.template}"/>        
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__PLUGIN_VERSION__',${plugin.version})}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__ZIPNAME__','ShiftDirectDownload_Mac_${plugin.version}')}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__CLIENT_VERSION__',${version})}"/>
+        
+        <delete file="${dip.yaml.file}" />
+        <echo message="${dip.yaml.text}" file="${dip.yaml.file}"/>
+
+        <task name="EAInstallerMac.BuildInstaller" 
+            ProjectFile="${dip.yaml.file}" 
+            ChildFile="${dip.childyaml.file}" 
+            ProjectThirdPartyFolder="${gameproject.dir}" 
+            RainbowGameDistributionFolder="${gameproject.dir}" 
+            BuildOutputFolder="${package.ShiftDirectDownload.dir}/target"
+            ExtraArgs="-b"
+            />
+      </do>
+      
+      <copy todir="${package.originClient.dir}/target">
+          <fileset basedir="${dip.output.dir}">
+              <includes name="ShiftDirectDownload*.zip"/>
+          </fileset>
+      </copy>
+    </target>
+        
+    <target name="ShiftDirectDownload-submit">
+      <dependent name="OriginUtils"/>
+        
+      
+      <property name="shift.platform" value="PC" unless="@{PropertyExists(shift.platform)}"/>
+      
+      // We don't know the actual name of the DiP file but we know it will be the only one in the directory.
+      <foreach property="file" item="File" in="${dip.output.dir}\ShiftDirectDownload*.zip" >
+        <property name="filename" value="@{PathGetFileName(${file})}"/>
+      </foreach>
+      
+      <property name="shift.template" value="${package.ShiftDirectDownload.dir}\shift\Shift_Direct_Download-${shift.platform}.properties" />
+      <property name="shift.user" value="originautomation@eac.ad.ea.com" />
+      <property name="shift.password" value="Origin@11" />
+      <property name="shift.source" value="\\eac.ad.ea.com\sports\ebisu\ShiftSubmissions\${filename}" />
+      
+      //copy the build to a network drive.
+      <copy file="${dip.output.dir}/${filename}" todir="@{PathGetDirectoryName(${shift.source})}" />
+      
+      <task name="shift-submit" 
+        template="${shift.template}"
+        source="${shift.source}"
+        user="${shift.user}"
+        password="${shift.password}"
+            />
+    </target>
+    
+    <target name="shift-test">
+        <property name="dip.yaml.file" value="${package.ShiftDirectDownload.dir}\ShiftDirectDownload.yaml"/>
+        <property name="dip.yaml.template" value="${package.ShiftDirectDownload.dir}\ShiftDirectDownload_tmp.yaml"/>
+        <property name="gameproject.dir" value="${package.ShiftDirectDownload.dir}\resources\pc"/>
+        
+        <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+          <property name="config" value="${config}" />
+        </nant>
+        <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+        <!-- Get the current plugin version -->
+        <nant buildfile="${package.OriginVersion.dir}/version.build" target="getpluginversion" >
+          <property name="config" value="${config}" />
+        </nant>
+        <property name="plugin.version" fromfile="${package.OriginVersion.plugin.version.file}" />
+      
+        <!-- create the yaml file for EAI with the correct versions -->
+        <property name="dip.yaml.text" fromfile="${dip.yaml.template}"/>        
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__PLUGIN_VERSION__',${plugin.version})}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__ZIPNAME__','ShiftDirectDownload_PC_${plugin.version}')}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__CLIENT_VERSION__',${version})}"/>
+        
+        <delete file="${dip.yaml.file}" />
+        <echo message="${dip.yaml.text}" file="${dip.yaml.file}"/>
+        
+    </target>
+</project>

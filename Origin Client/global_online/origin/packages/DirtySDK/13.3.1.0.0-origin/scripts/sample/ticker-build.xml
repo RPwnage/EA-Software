@@ -1,0 +1,125 @@
+<project>
+
+    <!-- convenience names -->
+    <property name="modulename"    value="ticker" />
+
+    <!-- Define platform source location: we can't use config-system directly because of pc64 and unix64 buildes -->
+    <property name="tester2-source" value="${config-system}"/>
+    <do if="${config-system} == 'winprt'">
+        <property name="tester2-source" value="winrt"/>
+    </do>
+
+    <property name="module.src"    value="${package.DirtySDK.dir}/sample/${tester2-source}/${modulename}/source.txt" />
+    <property name="modulecpp.src" value="${package.DirtySDK.dir}/sample/${tester2-source}/${modulename}/sourcecpp.txt" />
+
+    <!-- add this module to the list of modules to build -->
+    <property name="runtime.buildmodules">
+        ${property.value}
+        ${modulename}
+    </property>
+
+    <!-- declare the type of module to build -->
+    <property name="runtime.${modulename}.buildtype" value="DSProgram" />
+    <do if="${config-system} == 'pc' or ${config-system} == 'pc64' or ${config-system} == 'winrt' or ${config-system} == 'winprt'">
+      <property name="runtime.${modulename}.buildtype" value="WindowsProgram" />
+    </do>
+
+    <!-- only add a build dependency on the DS lib if samples are not being linked against a prebuilt DS -->
+    <do unless="@{PropertyTrue('DirtySDK-skip-lib-generation')}">
+        <property name="runtime.${modulename}.runtime.moduledependencies">
+            ${dirtysock_modulename}
+        </property>
+    </do>
+
+    <!-- start with empty dependency set for platforms that don't have any -->
+    <property name="${modulename}.builddependencies.${config-system}">
+    </property>
+
+    <!-- Android build dependencies -->
+    <property name="${modulename}.builddependencies.android">
+        AndroidSDK
+    </property>
+
+    <!-- BB10 build dependencies -->
+    <property name="${modulename}.builddependencies.bb10">
+        RimQnxSDK
+    </property>
+
+    <!-- iPhone build dependencies -->
+    <property name="${modulename}.builddependencies.iphone">
+        <!-- Don't make iphonesdk a build dependency because it breaks the xcode-projectize option. Such a dependency is not needed anyway. -->
+    </property>
+
+    <!-- PS3 use dependencies (PlayStation3NPEx can't be a build dependency like how the others are setup or the sln generation wont get the libs)-->
+    <do if="${config-system} == 'ps3'">
+      <property name="runtime.${modulename}.usedependencies">
+        ${property.value}
+        PlayStation3NPEx
+      </property>
+    </do>
+
+    <!-- WINRT build dependencies -->
+    <property name="${modulename}.builddependencies.winrt">
+    </property>
+
+    <!-- WINPRT build dependencies -->
+    <property name="${modulename}.builddependencies.winprt">
+    </property>
+
+    <!-- PSP2 dependencies -->
+    <property name="runtime.${modulename}.usedependencies.psp2">
+        ${property.value}
+        psp2npex
+    </property>
+
+    <!-- include the build dependency for the platform we're buildling -->
+    <do if="@{StrStartsWith('${config-system}', 'playbook')}">
+        <!-- Playbook build dependencies -->
+        <!-- do not use playbook-arm/playbook-x86 as they will soon no longer be supported in playbook_config -->
+        <property name="runtime.${modulename}.builddependencies">
+            PlaybookSDK
+        </property>
+    </do>
+    <do unless="@{StrStartsWith('${config-system}', 'playbook')}">
+        <property name="runtime.${modulename}.builddependencies">
+            ${${modulename}.builddependencies.${config-system}}
+        </property>
+    </do>
+
+    <!-- add this module's includes to the general includes -->
+    <property name="runtime.${modulename}.includedirs">
+        ${package.DirtySDK.includedirs}
+        ${package.DirtySDK.dir}/sample/common/include
+        ${package.DirtySDK.dir}/sample/${config-system}
+    </property>
+
+    <!-- inherit warning suppression from dirtysock -->
+    <property name="runtime.${modulename}.warningsuppression">
+        ${runtime.${dirtysock_modulename}.warningsuppression}
+    </property>
+
+    <!-- inherit defines from dirtysock -->
+    <property name="runtime.${modulename}.defines">
+        ${runtime.${dirtysock_modulename}.defines}
+    </property>
+
+    <!-- now bring in the list of files to build into this module -->
+    <fileset basedir="${package.DirtySDK.dir}" name="runtime.${modulename}.sourcefiles">
+        <includes fromfile="${module.src}"  if="@{FileExists('${module.src}')}"/>
+        <includes fromfile="${modulecpp.src}" optionset="DSCppProgram" if="@{FileExists('${modulecpp.src}')}"/>
+    </fileset>
+
+    <!-- add in platform-dependent network libs that are required for DirtySDK -->
+    <task name="AddDirtySDKLibsToModule" module="runtime.${modulename}"/>
+
+    <!-- psp2 sample libs/objs -->
+    <fileset name="runtime.${modulename}.libs.psp2" append="true" if="${config-system} == psp2">
+        <includes name="${package.DirtySDK.dir}/sample/psp2/ticker/lib/clear_f_gxp.obj" asis="true" />
+        <includes name="${package.DirtySDK.dir}/sample/psp2/ticker/lib/clear_v_gxp.obj" asis="true" />
+    </fileset>
+
+    <fileset name="runtime.${modulename}.libs" append="true">
+        <includes name="${package.configlibdir}/*${lib-suffix}"/>
+    </fileset>
+
+</project>

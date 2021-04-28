@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="c5b47e6a-0ffd-46c2-be46-42c72cff4450" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>Sections in this topic describe custom build steps step usage and examples</para>
+    </introduction>
+    <section address="Usage">
+      <title>Usage</title>
+      <content>
+        <para>Custom Build step is modeled after Visual Studio but is is supported in nant builds in Framework 3 as well. 
+        By default Custom Build is executed after link step and before <link xlink:href="fe59f5f6-7eeb-497c-b934-19c39cc69199">Post Build Step</link>.</para>
+        However, it can be set to execute before or after some targets. (ie. prebuild, postbuild, prelink, prerun, postrun)
+        <para>There is one custom build step per <token>Module</token>.
+        However, since both before and after can be set to different values, the same custom build step can be executed twice.
+        It is possible to define similar build steps per file, see <link xlink:href="8d1c6c4c-01b1-4c08-b710-32197c7c95e0">Custom Build Files</link>
+      </para>
+        <para>
+          The difference between Custom Build Step and <link xlink:href="fe59f5f6-7eeb-497c-b934-19c39cc69199">Post Build Step</link> 
+          is that Custom Build Step allows to define input and output dependencies, and is executed only when input dependencies are newer than outputs.
+        </para>
+        <para>To define Custom Build Step specify following properties:</para>
+        <list class="bullet">
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.vcproj.custom-build-tool</codeInline> - command to be executed by the custom build step
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.vcproj.custom-build-outputs</codeInline> - property should contain list of files that are added to
+              the step output dependencies. Each file path should be on a separate line.
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>vcproj.custom-build-dependencies</codeInline> - property should contain list of files that are added to
+              the step input dependencies. Each file path should be on a separate line.
+            </para>
+          </listItem>
+          <listItem>
+            <para>fileset <token>groupname</token><codeInline>vcproj.custom-build-dependencies</codeInline> - fileset with input dependencies.
+          	</para>
+            <para>This property is optional. If input dependencies are not specified step is executed when output(s) do not exist</para>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.custom-build-before-targets</codeInline> - The name of a target that this custom build target
+              should run before. Currently native NAnt builds only support <legacyBold>Build</legacyBold>, <legacyBold>Link</legacyBold> and <legacyBold>Run</legacyBold>, however Visual Studio builds support a much
+              larger set of targets.
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.custom-build-after-targets</codeInline> - The name of a target that this custom build target
+              should run after. Currently native NAnt builds only support <legacyBold>Build</legacyBold> and <legacyBold>Run</legacyBold>, however Visual Studio builds support a much
+              larger set of targets.
+            </para>
+          </listItem>
+        </list>
+      </content>
+    </section>
+    <section address="Example">
+      <title>Example</title>
+      <content>
+        <para>Input dependencies definition is optional.</para>
+        <code language="xml" title=" ">
+          
+&lt;property name="runtime.MyModule.buildtype" value="Program" /&gt;
+    
+&lt;property name="runtime.MyModule.vcproj.custom-build-tool"&gt;
+	copy ${package.dir}\${package.name}.build ${package.builddir}\MyModule_${config}.txt
+&lt;/property&gt;
+          
+&lt;property name="runtime.MyModule.vcproj.custom-build-outputs"&gt;
+	${package.builddir}\MyModule_${config}.txt
+&lt;/property&gt;
+   
+&lt;property name="runtime.MyModule.custom-build-after-targets" value="Run" /&gt;
+
+        </code>
+
+        <para>Custom Build Step can be specified for <link xlink:href="62dc9015-9df5-4ceb-8286-cae37a4a851f">Utility</link> modules.
+        
+      </para>
+        <code language="xml" title=" ">
+
+&lt;property name="runtime.MyModule.buildtype" value="Utility" /&gt;
+
+&lt;property name="outfile" value="${package.configbuilddir}/somefile.txt" /&gt;
+          
+&lt;property name="runtime.MyModule.vcproj.custom-build-tool"&gt;
+	copy @{PathToWindows('${package.dir}\${package.name}.build')} @{PathToWindows('${outfile}')}
+&lt;/property&gt;
+&lt;property name="runtime.MyModule.vcproj.custom-build-outputs"&gt;
+	${outfile}
+&lt;/property&gt;
+&lt;fileset name="runtime.MyModule.vcproj.custom-build-dependencies"&gt;
+	&lt;includes name="${package.dir}\${package.name}.build"/&gt;
+&lt;/fileset&gt;
+
+        </code>
+        
+        <para>Here is an example of how to set custom build steps in Structured XML:</para>
+        
+        <code language="xml" title=" ">
+&lt;CSharpProgram name="SecondModule"&gt;
+  &lt;sourcefiles basedir="${package.dir}/source"&gt;
+    &lt;includes name="${package.dir}/source/*.cs" /&gt;
+  &lt;/sourcefiles&gt;
+  &lt;buildsteps&gt;
+    &lt;custom-build-steps before="Run" after="Run"&gt;
+      &lt;custom-build-tool&gt;
+        echo "Structured Custom Build Event"
+      &lt;/custom-build-tool&gt;
+    &lt;/custom-build-steps&gt;
+  &lt;/buildsteps&gt;
+&lt;/CSharpProgram&gt;
+        </code>
+        
+      </content>
+    </section>
+
+    <relatedTopics>
+      <link xlink:href="8d1c6c4c-01b1-4c08-b710-32197c7c95e0"/>
+      <link xlink:href="fe59f5f6-7eeb-497c-b934-19c39cc69199"/>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

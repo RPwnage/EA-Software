@@ -1,0 +1,65 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+
+==============================================================================
+  Define an optionset containing the properties to be passed into <nant> buildall
+  and vcproj targets.
+    
+  The user needs to specify the property package-eaconfig-persistent-properties in
+  the build file. This property contains the names of the properties that the user wants
+  to pass across the <nant > buildall and vcproj targets.
+
+  e.g.
+  HelloWorld.build
+    . . .    
+    <property name="foo" value="barsss"/>
+    <property name="bulkbuild" value="true"/>
+
+    <property name="package.eaconfig.persistent.properties">
+      bulkbuild
+      foo
+    </property>
+    . . .
+-->
+
+<project>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-construct-persistent-properties" hidden="true">
+
+    <eval code="@{PropertyUndefine('package-eaconfig-persistent-properties')}" type='Function' />
+
+    <!-- Special Property that we always want to pass. -->
+    <property name="bulkbuild" value="true" unless="@{PropertyExists('bulkbuild')}"/>
+    <optionset name="package-eaconfig-persistent-properties">
+      <option name="bulkbuild" value="${bulkbuild}"/>
+    </optionset>
+
+    <do if="@{PropertyExists('package.eaconfig.persistent.properties')}">
+
+      <!-- TODO: DEPRECATED, remove support later -->
+      <echo unless="@{PropertyExists('__private_suppress_persistent_properties_warning')}" message="
+            
+            WARNING: As of Framework-2.10.00, 'package.eaconfig.persistent.properties' is deprecated. Please use global properties instead.
+            
+      "/>
+
+      <foreach property="persistent.property" item="String" in="${package.eaconfig.persistent.properties}">
+        <do if="@{PropertyExists('${persistent.property}')}">
+          <optionset name="package-eaconfig-persistent-properties" append="true">
+            <option name="${persistent.property}" value="${${persistent.property}}"/>
+          </optionset>
+        </do>
+      </foreach>
+
+      <!-- Pass the warning suppression flag down to sub-builds, if specified -->
+      <do if="@{PropertyExists('__private_suppress_persistent_properties_warning')}">
+        <optionset name="package-eaconfig-persistent-properties" append="true">
+          <option name="__private_suppress_persistent_properties_warning" value="true"/>
+        </optionset>
+      </do>
+
+    </do>
+  </target>
+
+</project>

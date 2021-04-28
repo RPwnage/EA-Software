@@ -1,0 +1,151 @@
+package com.ea.originx.automation.scripts.zGraveyard;
+
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.Criteria;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileFriendsTab;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileHeader;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import java.util.ArrayList;
+import java.util.List;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the layout of the 'My Friends' section on a user's profile page
+ *
+ * @author lscholte
+ */
+public class OAMyFriendsSection extends EAXVxTestTemplate {
+
+    @Test(groups = {"social","full_regression"})
+    public void testMyFriendsSection(ITestContext context) throws Exception {
+        final int friendCount = 9;
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        //Setup friends
+        final AccountManager accountManager = AccountManager.getInstance();
+        final Criteria criteria = new Criteria.CriteriaBuilder().build();
+        UserAccount userAccount = accountManager.requestWithCriteria(criteria, 360);
+        userAccount.cleanFriends();
+
+        //Clean friends for all the friend accounts
+        UserAccount friendAccount;
+        List<UserAccount> friendAccounts = new ArrayList<>();
+        for (int i = 0; i < friendCount; ++i) {
+            friendAccount = accountManager.requestWithCriteria(criteria, 360);
+            friendAccount.cleanFriends();
+            // add the account to FriendAccount listArray
+            friendAccounts.add(friendAccount);
+            System.out.println("Cleaned User Account:" + friendAccount.getUsername());
+        }
+
+        //Add friends to userAccount
+        for (int i = 0; i < friendAccounts.size(); ++i) {
+            UserAccount friendAcc = friendAccounts.get(i);
+            userAccount.addFriend(friendAcc);
+            System.out.println("Added friend :" + friendAcc.getUsername());
+        }
+
+        logFlowPoint(String.format("Launch Origin and login with user %s who has %d friends", userAccount.getUsername(), friendCount)); //1
+        logFlowPoint("Navigate to the current user's profile"); //2
+        logFlowPoint("Open the 'Friends' tab"); //3
+        logFlowPoint("Verify the 'No Friends' message is not visible"); //4
+        logFlowPoint(String.format("Verify the title of the section is 'My Friends - %d of %d'", friendCount, friendCount)); //5
+        logFlowPoint(String.format("Verify %d friends are displayed", friendCount)); //6
+        logFlowPoint("Verify that each friend has a username and avatar"); //7
+        logFlowPoint("Verify that the friends are sorted alphabetically by username"); //8
+        logFlowPoint("Verify that the 'View More' link is not present"); //9
+        logFlowPoint("Click on friend tile and verify you are taken to their profile page"); //10
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with the user.");
+        } else {
+            logFailExit("Could not log into Origin with the user.");
+        }
+
+        //2
+        MiniProfile miniProfile = new MiniProfile(driver);
+        miniProfile.waitForPageToLoad();
+        miniProfile.selectProfileDropdownMenuItem("View My Profile");
+        ProfileHeader profileHeader = new ProfileHeader(driver);
+        if (profileHeader.verifyOnProfilePage()) {
+            logPass("Successfully opened the profile through the mini profile menu");
+        } else {
+            logFailExit("Could not open the profile through the mini profile menu");
+        }
+
+        //3
+        profileHeader.openFriendsTab();
+        if (profileHeader.verifyFriendsTabActive()) {
+            logPass("Successfully opened the 'Friends' tab");
+        } else {
+            logFailExit("Failed to open the 'Friends' tab");
+        }
+
+        //4
+        ProfileFriendsTab friendsTab = new ProfileFriendsTab(driver);
+        if (!friendsTab.verifyNoFriendsMessage()) {
+            logPass("Verified that the 'No Friends' message is not displayed");
+        } else {
+            logFail("The 'No Friends' message is still displayed despite the user having friends");
+        }
+
+        //5
+        if (friendsTab.verifyMyFriendsHeader(friendCount, friendCount)) {
+            logPass("The 'My Friends' section header displays correctly");
+        } else {
+            logFail("The 'My Friends' section header does not display correctly");
+        }
+
+        //6
+        if (friendsTab.verifyNumberOfFriends(friendCount)) {
+            logPass("The 'My Friends' section displays the correct number of friends");
+        } else {
+            logFailExit("The 'My Friends' section does not display the correct number of friends");
+        }
+
+        //7
+        boolean usernamesDisplayed = friendsTab.verifyUsernamesDisplayed(friendCount);
+        boolean avatarsDisplayed = friendsTab.verifyAvatarsDisplayed(friendCount);
+        if (usernamesDisplayed && avatarsDisplayed) {
+            logPass("All friends have a username and avatar");
+        } else {
+            logFailExit("Not all friends have a username or avatar");
+        }
+
+        //8
+        if (friendsTab.verifyMyFriendsAlphabeticalOrder()) {
+            logPass("The 'My Friends' section is displayed in alphabetical order");
+        } else {
+            logFail("The 'My Friends' section is not displayed in alphabetical order");
+        }
+
+        //9
+        if (!friendsTab.verifyViewMoreVisible()) {
+            logPass("The 'View More' button does not exist");
+        } else {
+            logFail("The 'View More' button exists");
+        }
+
+        //10
+        friendsTab.clickFirstFriendTile();
+        ProfileHeader friendProfilePage = new ProfileHeader(driver);
+        if (Waits.pollingWait(() -> friendProfilePage.verifyOnProfilePage(), 3000, 700, 2000)) {
+            logPass("Successfully opened a friend's profile by clicking their username");
+        } else {
+            logFail("Failed to open a friend's profile by clicking their username");
+        }
+        softAssertAll();
+    }
+}

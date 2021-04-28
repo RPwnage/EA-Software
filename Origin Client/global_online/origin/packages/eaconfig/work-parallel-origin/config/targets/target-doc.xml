@@ -1,0 +1,152 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+  <target name="eaconfig-doxygen" hidden="true" >
+    <echo>build.module=${build.module}</echo>
+  </target>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-doxygen_1" hidden="true" >
+
+    <eaconfig-legacy-initializevariables/>
+
+    <dependent name="Doxygen"/>
+
+    <mkdir dir="${package.builddir}/doc" unless="@{DirectoryExists('${package.builddir}/doc')}" />
+
+    <!-- Use a default fileset for doxygen files if not specified -->
+    <fileset name="package.doxygenfiles" unless="@{FileSetExists('package.doxygenfiles')}">
+      <includes name="${package.dir}/source/doc/*.dxy"/>
+    </fileset>
+
+    <doxygen extractall="true" outdir="${package.builddir}/doc">
+      <inputs>
+        <includes fromfileset="package.doxygenfiles"/>
+        <includes fromfileset="build.headerfiles.all"/>
+        <includes fromfileset="build.sourcefiles.all"/>
+      </inputs>
+    </doxygen>
+
+    <delete dir="${package.builddir}/doc/html" failonerror='false'/>
+    <mkdir dir="${package.builddir}/doc/html" failonerror='false'/>
+    <copy todir="${package.dir}/doc/html">
+      <fileset basedir="${package.builddir}/doc/html">
+        <includes name="**/*"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-helptoolkit" hidden="true" >
+
+    <eaconfig-legacy-initializevariables/>
+
+    <echo message="Parsing and extracting documentation with Doxygen..." />
+
+    <property name="doxygen.outdir" value="${package.dir}/build/${package.name}/${package.version}/doc" unless="@{PropertyExists('doxygen.outdir')}"/>
+    <property name="doxygen.htmloutdir" value="html" />
+    <property name="doxygen.helpfilename" value="${package.name}.chm" unless="@{PropertyExists('doxygen.helpfilename')}"/>
+    <property name="doxygen.defines" value="" unless="@{PropertyExists('doxygen.defines')}" />
+    <property name="doxygen.enabledsections" value="" unless="@{PropertyExists('doxygen.enabledsections')}" />
+    <property name="doxygen.sourcebooksdir" value="${package.dir}\source\doc-lib\srcbooks" unless="@{PropertyExists('doxygen.sourcebooksdir')}" />
+    <property name="doxygen.inputspecfile" value="${package.dir}\source\doc-lib\config\inputspec.xml" unless="@{PropertyExists('doxygen.inputspecfile')}" />
+
+    <do unless="@{PropertyExists('doxygen.htmlheader')}">
+      <property name="doxygen.htmlheader" value="${doxygen.sourcebooksdir}/_html/header.html" if="@{FileExists('${doxygen.sourcebooksdir}/_html/header.html')}" />
+      <property name="doxygen.htmlheader" value="" unless="@{FileExists('${doxygen.sourcebooksdir}/_html/header.html')}" />
+    </do>
+    <do unless="@{PropertyExists('doxygen.htmlfooter')}">
+      <property name="doxygen.htmlfooter" value="${doxygen.sourcebooksdir}/_html/footer.html" if="@{FileExists('${doxygen.sourcebooksdir}/_html/footer.html')}" />
+      <property name="doxygen.htmlfooter" value="" unless="@{FileExists('${doxygen.sourcebooksdir}/_html/footer.html')}" />
+    </do>
+    <do unless="@{PropertyExists('doxygen.htmlstylesheet')}">
+      <property name="doxygen.htmlstylesheet" value="${doxygen.sourcebooksdir}/_html/stylesheet.css" if="@{FileExists('${doxygen.sourcebooksdir}/_html/stylesheet.css')}" />
+      <property name="doxygen.htmlstylesheet" value="" unless="@{FileExists('${doxygen.sourcebooksdir}/_html/stylesheet.css')}" />
+    </do>
+
+    <property name="doxygen.warnlogfile" value="${doxygen.outdir}/buildwarnings.txt" />
+    <property name="doxygen.tagfile" value="${doxygen.outdir}/${doxygen.htmloutdir}/tag.xml" />
+
+    <!-- pass the user settings to the Doxygen config file: -->
+    <property name="exec.env.PACKAGEDIR" value="${package.dir}" />
+    <property name="exec.env.PROJECTNAME" value="${package.name}" />
+    <property name="exec.env.PROJECTVERSION" value="${package.version}" />
+    <property name="exec.env.PREDEFINED" value="${doxygen.defines}" />
+    <property name="exec.env.ENABLEDSECTIONS" value="${doxygen.enabledsections}" />
+    <property name="exec.env.SRCBOOKSDIR" value="${doxygen.sourcebooksdir}" />
+    <property name="exec.env.OUTDIR" value="${doxygen.outdir}" />
+    <property name="exec.env.HTMLOUTDIR" value="${doxygen.htmloutdir}" />
+    <property name="exec.env.INPUTSPECFILE" value="${doxygen.inputspecfile}" />
+    <property name="exec.env.WARNLOGFILE" value="${doxygen.warnlogfile}" />
+    <property name="exec.env.TAGFILE" value="${doxygen.tagfile}" />
+    <property name="exec.env.HTMLHEADER" value="${doxygen.htmlheader}" />
+    <property name="exec.env.HTMLFOOTER" value="${doxygen.htmlfooter}" />
+    <property name="exec.env.HTMLSTYLESHEET" value="${doxygen.htmlstylesheet}" />
+
+    <dependent name="HelpToolkit"/>
+    <!-- This should move to the HelpToolkit package but it became a political necessity to put it here for now -->
+    <property name="doxygen.configfile" value="../options/help.doxy" unless="@{PropertyExists('doxygen.configfile')}" />
+
+    <!-- make dirs and copy required files for documentation -->
+    <mkdir dir="${doxygen.outdir}" />
+    <mkdir dir="${doxygen.outdir}/${doxygen.htmloutdir}" />
+    <copy todir="${doxygen.outdir}/${doxygen.htmloutdir}" flatten="true" overwrite="true">
+      <fileset>
+        <includes name="${doxygen.sourcebooksdir}/_docs/**" />
+        <includes name="${doxygen.sourcebooksdir}/_web/**" />
+        <includes name="${doxygen.sourcebooksdir}/_images/**" />
+        <includes name="${doxygen.sourcebooksdir}/_html/**" />
+      </fileset>
+    </copy>
+    <attrib readonly="false">
+      <fileset>
+        <includes name="${doxygen.outdir}/${doxygen.htmloutdir}/**"/>
+      </fileset>
+    </attrib>
+
+    <!-- run Doxygen to extract documentation -->
+    <exec program="${package.HelpToolkit.application.doxygenEA}" >
+      <arg value="${doxygen.configfile}" />
+    </exec>
+
+    <!-- replace special tags in index.html -->
+    <exec program="${package.ActivePython.exe}">
+      <arg value="${package.HelpToolkit.application.doxytagger} -pall ${doxygen.configfile} ${doxygen.outdir}/${doxygen.htmloutdir}/index.html" />
+    </exec>
+
+    <!-- adjust hhc file -->
+    <exec program="${package.ActivePython.exe}">
+      <arg value="${package.HelpToolkit.application.hhcbookupdate} ${doxygen.outdir}/${doxygen.htmloutdir}/index.hhc" />
+    </exec>
+
+    <echo message="Generated HMTL documentation in: ${doxygen.outdir}/${doxygen.htmloutdir}" />
+
+    <echo message="Compiling HTML Help File: ${package.dir}/doc/${doxygen.helpfilename}" />
+
+    <!-- compile -->
+    <exec program="${package.HelpToolkit.application.hhc}" workingdir="${doxygen.outdir}/${doxygen.htmloutdir}" failonerror="false">
+      <arg value="index.hhp" />
+    </exec>
+    <copy file="${doxygen.outdir}/${doxygen.htmloutdir}/index.chm" tofile="${package.dir}/doc/${doxygen.helpfilename}" overwrite="true" />
+    <move file="${doxygen.outdir}/${doxygen.htmloutdir}/index.chm" tofile="${doxygen.outdir}/${doxygen.htmloutdir}/${doxygen.helpfilename}" overwrite="true" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'doc')}' == 'exclude'">
+    <target name="doc" style="use" description="Generate documentation" >
+
+      <call target="doc.prebuildtarget" force="true" if="@{TargetExists('doc.prebuildtarget')}" />
+
+      <property name="doc.type" value="Doxygen" unless="@{PropertyExists('doc.type')}" />
+      <property name="eaconfig.build.target" value="eaconfig-doxygen" if="${doc.type} == 'Doxygen'"/>
+      <property name="eaconfig.build.target" value="eaconfig-helptoolkit" if="${doc.type} == 'HelpToolKit'"/>
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig-build-caller.supportmodules" value="false" />
+      
+      <call target="eaconfig-build-caller" force="true" />
+
+      <call target="doc.postbuildtarget" force="true" if="@{TargetExists('doc.postbuildtarget')}" />
+    </target>
+  </do>
+
+</project>

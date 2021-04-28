@@ -1,0 +1,1 @@
+This patch is like patch 2 except that the files are specified by "white-listing" instead of "black-listing". That is, the files are specified by what they are instead of what they aren't. This is done by using the PatchImpl UsedFileArray instead of IgnoredFileArray. See the .eaPatchImpl IgnoreFileArray and UsedFileArray fields.

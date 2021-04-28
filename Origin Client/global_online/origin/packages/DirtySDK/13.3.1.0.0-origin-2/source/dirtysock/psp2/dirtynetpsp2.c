@@ -1,0 +1,2556 @@
+/*H********************************************************************************/
+/*!
+    \File dirtynetpsp2.c
+
+    \Description
+        Provides a wrapper that translates the Sony network interface to the
+        DirtySock portable networking interface.
+
+    \Copyright
+        Copyright (c) 2010 Electronic Arts Inc.
+
+    \Version 11/02/2010 (jbrookes) Ported from PS3
+*/
+/********************************************************************************H*/
+
+/*** Include files ****************************************************************/
+
+#include <stdio.h>
+#include <string.h>
+
+#include <kernel.h>
+#include <net.h>
+#include <libnetctl.h>
+
+#include "DirtySDK/dirtysock.h"
+#include "DirtySDK/dirtyvers.h"
+#include "DirtySDK/dirtysock/dirtymem.h"
+#include "DirtySDK/dirtysock/dirtyerr.h"
+
+/*** Defines **********************************************************************/
+
+#define INVALID_SOCKET      (-1)
+
+#define CALLOUT_TPL         (32)
+#define CALLOUT_STACKSIZE   (4*1024)
+#define NETINTR_TPL         (32)
+#define NETINTR_STACKSIZE   (4*1024)
+#define SCE_APCTL_PRIO      (48)
+#define SCE_APCTL_STACKSIZE (12*1024 + DIRTYCODE_DEBUG*4096)
+
+#define SOCKET_RECVPRIO     (49)
+#define SOCKET_MAXPOLL      (32)
+
+#define SOCKET_VERBOSE      (DIRTYCODE_DEBUG && FALSE)
+
+/*** Type Definitions *************************************************************/
+
+//! private socketlookup structure containing extra data
+typedef struct SocketLookupPrivT
+{
+    HostentT            Host;      //!< must come first!
+    SceUID              iThreadId; //!< Sony threadid
+} SocketLookupPrivT;
+
+//! dirtysock connection socket structure
+struct SocketT
+{
+    SocketT *next;              //!< link to next active
+    SocketT *kill;              //!< link to next killed socket
+
+    int32_t family;             //!< protocol family
+    int32_t type;               //!< protocol type
+    int32_t proto;              //!< protocol ident
+
+    int8_t  opened;             //!< negative=error, zero=not open (connecting), positive=open
+    uint8_t bImported;          //!< whether socket was imported or not
+    uint8_t virtual;            //!< if true, socket is virtual
+    uint8_t bAsyncRecv;         //!< if true, async recv is enabled
+
+    SceNetId socket;            //!< psp2 socket ref
+    int32_t iLastError;         //!< last socket error
+
+    struct sockaddr local;      //!< local address
+    struct sockaddr remote;     //!< remote address
+
+    uint16_t virtualport;       //!< virtual port, if set
+    uint16_t _pad;
+
+    int32_t callmask;           //!< valid callback events
+    uint32_t calllast;          //!< last callback tick
+    uint32_t callidle;          //!< ticks between idle calls
+    void *callref;              //!< reference calback value
+    int32_t (*callback)(SocketT *sock, int32_t flags, void *ref);
+
+    #if SOCKET_ASYNCRECVTHREAD
+    NetCritT recvcrit;          //!< receive critical section
+    int32_t recverr;            //!< last error that occurred
+    uint32_t recvflag;          //!< flags from recv operation
+    unsigned char recvinp;      //!< if true, a receive operation is in progress
+    #endif
+
+    struct sockaddr recvaddr;   //!< receive address
+    int32_t recvstat;           //!< how many queued receive bytes
+    char recvdata[SOCKET_MAXUDPRECV]; //!< receive buffer
+};
+
+//! standard ipv4 packet header (see RFC791)
+typedef struct HeaderIpv4
+{
+    unsigned char verslen;      //!< version and length fields (4 bits each)
+    unsigned char service;      //!< type of service field
+    unsigned char length[2];    //!< total packet length (header+data)
+    unsigned char ident[2];     //!< packet sequence number
+    unsigned char frag[2];      //!< fragmentation information
+    unsigned char time;         //!< time to live (remaining hop count)
+    unsigned char proto;        //!< transport protocol number
+    unsigned char check[2];     //!< header checksum
+    unsigned char srcaddr[4];   //!< source ip address
+    unsigned char dstaddr[4];   //!< dest ip address
+} HeaderIpv4;
+
+//! local state
+typedef struct SocketStateT
+{
+    SocketT  *pSockList;                //!< master socket list
+    SocketT  *pSockKill;                //!< list of killed sockets
+
+    uint16_t aVirtualPorts[SOCKET_MAXVIRTUALPORTS]; //!< virtual port list
+
+    // module memory group
+    int32_t  iMemGroup;                 //!< module mem group id
+    void     *pMemGroupUserData;        //!< user data associated with mem group
+
+    void     *pMemPool;                 //!< sys_net memory pool pointer
+
+    SocketT  *pBcastSocket;             //!< socket used for radio sub-system wakeup
+
+    int32_t  iSid;                      //!< sony state id
+    int32_t  iHandlerId;                //!< id of connection handler
+    uint32_t uConnStatus;               //!< current connection status
+    uint32_t uLocalAddr;                //!< local internet address for active interface
+    int32_t  iMaxPacket;                //!< maximum packet size
+
+    uint8_t  aMacAddr[6];               //!< mac address for active interface
+    uint8_t  bNetAlreadyInitialized;    //!< TRUE if sceNet was already initialized at socket module creation time, else FALSE
+    uint8_t  bNetCtlAlreadyInitialized; //!< TRUE if sceNetCtl was already initialized at connect time, else FALSE
+
+    uint32_t uPacketLoss;               //!< packet loss simulation (debug only)
+
+    #if SOCKET_ASYNCRECVTHREAD
+    volatile SceUID  iRecvThread;
+    volatile int32_t iRecvLife;
+    #endif
+
+    SocketSendCallbackT *pSendCallback; //!< global send callback
+    void                *pSendCallref;  //!< user callback data
+} SocketStateT;
+
+/*** Variables ********************************************************************/
+
+//! module state ref
+static SocketStateT *_Socket_pState = NULL;
+
+//! mempool size for sys_net
+static int32_t      _Socket_iMemPoolSize = 128 * 1024;
+
+/*** Private Functions ************************************************************/
+
+/*** Public functions *************************************************************/
+
+
+/*F********************************************************************************/
+/*!
+    \Function    _XlatError
+
+    \Description
+        Translate a BSD error to dirtysock
+
+    \Input iErr     - BSD error code (e.g EAGAIN)
+
+    \Output
+        int32_t     - dirtysock error
+
+    \Version 06/21/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static int32_t _XlatError(int32_t iErr)
+{
+    if (iErr < 0)
+    {
+        iErr = sce_net_errno;
+        if ((iErr == SCE_NET_EWOULDBLOCK) || (iErr == SCE_NET_EINPROGRESS))
+            iErr = SOCKERR_NONE;
+        else if (iErr == SCE_NET_EHOSTUNREACH)
+            iErr = SOCKERR_UNREACH;
+        else if (iErr == SCE_NET_ENOTCONN)
+            iErr = SOCKERR_NOTCONN;
+        else if (iErr == SCE_NET_ECONNREFUSED)
+            iErr = SOCKERR_REFUSED;
+        else if (iErr == SCE_NET_ECONNRESET)
+            iErr = SOCKERR_CONNRESET;
+        else if ((iErr == SCE_NET_ERESUME) || (iErr == SCE_NET_EIPADDRCHANGED) || (iErr == SCE_NET_EINACTIVEDISABLED))
+            iErr = SOCKERR_BADPIPE;
+        else
+            iErr = SOCKERR_OTHER;
+    }
+    return(iErr);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    _SockAddrToSceAddr
+
+    \Description
+        Translate DirtySock socket address to Sony socket address.
+
+    \Input *pSceAddr    - [out] pointer to Sce address to set up
+    \Input *pSockAddr   - pointer to source DirtySock address
+
+    \Version 06/21/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static void _SockAddrToSceAddr(SceNetSockaddr *pSceAddr, const struct sockaddr *pSockAddr)
+{
+    memcpy(pSceAddr, pSockAddr, sizeof(*pSceAddr));
+    pSceAddr->sa_len = sizeof(*pSceAddr);
+    pSceAddr->sa_family = (unsigned char)pSockAddr->sa_family;
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    _SceAddrToSockAddr
+
+    \Description
+        Translate Sony socket address to DirtySock socket address.
+
+    \Input *pSockAddr   - [out] pointer to DirtySock address to set up
+    \Input *pSceAddr    - pointer to source Sce address
+
+    \Version 06/21/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static void _SceAddrToSockAddr(struct sockaddr *pSockAddr, const SceNetSockaddr *pSceAddr)
+{
+    memcpy(pSockAddr, pSceAddr, sizeof(*pSockAddr));
+    pSockAddr->sa_family = pSceAddr->sa_family;
+}
+
+/*F********************************************************************************/
+/*!
+    \Function _SocketGetActiveInterface
+
+    \Description
+        Finds the active interface, and gets its IP address and MAC address for
+        later use.
+
+    \Input iEventType   - event type
+    \Input *pUserData   - user data
+
+    \Version 06/22/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static void _SocketNetCtlHandler(int32_t iEventType, void *pUserData)
+{
+    SocketStateT *pState = (SocketStateT *)pUserData;
+
+    #if DIRTYCODE_LOGGING
+    static const char *_EventNames[] =
+    {
+        "DISCONNECTED",
+        "DISCONNECT_REQ_FINISHED",
+        "IPOBTAINED"
+    };
+
+    NetPrintf(("dirtynetpsp2: event=%s\n", _EventNames[iEventType-1]));
+    #endif
+
+    switch (iEventType)
+    {
+        case SCE_NET_CTL_EVENT_TYPE_IPOBTAINED:
+            SocketInfo(NULL, 'addr', 0, NULL, 0);   // get local address
+            SocketInfo(NULL, 'ethr', 0, NULL, 0);   // get ethernet address
+            pState->uConnStatus = '+onl';           // mark us as online
+            break;
+
+        case SCE_NET_CTL_EVENT_TYPE_DISCONNECT_REQ_FINISHED:
+        case SCE_NET_CTL_EVENT_TYPE_DISCONNECTED:
+            NetPrintf(("dirtynetpsp2: got disconnect event at %d\n", NetTick()));
+            pState->uConnStatus = '-dsc';
+            pState->uLocalAddr = 0;
+            break;
+
+        default:
+            NetPrintf(("dirtynetpsp2: got invalid connection state event (%d)\n", iEventType));
+            break;
+    }
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    _SocketOpen
+
+    \Description
+        Create a new transfer endpoint. A socket endpoint is required for any
+        data transfer operation.  If iSocket != -1 then used existing socket.
+
+    \Input iSocket      - Socket descriptor to use or -1 to create new
+    \Input iAddrFamily  - address family (AF_INET)
+    \Input iType        - socket type (SOCK_STREAM, SOCK_DGRAM, SOCK_RAW, ...)
+    \Input iProto       - protocol type for SOCK_RAW (unused by others)
+    \Input iOpened      - 0=not open (connecting), 1=open
+
+    \Output
+        SocketT *       - socket reference
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static SocketT *_SocketOpen(SceNetId iSocket, int32_t iAddrFamily, int32_t iType, int32_t iProto, int32_t iOpened)
+{
+    SocketStateT *pState = _Socket_pState;
+    SocketT *pSocket;
+
+    // allocate memory
+    if ((pSocket = DirtyMemAlloc(sizeof(*pSocket), SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData)) == NULL)
+    {
+        NetPrintf(("dirtynetpsp2: unable to allocate memory for socket\n"));
+        return(NULL);
+    }
+    memset(pSocket, 0, sizeof(*pSocket));
+
+    if (iSocket == -1)
+    {
+        uint32_t uTrue = 1;
+
+        // create socket
+        if ((iSocket = sceNetSocket("name", SCE_NET_AF_INET, iType, iProto)) >= 0)
+        {
+            // if dgram, allow broadcast
+            if (iType == SCE_NET_SOCK_DGRAM)
+            {
+                sceNetSetsockopt(iSocket, SCE_NET_SOL_SOCKET, SCE_NET_SO_BROADCAST, &uTrue, sizeof(uTrue));
+            }
+            // set nonblocking operation
+            sceNetSetsockopt(iSocket, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, &uTrue, sizeof(uTrue));
+        }
+        else
+        {
+            NetPrintf(("dirtynetpsp2: socket() failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+        }
+    }
+
+    // set family/proto info
+    pSocket->family = iAddrFamily;
+    pSocket->type = iType;
+    pSocket->proto = iProto;
+    pSocket->socket = iSocket;
+    pSocket->opened = iOpened;
+    pSocket->iLastError = SOCKERR_NONE;
+    pSocket->bAsyncRecv = ((iType == SOCK_DGRAM) || (iType == SOCK_RAW)) ? TRUE : FALSE;
+
+    // inititalize critical section
+    #if SOCKET_ASYNCRECVTHREAD
+    NetCritInit(&pSocket->recvcrit, "inet-recv");
+    #endif
+
+    // install into list
+    NetCritEnter(NULL);
+    pSocket->next = pState->pSockList;
+    pState->pSockList = pSocket;
+    NetCritLeave(NULL);
+
+    // return the socket
+    return(pSocket);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function _SocketClose
+
+    \Description
+        Disposes of a SocketT, including disposal of the SocketT allocated memory.  Does
+        NOT dispose of the Sony socket ref.
+
+    \Input *pSocket - socket to close
+
+    \Version 06/21/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static int32_t _SocketClose(SocketT *pSocket)
+{
+    SocketStateT *pState = _Socket_pState;
+    uint32_t bSockInList;
+    SocketT **ppSocket;
+
+    // remove sock from linked list
+    NetCritEnter(NULL);
+    for (ppSocket = &pState->pSockList, bSockInList = FALSE; *ppSocket != NULL; ppSocket = &(*ppSocket)->next)
+    {
+        if (*ppSocket == pSocket)
+        {
+            *ppSocket = pSocket->next;
+            bSockInList = TRUE;
+            break;
+        }
+    }
+    NetCritLeave(NULL);
+
+    // make sure the socket is in the socket list (and therefore valid)
+    if (bSockInList == FALSE)
+    {
+        NetPrintf(("dirtynetpsp2: warning, trying to close socket 0x%08x that is not in the socket list\n", (intptr_t)pSocket));
+        return(-1);
+    }
+
+    // finish any idle call
+    NetIdleDone();
+
+    // mark as closed
+    pSocket->socket = INVALID_SOCKET;
+    pSocket->opened = FALSE;
+
+    // kill critical section
+    #if SOCKET_ASYNCRECVTHREAD
+    NetCritKill(&pSocket->recvcrit);
+    #endif
+
+    // put into killed list
+    NetCritEnter(NULL);
+    pSocket->kill = pState->pSockKill;
+    pState->pSockKill = pSocket;
+    NetCritLeave(NULL);
+    return(0);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    _SocketIdle
+
+    \Description
+        Call idle processing code to give connections time.
+
+    \Input *pData   - pointer to socket state
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static void _SocketIdle(void *pData)
+{
+    SocketStateT *pState = (SocketStateT *)pData;
+    SocketT *pSocket;
+    uint32_t uTick;
+
+    sceNetCtlCheckCallback();
+
+    // for access to g_socklist and g_sockkill
+    NetCritEnter(NULL);
+
+    // get current tick
+    uTick = NetTick();
+
+    // walk socket list and perform any callbacks
+    for (pSocket = pState->pSockList; pSocket != NULL; pSocket = pSocket->next)
+    {
+        // see if we should do callback
+        if ((pSocket->callidle != 0) &&
+            (pSocket->callback != NULL) &&
+            (pSocket->calllast != (unsigned)-1) &&
+            ((uTick - pSocket->calllast) > pSocket->callidle))
+        {
+            pSocket->calllast = (unsigned)-1;
+            (pSocket->callback)(pSocket, 0, pSocket->callref);
+            pSocket->calllast = uTick = NetTick();
+        }
+    }
+
+    // delete any killed sockets
+    while ((pSocket = pState->pSockKill) != NULL)
+    {
+        pState->pSockKill = pSocket->kill;
+        DirtyMemFree(pSocket, SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData);
+    }
+
+    // for access to g_socklist and g_sockkill
+    NetCritLeave(NULL);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketLookupDone
+
+    \Description
+        Callback to determine if gethostbyname is complete.
+
+    \Input *pHost    - pointer to host lookup record
+
+    \Output
+        int32_t     - zero=in progess, neg=done w/error, pos=done w/success
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static int32_t _SocketLookupDone(HostentT *pHost)
+{
+    // return current status
+    return(pHost->done);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketLookupFree
+
+    \Description
+        Release resources used by SocketLookup()
+
+    \Input *pHost    - pointer to host lookup record
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static void _SocketLookupFree(HostentT *pHost)
+{
+    SocketStateT *pState = _Socket_pState;
+
+    if (pHost->sema != 0)
+    {
+        // if there is a resolve in progress, terminate it
+        if (pHost->thread != 0)
+        {
+            // stop resolver, in case a resolve is in progress
+            sceNetResolverAbort(pHost->thread, 0);
+        }
+
+        // signal the thread to die
+        sceKernelSignalSema(pHost->sema, 1);
+    }
+    else
+    {
+        // no thread -- take care of free
+        DirtyMemFree(pHost, SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData);
+    }
+}
+
+/*F********************************************************************************/
+/*!
+    \Function _SocketLookupMemAlloc
+
+    \Description
+        Alloc function required by Sce resolver
+
+    \Input iSize        - size of memory to alloc
+    \Input iRid         - resolver id
+    \Input *pName       - resolve name
+    \Input *pUserData   - user data
+
+    \Output
+        void *          - allocated memory, or NULL if allocation failed
+
+    \Version 11/19/2010 (jbrookes)
+*/
+/********************************************************************************F*/
+static void *_SocketLookupMemAlloc(SceSize iSize, SceNetId iRid, const char *pName, void *pUserData)
+{
+    SocketStateT *pState = (SocketStateT *)pUserData;
+    return(DirtyMemAlloc(iSize, SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData));
+}
+
+/*F********************************************************************************/
+/*!
+    \Function _SocketLookupMemFree
+
+    \Description
+        Free function required by Sce resolver
+
+    \Input *pPtr        - memory to free
+    \Input iRd          - resolver id
+    \Input *pName       - resolve name
+    \Input *pUserData   - user data
+
+    \Version 11/19/2010 (jbrookes)
+*/
+/********************************************************************************F*/
+static void _SocketLookupMemFree(void *pPtr, SceNetId iRd, const char *pName, void *pUserData)
+{
+    SocketStateT *pState = (SocketStateT *)pUserData;
+    DirtyMemFree(pPtr, SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    _SocketLookupThread
+
+    \Description
+        Socket lookup thread
+
+    \Input iArgSize - size of argument
+    \Input pArgData - pointer to argument
+
+    \Output
+        int32_t         - zero
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+static int32_t _SocketLookupThread(SceSize iArgSize, void *pArgData)
+{
+    SocketStateT *pState = _Socket_pState;
+    HostentT *pHost = *(HostentT **)pArgData;
+    SceNetResolverParam ResolverParam;
+    int32_t iResolverId, iResult;
+    struct SceNetInAddr Addr;
+
+    NetPrintf(("dirtynetpsp2: lookup thread start; name=%s (thid=%d)\n", pHost->name, sceKernelGetThreadId()));
+
+    // set up resolver param and create resolver
+    memset(&ResolverParam, 0, sizeof(ResolverParam));
+    ResolverParam.allocate = _SocketLookupMemAlloc;
+    ResolverParam.free = _SocketLookupMemFree;
+    ResolverParam.user = pState;
+    if ((iResolverId = sceNetResolverCreate("SocketLookup", &ResolverParam, 0)) >= 0)
+    {
+        NetPrintf(("dirtynetpsp2: created resolver\n"));
+        pHost->thread = iResolverId;
+        if ((iResult = sceNetResolverStartNtoa(iResolverId, pHost->name, &Addr, pHost->timeout * 1000, 5, 0)) >= 0)
+        {
+            NetPrintf(("dirtynetpsp2: resolve complete\n"));
+            pHost->addr = SocketNtohl(*(uint32_t *)&Addr);
+            pHost->done = 1;
+            NetPrintf(("dirtynetpsp2: lookup success; addr=%a\n", pHost->addr));
+        }
+        else
+        {
+            NetPrintf(("dirtynetpsp2: sceNetResolverStartNtoA() failed (err=%s)\n", DirtyErrGetName(iResult)));
+            pHost->done = -1;
+        }
+    }
+    else
+    {
+        NetPrintf(("dirtynetpsp2: sceNetResolverCreate() failed (err=%s)\n", DirtyErrGetName(iResolverId)));
+        pHost->done = -1;
+    }
+
+    // wait until _SocketLookupFree() is called
+    sceKernelWaitSema(pHost->sema, 1, NULL);
+
+    // dispose of resources
+    if (pHost->thread != 0)
+    {
+        sceNetResolverDestroy(pHost->thread);
+    }
+    sceKernelDeleteSema(pHost->sema);
+    DirtyMemFree(pHost, SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData);
+
+    // terminate ourselves
+    sceKernelExitDeleteThread(0);
+    return(0);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    _SocketRecvfrom
+
+    \Description
+        Receive data from a remote host on a datagram socket.
+
+    \Input *pSocket - socket reference
+    \Input *pBuf    - buffer to receive data
+    \Input iLen     - length of recv buffer
+    \Input *pFrom   - address data was received from (NULL=ignore)
+    \Input *pFromLen- length of address
+
+    \Output
+        int32_t         - positive=data bytes received, else error
+
+    \Version 09/10/04 (jbrookes)
+*/
+/********************************************************************************F*/
+static int32_t _SocketRecvfrom(SocketT *pSocket, char *pBuf, int32_t iLen, struct sockaddr *pFrom, int32_t *pFromLen)
+{
+    int32_t iResult;
+
+    if (pFrom != NULL)
+    {
+        SceNetSockaddr SockAddr;
+        SceNetSocklen_t iSockLen = sizeof(SockAddr);
+
+        // do the receive
+        if ((iResult = sceNetRecvfrom(pSocket->socket, pBuf, iLen, 0, &SockAddr, &iSockLen)) > 0)
+        {
+            // save who we were from
+            _SceAddrToSockAddr(pFrom, &SockAddr);
+            SockaddrInSetMisc(pFrom, NetTick());
+             *pFromLen = sizeof(*pFrom);
+        }
+    }
+    else
+    {
+        iResult = sceNetRecv(pSocket->socket, pBuf, iLen, 0);
+    }
+
+    return(iResult);
+}
+
+#if SOCKET_ASYNCRECVTHREAD
+/*F*************************************************************************************/
+/*!
+    \Function    _SocketRecvData
+
+    \Description
+        Called when data is received by _SocketRecvThread(). If there is a callback
+        registered than the socket is passed to that callback so the data may be
+        consumed.
+
+    \Input *pSocket - pointer to socket that has new data
+
+    \Version 10/21/2004 (jbrookes)
+*/
+/************************************************************************************F*/
+static void _SocketRecvData(SocketT *pSocket)
+{
+    // see if we should issue callback
+    if ((pSocket->calllast != (unsigned)-1) && (pSocket->callback != NULL) && (pSocket->callmask & CALLB_RECV))
+    {
+        pSocket->calllast = (unsigned)-1;
+        (pSocket->callback)(pSocket, 0, pSocket->callref);
+        pSocket->calllast = NetTick();
+    }
+}
+#endif
+
+#if SOCKET_ASYNCRECVTHREAD
+/*F*************************************************************************************/
+/*!
+    \Function    _SocketRead
+
+    \Description
+        Attempt to read data from the given socket.
+
+    \Input *pState  - pointer to module state
+    \Input *pSocket - pointer to socket to read from
+
+    \Version 10/21/2004 (jbrookes)
+*/
+/************************************************************************************F*/
+static void _SocketRead(SocketStateT *pState, SocketT *pSocket)
+{
+    // if we already have data or this is a virtual socket
+    if ((pSocket->recvstat != 0)  || (pSocket->virtual == TRUE))
+    {
+        return;
+    }
+
+    // try and receive some data
+    if ((pSocket->type == SOCK_DGRAM) || (pSocket->type == SOCK_RAW))
+    {
+        int32_t iFromLen = sizeof(pSocket->recvaddr);
+        pSocket->recvstat = _SocketRecvfrom(pSocket, pSocket->recvdata, sizeof(pSocket->recvdata), &pSocket->recvaddr, &iFromLen);
+    }
+    else
+    {
+        pSocket->recvstat = _SocketRecvfrom(pSocket, pSocket->recvdata, sizeof(pSocket->recvdata), NULL, 0);
+    }
+
+    // if the read completed successfully, forward data to socket callback
+    if (pSocket->recvstat > 0)
+    {
+        _SocketRecvData(pSocket);
+    }
+}
+#endif
+
+#if SOCKET_ASYNCRECVTHREAD
+/*F*************************************************************************************/
+/*!
+    \Function    _SocketRecvThread
+
+    \Description
+        Wait for incoming data and deliver it immediately to the socket callback,
+        if registered.
+
+    \Input  pArg    - pointer to Socket module state
+
+    \Version 10/21/2004 (jbrookes)
+*/
+/************************************************************************************F*/
+static void _SocketRecvThread(uint64_t pArg)
+{
+    typedef struct PollListT
+    {
+        SocketT *aSockets[SOCKET_MAXPOLL];
+        struct pollfd aPollFds[SOCKET_MAXPOLL];
+        int32_t iCount;
+    } PollListT;
+
+    PollListT pollList, previousPollList;
+    SocketT *pSocket;
+    int32_t iListIndex, iResult;
+    SocketStateT *pState = (SocketStateT *)(uintptr_t)pArg;
+
+    // show we are alive
+    NetPrintf(("dirtynetpsp2: receive thread started (thid=%d)\n", pState->iRecvThread));
+    pState->iRecvLife = 1;
+
+    // reset contents of pollList
+    memset(&pollList, 0, sizeof(pollList));
+
+    // loop until done
+    while(pState->iRecvThread != 0)
+    {
+        // reset contents of previousPollList
+        memset(&previousPollList, 0, sizeof(previousPollList));
+
+        // make a copy of the poll list used for the last socketpoll() call
+        for (iListIndex = 0; iListIndex < pollList.iCount; iListIndex++)
+        {
+            // copy entry from pollList to previousPollList
+            previousPollList.aSockets[iListIndex] = pollList.aSockets[iListIndex];
+            previousPollList.aPollFds[iListIndex] = pollList.aPollFds[iListIndex];
+        }
+        previousPollList.iCount = pollList.iCount;
+
+        // reset contents of pollList in preparation for the next socketpoll() call
+        memset(&pollList, 0, sizeof(pollList));
+
+        // acquire global critical section for access to socket list
+        NetCritEnter(NULL);
+
+        // walk the socket list and do two things:
+        //    1- if the socket is ready for reading, perform the read operation
+        //    2- if the buffer in which inbound data is saved is empty, initiate a new low-level read operation for that socket
+        for (pSocket = pState->pSockList; (pSocket != NULL) && (pollList.iCount < SOCKET_MAXPOLL); pSocket = pSocket->next)
+        {
+            // only handle non-virtual sockets with asyncrecv enabled
+            if ((pSocket->virtual == FALSE) && (pSocket->socket != INVALID_SOCKET) && (pSocket->bAsyncRecv == TRUE))
+            {
+                // acquire socket critical section
+                NetCritEnter(&pSocket->recvcrit);
+
+                // was this socket in the poll list of the previous socketpoll() call
+                for (iListIndex = 0; iListIndex < previousPollList.iCount; iListIndex++)
+                {
+                    if (previousPollList.aSockets[iListIndex] == pSocket)
+                    {
+                        // socket was in previous poll list!
+                        // now check if socketpoll() notified that this socket is ready for reading
+                        if (previousPollList.aPollFds[iListIndex].revents & POLLIN)
+                        {
+                            /*
+                            Note:
+                            The socketpoll() doc states that some error codes returned by the function
+                            may only apply to one of the sockets in the poll list. For this reason,
+                            we check the polling result for all entries in the list regardless
+                            of the return value of socketpoll().
+                            */
+
+                            // ready for reading, so go ahead and read
+                            _SocketRead(pState, previousPollList.aSockets[iListIndex]);
+                        }
+                        break;
+                    }
+                }
+
+                // if no data is queued, add this socket to the poll list to be used by the next socketpoll() call
+                if ((pSocket->recvstat <= 0) && (pSocket->socket != INVALID_SOCKET))
+                {
+                    // add socket to poll list
+                    pollList.aSockets[pollList.iCount] = pSocket;
+                    pollList.aPollFds[pollList.iCount].fd = pSocket->socket;
+                    pollList.aPollFds[pollList.iCount].events = POLLIN;
+                    pollList.iCount += 1;
+                }
+
+                // release socket critical section
+                NetCritLeave(&pSocket->recvcrit);
+            }
+        }
+
+        // release global critical section
+        NetCritLeave(NULL);
+
+        // any sockets?
+        if (pollList.iCount > 0)
+        {
+            // poll for data (wait up to 50ms)
+            iResult = socketpoll(pollList.aPollFds, pollList.iCount, 50);
+
+            if (iResult < 0)
+            {
+                NetPrintf(("dirtynetpsp2: socketpoll() failed (err=%s)\n", DirtyErrGetName(sys_net_errno)));
+
+                // stall for 50ms because experiment shows that next call to socketpoll() may not block
+                // internally if a socket is alreay in error.
+                sys_timer_usleep(50*1000);
+            }
+        }
+        else
+        {
+            // no sockets, so stall for 50ms
+            sys_timer_usleep(50*1000);
+        }
+    }
+
+    // indicate we are done
+    NetPrintf(("dirtynetpsp: receive thread exit\n"));
+    pState->iRecvLife = 0;
+
+    // terminate and exit
+    sys_net_free_thread_context(0, SYS_NET_THREAD_SELF);
+    sys_ppu_thread_exit(0);
+}
+#endif // SOCKET_ASYNCRECVTHREAD
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketCreate
+
+    \Description
+        Create new instance of socket interface module.  Initializes all global
+        resources and makes module ready for use.
+
+
+    \Input iThreadPrio        - priority to start threads with
+    \Input iThreadStackSize   - stack size to start threads with (in bytes)
+    \Input iThreadCpuAffinity - cpu affinity to start threads with
+
+    \Output
+        int32_t               - negative=error, zero=success
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketCreate(int32_t iThreadPrio, int32_t iThreadStackSize, int32_t iThreadCpuAffinity)
+{
+    SocketStateT *pState = _Socket_pState;
+    int32_t iResult;
+    int32_t iMemGroup;
+    void *pMemGroupUserData;
+    SceNetInitParam NetInitParam;
+
+    // Query mem group data
+    DirtyMemGroupQuery(&iMemGroup, &pMemGroupUserData);
+
+    // error if already started
+    if (pState != NULL)
+    {
+        NetPrintf(("dirtynetpsp2: SocketCreate() called while module is already active\n"));
+        return(-1);
+    }
+
+    // print version info
+    NetPrintf(("dirtynetpsp2: DirtySDK v%d.%d.%d.%d.%d\n", DIRTYSDK_VERSION_YEAR, DIRTYSDK_VERSION_SEASON, DIRTYSDK_VERSION_MAJOR, DIRTYSDK_VERSION_MINOR, DIRTYSDK_VERSION_PATCH));
+
+    // alloc and init state ref
+    if ((pState = DirtyMemAlloc(sizeof(*pState), SOCKET_MEMID, iMemGroup, pMemGroupUserData)) == NULL)
+    {
+        NetPrintf(("dirtynetpsp2: unable to allocate module state\n"));
+        return(-2);
+    }
+    memset(pState, 0, sizeof(*pState));
+    pState->iMemGroup = iMemGroup;
+    pState->pMemGroupUserData = pMemGroupUserData;
+    pState->iMaxPacket = SOCKET_MAXUDPRECV;
+
+    // startup network libs
+    NetLibCreate(iThreadPrio, iThreadStackSize, iThreadCpuAffinity);
+
+    // add our idle handler
+    NetIdleAdd(&_SocketIdle, pState);
+
+    // allocate memory pool for sceNetInit()
+    if ((pState->pMemPool = DirtyMemAlloc(_Socket_iMemPoolSize, SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData)) == NULL)
+    {
+        NetPrintf(("dirtynetpsp2: unable to allocate %d byte memory pool for sceNetInit()\n", _Socket_iMemPoolSize));
+        DirtyMemFree(pState, SOCKET_MEMID, iMemGroup, pMemGroupUserData);
+        return(-3);
+    }
+
+    // init network stack
+    memset(&NetInitParam, 0, sizeof(NetInitParam));
+    NetInitParam.memory = pState->pMemPool;
+    NetInitParam.size = _Socket_iMemPoolSize;
+
+    if ((iResult = sceNetInit(&NetInitParam)) < 0)
+    {
+        if (iResult == (signed)SCE_NET_ERROR_EBUSY)  // this error means "already initialized"
+        {
+            NetPrintf(("dirtynetpsp2: warning -- sceNet already initialized; sceNetTerm() will not be called on destroy\n"));
+            pState->bNetAlreadyInitialized = TRUE;
+        }
+        else
+        {
+            NetPrintf(("dirtynetpsp2: sceNetInit() failed err=%s\n", DirtyErrGetName(iResult)));
+            return(-4);
+        }
+    }
+    else
+    {
+        pState->bNetAlreadyInitialized = FALSE;
+    }
+
+
+    // create high-priority receive thread
+    #if SOCKET_ASYNCRECVTHREAD
+    sys_ppu_thread_create((sys_ppu_thread_t *)&pState->iRecvThread, _SocketRecvThread, (uintptr_t)pState, iThreadPrio, (iThreadStackSize?iThreadStackSize:(16*1024)), 0, "SocketRecv");
+    if (pState->iRecvThread <= 0)
+    {
+        NetPrintf(("dirtynetpsp2: unable to create recv thread (err=%s)\n", DirtyErrGetName(pState->iRecvThread)));
+    }
+    #endif
+
+    // save state
+    _Socket_pState = pState;
+    return(0);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketDestroy
+
+    \Description
+        Release resources and destroy module.
+
+    \Input uFlags   - shutdown flags
+
+    \Output
+        int32_t     - negative=error, zero=success
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketDestroy(uint32_t uFlags)
+{
+    SocketStateT *pState = _Socket_pState;
+    int32_t iResult;
+
+    // error if not active
+    if (pState == NULL)
+    {
+        NetPrintf(("dirtynetpsp2: SocketDestroy() called while module is not active\n"));
+        return(-1);
+    }
+
+    NetPrintf(("dirtynetpsp2: shutting down\n"));
+
+    // kill idle callbacks
+    NetIdleDel(&_SocketIdle, pState);
+
+    // let any idle event finish
+    NetIdleDone();
+
+    #if SOCKET_ASYNCRECVTHREAD
+    // tell receive thread to quit
+    pState->iRecvThread = 0;
+
+    // wait for thread to terminate
+    while (pState->iRecvLife > 0)
+    {
+        sys_timer_usleep(1*1000);
+    }
+    #endif
+
+    // close all sockets
+    while (pState->pSockList != NULL)
+    {
+        SocketClose(pState->pSockList);
+    }
+
+    // clear the kill list
+    _SocketIdle(pState);
+
+    // shut down network libs
+    NetLibDestroy(0);
+
+    if (pState->bNetAlreadyInitialized == FALSE)
+    {
+        // shut down sony networking (must come after thread exit)
+        if ((iResult = sceNetTerm()) < 0)
+        {
+            NetPrintf(("dirtynetpsp2: sceNetTerm() failed (err=%s)\n", DirtyErrGetName(iResult)));
+        }
+    }
+
+    // dispose of sceNet memory pool
+    DirtyMemFree(pState->pMemPool, SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData);
+
+    // dispose of state
+    DirtyMemFree(pState, SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData);
+    _Socket_pState = NULL;
+    return(0);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketOpen
+
+    \Description
+        Create a new transfer endpoint. A socket endpoint is required for any
+        data transfer operation.
+
+    \Input iAddrFamily  - address family (AF_INET)
+    \Input iType        - socket type (SOCK_STREAM, SOCK_DGRAM, SOCK_RAW, ...)
+    \Input iProto       - protocol type for SOCK_RAW (unused by others)
+
+    \Output
+        SocketT *   - socket reference
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+SocketT *SocketOpen(int32_t iAddrFamily, int32_t iType, int32_t iProto)
+{
+    return(_SocketOpen(-1, iAddrFamily, iType, iProto, 0));
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketClose
+
+    \Description
+        Close a socket. Performs a graceful shutdown of connection oriented protocols.
+
+    \Input *pSocket - socket reference
+
+    \Output
+        int32_t         - zero
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketClose(SocketT *pSocket)
+{
+    int32_t iSocket = pSocket->socket;
+
+    // stop sending
+    SocketShutdown(pSocket, SOCK_NOSEND);
+
+    // dispose of SocketT
+    if (_SocketClose(pSocket) < 0)
+    {
+        return(-1);
+    }
+
+    // close sce socket if allocated
+    if (iSocket >= 0)
+    {
+        // close socket
+        if (sceNetSocketClose(iSocket) < 0)
+        {
+            NetPrintf(("dirtynetpsp2: sceNetSocketClose() failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+        }
+    }
+
+    // success
+    return(0);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function SocketImport
+
+    \Description
+        Import a socket.  The given socket ref may be a SocketT, in which case a
+        SocketT pointer to the ref is returned, or it can be an actual Sony socket ref,
+        in which case a SocketT is created for the Sony socket ref.
+
+    \Input uSockRef - socket reference
+
+    \Output
+        SocketT *   - pointer to imported socket, or NULL
+
+    \Version 01/14/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+SocketT *SocketImport(intptr_t uSockRef)
+{
+    SocketStateT *pState = _Socket_pState;
+    uint32_t uProtoSize;
+    SocketT *pSock;
+    int32_t iProto;
+
+    // see if this socket is already in our socket list
+    NetCritEnter(NULL);
+    for (pSock = pState->pSockList; pSock != NULL; pSock = pSock->next)
+    {
+        if (pSock == (SocketT *)uSockRef)
+        {
+            break;
+        }
+    }
+    NetCritLeave(NULL);
+
+    // if socket is in socket list, just return it
+    if (pSock != NULL)
+    {
+        return(pSock);
+    }
+
+    // get info from socket ref
+    uProtoSize = sizeof(iProto);
+    if (sceNetGetsockopt(uSockRef, SCE_NET_SOL_SOCKET, SCE_NET_SO_TYPE, &iProto, &uProtoSize) == 0)
+    {
+        // create the socket
+        pSock = _SocketOpen(uSockRef, AF_INET, iProto, 0, 0);
+
+        // update local and remote addresses
+        SocketInfo(pSock, 'bind', 0, &pSock->local, sizeof(pSock->local));
+        SocketInfo(pSock, 'peer', 0, &pSock->remote, sizeof(pSock->remote));
+
+        // mark it as imported
+        pSock->bImported = TRUE;
+    }
+    else
+    {
+        NetPrintf(("dirtynetpsp2: sceNetGetsockopt(SO_TYPE) failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+    }
+
+    return(pSock);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function SocketRelease
+
+    \Description
+        Release an imported socket.
+
+    \Input *pSocket - pointer to socket
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+void SocketRelease(SocketT *pSocket)
+{
+    // if it wasn't imported, nothing to do
+    if (pSocket->bImported == FALSE)
+    {
+        return;
+    }
+
+    // dispose of SocketT, but leave the sockref alone
+    _SocketClose(pSocket);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketShutdown
+
+    \Description
+        Perform partial/complete shutdown of socket indicating that either sending
+        and/or receiving is complete.
+
+    \Input *pSocket - socket reference
+    \Input iHow     - SOCK_NOSEND and/or SOCK_NORECV
+
+    \Output
+        int32_t         - zero
+
+    \Version 09/10/04 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketShutdown(SocketT *pSocket, int32_t iHow)
+{
+    int32_t iResult=0;
+
+    // only shutdown a connected socket
+    if (pSocket->type != SOCK_STREAM)
+    {
+        pSocket->iLastError = SOCKERR_NONE;
+        return(pSocket->iLastError);
+    }
+
+    // make sure socket ref is valid
+    if (pSocket->socket == INVALID_SOCKET)
+    {
+        pSocket->iLastError = SOCKERR_NONE;
+        return(pSocket->iLastError);
+    }
+
+    // translate how
+    if (iHow == SOCK_NOSEND)
+    {
+        iHow = SCE_NET_SHUT_WR;
+    }
+    else if (iHow == SOCK_NORECV)
+    {
+        iHow = SCE_NET_SHUT_RD;
+    }
+    else if (iHow == (SOCK_NOSEND|SOCK_NORECV))
+    {
+        iHow = SCE_NET_SHUT_RDWR;
+    }
+
+    // do the shutdown
+    if (sceNetShutdown(pSocket->socket, iHow) < 0)
+    {
+        iResult = sce_net_errno;
+        NetPrintf(("dirtynetpsp2: sceNetShutdown(%d, %d) failed (err=%s)\n", pSocket->socket, iHow, DirtyErrGetName(iResult)));
+    }
+
+    pSocket->iLastError = _XlatError(iResult);
+    return(pSocket->iLastError);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketBind
+
+    \Description
+        Bind a local address/port to a socket.
+
+    \Input *pSocket - socket reference
+    \Input *pName   - local address/port
+    \Input iNameLen - length of name
+
+    \Output
+        int32_t         - standard network error code (SOCKERR_xxx)
+
+    \Notes
+        If either address or port is zero, then they are filled in automatically.
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketBind(SocketT *pSocket, const struct sockaddr *pName, int32_t iNameLen)
+{
+    SocketStateT *pState = _Socket_pState;
+    SceNetSockaddr SockAddr;
+    int32_t iResult;
+
+    // make sure socket is valid
+    if (pSocket->socket < 0)
+    {
+        NetPrintf(("dirtynetpsp2: attempt to bind invalid socket\n"));
+        pSocket->iLastError = SOCKERR_INVALID;
+        return(pSocket->iLastError);
+    }
+
+    // make sure we're not binding port 3658/UDP, which is used by Sony for STUN
+    if ((pSocket->type == SOCK_DGRAM) && (SockaddrInGetPort(pName) == 3658))
+    {
+        NetPrintf(("dirtynetpsp2: warning -- bind of port 3658/UDP not allowed due to conflict with Sony STUN service\n"));
+        pSocket->iLastError = SOCKERR_NONE;
+        return(pSocket->iLastError);
+    }
+
+    // save local address
+    memcpy(&pSocket->local, pName, sizeof(pSocket->local));
+
+    // is the bind port a virtual port?
+    if (pSocket->type == SOCK_DGRAM)
+    {
+        int32_t iPort;
+        uint16_t uPort;
+
+        if ((uPort = SockaddrInGetPort(pName)) != 0)
+        {
+            // find virtual port in list
+            for (iPort = 0; (iPort < SOCKET_MAXVIRTUALPORTS) && (pState->aVirtualPorts[iPort] != uPort); iPort++)
+                ;
+            if (iPort < SOCKET_MAXVIRTUALPORTS)
+            {
+                // close winsock socket
+                NetPrintf(("dirtynetpsp2: making socket bound to port %d virtual\n", uPort));
+                if (pSocket->socket != INVALID_SOCKET)
+                {
+                    sceNetShutdown(pSocket->socket, SCE_NET_SHUT_WR);
+                    sceNetSocketClose(pSocket->socket);
+                    pSocket->socket = INVALID_SOCKET;
+                }
+                pSocket->virtualport = uPort;
+                pSocket->virtual = TRUE;
+                return(0);
+            }
+        }
+    }
+
+    // set up sce sockaddr
+    _SockAddrToSceAddr(&SockAddr, pName);
+
+    // do the bind
+    if ((iResult = sceNetBind(pSocket->socket, &SockAddr, sizeof(SockAddr))) < 0)
+    {
+        NetPrintf(("dirtynetpsp2: bind() to port %d failed (err=%s)\n", SockaddrInGetPort(pName), DirtyErrGetName(sce_net_errno)));
+    }
+
+    pSocket->iLastError = _XlatError(iResult);
+    return(pSocket->iLastError);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketConnect
+
+    \Description
+        Initiate a connection attempt to a remote host.
+
+    \Input *pSocket - socket reference
+    \Input *pName   - pointer to name of socket to connect to
+    \Input iNameLen - length of name
+
+    \Output
+        int32_t     - standard network error code (SOCKERR_xxx)
+
+    \Notes
+        Only has real meaning for stream protocols. For a datagram protocol, this
+        just sets the default remote host.
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketConnect(SocketT *pSocket, struct sockaddr *pName, int32_t iNameLen)
+{
+    SceNetSockaddr SockAddr;
+    SceNetSocklen_t iSockLen;
+    int32_t iResult;
+
+    NetPrintf(("dirtynetpsp2: connecting to %a:%d\n", SockaddrInGetAddr(pName), SockaddrInGetPort(pName)));
+
+    // format address
+    _SockAddrToSceAddr(&SockAddr, pName);
+
+    // do the connect
+    pSocket->opened = 0;
+    iSockLen = sizeof(SockAddr);
+    if (((iResult = sceNetConnect(pSocket->socket, &SockAddr, iSockLen)) < 0) && (sce_net_errno != SCE_NET_EINPROGRESS))
+    {
+        iResult = sce_net_errno;
+        NetPrintf(("dirtynetpsp2: connect() failed (err=%s)\n", DirtyErrGetName(iResult)));
+    }
+
+    pSocket->iLastError = _XlatError(iResult);
+    return(pSocket->iLastError);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketListen
+
+    \Description
+        Start listening for an incoming connection on the socket.  The socket must already
+        be bound and a stream oriented connection must be in use.
+
+    \Input *pSocket - socket reference to bound socket (see SocketBind())
+    \Input iBacklog - number of pending connections allowed
+
+    \Output
+        int32_t     - standard network error code (SOCKERR_xxx)
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketListen(SocketT *pSocket, int32_t iBacklog)
+{
+    int32_t iResult;
+
+    // do the listen
+    if ((iResult = sceNetListen(pSocket->socket, iBacklog)) < 0)
+    {
+        iResult = sce_net_errno;
+        NetPrintf(("dirtynetpsp2: listen() failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+    }
+
+    pSocket->iLastError = _XlatError(iResult);
+    return(pSocket->iLastError);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketAccept
+
+    \Description
+        Accept an incoming connection attempt on a socket.
+
+    \Input *pSocket     - socket reference to socket in listening state (see SocketListen())
+    \Input *pAddr       - pointer to storage for address of the connecting entity, or NULL
+    \Input *pAddrLen    - pointer to storage for length of address, or NULL
+
+    \Output
+        SocketT *       - the accepted socket, or NULL if not available
+
+    \Notes
+        The integer pointed to by addrlen should on input contain the number of characters
+        in the buffer addr.  On exit it will contain the number of characters in the
+        output address.
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+SocketT *SocketAccept(SocketT *pSocket, struct sockaddr *pAddr, int32_t *pAddrLen)
+{
+    int32_t iResult;
+    SceNetSockaddr SockAddr;
+    SceNetSocklen_t iSockLen;
+    SocketT *pOpen = NULL;
+
+    pSocket->iLastError = SOCKERR_INVALID;
+
+    // make sure we have an INET socket
+    if ((pSocket->socket == INVALID_SOCKET) || (pSocket->family != AF_INET))
+    {
+        return(NULL);
+    }
+
+    // make sure turn parm is valid
+    if ((pAddr != NULL) && (*pAddrLen < (signed)sizeof(struct sockaddr)))
+    {
+        return(NULL);
+    }
+
+    // set up sce sockaddr
+    _SockAddrToSceAddr(&SockAddr, pAddr);
+
+    // perform inet accept
+    iSockLen = sizeof(SockAddr);
+    iResult = sceNetAccept(pSocket->socket, &SockAddr, &iSockLen);
+    if (iResult > 0)
+    {
+        // Allocate socket structure and install in list
+        pOpen = _SocketOpen(iResult, pSocket->family, pSocket->type, pSocket->proto, 1);
+        pSocket->iLastError = SOCKERR_NONE;
+    }
+    else
+    {
+        pSocket->iLastError = _XlatError(iResult);
+
+        if (sce_net_errno != SCE_NET_EWOULDBLOCK)
+        {
+            NetPrintf(("dirtynetpsp2: sceNetAccept() failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+        }
+    }
+
+    // return the socket
+    return(pOpen);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketSendto
+
+    \Description
+        Send data to a remote host. The destination address is supplied along with
+        the data. Should only be used with datagram sockets as stream sockets always
+        send to the connected peer.
+
+    \Input *pSocket - socket reference
+    \Input *pBuf    - the data to be sent
+    \Input iLen     - size of data
+    \Input iFlags   - unused
+    \Input *pTo     - the address to send to (NULL=use connection address)
+    \Input iToLen   - length of address
+
+    \Output
+        int32_t     - standard network error code (SOCKERR_xxx)
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketSendto(SocketT *pSocket, const char *pBuf, int32_t iLen, int32_t iFlags, const struct sockaddr *pTo, int32_t iToLen)
+{
+    SocketStateT *pState = _Socket_pState;
+    int32_t iResult = -1;
+
+    // if installed, give socket callback right of first refusal
+    if (pState->pSendCallback != NULL)
+    {
+        if ((iResult = pState->pSendCallback(pSocket, pSocket->type, (const uint8_t *)pBuf, iLen, pTo, pState->pSendCallref)) > 0)
+        {
+            return(iResult);
+        }
+    }
+
+    // make sure socket ref is valid
+    if (pSocket->socket < 0)
+    {
+        NetPrintf(("dirtynetpsp2: attempting to send on invalid socket\n"));
+        pSocket->iLastError = SOCKERR_INVALID;
+        return(pSocket->iLastError);
+    }
+
+    // raw sockets assume the data includes an IPV4 header
+    if (pSocket->type == SOCK_RAW)
+    {
+        HeaderIpv4 *pIpv4 = (HeaderIpv4 *)pBuf;
+
+        // skip past the IP header (stack will add its own)
+        iLen -= (pIpv4->verslen & 15) * 4;
+        pBuf += (pIpv4->verslen & 15) * 4;
+        if (iLen < 0)
+        {
+            iLen = 0;
+        }
+    }
+
+    // use appropriate version
+    if (pTo == NULL)
+    {
+        if ((iResult = sceNetSend(pSocket->socket, pBuf, iLen, 0)) < 0)
+        {
+            NetPrintf(("dirtynetpsp2: sceNetSend() failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+        }
+    }
+    else
+    {
+        SceNetSockaddr SockAddr;
+        SceNetSocklen_t iSockLen = sizeof(SockAddr);
+
+        // set up Sce addr
+        _SockAddrToSceAddr(&SockAddr, pTo);
+
+        // do the send
+        #if SOCKET_VERBOSE
+        NetPrintf(("dirtynetpsp2: sending %d bytes to %a\n", iLen, SockaddrInGetAddr(pTo)));
+        #endif
+        if ((iResult = sceNetSendto(pSocket->socket, pBuf, iLen, 0, &SockAddr, iSockLen)) < 0)
+        {
+            NetPrintf(("dirtynetpsp2: sceNetSendto() failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+        }
+    }
+
+    // return bytes sent
+    pSocket->iLastError = _XlatError(iResult);
+    return(pSocket->iLastError);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketRecvfrom
+
+    \Description
+        Receive data from a remote host. If socket is a connected stream, then data can
+        only come from that source. A datagram socket can receive from any remote host.
+
+    \Input *pSocket - socket reference
+    \Input *pBuf    - buffer to receive data
+    \Input iLen     - length of recv buffer
+    \Input iFlags   - unused
+    \Input *pFrom   - address data was received from (NULL=ignore)
+    \Input *pFromLen- length of address
+
+    \Output
+        int32_t         - positive=data bytes received, else standard error code
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketRecvfrom(SocketT *pSocket, char *pBuf, int32_t iLen, int32_t iFlags, struct sockaddr *pFrom, int32_t *pFromLen)
+{
+    int32_t iRecv = -1;
+
+    // receiving on an asyncrecv socket?
+    if (pSocket->bAsyncRecv == TRUE)
+    {
+        #if SOCKET_ASYNCRECVTHREAD
+        // see if we have any data
+        if (((iRecv = pSocket->recvstat) > 0) && (iLen > 0))
+        {
+            // acquire socket receive critical section
+            NetCritEnter(&pSocket->recvcrit);
+
+            /*  re-read recvstat now that we have acquired critical section.  we do this
+                because SocketControl('push') could have updated the recvstat variable
+                to a new value before we acquired the critical section */
+            iRecv = *(volatile int32_t *)&pSocket->recvstat;
+
+            // copy sender
+            if (pFrom != NULL)
+            {
+                memcpy(pFrom, &pSocket->recvaddr, sizeof(*pFrom));
+                *pFromLen = sizeof(*pFrom);
+            }
+
+            // make sure we fit in the buffer
+            if (iRecv > iLen)
+            {
+                iRecv = iLen;
+            }
+            memcpy(pBuf, pSocket->recvdata, iRecv);
+
+            // mark data as consumed
+            pSocket->recvstat = 0;
+
+            // issue a new read request (only if no callback installed for this socket)
+            if (pSocket->callback == NULL)
+            {
+                _SocketRead(_Socket_pState, pSocket);
+            }
+
+            // release socket receive critical section
+            NetCritLeave(&pSocket->recvcrit);
+        }
+        else if (pSocket->recvstat <= 0)
+        {
+            // acquire socket receive critical section
+            NetCritEnter(&pSocket->recvcrit);
+            // clear error
+            if (pSocket->recvstat < 0)
+            {
+                pSocket->recvstat = 0;
+            }
+            // release socket receive critical section
+            NetCritLeave(&pSocket->recvcrit);
+
+            pSocket->iLastError = SOCKERR_NONE;
+            return(pSocket->iLastError);
+        }
+        #else
+        // first check for pushed data
+        if (pSocket->recvstat != 0)
+        {
+            if (pFrom != NULL)
+            {
+                memcpy(pFrom, &pSocket->recvaddr, sizeof(*pFrom));
+            }
+            if (iLen > pSocket->recvstat)
+            {
+                iLen = pSocket->recvstat;
+            }
+            memcpy(pBuf, pSocket->recvdata, iLen);
+            pSocket->recvstat = 0;
+            return(iLen);
+        }
+        // make sure socket ref is valid
+        if (pSocket->socket == INVALID_SOCKET)
+        {
+            pSocket->iLastError = SOCKERR_INVALID;
+            return(pSocket->iLastError);
+        }
+        // do direct recv call
+        if (((iRecv = _SocketRecvfrom(pSocket, pBuf, iLen, pFrom, pFromLen)) < 0) && (sce_net_errno != SCE_NET_EWOULDBLOCK))
+        {
+            NetPrintf(("dirtynetpsp2: _SocketRecvfrom() failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+        }
+        #endif
+    }
+    else // non-async recvthread socket
+    {
+        // make sure socket ref is valid
+        if (pSocket->socket == INVALID_SOCKET)
+        {
+            pSocket->iLastError = SOCKERR_INVALID;
+            return(pSocket->iLastError);
+        }
+        // do direct recv call
+        if (((iRecv = _SocketRecvfrom(pSocket, pBuf, iLen, pFrom, pFromLen)) < 0) && (sce_net_errno != SCE_NET_EWOULDBLOCK))
+        {
+            NetPrintf(("dirtynetpsp2: _SocketRecvfrom() failed on a SOCK_STREAM socket (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+        }
+    }
+
+    // do error conversion
+    iRecv = (iRecv == 0) ? SOCKERR_CLOSED : _XlatError(iRecv);
+
+    // simulate packet loss
+    #if DIRTYCODE_DEBUG
+    if ((_Socket_pState->uPacketLoss != 0) && (pSocket->type == SOCK_DGRAM) && (iRecv > 0) && (SocketSimulatePacketLoss(_Socket_pState->uPacketLoss) != 0))
+    {
+        pSocket->iLastError = SOCKERR_NONE;
+        return(pSocket->iLastError);
+    }
+    #endif
+
+    // return the error code
+    pSocket->iLastError = iRecv;
+    return(pSocket->iLastError);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketInfo
+
+    \Description
+        Return information about an existing socket.
+
+    \Input *pSocket - socket reference
+    \Input iInfo    - selector for desired information
+    \Input iData    - selector specific
+    \Input *pBuf    - return buffer
+    \Input iLen     - buffer length
+
+    \Output
+        int32_t     - selector-specific
+
+    \Notes
+        iInfo can be one of the following:
+
+        \verbatim
+            'actv' - returns whether module is active or not
+            'addr' - returns local address
+            'audt' - prints verbose socket info (debug only)
+            'bind' - return bind data (if pSocket == NULL, get socket bound to given port)
+            'bndu' - return bind data (only with pSocket=NULL, get SOCK_DGRAM socket bound to given port)
+            'conn' - connection status
+            'ethr' - local ethernet address (returned in pBuf), 0=success, negative=error
+            'macx' - mac address of client (returned in pBuf),  0=success, negative=error
+            'maxp' - return max packet size
+            'peer' - peer info (only valid if connected)
+            'plug' - plug status
+            'serr' - last socket error
+            'stat' - socket status
+            'virt' - TRUE if socket is virtual, else FALSE
+        \endverbatim
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketInfo(SocketT *pSocket, int32_t iInfo, int32_t iData, void *pBuf, int32_t iLen)
+{
+    SocketStateT *pState = _Socket_pState;
+    int32_t iResult;
+
+    // always zero results by default
+    if (pBuf != NULL)
+    {
+        memset(pBuf, 0, iLen);
+    }
+
+    // socket module options
+    if (pSocket == NULL)
+    {
+        union SceNetCtlInfo CtlInfo;
+
+        if (iInfo == 'addr')
+        {
+            if (pState->uLocalAddr == 0)
+            {
+                // get local address
+                if ((iResult = sceNetCtlInetGetInfo(SCE_NET_CTL_INFO_IP_ADDRESS, &CtlInfo)) >= 0)
+                {
+                    pState->uLocalAddr = SocketInTextGetAddr(CtlInfo.ip_address);
+                    NetPrintf(("dirtynetpsp2: obtained IP address %a\n", pState->uLocalAddr));
+                }
+                else
+                {
+                    NetPrintf(("dirtynetpsp2: sceNetCtlInetGetInfo(SCE_NET_CTL_INFO_IP_ADDRESS) failed (err=%s)\n", DirtyErrGetName(iResult)));
+                }
+            }
+            return(pState->uLocalAddr);
+        }
+        // display verbose socket info
+        #if DIRTYCODE_LOGGING
+        if (iInfo == 'audt')
+        {
+            // display global statistics
+            NetPrintf(("dirtynetpsp2: --------------------- audit status ---------------------\n"));
+            sceNetShowIfconfig();
+
+            // walk socket list and display audit information for all sockets
+            NetCritEnter(NULL);
+            for (pSocket = pState->pSockList; pSocket != NULL; pSocket = pSocket->next)
+            {
+                SocketInfo(pSocket, iInfo, iData, pBuf, iLen);
+            }
+            NetCritLeave(NULL);
+            NetPrintf(("dirtynetpsp2: --------------------------------------------------------\n"));
+        }
+        #endif
+        // get socket bound to given port
+        if ( (iInfo == 'bind') || (iInfo == 'bndu') )
+        {
+            struct sockaddr BindAddr;
+            int32_t iFound = -1;
+
+            // for access to socket list
+            NetCritEnter(NULL);
+
+            // walk socket list and find matching socket
+            for (pSocket = pState->pSockList; pSocket != NULL; pSocket = pSocket->next)
+            {
+                // if iInfo is 'bndu', only consider sockets of type SOCK_DGRAM
+                // note: 'bndu' stands for "bind udp"
+                if ( (iInfo == 'bind') || ((iInfo == 'bndu') && (pSocket->type == SOCK_DGRAM)) )
+                {
+                    // get socket info
+                    SocketInfo(pSocket, 'bind', 0, &BindAddr, sizeof(BindAddr));
+                    if (SockaddrInGetPort(&BindAddr) == iData)
+                    {
+                        *(SocketT **)pBuf = pSocket;
+                        iFound = 0;
+                        break;
+                    }
+                }
+            }
+
+            // for access to g_socklist and g_sockkill
+            NetCritLeave(NULL);
+            return(iFound);
+        }
+        if (iInfo == 'conn')
+        {
+            return(pState->uConnStatus);
+        }
+        if ((iInfo == 'ethr') || (iInfo == 'macx'))
+        {
+            const uint8_t _aZeros[6] = { 0, 0, 0, 0, 0, 0 };
+
+            // try to get mac address if we don't already have it
+            if (!memcmp(pState->aMacAddr, _aZeros, sizeof(pState->aMacAddr)))
+            {
+                // get ethernet address
+                if ((iResult = sceNetCtlInetGetInfo(SCE_NET_CTL_INFO_ETHER_ADDR, &CtlInfo)) >= 0)
+                {
+                    memcpy(pState->aMacAddr, CtlInfo.ether_addr.data, sizeof(pState->aMacAddr));
+                    NetPrintf(("dirtynetpsp2: obtained MAC address $%02x%02x%02x%02x%02x%02x\n",
+                        pState->aMacAddr[0], pState->aMacAddr[1], pState->aMacAddr[2],
+                        pState->aMacAddr[3], pState->aMacAddr[4], pState->aMacAddr[5]));
+                }
+                else
+                {
+                    NetPrintf(("dirtynetpsp2: sceNetCtlInetGetInfo(SCE_NET_CTL_INFO_ETHER_ADDR) failed (err=%s)\n", DirtyErrGetName(iResult)));
+                }
+            }
+
+            // return MAC address
+            if ((pBuf != NULL) && (iLen >= (signed)sizeof(pState->aMacAddr)))
+            {
+                memcpy(pBuf, &pState->aMacAddr, sizeof(pState->aMacAddr));
+                return(0);
+            }
+            return(-1);
+        }
+        // return max packet size
+        if (iInfo == 'maxp')
+        {
+            return(pState->iMaxPacket);
+        }
+        if (iInfo == 'plug')
+        {
+            if ((iResult = sceNetCtlInetGetInfo(SCE_NET_CTL_INFO_LINK, &CtlInfo)) == 0)
+            {
+                return(CtlInfo.link);
+            }
+            else
+            {
+                NetPrintf(("dirtynetpsp2: sceNetCtlInetGetInfo(SCE_NET_CTL_INFO_LINK) failed (err=%s)\n", DirtyErrGetName(iResult)));
+            }
+        }
+        return(-1);
+    }
+
+    // display verbose socket info for this socket
+    #if DIRTYCODE_LOGGING
+    if (iInfo == 'audt')
+    {
+        SceNetSockInfo SockInfo;
+        if ((iResult = sceNetGetSockInfo(pSocket->socket, &SockInfo, 1, 0)) >= 0)
+        {
+            NetPrintf(("dirtynetpsp2: id=%d pr=%d rq=%d sq=%d la=%a:%d ra=%a:%d st=%d\n",
+                SockInfo.s,
+                SockInfo.socket_type,
+                SockInfo.recv_queue_length,
+                SockInfo.send_queue_length,
+                SockInfo.local_adr.s_addr,
+                SockInfo.local_port,
+                SockInfo.remote_adr.s_addr,
+                SockInfo.remote_port,
+                SockInfo.state));
+        }
+        else
+        {
+            NetPrintf(("dirtynetpsp2: sceNetGetSockInfo() failed (err=%s)\n", DirtyErrGetName(sce_net_errno)));
+        }
+        return(0);
+    }
+    #endif
+
+    // return local bind data
+    if (iInfo == 'bind')
+    {
+        if (iLen >= (signed)sizeof(pSocket->local))
+        {
+            SceNetSockaddr SceAddr;
+            SceNetSocklen_t iAddrLen = sizeof(SceAddr);
+
+            if (pSocket->virtual == TRUE)
+            {
+                SockaddrInit((struct sockaddr *)pBuf, AF_INET);
+                SockaddrInSetPort((struct sockaddr *)pBuf, pSocket->virtualport);
+            }
+            else
+            {
+                sceNetGetsockname(pSocket->socket, &SceAddr, &iAddrLen);
+                _SceAddrToSockAddr((struct sockaddr *)pBuf, &SceAddr);
+            }
+            return(0);
+        }
+    }
+
+    // return whether the socket is virtual or not
+    if (iInfo == 'virt')
+    {
+        return(pSocket->virtual);
+    }
+
+    // make sure there is a valid socket ref
+    if (pSocket->socket == INVALID_SOCKET)
+    {
+        return(-2);
+    }
+
+    // return local peer data
+    if ((iInfo == 'conn') || (iInfo == 'peer'))
+    {
+        if (iLen >= (signed)sizeof(pSocket->local))
+        {
+            SceNetSockaddr SceAddr;
+            SceNetSocklen_t iAddrLen = sizeof(SceAddr);
+
+            sceNetGetpeername(pSocket->socket, &SceAddr, &iAddrLen);
+            _SceAddrToSockAddr((struct sockaddr *)pBuf, &SceAddr);
+        }
+        return(0);
+    }
+
+    // return last socket error
+    if (iInfo == 'serr')
+    {
+        return(pSocket->iLastError);
+    }
+
+    // return socket status
+    if (iInfo == 'stat')
+    {
+        SceNetSockaddr SockAddr;
+        SceNetSocklen_t iAddrLen = sizeof(SockAddr);
+        int32_t iResult;
+
+        // try to validate connection status
+        iResult = sceNetGetpeername(pSocket->socket, &SockAddr, &iAddrLen);
+
+        // if not connected, check result for success to indicate connection is open
+        if ((pSocket->opened == 0) && (iResult == 0))
+        {
+            NetPrintf(("dirtynetpsp2: connection open\n"));
+            pSocket->opened = 1;
+        }
+        // if previously connected, make sure connect still valid
+        else if ((pSocket->opened > 0) && (iResult < 0))
+        {
+            NetPrintf(("dirtynetpsp2: connection closed\n"));
+            pSocket->opened = -1;
+        }
+
+        // return connect status
+        return(pSocket->opened);
+    }
+
+    // unhandled option?
+    NetPrintf(("dirtynetpsp2: unhandled SocketInfo() option '%C'\n", iInfo));
+    return(-1);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketCallback
+
+    \Description
+        Register a callback routine for notification of socket events.  Also includes
+        timeout support.
+
+    \Input *sock    - socket reference
+    \Input mask     - valid callback events (CALLB_NONE, CALLB_SEND, CALLB_RECV)
+    \Input idle     - if nonzero, specifies the number of ticks between idle calls
+    \Input *ref     - user data to be passed to proc
+    \Input *proc    - user callback
+
+    \Output
+        int32_t         - zero
+
+    \Notes
+        A callback will reset the idle timer, so when specifying a callback and an
+        idle processing time, the idle processing time represents the maximum elapsed
+        time between calls.
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketCallback(SocketT *sock, int32_t mask, int32_t idle, void *ref, int32_t (*proc)(SocketT *sock, int32_t flags, void *ref))
+{
+    sock->callidle = idle;
+    sock->callmask = mask;
+    sock->callref = ref;
+    sock->callback = proc;
+    return(0);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketControl
+
+    \Description
+        Process a control message (type specific operation)
+
+    \Input *pSocket - socket to control, or NULL for module-level option
+    \Input iOption  - the option to pass
+    \Input iData1   - message specific parm
+    \Input *pData2  - message specific parm
+    \Input *pData3  - message specific parm
+
+    \Output
+        int32_t     - message specific result (-1=unsupported message)
+
+    \Notes
+        iOption can be one of the following:
+
+        \verbatim
+            'arcv' - set async receive enable/disable (default enabled for DGRAM/RAW, disabled for TCP)
+            'conn' - init network stack
+            'disc' - bring down network stack
+            'loss' - simulate packet loss (debug only)
+            'maxp' - set max udp packet size
+            'nbio' - set nonblocking/blocking mode (TCP only, iData1=TRUE (nonblocking) or FALSE (blocking))
+            'ndly' - set TCP_NODELAY state for given stream socket (iData1=zero or one)
+            'pool' - set sys_net mempool size (default=128k)
+            'push' - push data into given socket receive buffer (iData1=size, pData2=data ptr, pData3=sockaddr ptr)
+            'rbuf' - set socket recv buffer size
+            'sbuf' - set socket send buffer size
+            'sdcb' - set send callback (pData2=callback, pData3=callref)
+            'vadd' - add a port to virtual port list
+            'vdel' - del a port from virtual port list
+            'wkup' - force a dummy udp broadcast to attempt a radio sub-system wakeup
+        \endverbatim
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketControl(SocketT *pSocket, int32_t iOption, int32_t iData1, void *pData2, void *pData3)
+{
+    SocketStateT *pState = _Socket_pState;
+    int32_t iResult;
+
+    // set async recv enable
+    #if SOCKET_ASYNCRECVTHREAD
+    if (iOption == 'arcv')
+    {
+        // set socket async recv flag
+        pSocket->bAsyncRecv = iData1 ? TRUE : FALSE;
+        return(0);
+    }
+    #endif // SOCKET_ASYNCRECVTHREAD
+    // init network stack and bring up interface
+    if (iOption == 'conn')
+    {
+        int32_t iState, iResult;
+
+        if ((iResult = sceNetCtlInit()) < 0)
+        {
+            if (iResult == (signed)SCE_NET_CTL_ERROR_NOT_TERMINATED)
+            {
+                NetPrintf(("dirtynetpsp2: warning -- sceNetCtl already initialized; sceNetCtlTerm() will not be called on disconnect\n"));
+                pState->bNetCtlAlreadyInitialized = TRUE;
+            }
+            else
+            {
+                NetPrintf(("dirtynetpsp2: sceNetCtlInit() failed err=%s\n", DirtyErrGetName(iResult)));
+                return(-1);
+            }
+        }
+        else
+        {
+            pState->bNetCtlAlreadyInitialized = FALSE;
+        }
+
+        if ((iResult = sceNetCtlInetRegisterCallback(_SocketNetCtlHandler, pState, &pState->iHandlerId)) < 0)
+        {
+            NetPrintf(("dirtynetpsp2: sceNetCtlInetRegisterCallback() failed err=%s\n", DirtyErrGetName(iResult)));
+            return(-1);
+        }
+        pState->uConnStatus = '~con';
+
+        // to compensate for any event we may have missed because of late registration of the handler,
+        // we poll system connection status once and fake a connection status transition if appropriate
+        sceNetCtlInetGetState(&iState);
+        switch (iState)
+        {
+            case SCE_NET_CTL_STATE_DISCONNECTED:
+            case SCE_NET_CTL_STATE_CONNECTING:
+            case SCE_NET_CTL_STATE_IPOBTAINING:
+                break;
+            case SCE_NET_CTL_STATE_IPOBTAINED:
+                _SocketNetCtlHandler(SCE_NET_CTL_EVENT_TYPE_IPOBTAINED, pState);
+                break;
+            default:
+                NetPrintf(("dirtynetpsp2: sceNetCtlInetGetState() returned unknown network connection state (%d)\n", iState));
+                break;
+        }
+
+        // attempt to wake up radio sub-system (in case it is currently suspended)
+        SocketControl(NULL, 'wkup', 0, NULL, NULL);
+
+        return(0);
+    }
+
+    if (iOption == 'wkup')
+    {
+        struct dummyData {
+            uint8_t aDummyData[8];
+        } dummyData;
+        struct sockaddr bind, bcast;
+
+        SockaddrInit(&bind, AF_INET);
+        SockaddrInSetPort(&bind, INADDR_ANY);
+        SockaddrInSetAddr(&bind, INADDR_ANY);
+
+        /*
+        The PSP2 has a concept of "intermittent connection". When there is no network activity, the radio sub-system
+        can be put to sleep to save power. The wake it up, the application needs to generate some network traffic.
+        Experimentation showed that in some scenarios, the netconnpsp2 connection state machine can be stuck for ever
+        waiting for the SCE_NET_CTRL_STATE_IPOBTAINED to be reached by thesystem network stack. To avoid this, we force
+        some networking activity here to make sure the radio sub-system is waken up and the network layer tries to get
+        an IP address
+        */
+
+        if (pState->pBcastSocket == NULL)
+        {
+
+            if ((pState->pBcastSocket = SocketOpen(AF_INET, SOCK_DGRAM, 0)) == NULL)
+            {
+                NetPrintf(("dirtynetpsp2: failed to create socket used to broadcast a dummy packet over the subnet to force radio sub-system wake up\n"));
+                return(-1);
+            }
+
+            if ((iResult = SocketBind(pState->pBcastSocket, &bind, sizeof(bind))) != 0)
+            {
+                NetPrintf(("dirtynetpsp2: failed to bind socket used to broadcast a dummy packet over the subnet to force radio sub-system wake up (err=%s)\n", DirtyErrGetName(iResult)));
+                return(-1);
+            }
+        }
+
+        SockaddrInit(&bcast, AF_INET);
+        SockaddrInSetPort(&bcast, 9);   // UPD port 9 is the "discard" port. (Reads pkt, then discards them)
+        SockaddrInSetAddr(&bcast, INADDR_BROADCAST);
+        if ((iResult = SocketSendto(pState->pBcastSocket, (char *)&dummyData, sizeof(dummyData), 0, &bcast, sizeof(bcast))) >= 0)
+        {
+            NetPrintf(("dirtynetpsp2: successfully broadcasted a dummy packet (%d bytes) over the subnet to force radio sub-system wake up\n", iResult));
+        }
+        else
+        {
+            NetPrintf(("dirtynetpsp2: failed to broadcast a dummy packet over the subnet to force radio sub-system wake up (err=%s)\n", DirtyErrGetName(iResult)));
+            return(-1);
+        }
+
+        return(0);
+    }
+
+    // bring down interface
+    if (iOption == 'disc')
+    {
+        // close socket used for radio sub-system wakeup
+        if (pState->pBcastSocket)
+        {
+            SocketClose(pState->pBcastSocket);
+        }
+
+        NetPrintf(("dirtynetpsp2: disconnecting from network\n"));
+        if ((iResult = sceNetCtlInetUnregisterCallback(pState->iHandlerId)) < 0)
+        {
+            NetPrintf(("dirtynetpsp2: sceNetCtlInetUnregisterCallback() failed err=%s\n", DirtyErrGetName(iResult)));
+        }
+        if (pState->bNetCtlAlreadyInitialized == FALSE)
+        {
+            sceNetCtlTerm();
+        }
+        return(0);
+    }
+    // set up packet loss simulation
+    #if DIRTYCODE_DEBUG
+    if (iOption == 'loss')
+    {
+        pState->uPacketLoss = (unsigned)iData1;
+        NetPrintf(("dirtynetpsp2: packet loss simulation %s (param=0x%08x)\n", pState->uPacketLoss ? "enabled" : "disabled", pState->uPacketLoss));
+        return(0);
+    }
+    #endif
+    // set max udp packet size
+    if (iOption == 'maxp')
+    {
+        NetPrintf(("dirtynetpsp2: setting max udp packet size to %d\n", iData1));
+        pState->iMaxPacket = iData1;
+        return(0);
+    }
+    // if a stream socket, set nonblocking/blocking mode
+    if ((iOption == 'nbio') && (pSocket != NULL) && (pSocket->type == SOCK_STREAM))
+    {
+        uint32_t uNbio = (uint32_t)iData1;
+        iResult = sceNetSetsockopt(pSocket->socket, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, &uNbio, sizeof(uNbio));
+        pSocket->iLastError = _XlatError(iResult);
+        NetPrintf(("dirtynetpsp2: setting socket:0x%x to %s mode %s (LastError=%d).\n", pSocket, iData1 ? "nonblocking" : "blocking", iResult ? "failed" : "succeeded", pSocket->iLastError));
+        return(pSocket->iLastError);
+    }
+    // if a stream socket, set TCP_NODELAY state
+    if ((iOption == 'ndly') && (pSocket != NULL) && (pSocket->type == SOCK_STREAM))
+    {
+        iResult = sceNetSetsockopt(pSocket->socket, SCE_NET_IPPROTO_TCP, SCE_NET_TCP_NODELAY, &iData1, sizeof(iData1));
+        return(_XlatError(iResult));
+    }
+    if (iOption == 'pool')
+    {
+        NetPrintf(("dirtynetpsp2: setting netpool size=%d bytes\n", iData1));
+        _Socket_iMemPoolSize = iData1;
+        return(0);
+    }
+    // push data into receive buffer
+    if (iOption == 'push')
+    {
+        if (pSocket != NULL)
+        {
+            #if SOCKET_ASYNCRECVTHREAD
+            // acquire socket critical section
+            NetCritEnter(&pSocket->recvcrit);
+            #endif
+
+            // don't allow data that is too large (for the buffer) to be pushed
+            if (iData1 > (signed)sizeof(pSocket->recvdata))
+            {
+                NetPrintf(("dirtynetpsp2: request to push %d bytes of data discarded (max=%d)\n", iData1, sizeof(pSocket->recvdata)));
+                #if SOCKET_ASYNCRECVTHREAD
+                NetCritLeave(&pSocket->recvcrit);
+                #endif
+                return(-1);
+            }
+
+            if (pSocket->recvstat > 0)
+            {
+                NetPrintf(("dirtynetpsp2: warning - overwriting packet data with SocketControl('push')\n"));
+            }
+
+            // save the size and copy the data
+            pSocket->recvstat = iData1;
+            memcpy(pSocket->recvdata, pData2, pSocket->recvstat);
+
+            // save the address
+            memcpy(&pSocket->recvaddr, pData3, sizeof(pSocket->recvaddr));
+            // save receive timestamp
+            SockaddrInSetMisc(&pSocket->recvaddr, NetTick());
+
+            // release socket critical section
+            #if SOCKET_ASYNCRECVTHREAD
+            NetCritLeave(&pSocket->recvcrit);
+            #endif
+
+            // see if we should issue callback
+            if ((pSocket->callback != NULL) && (pSocket->callmask & CALLB_RECV))
+            {
+                pSocket->callback(pSocket, 0, pSocket->callref);
+            }
+        }
+        else
+        {
+            NetPrintf(("dirtynetpsp2: warning - call to SocketControl('push') ignored because pSocket is NULL\n"));
+            return(-1);
+        }
+        return(0);
+    }
+    // set socket receive buffer size
+    if ((iOption == 'rbuf') || (iOption == 'sbuf'))
+    {
+        int32_t iOldSize, iNewSize;
+        int32_t iSockOpt = (iOption == 'rbuf') ? SCE_NET_SO_RCVBUF : SCE_NET_SO_SNDBUF;
+        SceNetSocklen_t uOptLen = 4;
+
+        // get current buffer size
+        sceNetGetsockopt(pSocket->socket, SCE_NET_SOL_SOCKET, iSockOpt, (char *)&iOldSize, &uOptLen);
+
+        // set new size
+        iResult = sceNetSetsockopt(pSocket->socket, SCE_NET_SOL_SOCKET, iSockOpt, (const char *)&iData1, sizeof(iData1));
+        pSocket->iLastError = _XlatError(iResult);
+
+        // get new size
+        sceNetGetsockopt(pSocket->socket, SCE_NET_SOL_SOCKET, iSockOpt, (char *)&iNewSize, &uOptLen);
+        NetPrintf(("dirtynetpsp2: setsockopt(%s) changed buffer size from %d to %d\n", (iOption == 'rbuf') ? "SO_RCVBUF" : "SO_SNDBUF",
+            iOldSize, iNewSize));
+        return(pSocket->iLastError);
+    }
+    // mark a port as virtual
+    if (iOption == 'vadd')
+    {
+        int32_t iPort;
+
+        // find a slot to add virtual port
+        for (iPort = 0; pState->aVirtualPorts[iPort] != 0; iPort++)
+            ;
+        if (iPort < SOCKET_MAXVIRTUALPORTS)
+        {
+            pState->aVirtualPorts[iPort] = (uint16_t)iData1;
+            return(0);
+        }
+    }
+    // remove port from virtual port list
+    if (iOption == 'vdel')
+    {
+        int32_t iPort;
+
+        // find virtual port in list
+        for (iPort = 0; (iPort < SOCKET_MAXVIRTUALPORTS) && (pState->aVirtualPorts[iPort] != (uint16_t)iData1); iPort++)
+            ;
+        if (iPort < SOCKET_MAXVIRTUALPORTS)
+        {
+            pState->aVirtualPorts[iPort] = 0;
+            return(0);
+        }
+    }
+    // set global send callback
+    if (iOption == 'sdcb')
+    {
+        pState->pSendCallback = (SocketSendCallbackT *)pData2;
+        pState->pSendCallref = pData3;
+        return(0);
+    }
+    // unhandled
+    NetPrintf(("dirtynetpsp2: unhandled control option '%c%c%c%c'\n",
+        (uint8_t)(iOption>>24), (uint8_t)(iOption>>16), (uint8_t)(iOption>>8), (uint8_t)iOption));
+    return(-1);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketGetLocalAddr
+
+    \Description
+        Returns the "external" local address (ie, the address as a machine "out on
+        the Internet" would see as the local machine's address).
+
+    \Output
+        uint32_t        - local address
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+uint32_t SocketGetLocalAddr(void)
+{
+    SocketStateT *pState = _Socket_pState;
+    return(pState->uLocalAddr);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketLookup
+
+    \Description
+        Lookup a host by name and return the corresponding Internet address. Uses
+        a callback/polling system since the socket library does not allow blocking.
+
+    \Input *pText   - pointer to null terminated address string
+    \Input iTimeout - number of milliseconds to wait for completion
+
+    \Output
+        HostentT *  - hostent struct that includes callback vectors
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+HostentT *SocketLookup(const char *pText, int32_t iTimeout)
+{
+    SocketStateT *pState = _Socket_pState;
+    SocketLookupPrivT *pPriv;
+    int32_t iAddr, iResult;
+    HostentT *pHost;
+
+    NetPrintf(("dirtynetpsp2: looking up address for host '%s'\n", pText));
+
+    // dont allow negative timeouts
+    if (iTimeout < 0)
+    {
+        return(NULL);
+    }
+
+    // create new structure
+    pPriv = DirtyMemAlloc(sizeof(*pPriv), SOCKET_MEMID, pState->iMemGroup, pState->pMemGroupUserData);
+    memset(pPriv, 0, sizeof(*pPriv));
+    pHost = &pPriv->Host;
+
+    // setup callbacks
+    pHost->Done = &_SocketLookupDone;
+    pHost->Free = &_SocketLookupFree;
+
+    // check for dot notation
+    if ((iAddr = SocketInTextGetAddr(pText)) != 0)
+    {
+        // we've got a dot-notation address
+        pHost->addr = iAddr;
+        pHost->done = 1;
+        // return completed record
+        return(pHost);
+    }
+
+    // copy over the target address
+    ds_strnzcpy(pHost->name, pText, sizeof(pHost->name));
+
+    // create the access semaphore
+    if ((pHost->sema = sceKernelCreateSema("SocketLookup", SCE_KERNEL_SEMA_ATTR_TH_FIFO, 0, 1, NULL)) < 0)
+    {
+        NetPrintf(("dirtynetpsp2: sceKernelCreateSema() failed; unable to create semaphore for lookup thread (err=%s)\n", DirtyErrGetName(pHost->sema)));
+        pHost->sema = 0;
+        pHost->done = -1;
+    }
+
+    // create resolver thread
+    // note: thread within priority range 64 to 127 cannot be created with SCE_KERNEL_CPU_MASK_USER_ALL (see psp2 doc - Kernel-Overview_e.pdf)
+    if ((pPriv->iThreadId = sceKernelCreateThread("SocketLookup", _SocketLookupThread, SCE_KERNEL_HIGHEST_PRIORITY_USER, (16 * 1024), 0, SCE_KERNEL_CPU_MASK_USER_0, NULL)) < 0)
+    {
+        NetPrintf(("dirtynetpsp2: sceKernelCreateThread() failed; unable to create lookup thread (err=%s)\n", DirtyErrGetName(pPriv->iThreadId)));
+        pHost->done = -1;
+    }
+    if ((iResult = sceKernelStartThread(pPriv->iThreadId, sizeof(pHost), &pHost)) < 0)
+    {
+        NetPrintf(("dirtynetpsp2: sceKernelStartThread() failed; unable to start lookup thread (err=%s)\n", DirtyErrGetName(iResult)));
+        pHost->done = -1;
+    }
+
+    // return the host reference
+    return(pHost);
+}
+
+/*F********************************************************************************/
+/*!
+    \Function    SocketHost
+
+    \Description
+        Return the host address that would be used in order to communicate with
+        the given destination address.
+
+    \Input *host    - local sockaddr struct
+    \Input hostlen  - length of structure (sizeof(host))
+    \Input *dest    - remote sockaddr struct
+    \Input destlen  - length of structure (sizeof(dest))
+
+    \Output
+        int32_t         - zero=success, negative=error
+
+    \Version 06/20/2005 (jbrookes)
+*/
+/********************************************************************************F*/
+int32_t SocketHost(struct sockaddr *host, int32_t hostlen, const struct sockaddr *dest, int32_t destlen)
+{
+    SocketStateT *pState = _Socket_pState;
+
+    // must be same kind of addresses
+    if (hostlen != destlen)
+    {
+        return(-1);
+    }
+
+    // do family specific lookup
+    if (dest->sa_family == AF_INET)
+    {
+        // special case destination of zero or loopback to return self
+        if ((SockaddrInGetAddr(dest) == 0) || (SockaddrInGetAddr(dest) == 0x7f000000))
+        {
+            memcpy(host, dest, hostlen);
+            return(0);
+        }
+        else
+        {
+            memset(host, 0, hostlen);
+            host->sa_family = AF_INET;
+            SockaddrInSetAddr(host, pState->uLocalAddr);
+            return(0);
+        }
+    }
+
+    // unsupported family
+    memset(host, 0, hostlen);
+    return(-3);
+}
+
+

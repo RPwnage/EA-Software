@@ -1,0 +1,115 @@
+<html>
+
+<head>
+    <script src="lib/console-0.9.js" type="text/javascript"></script>
+    <script src="lib/jquery-1.4.3.min.js" type="text/javascript"></script>
+    <script src="lib/jquery-ui-1.8.6.custom.min.js" type="text/javascript"></script>
+    <script src="Sonar.js" type="text/javascript"></script>
+    <meta http-equiv="refresh" content="10">
+</head>
+
+<body>
+
+</body>
+
+
+<script language="javascript">
+
+    var clientPrefix = Math.floor(Math.random()*11);
+
+
+    function getToken(userId, userDescription, channelId, channelDesc, callback) {
+    var paramString = "";
+    var params = [];
+
+    if (userDescription !== undefined && userDescription != null) { params.push('udc=' + userDescription); }
+    if (channelId !== undefined && channelId != null) { params.push('cid=' + channelId); }
+    if (channelDesc !== undefined && channelDesc != null) { params.push('cdc=' + channelDesc); }
+
+    if (params.length > 0)
+    paramString = "?" + params.join('&');
+
+    $.getJSON("http://topdomain.com:30002/api/default/users/" + userId + "/control-token" + paramString, callback);
+    }
+
+    function zeroPad(num,count)
+    {
+    var numZeropad = num + '';
+    while(numZeropad.length < count) {
+    numZeropad = "0" + numZeropad;
+    }
+    return numZeropad;
+    }
+
+    function joinChannel(userId, channelId, channelDesc, location, callback) {
+    var paramString = "";
+    var params = [];
+
+    if (channelDesc !== undefined && channelDesc != null) { params.push('channelDesc=' + channelDesc); }
+    if (location !== undefined && location != null) { params.push('location=' + location); }
+
+    if (params.length > 0)
+    paramString = "?" + params.join('&');
+
+
+    $.ajax({url: "/api/default/users/" + userId + "/channel" + paramString, type: 'PUT', dataType: 'json', data: '"' +
+    channelId + '"', success: callback, contentType: 'application/json'});
+
+    }
+
+
+    function createClient(userId, instanceName)
+    {
+    // Get token
+    getToken(userId, "Description of " + userId, "", "", function (token) {
+    console.log('Token', token);
+
+    try {
+    sonar = new SonarVoice(token, {pluginObjectId: "id_" + userId, instanceName: instanceName + ".topdomain.com"});
+    } catch (e) {
+    console.log('Exception', e);
+    return;
+    }
+
+    });
+    }
+
+    var numClients = 4;
+
+
+    function joinNextChannel(num) {
+    var channelId = "c" + zeroPad(num, 4);
+
+    for (var uid = 0; uid < numClients; uid ++)
+    {
+    var userId = clientPrefix + zeroPad(uid, 4);
+    joinChannel(userId, channelId, "", "", function(){});
+    }
+
+    //setTimeout(joinNextChannel(num + 1), 5000);
+    }
+
+    for (var uid = 0; uid < numClients; uid ++)
+    {
+    var instanceName = zeroPad(uid, 4);
+    var userId = clientPrefix + instanceName;
+    createClient(userId, instanceName);
+    }
+
+    var randomnumber=Math.floor(Math.random()*11)
+
+    var chidCounter = 0;
+
+    function doTick(){
+    joinNextChannel(chidCounter);
+    chidCounter ++;
+    }
+
+    window.setInterval(doTick, 1000);
+
+    //joinNextChannel(randomnumber);
+
+
+</script>
+
+</html>

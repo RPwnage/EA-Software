@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="EAPatchMaker" default="build">
+
+    <property name="Dll" value="false" unless="@{PropertyExists('Dll')}" />
+
+    <optionset name="config.targetoverrides">
+        <option name="test-build" value="include" />
+        <option name="test-buildall" value="include" />
+        <option name="test-run" value="include" />
+        <option name="test-runall" value="include" />
+    </optionset>
+
+
+    <!-- Package declaration -->
+    <!-- Get the version number from current directory -->
+    <property name="currDir" value="@{PathGetFullPath('.')}" />
+    <property name="currVer" value="@{PathGetFileName('${currDir}')}" />
+    <package name="EAPatchMaker" targetversion="${currVer}" />
+
+
+    <!-- Default global properties        -->
+    <!--   <globalproperties>             -->
+    <!--       EATECH_WARNINGSASERRORS=1  -->
+    <!--   </globalproperties>            -->
+    <property name="EATECH_WARNINGSASERRORS" value="0" unless="@{PropertyExists('EATECH_WARNINGSASERRORS')}" />
+
+
+
+    <!-- ********************* -->
+    <!-- Library configuration -->
+    <!-- ********************* -->
+
+    <property name="runtime.buildmodules" value="${property.value} EAPatchMakerLib" />
+    <property name="runtime.EAPatchMakerLib.buildtype" value="Library" />
+
+    <fileset name="runtime.EAPatchMakerLib.sourcefiles">    
+        <includes name="${package.dir}/source/*.cpp" />
+    </fileset>
+
+    <fileset name="runtime.EAPatchMakerLib.bulkbuild.sourcefiles" fromfileset="runtime.EAPatchMakerLib.sourcefiles" />
+
+    <property name="runtime.EAPatchMakerLib.usedependencies">
+        coreallocator
+        EABase
+        EAAssert
+        EASTL
+        EAIO
+        EAStdC
+        EAThread
+        DirtySDK
+        EAPatchClient
+        UTFXml
+    </property>
+
+    <property name="runtime.EAPatchMakerLib.defines">
+        ${property.value}
+        UTF_USE_EAASSERT=1
+    </property>
+
+
+
+
+    <!-- ********************* -->
+    <!-- App configuration -->
+    <!-- ********************* -->
+    <dependent name="EAPatchClient"/> <!-- We declare this because we need to use properties EAPatchClient exposes in its scripts/Initialize.xml file. -->
+
+    <property name="runtime.buildmodules" value="${property.value} EAPatchMaker EAPatchMakerTest TestFileGenerator" />
+    <property name="runtime.EAPatchMaker.buildtype" value="Program" />
+    <property name="runtime.EAPatchMakerTest.buildtype" value="Program" />
+    <property name="runtime.TestFileGenerator.buildtype" value="Program" />
+
+    <fileset name="runtime.EAPatchMaker.sourcefiles">    
+        <includes name="${package.dir}/app/source/*.cpp" />
+    </fileset>
+    <fileset name="runtime.EAPatchMakerTest.sourcefiles">    
+        <includes name="${package.dir}/test/source/*.cpp" />
+        <excludes name="${package.dir}/test/source/TestFileGenerator.cpp" />
+    </fileset>
+    <fileset name="runtime.TestFileGenerator.sourcefiles">    
+        <includes name="${package.dir}/test/source/TestFileGenerator.cpp" />
+        <includes name="${package.EAPatchClient.test_sourcedir}/ValidationFile.cpp" />
+    </fileset>
+
+    <property name="runtime.EAPatchMaker.includedirs">
+        ${package.dir}/include
+        ${package.dir}/app/include
+        ${package.EAPatchClient.test_includedir}
+    </property>
+    <property name="runtime.EAPatchMakerTest.includedirs">
+        ${package.dir}/include
+        ${package.dir}/app/include
+        ${package.dir}/test/include
+    </property>
+    <property name="runtime.TestFileGenerator.includedirs">
+        ${package.dir}/test/include
+        ${package.EAPatchClient.test_includedir}
+    </property>
+
+    <property name="runtime.EAPatchMaker.usedependencies">
+        EABase
+        coreallocator
+    </property>
+    <property name="runtime.EAPatchMakerTest.usedependencies">
+        ${runtime.EAPatchMaker.usedependencies}
+    </property>
+    <property name="runtime.TestFileGenerator.usedependencies">
+        ${runtime.EAPatchMaker.usedependencies}
+    </property>
+
+    <property name="runtime.EAPatchMaker.runtime.moduledependencies">
+        EAPatchMakerLib
+    </property>
+    <property name="runtime.EAPatchMakerTest.runtime.moduledependencies">
+        EAPatchMakerLib
+    </property>
+
+    <property name="runtime.EAPatchMaker.builddependencies">
+        ${property.value}
+        EAAssert
+        EASTL
+        EAIO
+        EAStdC
+        EAThread
+        DirtySDK
+        EAPatchClient
+        UTFXml
+        MemoryMan
+        PPMalloc
+    </property>
+    <property name="runtime.EAPatchMakerTest.builddependencies">
+        ${runtime.EAPatchMaker.builddependencies}
+        EATest
+        EAMain
+    </property>
+    <property name="runtime.TestFileGenerator.builddependencies">
+        ${runtime.EAPatchMaker.builddependencies}
+        EATest
+        EAMain
+    </property>
+
+    <property name="runtime.EAPatchMaker.defines">
+        ${property.value}
+        UTF_USE_EAASSERT=1
+        _GLIBCPP_USE_C99=1
+        _GLIBCXX_USE_C99_MATH=1
+    </property>
+    <property name="runtime.EAPatchMakerTest.defines">
+        ${runtime.EAPatchMaker.defines}
+    </property>
+
+    <fileset name="runtime.EAPatchMaker.libs">
+        <group if="${config-system} == pc or ${config-system} == pc64">
+            <includes name="iphlpapi.lib" asis="true" />
+            <includes name="winmm.lib" asis="true" />
+            <includes name="ws2_32.lib" asis="true" />
+        </group>
+
+        <group if="${config-system} == xenon">
+            <includes name="xonline.lib" asis="true" />
+        </group>
+
+        <group if="${config-system} == ps3">
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/libsn.a" />
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/librtc_stub.a" />
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/libsysutil_stub.a" />
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/libsysutil_game_stub.a" />
+        </group>
+
+        <group if="${config-system} == kettle">
+            <includes name="${package.kettlesdk.libdir}\libSceNet.so"/>
+            <includes name="${package.kettlesdk.libdir}\libSceNetCtl.so"/>
+        </group>
+    </fileset>
+
+    <task name="AddNetworkLibsToModule" module="runtime.EAPatchMaker"/>
+    <task name="AddNetworkLibsToModule" module="runtime.EAPatchMakerTest"/>
+
+    <fileset name="runtime.EAPatchMakerTest.libs" fromfileset="runtime.EAPatchMaker.libs"/>
+
+</project>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

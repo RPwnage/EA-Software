@@ -1,0 +1,139 @@
+<project>
+  <createtask name="shift-submit-jenkins">
+    <parameters>
+      <option name="template" value="Required"/>
+      <option name="user" value="Required"/>
+      <option name="password" value="Required"/>
+    </parameters>
+    
+    <code>
+      <property name="shift.submission.dir" value="@{PathGetFullPath('${package.OriginUtils.dir}\..\..\..\ShiftSubmissions')}"/>
+      <fail message="No file found in ${shift.submission.dir}." unless="@{DirectoryExists(${shift.submission.dir})}"/>
+      <fail message="More than 1 zip file found in ${shift.submission.dir}. You can only have one file." unless="@{DirectoryGetFileCount(${shift.submission.dir},'*.zip')} == '1'"/>
+    
+      <property name="source.filename" value="@{DirectoryGetFiles(${shift.submission.dir},'*.zip',' ')}" />
+
+      //copy the build to a network drive.
+      <copy file="${source.filename}" todir="\\eac.ad.ea.com\sports\ebisu\ShiftSubmissions" />
+      
+      <property name="shift.source" value="\\eac.ad.ea.com\sports\ebisu\ShiftSubmissions\@{PathGetFileName(${source.filename})}"/>
+      
+      <task name="shift-submit" 
+        template="${shift-submit-jenkins.template}"
+        source="${shift.source}"
+        user="${shift-submit-jenkins.user}"
+        password="${shift-submit-jenkins.password}"
+        />
+
+      <!-- clean it out for the next job -->
+      <delete>
+        <fileset basedir="${package.OriginUtils.dir}\ShiftSubmissions">
+          <includes name="*.zip"/>
+        </fileset>
+      </delete>
+    </code>
+  </createtask>
+    
+  <createtask name="shift-submit">
+    <parameters>
+      <option name="template" value="Required"/>
+      <option name="source" value="Required"/>
+      <option name="user" value="Required"/>
+      <option name="password" value="Required"/>
+    </parameters>
+    
+    <code>
+      <do if="${config-system} == 'pc'">
+        <property name="shift.template" value="${shift-submit.template}" />
+        <property name="shift.source" value="${shift-submit.source}" />
+        <property name="shift.user" value="${shift-submit.user}" />
+        <property name="shift.password" value="${shift-submit.password}" />
+        
+      </do>
+      
+      <exec program="${package.OriginUtils.dir}/bin/ShiftSubmit_2_2.exe" workingdir="${package.OriginUtils.dir}\bin">
+        <args>
+          <arg value="/template:${shift.template}"/>
+          <arg value="/user:${shift.user}"/>
+          <arg value="/password:${shift.password}"/>
+          <arg value="/source:${shift.source}"/>
+          <arg value="/notify:${shift.user}"/>
+          <arg value="/webservice:http://shift.ea.com"/>
+          <arg value="/override:shift.export.version.distribution.type=InternalOnly shift.export.version.encryption.type=Cucku"/>
+        </args>
+      </exec>
+    </code>
+  </createtask>
+      
+  <target name="shift-submit-jenkins">
+    <fail message="You must define a shift.template" unless="@{PropertyExists('shift.template')}" />
+
+    <property name="shift.user" value="originautomation@eac.ad.ea.com" />
+    <property name="shift.password" value="Origin@11" />
+
+    <task name="shift-submit-jenkins" 
+      template="${shift.template}"
+      user="${shift.user}"
+      password="${shift.password}"
+      />
+  </target>
+  
+	<createtask name="get-low-word">
+		<parameters>
+			<option name="value" value="Required"/>
+			<option name="property" value="Required"/>
+		</parameters>
+		
+		<code>
+			<script language="C#" mainclass="Scriptlet">
+				<code><![CDATA[
+					public Scriptlet(Project project)
+					{
+						Project _project;
+					}
+					
+					public static void ScriptMain(Project project) {
+						Scriptlet script = new Scriptlet(project);
+						int inValue = Convert.ToInt32(project.GetPropertyValue("get-low-word.value"));
+						string outProp = project.GetPropertyValue("get-low-word.property");
+						Console.WriteLine("Getting lower 16 bits of " + inValue + " and putting in property named " + "\"" + outProp + "\".");
+						int result = inValue & 0xFFFF;
+						project.Properties[outProp] = Convert.ToString(result);
+					}
+				]]></code>
+			</script>
+		</code>
+	</createtask>
+	
+	<createtask name="get-p4-path">
+		<parameters>
+			<option name="property" value="Required"/>
+			<option name="p4.clientspec" value="Required"/>
+			<option name="p4.port" value="Required"/>
+			<option name="p4.user" value="Required"/>
+			<option name="p4.passwd" value="Required"/>
+			<option name="file" value="Required"/>
+		</parameters>
+		<code>
+			<mkdir dir="${package.configbuilddir}" unless="@{DirectoryExists(${package.configbuilddir})}"/>
+			<property name="get-p4-path.outputfile" value="${package.configbuilddir}/p4where.txt" />
+			<exec program="p4" workingdir="." output="${get-p4-path.outputfile}">
+				<args>
+					<arg value="-c ${get-p4-path.p4.clientspec}"/>
+					<arg value="-p ${get-p4-path.p4.port}"/>
+					<arg value="-u ${get-p4-path.p4.user}"/>
+					<arg value="-P ${get-p4-path.p4.passwd}"/>
+					<arg value="where"/>
+					<arg value="${get-p4-path.file}"/>
+				</args>
+			</exec>
+			<property name="p4where.output" fromfile="${get-p4-path.outputfile}"/>
+			<property name="count" value="0"/>
+			<foreach property="p4where.part" item="String" delim=" " in="${p4where.output}" >
+				<property name="p4where.part.${count}" value="${p4where.part}" />
+				<property name="count" value="@{MathAdd(${property.value},1)}" />
+			</foreach>
+			<property name="${get-p4-path.property}" value="${p4where.part.1}"/>
+		</code>
+	</createtask>
+</project>

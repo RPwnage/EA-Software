@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="clean" value="exclude"/>
+    </optionset>
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.services.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.services.version"  value="@{PathGetFileName('${package.services.dir}')}"/>
+    <package name="services" targetversion="${package.services.version}"/>
+
+    <!-- ******************** -->
+    <!-- Package dependencies -->
+    <!-- ******************** -->
+    <dependent name="OriginVersion" />
+    <dependent name="OriginConfig" />
+    <dependent name="Qt" />
+    <dependent name="openSSL" />
+
+    <!-- ***************************** -->
+    <!-- Build Configuration properties-->
+    <!-- ***************************** -->
+
+	<property name="dirtysdk-samples" value="true" />
+
+    <!-- ********************* -->
+    <!-- Runtime configuration -->
+    <!-- ********************* -->
+	<BuildType name="services.buildtype" from="OriginLibrary">
+        <option name="buildset.cc.defines" if="${config-system} == pc">
+          ${option.value}
+          NOMINMAX
+        </option>
+        <option name="buildset.cc.defines" if="${config-system} == osx">
+          ${option.value}
+        </option>
+        <option name="buildset.cc.options" if="${config-system} == pc">
+          ${option.value}
+          /FI ${package.services.dir}/include/services/OriginCommon.h
+        </option>
+  </BuildType>
+    <property name="runtime.buildtype" value="services.buildtype" />
+
+    <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+    <target name="generate-code" depends="setup-generate-code moc-compile ui-compile qt-rc-compile" />
+    <!--target name="generate-code" depends="setup-generate-code" >
+        <call target="moc-compile" if="@{FileSetExists('runtime.moc_sourcefiles')}" />
+        <call target="ui-compile" if="@{FileSetExists('runtime.ui_sourcefiles')}" />
+        <call target="qt-rc-compile" if="@{FileSetExists('runtime.qrc_sourcefiles')}" />
+    </target-->
+
+    <property name="runtime.prebuildtarget" value="generate-code" />
+
+    <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+    <property name="runtime.vcproj.pre-build-step">
+        ${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.prebuildtarget}
+    </property>
+
+	<property name="runtime.builddependencies">
+        LSXWrapper
+    </property>
+
+    <property name="runtime.usedependencies">
+        OriginConfig
+        OriginVersion
+        OriginLegacyApp
+        Qt
+        coreallocator
+        EABase
+        EAIO
+        EATrace
+        EAStdC
+        EAThread
+        EASTL
+        BugSentry
+        DirtySDK
+        EACallstack
+        PPMalloc
+        ExceptionHandler
+        TelemetryAPI
+        openSSL
+        LSXWrapper
+    </property>
+
+    <property name="runtime.interfacedependencies" if="${config-system} == 'pc'">
+        zlib
+    </property>
+
+    <property name="runtime.usedependencies" if="${config-system} == 'osx'">
+        ${property.value}
+        zlib
+    </property>
+    
+    <property name="runtime.usedependencies" if="${config-system} == 'pc'">
+        ${property.value}
+        Sonar
+    </property>    
+
+    <property name="runtime.includedirs" >
+        ${package.services.dir}
+        ${package.services.dir}/include
+        ${package.services.dir}/include/services/achievements
+        ${package.services.dir}/include/services/config
+        ${package.services.dir}/include/services/compression
+        ${package.services.dir}/include/services/crypto
+        ${package.services.dir}/include/services/debug
+        ${package.services.dir}/include/services/downloader
+        ${package.services.dir}/include/services/entitlements
+        ${package.services.dir}/include/services/escalation
+        ${package.services.dir}/include/services/exception
+        ${package.services.dir}/includes/services/heartbeat
+        ${package.services.dir}/include/services/log
+        ${package.services.dir}/include/services/network
+        ${package.services.dir}/include/services/platform
+        ${package.services.dir}/include/services/plugin
+        ${package.services.dir}/include/services/process
+        ${package.services.dir}/include/services/publishing
+        ${package.services.dir}/include/services/qt
+        ${package.services.dir}/include/services/rest
+        ${package.services.dir}/include/services/rest/private
+        ${package.services.dir}/include/services/settings
+        ${package.services.dir}/include/services/session
+        ${package.services.dir}/include/services/subscription
+        ${package.services.dir}/include/services/translator
+        ${package.services.dir}/include/services/trials
+        ${package.services.dir}/include/services/voice
+        ${package.services.dir}/include/services/originwebsocket
+        ${package.services.dir}/downloader/source
+        ${package.services.dir}/entitlements/cache
+        ${package.services.dir}/entitlements/parser
+        ${moc.output.dir}
+    </property>
+
+    <!-- common source files -->
+    <fileset name="runtime.sourcefiles" basedir="${package.dir}">
+        <includes name="${package.services.dir}/achievements/**/*.cpp" />
+        <includes name="${package.services.dir}/compression/*.cpp" />
+        <includes name="${package.services.dir}/common/source/*.cpp" />
+        <includes name="${package.services.dir}/connection/source/*.cpp" />
+        <includes name="${package.services.dir}/config/*.cpp" />
+        <includes name="${package.services.dir}/crypto/*.cpp" />
+        <includes name="${package.services.dir}/debug/source/*.cpp" />
+        <includes name="${package.services.dir}/downloader/source/**/*.cpp" />
+        <includes name="${package.services.dir}/downloader/source/*.cpp" />
+        <includes name="${package.services.dir}/entitlements/**/*.cpp" />
+        <includes name="${package.services.dir}/entitlements/*.cpp" />
+        <includes name="${package.services.dir}/escalation/*.cpp" />
+        <includes name="${package.services.dir}/escalation/*.mm" if="${config-system} == 'osx'"/>
+        <includes name="${package.services.dir}/exception/*.cpp" />
+        <includes name="${package.services.dir}/heartbeat/source/**/*.cpp" />
+        <includes name="${package.services.dir}/log/source/*.cpp" />
+        <includes name="${package.services.dir}/network/**/*.cpp" />
+        <includes name="${package.services.dir}/network/*.cpp" />
+        <includes name="${package.services.dir}/originwebsocket/*.cpp" />
+        <includes name="${package.services.dir}/platform/**/*.cpp" />
+        <includes name="${package.services.dir}/platform/**/*.mm" if="${config-system} == 'osx'"/>
+        <includes name="${package.services.dir}/process/source/*.cpp" />
+        <includes name="${package.services.dir}/process/source/*.mm" if="${config-system} == 'osx'" />
+        <includes name="${package.services.dir}/publishing/*.cpp" />
+        <includes name="${package.services.dir}/qt/*.cpp" />
+        <includes name="${package.services.dir}/rest/*.cpp" />
+        <includes name="${package.services.dir}/session/source/*.cpp" />
+        <includes name="${package.services.dir}/settings/source/*.cpp" />
+        <includes name="${package.services.dir}/subscription/**/*.cpp" />
+        <includes name="${package.services.dir}/translator/source/*.cpp" />
+      <includes name="${package.services.dir}/trials/**/*.cpp" />
+      <includes name="${package.services.dir}/voice/source/**/*.cpp" />
+    </fileset>
+
+    <!-- strip out platform specific files -->
+    <fileset name="runtime.sourcefiles" basedir="${package.dir}" append="true">
+        <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+        <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    </fileset>
+
+    <fileset name="runtime.libs" >
+        <group if="${config-system} == 'pc'">
+            <includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/QtSql${debug-suffix}4.lib"/>
+            <includes name="${package.Qt.libdir}/QtXml${debug-suffix}4.lib"/>
+            <includes name="${package.Qt.libdir}/QtXmlPatterns${debug-suffix}4.lib"/>
+            <includes name="${package.Qt.libdir}/QtNetwork${debug-suffix}4.lib"/>
+            <includes name="${package.Qt.libdir}/QtCore${debug-suffix}4.lib"/>
+            <includes name="${package.Qt.libdir}/QtWebKit${debug-suffix}4.lib"/>
+        </group>
+    </fileset>
+
+    <target name="dumpsources">
+        <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+            <echo message="source ${fname}" />
+        </foreach>
+    </target>
+
+    <fileset name="runtime.headerfiles" basedir="${package.dir}">
+        <includes name="${package.services.dir}/**/*.h" />
+    </fileset>
+
+    <property name="runtime.res.includedirs">
+        ${package.services.dir}/include
+    </property>
+
+  <fileset name="runtime.resourcefiles">
+  </fileset>
+
+  <fileset name="runtime.ui_sourcefiles" basedir="${package.dir}" append="true">
+    <includes name="**/*.ui" />
+  </fileset>
+
+  <!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+  <fileset name="runtime.moc_sourcefiles" basedir="${package.services.dir}" append="true">
+      <includes name="include/services/downloader/DownloadService.h" />
+	  <includes name="include/services/downloader/DownloaderErrors.h" />
+      <includes name="include/services/downloader/UnpackService.h" />
+      <includes name="include/services/downloader/CRCMap.h" />
+      <includes name="include/services/downloader/MounterQt.h" />
+      <includes name="include/services/debug/DebugService.h" />
+      <includes name="include/services/log/LogService.h" />
+      <includes name="include/services/rest/GamesServiceResponse.h" />
+      <includes name="include/services/rest/NonOriginGameServiceResponses.h" />
+      <includes name="include/services/rest/NotificationServiceBase.h" />
+      <includes name="include/services/rest/IdentityUserProfileService.h" />
+      <includes name="include/services/rest/CloudSyncServiceResponses.h" /> 
+      <includes name="include/services/rest/GroupServiceResponse.h" />
+      <includes name="include/services/rest/OnTheHousePromoService.h" /> 
+      <includes name="include/services/rest/OriginServiceResponse.h" /> 
+      <includes name="include/services/rest/OriginAuthServiceResponse.h" />
+      <includes name="include/services/rest/OriginCatalogPublicPrivateResponse.h" />
+      <includes name="include/services/rest/HttpServiceResponse.h" />
+      <includes name="include/services/publishing/NucleusEntitlement.h" />
+      <includes name="include/services/publishing/CatalogDefinitionService.h" />
+      <includes name="include/services/publishing/CatalogDefinition.h" />
+      <includes name="include/services/rest/SSOTicketServiceResponse.h" />
+      <includes name="include/services/rest/NetPromoterService.h" />
+      <includes name="include/services/rest/SearchFriendServiceResponses.h" />	
+      <includes name="include/services/rest/StoreServiceResponses.h" />	
+      <includes name="include/services/rest/VoiceServiceResponse.h" />
+      <includes name="include/services/config/OriginConfigService.h" />
+      <includes name="include/services/platform/TrustedClock.h" />
+      <includes name="include/services/network/NetworkAccessManager.h" />
+      <includes name="include/services/network/NetworkAccessManagerFactory.h" />
+      <includes name="include/services/network/NetworkProxyFactory.h" />
+      <includes name="include/services/network/GlobalConnectionStateMonitor.h" />
+	  <includes name="include/services/network/ClientNetworkConfigReader.h" />
+      <includes name="include/services/network/AuthenticationMonitor.h" />
+      <includes name="include/services/entitlements/cache/CustomBoxartCache.h" />
+      <includes name="include/services/session/SessionService.h" />
+      <includes name="include/services/session/AbstractSession.h" />
+      <includes name="include/services/session/LoginRegistrationSession.h" />
+      <includes name="include/services/network/NetworkCookieJar.h" />
+      <includes name="include/services/network/SslSafeNetworkDiskCache.h" />
+      <includes name="include/services/process/IProcess.h" />
+      <includes name="include/services/settings/Setting.h" />
+      <includes name="include/services/settings/SettingsManager.h" />
+      <includes name="include/services/connection/ConnectionStatesService.h" />
+	  <includes name="include/services/heartbeat/heartbeat.h" />
+      <includes name="downloader/source/io/HttpChannel.h" />
+      <includes name="downloader/source/io/DownloadServiceInternal.h" />
+      <includes name="downloader/source/io/UnpackStream.h" />
+      <includes name="include/services/downloader/UnpackStreamFile.h" />
+      <includes name="include/services/process/ProcessOSX.h" />
+      <includes name="include/services/process/ProcessWin.h" />
+      <includes name="include/services/escalation/IPCService.h" />
+      <includes name="include/services/escalation/IEscalationClient.h" />
+      <includes name="include/services/escalation/IEscalationService.h" />
+      <includes name="include/services/escalation/ICommandProcessor.h" />
+      <includes name="include/services/escalation/EscalationClientWin.h" />
+      <includes name="include/services/escalation/EscalationServiceWin.h" />
+      <includes name="include/services/escalation/CommandProcessorWin.h" />
+      <includes name="include/services/escalation/EscalationClientOSX.h" />
+      <includes name="include/services/escalation/EscalationServiceOSX.h" />
+      <includes name="include/services/escalation/CommandProcessorOSX.h" />
+      <includes name="include/services/settings/cloudsettings/*.h" />
+	  <includes name="include/services/translator/*.h" />
+	  <includes name="include/services/originwebsocket/*.h" />
+      <includes name="include/services/voice/VoiceDeviceService.h" if="${config-system} == 'pc'"/>
+      <includes name="settings/source/ServerUserSettings.h" />
+	  <includes name="include/services/qt/QtUtil.h" />
+  </fileset> 
+
+    <!-- strip out platform specific files -->
+    <fileset name="runtime.moc_sourcefiles" basedir="${package.services.dir}" append="true">
+        <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+        <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    </fileset>
+
+
+    <!-- construct the paths to include the moc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+        <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+
+
+    <!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+    <fileset name="runtime.qrc_sourcefiles" basedir="${package.services.dir}">
+        <includes name="${package.services.dir}/resources/services.qrc" />
+    </fileset>
+
+    <!-- construct the paths to include the qrc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.qrc_sourcefiles">
+        <property name="sourcefile" value="${rc.output.dir}/qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+
+    <target name="setup-generate-code">
+        <!-- get the options from the current config -->
+        <property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.buildtype}','cc.defines')}"/>
+        <property name="runtime.moc_includedirs" value="${runtime.includedirs}"/>
+    </target>
+
+</project>

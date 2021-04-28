@@ -1,0 +1,211 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.macroaction.MacroStore;
+import com.ea.originx.automation.lib.pageobjects.chrome.ChromeSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.dialog.DownloadDialog;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.PaymentInformationPage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Test PDP Hero for a non-subscriber viewing a different edition than the one
+ * owned
+ *
+ * @author cbalea
+ */
+public class OAPDPOwnedNonSubscriberVault extends EAXVxTestTemplate {
+
+    public enum TEST_TYPE {
+        OWN_LOWER_EDITION_VIEW_LOWER_EDITION,
+        OWN_LOWER_EDITION_VIEW_VAULT_EDITION
+    }
+
+    public void testOAPDPOwnedNonSubscriberVault(ITestContext context, OAPDPOwnedNonSubscriberVault.TEST_TYPE type) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        EntitlementInfo ownedEntitlement;
+        EntitlementInfo entitlementToView;
+        EntitlementId lesserEntitlementID = EntitlementId.DA_INQUISITION;
+        EntitlementId vaultEntitlementID = EntitlementId.DA_INQUISITION_DIGITAL_DELUXE;
+        String entitlementToViewName = "";
+        String extraText = "";
+        String extraText_2 = "";
+        String flowPoint_7 = "";
+        String flowPoint_8 = "";
+        String flowPoint_9 = "";
+        String flowPoint_10 = "";
+        String flowPoint_11 = "";
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        switch (type) {
+            case OWN_LOWER_EDITION_VIEW_LOWER_EDITION:
+                ownedEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(lesserEntitlementID);
+                entitlementToView = EntitlementInfoHelper.getEntitlementInfoForId(lesserEntitlementID);
+                entitlementToViewName = entitlementToView.getName();
+                extraText = "you own";
+                extraText_2 = "'Play Game/Download'";
+                flowPoint_7 = "there is a discount percentage with strike off price, if store discount is provided for the product";
+                flowPoint_8 = "there is a 'Purchase as gift' CTA with price (discounted price if applicable)";
+                flowPoint_9 = "'EULA' and 'Terms and Conditions' hyperlinks";
+                flowPoint_10 = "information about vault edition being available appears";
+                flowPoint_11 = "information about Subscription offers is available";
+                break;
+            case OWN_LOWER_EDITION_VIEW_VAULT_EDITION:
+                ownedEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(lesserEntitlementID);
+                entitlementToView = EntitlementInfoHelper.getEntitlementInfoForId(vaultEntitlementID);
+                entitlementToViewName = entitlementToView.getName();
+                extraText = "available in the vault";
+                extraText_2 = "'Play Now Access'";
+                flowPoint_7 = "the 'OR' separator is visible ";
+                flowPoint_8 = "there is a secondary CTA to purchase the game";
+                flowPoint_9 = "the CTA is clear colour";
+                flowPoint_10 = "clicking the secondary CTA starts the checkout flow";
+                flowPoint_11 = "legal links are visible";
+                break;
+            default:
+                throw new RuntimeException("Unexpected test type " + type);
+        }
+
+        logFlowPoint("Using an account which owns a lower edition than a game offered in the Vault, log into Origin client"); //1
+        logFlowPoint("Navigate to the PDP of an edition of the game " + extraText); //2
+        logFlowPoint("Verify there is a message indicating that the user owns the higher edition"); //3
+        logFlowPoint("Verify there is a hyperlink to the edition in your game library"); //4
+        logFlowPoint("Verify CTA " + extraText_2 + " is visible"); //5
+        logFlowPoint("Verify the CTA colour is 'orange'"); //6
+        logFlowPoint("Verify " + flowPoint_7); //7
+        logFlowPoint("Verify " + flowPoint_8); //8
+        logFlowPoint("Verify " + flowPoint_9); //9
+        logFlowPoint("Verify " + flowPoint_10); //10
+        logFlowPoint("Verify " + flowPoint_11); //11
+        if (type == TEST_TYPE.OWN_LOWER_EDITION_VIEW_LOWER_EDITION) {
+            logFlowPoint("Verify there is a link to learn more about Origin Access"); //12
+            if (isClient) {
+                logFlowPoint("Verify clicking CTA starts the download game flow"); //13a
+            } else {
+                logFlowPoint("Verify clicking CTA starts downloading origin setup"); //13b
+            }
+        }
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+
+        //Purchasing DA as there aren't any available accounts with that edition already purchased
+        MacroPurchase.purchaseEntitlement(driver, ownedEntitlement);
+
+        //2
+        logPassFail(MacroPDP.loadPdpPage(driver, entitlementToView), true);
+
+        //3
+        PDPHeroActionDescriptors pdpHeroActionDescriptors = new PDPHeroActionDescriptors(driver);
+        new MainMenu(driver).selectRefresh(); // sometimes after accessing the PDP the owned product message is not displayed , this is fixed by reloading the page
+        pdpHeroActionDescriptors.waitForPdpHeroToLoad(); //waiting needed after page refresh
+        logPassFail(pdpHeroActionDescriptors.verifyOwnedProductStatusMessage(), false);
+
+        //4
+        logPassFail(pdpHeroActionDescriptors.verifyOGDLinkVisible(), false);
+
+        //5
+        PDPHeroActionCTA pdpHeroActionCTA = new PDPHeroActionCTA(driver);
+        boolean visibleCTA;
+        String textCTA;
+        if (type == TEST_TYPE.OWN_LOWER_EDITION_VIEW_LOWER_EDITION) {
+            visibleCTA = pdpHeroActionCTA.verifyDirectAcquisitionButtonVisible();
+            textCTA = pdpHeroActionCTA.getDirectAcquisitionButtonText();
+        } else {
+            visibleCTA = pdpHeroActionCTA.verifyPlayNowAccessVisible();
+            textCTA = pdpHeroActionCTA.getPlayNowAccessText();
+        }
+        logPassFail(visibleCTA, false);
+
+        //6
+        boolean colorCTA = type == TEST_TYPE.OWN_LOWER_EDITION_VIEW_LOWER_EDITION ? pdpHeroActionCTA.verifyDirectAcquisitionButtonColor() : pdpHeroActionCTA.verifyPlayNowAccessColour();
+
+        logPassFail(colorCTA, false);
+
+        //7
+        if (type == TEST_TYPE.OWN_LOWER_EDITION_VIEW_LOWER_EDITION) {
+            boolean isPriceDiscounted = false;
+            double priceOriginal = 0.0;
+            if (pdpHeroActionDescriptors.verifyOriginAccessSavingsPercent()) {
+                isPriceDiscounted = true;
+                priceOriginal = pdpHeroActionDescriptors.getStrikedThroughPrice(); // needed for step 8
+            }
+            logPassFail(isPriceDiscounted, false);
+
+            //8
+            boolean buyAsGiftButton = pdpHeroActionCTA.verifyBuyAsGiftButtonVisible();
+            double priceDiscounted = pdpHeroActionCTA.getBuyAsGiftButtonPrice();
+            if (!isPriceDiscounted) {
+                logPassFail(buyAsGiftButton, false);
+            } else {
+                logPassFail(buyAsGiftButton && priceOriginal != priceDiscounted, false);
+            }
+
+            //9
+            boolean EULALink = pdpHeroActionDescriptors.verifyEULALinkText();
+            boolean TOSLink = pdpHeroActionDescriptors.verifyTermsAndConditionsLinkText();
+            logPassFail(TOSLink && EULALink, false);
+
+            //10
+            logPassFail(pdpHeroActionDescriptors.verifyProductPartOfOriginAccessVisible(), false);
+
+            //11
+            logPassFail(pdpHeroActionDescriptors.verifyOriginAccessBriefDescription(), false);
+
+            //12
+            logPassFail(pdpHeroActionDescriptors.verifyOriginAccessLearnMoreLinkVisible(), false);
+
+            //13
+            if (isClient) {
+                pdpHeroActionCTA.clickDirectAcquisitionButton();
+                logPassFail(new DownloadDialog(driver).isDialogVisible(), true);
+                //13b
+            } else {
+                MacroStore.downloadOriginSetup(driver);
+                logPassFail(new ChromeSettingsPage(driver).verifyOriginSetupDownload(), true);
+            }
+
+            //7
+        } else {
+            logPassFail(pdpHeroActionCTA.verifySeparatorVisible(), false);
+
+            //8
+            logPassFail(pdpHeroActionCTA.verifySubscriberBuyButtonVisible(), false);
+
+            //9
+            logPassFail(pdpHeroActionCTA.verifySubscriberBuyButtonColor(), false);
+
+            //10
+            PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+            pdpHeroActionCTA.clickSubscriberBuyButton();
+            paymentInformationPage.waitForPaymentInfoPageToLoad();
+            logPassFail(paymentInformationPage.verifyPaymentInformationReached(), true);
+
+            //11
+            paymentInformationPage.clickCloseButton();
+            boolean EULALink = pdpHeroActionDescriptors.verifyEULALinkText();
+            boolean TOSLink = pdpHeroActionDescriptors.verifyTermsAndConditionsLinkText();
+            logPassFail(EULALink && TOSLink, true);
+        }
+        softAssertAll();
+    }
+}

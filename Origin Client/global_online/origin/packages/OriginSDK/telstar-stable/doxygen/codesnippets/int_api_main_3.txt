@@ -1,0 +1,67 @@
+//--------------------------------------------------------------------------------------
+// This callback function will be called at the end of every frame to perform all the 
+// rendering calls for the scene, and it will also be called if the window needs to be 
+// repainted. After this function has returned, DXUT will call 
+// IDirect3DDevice9::Present to display the contents of the next buffer in the swap chain
+//--------------------------------------------------------------------------------------
+void CALLBACK OnFrameRender( IDirect3DDevice9* pd3dDevice, double fTime, float fElapsedTime, void* pUserContext )
+{
+	...
+
+    // Render the scene
+    if( SUCCEEDED( pd3dDevice->BeginScene() ) )
+    {
+		...
+        // Apply the technique contained in the effect 
+        V( g_pEffect->Begin( &cPasses, 0 ) );
+
+        for( iPass = 0; iPass < cPasses; iPass++ )
+        {
+            V( g_pEffect->BeginPass( iPass ) );
+
+            // The effect interface queues up the changes and performs them 
+            // with the CommitChanges call. You do not need to call CommitChanges if 
+            // you are not setting any parameters between the BeginPass and EndPass.
+            // V( g_pEffect->CommitChanges() );
+
+            // Render the mesh with the applied technique
+            V( g_pMesh->DrawSubset( 0 ) );
+
+            V( g_pEffect->EndPass() );
+        }
+        V( g_pEffect->End() );
+
+        g_HUD.OnRender( fElapsedTime );
+        g_SampleUI.OnRender( fElapsedTime );
+
+        
+        
+        // ////////////////////////////////////////////////////////////////////
+        // ORIGIN IGO API SUPPORT
+        // //////////////////////////////////////////////////////////////////// 
+        // OIG rendering
+        OriginIGORenderingContext_DX9_T context;
+        ZeroMemory(&context, sizeof(context));
+        context.base.size = sizeof(OriginIGORenderingContext_DX9_T);
+        context.base.rendererType = ORIGIN_IGO_RENDERER_DX9;
+        context.saveAndRestoreGFXStates = true; // IGO handles state save & restore
+        
+        pd3dDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &context.broadcastSurface);
+        pd3dDevice->GetRenderTarget(0, &context.renderTarget);
+        context.renderDevice = pd3dDevice;
+
+        //NOTE: if members of the context change between calls, OriginIGOReset has to be called otherwise OriginIGOUpdate fails
+        if (OriginIGOUpdate(reinterpret_cast<OriginIGORenderingContextT* const>(&context)) != ORIGIN_SUCCESS_IGOAPI)
+        {
+            //_ASSERTE(0);
+        }
+
+        context.broadcastSurface->Release();
+        context.renderTarget->Release();
+
+
+
+        RenderText( fTime );
+        V( pd3dDevice->EndScene() );
+    }
+}

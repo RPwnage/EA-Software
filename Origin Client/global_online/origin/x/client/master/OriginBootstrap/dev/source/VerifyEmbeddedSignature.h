@@ -1,0 +1,6 @@
+#ifndef VERIFYEMBEDDEDSIGNATURE_H
+#define VERIFYEMBEDDEDSIGNATURE_H
+
+bool isValidEACertificate(LPCWSTR szBinaryFileName);
+
+#endif //VERIFYEMBEDDEDSIGNATURE_H

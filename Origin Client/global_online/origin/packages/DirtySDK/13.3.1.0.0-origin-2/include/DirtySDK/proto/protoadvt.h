@@ -1,0 +1,269 @@
+/*H*************************************************************************************/
+/*!
+
+    \File    protoadvt.h
+
+    \Description
+        This advertising module provides a relatively simple multi-protocol
+        distributed name server architecture utilizing the broadcast capabilities
+        of UDP and IPX. Once the module is instantiated, it can be used as both
+        an advertiser (server) and watcher (client) simultaneously.
+
+    \Notes
+        None.
+
+    \Copyright
+        Copyright (c) Tiburon Entertainment / Electronic Arts 2002.  ALL RIGHTS RESERVED.
+
+    \Version    1.0        02/17/99 (GWS) Original version
+    \Version    1.1        02/25/99 (GWS) Alpha release
+    \Version    1.2        08/10/99 (GWS) Final release
+    \Version    1.3        12/04/00 (GWS) Revised for Dirtysock
+
+*/
+/*************************************************************************************H*/
+
+#ifndef _protoadvt_h
+#define _protoadvt_h
+
+/*!
+    \Moduledef Proto Proto
+
+    \Description
+        The Proto module is made up of a set of mid-level communications protocols.
+
+        <b>Index</b>
+
+        <a href="#proto_overview">Overview</a>\n
+        <a href="#proto_depgraph">Module Dependency Graph</a>\n
+        <a href="#proto_dirtysock">Using a Dirtysock Protocol</a>\n
+        <a href="#proto_example">Example</a>\n
+
+        <b><a name="proto_overview">Overview</a></b>
+
+        The Proto module contains several useful communications protocols, including:
+
+        - Advt  - an "advertising" protocol for broadcasting announcements over a LAN
+        - Aries - a simple TCP length prefixed packet format
+        - Http  - web server transaction protocol
+        - Https - secure web server transaction protocol
+        - Ping  - 
+        - SSL   - secure sockets layer protocol
+
+        <b><a name="proto_depgraph">Module Dependency Graph</a></b>
+
+            <img alt="" src="proto.png">
+
+        <b><a name="proto_dirtysock">Using a Dirtysock Protocol</a></b>
+
+        Generally, there is a core set of functions a Dirtysock protocol implements:
+
+        <ul>
+            <li>
+                <b>Proto<em>Protocol</em>Create</b> - handles the allocation of a private state structure
+                as well as basic initialization tasks.  The reference pointer returned by the
+                Create function is used by the other protocol functions.
+
+                Examples: ProtoHttpCreate(), ProtoPingCreate()
+            </li>
+
+            <li>
+                <b>Proto<em>Protocol</em>Destroy</b> - releases the private state structure, terminates any
+                pending connections, and closes any open socket resources.
+
+                Examples: ProtoSSLDestroy(), ProtoAriesDestroy()
+            </li>
+
+            <li>
+                <b>Proto<em>Protocol</em>Request</b> - initiates a transaction request of some sort.  The naming
+                will vary depending on the protocol in question.
+
+                Examples: ProtoHttpGet(), ProtoPingRequest()
+            </li>
+
+            <li>
+                <b>Proto<em>Protocol</em>Receive</b> - reads the response from a Request transaction.  Returns
+                zero if no data is available.  In general, the caller is responsible for handling
+                timeout errors.
+
+                Examples: ProtoHttpInfo()/ProtoHttpData(), ProtoPingResponse(), ProtoSSLRecv()
+            </li>
+
+            <li>
+                <b>Proto<em>Protocol</em>Update</b> - handles reading from the socket and any protocol parsing
+                involved, and generally stores the data within the protocol reference structure.
+                In some cases, Update() is called asynchronously via socket callback, in other
+                cases the user must periodically call the update function.
+
+                Examples: _ProtoPingCallback() (private, called by socket callback) ProtoHttpUpdate() (public,
+                called by user).
+            </li>
+        </ul>
+
+        Commonly, a single recurring state-based routine will handle these transactions.  Example
+        psuedocode could look like this:
+
+        <b><a name="proto_example">Example</a></b>
+
+        \code
+
+        int32_t MyRecurringNetFunc(MyNetRef *pMyNetState, char *pHostName, uint32_t timeout)
+        {
+            // if update function is not in a socket callback, call it here
+            if (pMyNetState->pRef != NULL)
+            {
+                ProtoUpdate(pMyNetState->pRef);
+            }
+
+            switch(pMyNetState->eState)
+            {
+                // before we can do anything, we have to resolve the hostname
+                case MYPROTO_STATE_RESOLVE:
+                {
+                    if (pMyNetState->pHost == NULL)
+                    {
+                        // request hostname resolve (async)
+                        pMyNetState->pHost = SocketLookup(pHostName,timeout);
+                    }
+                    else
+                    {
+                        int32_t host;
+
+                        // check to see if the hostname is resolved yet
+                        host = pMyNetState->pHost->Done(pMyNetState->pHost);
+                        if (host == -1)
+                        {
+                            // we've timed out - move to destroy state
+                            pMyNetState->eState = MYPROTO_STATE_DESTROY;
+                        }
+                        else if (host != 0)
+                        {
+                            // init the protocol, and move to request state
+                            pMyNetState->pRef = ProtoCreate();
+                            pMyNetState->eState = MYPROTO_STATE_REQUEST;
+                        }
+                    }
+                }
+                break;
+
+                case MYPROTO_STATE_REQUEST:
+                {
+                    // make the transaction request
+                    ProtoRequest(pMyNetState->pRef,...);
+
+                    // advance to receive state
+                    pMyNetState->eState = MYPROTO_STATE_RECEIVE;
+                }
+                break;
+
+                case MYPROTO_STATE_RECEIVE:
+                {
+                    if (ProtoReceive(pMyNetState->pRef,...))
+                    {
+                        // we've got some data... do something with it
+                        _MyNetReadDataFunc(pMyNetState);
+
+                        // done - advance to destroy stage
+                        pMyNetState->eState = MYPROTO_STATE_DESTROY;
+                    }
+                }
+                break;
+
+                case MYPROTO_STATE_DESTROY:
+                {
+                    if (pMyNetState->pHost)
+                    {
+                        // release hostname resolve socket
+                        pMyNetState->pHost->Free(pCmdRef->pHost);
+                        pMyNetState->pHost = NULL;
+                    }
+
+                    if (pMyNetState->pRef)
+                    {
+                        // release protocol
+                        ProtoDestroy(pCmdRef->pRef);
+                        pMyNetState->pRef = NULL;
+                    }
+
+                    pMyNetState->eState = MYPROTO_STATE_INACTIVE;
+                }
+                break;
+
+                case MYPROTO_STATE_INACTIVE:
+                {
+                }
+                break;
+            }
+        }
+
+        \endcode
+
+        In many cases, some of these states will be broken out into separate functions, when
+        multiple transactions are required.
+
+*/
+//@{
+
+/*** Include files *********************************************************************/
+
+/*** Defines ***************************************************************************/
+
+//! define the ports used for service broadcasts
+#define ADVERT_BROADCAST_PORT_UDP 9999
+#define ADVERT_BROADCAST_PORT_IPX 9999
+
+//! define the static packet header identifier
+#define ADVERT_PACKET_IDENTIFIER "gEA"
+
+/*** Macros ****************************************************************************/
+
+/*** Type Definitions ******************************************************************/
+
+//! module reference -- passed as first arg to all module functions
+typedef struct ProtoAdvtRef ProtoAdvtRef;
+
+/*** Variables *************************************************************************/
+
+/*** Functions *************************************************************************/
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// construct an advertising agent
+ProtoAdvtRef *ProtoAdvtConstruct(int32_t buffer);
+
+// destruct an advertising agent
+void ProtoAdvtDestroy(ProtoAdvtRef *what);
+
+// query for available services
+int32_t ProtoAdvtQuery(ProtoAdvtRef *what, const char *kind, const char *proto,
+				  char *buffer, int32_t buflen, int32_t local);
+
+// locate a specific advertisement and return advertisers address (UDP only)
+uint32_t ProtoAdvtLocate(ProtoAdvtRef *ref, const char *kind, const char *name,
+                             uint32_t *host, uint32_t defval);
+
+// advertise a service as available
+int32_t ProtoAdvtAnnounce(ProtoAdvtRef *what, const char *kind, const char *name,
+					 const char *addr, const char *note, int32_t freq);
+
+// cancel server advertisement
+int32_t ProtoAdvtCancel(ProtoAdvtRef *what, const char *kind, const char *name);
+
+#ifdef __cplusplus
+}
+#endif
+
+//@}
+
+#endif // _protoadvt_h
+
+
+
+
+
+
+
+
+

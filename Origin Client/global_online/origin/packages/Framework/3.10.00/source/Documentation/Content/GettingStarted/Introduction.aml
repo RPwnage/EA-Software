@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="a8cbd50b-49bc-4431-b472-36c4dc2720a3" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+    <introduction>
+      <autoOutline />
+      <para>
+        This topic introduces Framework, outlines reasons we use Framework, and explains differences between
+        <token>Framework1</token>, <token>Framework2</token>, and <token>Framework3</token>
+      </para>
+    </introduction>
+
+    <section address="Introduction">
+      <!--
+      <title>Introduction</title>
+      -->
+      <content>
+        <para>
+          Framework is a system for building code and data as well as a set of conventions which standardize how to perform these operations across EA.
+        </para>
+        <para>
+          At the heart of Framework 2 is NAnt - an extensible commandline executable written in C# which executes a graph of XML based build scripts.
+          NAnt does not directly build code or data - it simply executes a series of Targets defined in Configuration Package and/or in your Build Script(s)
+          which specifies one or more processes known as Tasks to run (e.g., run the Visual Studio compiler on a group of .cpp files, run the file copy command
+          on a group of output files etc.). NAnt can be extended by creating custom Tasks which can then be executed in build scripts. Tasks also contain
+          attributes which are dynamically configured via user defined variables known as Properties. Nant has several data structures (Property, FileSet, Optionset)
+          that can be defined in the Build scripts and a number of script language elements like &lt;if&gt;, &lt;do&gt;, &lt;foreach&gt;, etc that are used to control execution flow.
+          Another vital part of Framework 2 is the Eaconfig configuration package. The configuration package is a set of XML Build scripts that are loaded by nant before executing a package Build script.
+          It is the Eaconfig package that imposes Framework 2 standards, conventions and build logic.
+          Eaconfig defines Targets to build packages, generate Visual Studio Solutions, build visual Studio Solution, do distributed builds,
+          create documentation, and others. Eaconfig is what makes a general purpose build tool, such as NAnt, become a specialized system like Framework.
+        </para>
+      </content>
+    </section>
+    <section>
+      <title>Why Framework?</title>
+      <content>
+        <para>
+          Framework separates package definition, build options and package version management. Package definition describes source files, build type and other data. 
+          If a package depends on other packages, the names of the dependent packages are listed in the build script, but not versions. Versions of the packages that will 
+          be used in a build are specified in the Masterconfig.xml file. Masterconfig file also specifies the configuration package. The configuration package is a special 
+          package that defines most of the build settings, such as compiler and linker flags, as well as the various targets executed during a build.
+        </para>
+        <para>
+          For code to be buildable by Framework it should be in the form of a package. A package is a directory whose name is equal to the package name, 
+          with a subdirectory whose name is equal to the package version. The version subdirectory should contain a NAnt build script. 
+          If a package is supposed to be part of a bigger build it will need to export package data to other packages. To export package data to parent packages
+          in the dependency graph, the version directory requires a scripts subdirectory with a file called Intitialize.xml. This file is a NAnt script that 
+          defines data exported by the package. For Framework 2 and 3 packages, the version directory will also have a Manifest.xml file. 
+          The presence of this file indicates to nant that this package is a Framework 2 or Framework 3 package. 
+          Content from Manifest.xml is used by the package server and in the build process.
+        </para>
+        <para>
+          By creating a Framework 3 compliant Package to build your content with NAnt, you gain the following features of Framework 3 which make it
+          more powerful than a traditional build system:
+        </para>
+        <list class="bullet">
+          <listItem>
+            <para>
+              <legacyBold>Using the same set of package build scripts: perform build; generate Visual Studio Solution or XCode project; perform distributed build.</legacyBold>
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <legacyBold>Versions for dependant Packages can be updated in one file: masterconfig.xml so that Build Scripts don't need to be modified when the version(s) need to be changed.</legacyBold>
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <legacyBold>A Package can be built for multiple target platforms without changes to the Package's Build Script.</legacyBold>
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              <legacyBold>Framework 2 completely isolates the build from the local PC environment which is executing the build.</legacyBold>
+              No PC environment tweaking is required to do a build. Environment variables, registry settings do not affect build results. 
+              The results for builds performed on different PCs are identical regardless of local PC configurations. Missing system dependencies and environmental requirements can be detected by a build.
+            </para>
+          </listItem>
+        </list>
+        <mediaLink>
+          <image xlink:href="Why_Framework3"/>
+        </mediaLink>
+      </content>
+    </section>
+    <section address="Framework123">
+      <title>Framework 1, 2, 3 - what is the difference?</title>
+      <content>
+        <para>
+          Throughout this guide you may encounter terms <newTerm>Framework 1</newTerm>, <newTerm>Framework 2</newTerm>, and the current version <newTerm>Framework 3</newTerm>.
+          Framework has a long history at EA and each version number means major rework of the Framework based on the usage experience and new demands.
+        </para>
+        <para>
+          All Framework implementations are based on NAnt, but the flow of a build process and XML interfaces are quite different. Nonetheless each subsequent implementation of the Framework is backwards
+          compatible (with some minor restrictions) and supports packages written for a previous version of Framework.
+        </para>
+        <list class="bullet">
+          <listItem address="Framework1Definition">
+            <para>
+              <application>Framework 1</application>
+            </para>
+            <para>
+              In Framework 1 each <token>FrameworkPackage</token> contained explicit commands how to build it.
+              The build script contained implementation of the build target that would build the <token>FrameworkPackage</token> and all its dependent packages.
+              Versions of dependent packages were specified in the parent package build script.  When Framework 1 was written, it was common practice to distribute
+              pre-built libraries and binaries as part of the package distribution; publishing source was considered optional.
+            </para>
+            <para>
+              Framework 1 approach to code builds contained number of maintenance challenges and restrictions:
+            </para>
+            <list class="bullet">
+              <listItem>
+                <para>
+                  Updating versions of <token>FrameworkPackage</token>s required editing of other <token>FrameworkPackage</token>s build scripts.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Because all that was required from a <token>FrameworkPackage</token> is to be able to build itself, it was difficult to convert a Framework
+                  build script into input to some other build system (for example, into a native Visual Studio solution and/or project file).
+                </para>
+              </listItem>
+            </list>
+          </listItem>
+          <listItem address="Framework2Definition">
+            <para>
+              <application>Framework 2</application>
+            </para>
+            <para>
+              As our CM processes evolved, it became common practice to publish source code and instructions for building it rather than pre-built libraries.
+              This presented a number of challeges to the Framework 1 model, so Framework 2 was created to address them.  Packages written for Framework 2 use
+              a <phrase>descriptive</phrase> instead of <phrase>imperative</phrase> approach to their build scripts.
+            </para>
+            <list class="bullet">
+              <listItem>
+                <para>
+                  In Framework 2, <token>FrameworkPackage</token> build scripts describe the package content and provides build instructions
+                  rather than doing the build itself.
+                </para>
+                <para>
+                  The task of building was delegated to the common targets implemented in the <token>eaconfig</token> Package. The information collected from each package
+                  build script could then be used to do a build or to convert this information into a Visual Studio Solution, or, potentially, another format.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Another big step in Framework 2 is introduction of the <token>Masterconfig</token>. Masterconfig file now contained versions of all Packages involved, and it become
+                  much easier to perform updates.
+                </para>
+              </listItem>
+            </list>
+            <para>
+              Framework 2 was big step forward compared to Framework 1, but it had number of problems that were addressed in Framework 3:
+            </para>
+            <list class="bullet">
+              <listItem>
+                <para>
+                  Recursive nature of Framework 2 inherited from Framework 1 made it diffucult to collect build information and convert it to other build system formats.
+                  <newTerm>nantToVSTools</newTerm> Package used to convert Framewotk build scripts into Visual Studio solutions became extremely complicated, fragile and hard to maintain.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Framework 2 was not flexible enough to easily accomodate new complex build pipeline of platforms such as Android, Marmalade, and others,
+                  and a lot of hacks were introduced to make Framework work on those platforms.  These hacks ade the whole system very fragile and hard to maintain.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Framework 2 was not fast enough. There were several optimizations of the Framework 2 over past few years, but improvements in speed were not catching up with
+                  increased size and complexity of our builds
+                </para>
+              </listItem>
+            </list>
+          </listItem>
+          <listItem address="Framework3Definition">
+            <para>
+              <application>Framework 3</application>
+            </para>
+            <para>
+              Framework 3 uses the same build script interfaces and <token>Masterconfig</token> files as Framework 2, and it addresses many of the problems
+              that were found in Framework 2 by implementing completely different internal flow for the build process:
+            </para>
+            <list class="bullet">
+              <listItem>
+                <para>
+                  Framework 3 abandons recursive approach to builds used in Framework 2.
+                  Package script files are loaded and converted into C# objects organized in a graph.
+                  Tasks in Framework 3 can use the <newTerm>Build Graph</newTerm> to perform nant build or write build graph in different formats.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Framework 3 version of NAnt was significantly reworked to be thread safe, and concurrency was introduced at all stages of the build process.
+                  As result both native nant builds and solution generation are significantly faster than in Framework 2.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Framework 3 supports transitive dependency propagation, which should reduce package maintenance effort and should help to reduce number of Packages
+                  that aren't needed anymore but still present in game build scripts because of explicit dependencies declared by top level packages.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  There are multiple new features and targets introduced in Framework 3.
+                </para>
+              </listItem>
+            </list>
+          </listItem>
+        </list>
+      </content>
+    </section>
+    <relatedTopics>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

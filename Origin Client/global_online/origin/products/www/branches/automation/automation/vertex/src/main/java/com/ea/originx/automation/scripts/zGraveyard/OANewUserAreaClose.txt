@@ -1,0 +1,91 @@
+package com.ea.originx.automation.scripts.zGraveyard;
+
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.TakeOverPage;
+import com.ea.originx.automation.lib.pageobjects.discover.DiscoverPage;
+import com.ea.originx.automation.lib.pageobjects.discover.NewUserArea;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the new user area features
+ *
+ * @author mkalaivanan
+ */
+public class OANewUserAreaClose extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 1016704)
+    @Test(groups = {"myhome", "release_smoke"})
+    public void testNewUserAreaClose(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        logFlowPoint("Create a new user: " + userAccount.getUsername()); //1
+        logFlowPoint("Navigate to the Discover Page"); //2
+        logFlowPoint("Verify the New User Area is Visible"); //3
+        logFlowPoint("Verify the Title of the New User Area is Correct"); //4
+        logFlowPoint("Verify the Subtitle of the New User Area is Correct"); //5
+        logFlowPoint("Verify the User can Close the Message by Clicking on 'Got It'"); //6
+
+        //1 Create user
+        WebDriver driver = startClientObject(context, client);
+        // wait for the login page available
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with the user");
+        } else {
+            logFailExit("Could not log into Origin with the user");
+        }
+
+        //2
+        DiscoverPage discoverPage = new NavigationSidebar(driver).gotoDiscoverPage();
+        new TakeOverPage(driver).closeIfOpen();
+        if (discoverPage.verifyDiscoverPageReached()) {
+            logPass("Successfully navigated to the Discover Page");
+        } else {
+            logFailExit("Could not navigate to the Discover Page");
+        }
+
+        //3
+        NewUserArea newUserArea = new NewUserArea(driver);
+        if (newUserArea.verifyNewUserAreaVisible()) {
+            logPass("New User Area is Visible");
+        } else {
+            logFailExit("New User Area is not visible");
+        }
+
+        //4
+        if (newUserArea.verifyTitleCorrect()) {
+            logPass("Title is correct");
+        } else {
+            logFail("Title is not correct");
+        }
+
+        //5
+        if (newUserArea.verifySubTitleCorrect()) {
+            logPass("Subtitle is correct");
+        } else {
+            logFail("Subtitle is not correct");
+        }
+
+        //6
+        newUserArea.clickGotItButton();
+        if (newUserArea.verifyNewUserClosed()) {
+            logPass("Successfully closed the New User message");
+        } else {
+            logFail("Could not close the New User message");
+        }
+
+        softAssertAll();
+    }
+
+}

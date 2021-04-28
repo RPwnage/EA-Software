@@ -1,0 +1,130 @@
+package com.ea.originx.automation.scripts.checkout;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.GlobalSearch;
+import com.ea.originx.automation.lib.pageobjects.common.GlobalSearchResults;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageHeader;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageVaultList;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHero;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.StorePage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.resources.OSInfo;
+import static com.ea.vx.originclient.templates.OATestBase.sleep;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests navigation to PDP page and to the product landing page and verifies the
+ * list of vault games
+ *
+ * @author mdobre
+ */
+public class OAJoinAndSaveVaultList extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 1016758)
+    @Test(groups = {"checkout", "full_regression"})
+    public void testJoinAndSaveVaultList(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+        String vaultEntitlementName = "STAR WARSâ„¢ Battlefrontâ„¢ II";
+        final boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        logFlowPoint("Login to Origin with a non-subscriber account and navigate to Origin X store"); //1
+        logFlowPoint("Navigate to the PDP page of a game in pre-order state"); //2
+        logFlowPoint("Click on 'Learn More' CTA and verify it navigates to product landing page"); //3
+        logFlowPoint("Observe the vault list and verify the header text is visible and correct"); //4
+        logFlowPoint("Verify there are bullet points below the header explaining the benefits of Origin Access"); //5
+        logFlowPoint("Verify that there are only vault games shown in the list"); //6
+        logFlowPoint("Verify there is a 'Show more' (or similar) button at the bottom of the module"); //7
+        logFlowPoint("Verify clicking on 'Show more' expands the games list"); //8
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (!isClient) {
+            driver.get(OSInfo.getXURL("SANDBOX_ADDRESS", "/can/en-us", null));
+        }
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        boolean isLogin = MacroLogin.startLogin(driver, userAccount);
+        StorePage storePage = navBar.gotoStorePage();
+        if (isLogin && storePage.verifyStorePageReached()) {
+            logPass(String.format("Verified login successful as non-subscriber %s and navigated to store", userAccount.getUsername()));
+        } else {
+            logFailExit(String.format("Failed: Cannot login as non-subscriber %s and navigate to store", userAccount.getUsername()));
+        }
+        //2
+        new GlobalSearch(driver).enterSearchText(vaultEntitlementName);
+        GlobalSearchResults searchResults = new GlobalSearchResults(driver);
+        String foundEntitlementName = searchResults.getVisibleStoreGame(vaultEntitlementName);
+        searchResults.viewGDPOfGame(foundEntitlementName);
+        if (new PDPHero(driver).verifyPDPHeroReached()) {
+            logPass(String.format("Verified PDP page opens successfully for '%s'", foundEntitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot open PDP page for '%s'", foundEntitlementName));
+        }
+
+        //3
+        PDPHeroActionDescriptors pdpHeroDescriptors = new PDPHeroActionDescriptors(driver);
+        pdpHeroDescriptors.clickOriginAccessLearnMoreLink();
+        ProductLandingPageHeader productLandingPageHeader = new ProductLandingPageHeader(driver);
+        if (productLandingPageHeader.verifyProductLandingPageReached()) {
+            logPass("Successfully navigated to the product landing page.");
+        } else {
+            logFailExit("Failed to navigate to the product landing page.");
+        }
+
+        //4
+        ProductLandingPageVaultList vaultList = new ProductLandingPageVaultList(driver);
+        vaultList.scrollToVaultList();
+        if (vaultList.verifyHeaderVisible()) {
+            logPass("Verified header is displayed and contains the entitlement name.");
+        } else {
+            logFail("Failed to verify header text is displayed or contains the entitlement name.");
+        }
+
+        // 5
+        if (vaultList.verifyBulletPointsVisible()) {
+            logPass("Verified all bullet points are displayed and are correct.");
+        } else {
+            logFail("Failed to verify all bullet points are displayed or are correct.");
+        }
+
+        //6
+        if (vaultList.verifyOnlyVaultGamesInVaultList()) {
+            logPass("Successfully verified there are only vault games in the list");
+        } else {
+            logFailExit("Failed to verify there are only vault games in the list");
+        }
+
+        //7
+        vaultList.scrollToShowMoreBtn();
+        if (Waits.pollingWait(() -> vaultList.verifyShowMoreBtnVisible())) {
+            logPass("Successfully verified the 'Show More' button is visible");
+        } else {
+            logFailExit("Failed to verify the 'Show More' button is visible");
+        }
+
+        //8
+        vaultList.scrollToVaultList();
+        int gamesBeforeExpand = vaultList.getNumberOfGames();
+        vaultList.clickOnShowMoreBtn();
+        sleep(2000); // waiting for the section to expand
+        int gamesAfterExpand = vaultList.getNumberOfGames();
+        if (gamesAfterExpand > gamesBeforeExpand) {
+            logPass("Successfully verified the 'Show More' button expands the games section");
+        } else {
+            logFailExit("Failed to verify the 'Show More' button expands the game section");
+        }
+
+        softAssertAll();
+    }
+}

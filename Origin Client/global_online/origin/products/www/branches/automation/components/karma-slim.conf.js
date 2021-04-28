@@ -1,0 +1,57 @@
+// Karma configuration for Origin components
+// http://karma-runner.github.io/0.10/config/configuration-file.html
+// This configuration runs tests without calculating CI documents like coverage and
+// Junit xml
+
+'use strict';
+
+module.exports = function(config) {
+    config.set({
+        frameworks: ['jasmine'],
+
+        files: [
+            // vendor libs
+            'dist/bower_components/promise-polyfill/Promise.js',
+            'dist/bower_components/angular/angular.js',
+            'dist/bower_components/angular-mocks/angular-mocks.js',
+            'dist/bower_components/angular-resource/angular-resource.js',
+            'dist/bower_components/angular-cookies/angular-cookies.js',
+            'dist/bower_components/angular-sanitize/angular-sanitize.js',
+            'dist/bower_components/angular-toArrayFilter/toArrayFilter.js',
+            'dist/bower_components/moment/moment.js',
+            'dist/bower_components/moment-timezone/builds/moment-timezone-with-data.min.js',
+            'dist/bower_components/lodash/lodash.js',
+
+            // origin source code
+            'dist/bower_components/origin-i18n/dist/origin-i18n.js',
+            '.tmp/karma-test/origin-test-components.js',
+
+            // unit test specs
+            'test/spec/**/*.js'
+        ],
+
+        // web server port
+        port: 9192,
+
+        // level of logging
+        // possible values: LOG_DISABLE || LOG_ERROR || LOG_WARN || LOG_INFO || LOG_DEBUG
+        logLevel: config.LOG_INFO,
+
+        // enable / disable watching file and executing tests whenever any file changes
+        autoWatch: false,
+
+        // Start these browsers, currently available:
+        // - Chrome
+        // - ChromeCanary
+        // - Firefox
+        // - Opera
+        // - Safari (only Mac)
+        // - PhantomJS
+        // - IE (only Windows)
+        browsers: ['PhantomJS'],
+
+        // Continuous Integration mode
+        // if true, it capture browsers, run tests and exit
+        singleRun: true
+    });
+};

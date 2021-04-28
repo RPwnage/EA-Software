@@ -1,0 +1,190 @@
+This document is intended to aid the process of transitioning user code built against the DirtySock V4 series
+of SDKs to the DirtySock V5 series of SDKs.  If there are items that should be in this document but are not,
+please write the "GOS dirtysock support" mailing list.
+
+
+File moving and renaming
+
+    The following files have been renamed and possibly moved (will affect user code or build process)
+    
+    Old location/name                           New location/name
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    contrib\dirtygraph\include\dirtygif.h       core\include\dirtygif.h
+    contrib\dirtygraph\include\dirtygraph.h     core\include\dirtygraph.h
+    contrib\dirtygraph\include\dirtyjpg.h       core\include\dirtyjpg.h
+    core\include\lobbypingmanager.h             core\include\protopingmanager.h
+    core\include\roomlistapi.h                  core\include\lobbyroomlistapi.h
+    core\source\lobby\lobbypingmanager.c        core\source\proto\protopingmanager.c
+    core\source\lobby\roomlistapi.c             core\source\lobby\lobbyroomlistapi.c
+
+    The following files have been moved (should not affect user code).
+    
+    Old location                                New location
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    contrib\dirtygraph\source\dirtygif.c        core\source\graph\dirtygif.c
+    contrib\dirtygraph\source\dirtygraph.c      core\source\graph\dirtygraph.c
+    contrib\dirtygraph\source\dirtyjpg.c        core\source\graph\dirtyjpg.c
+    core\source\lobby\buddyapi.c                core\source\buddy\buddyapi.c
+    core\source\lobby\hlbudapi.c                core\source\buddy\hlbudapi.c
+    core\source\lobby\ps3\hlbudapips3.c         core\source\buddy\ps3\hlbudapips3.c
+    core\source\lobby\xbox\xbfriends.c          core\source\buddy\xbox\xbfriends.c
+    core\source\lobby\xenon\hlbudapixenon.c     core\source\buddy\xenon\hlbudapixenon.c
+    core\source\lobby\xenon\xnfriends.c         core\source\buddy\xenon\xnfriends.c
+    core\source\lobby\lobbybase64.c             core\source\util\lobbybase64.c
+    core\source\lobby\lobbydisplist.c           core\source\util\lobbydisplist.c
+    core\source\lobby\lobbyhasher.c             core\source\util\lobbyhasher.c  
+    core\source\lobby\lobbylan.c                core\source\util\lobbylan.c
+    core\source\lobby\lobbysort.c               core\source\util\lobbysort.c
+    core\source\lobby\lobbytagfield.c           core\source\util\lobbytagfield.c
+    core\source\lobby\lobbyutf8.c               core\source\util\lobbyutf8.c
+    core\source\lobby\porttestapi.c             core\source\misc\porttestapi.c
+    core\source\lobby\porttestpkt.c             core\source\misc\porttestpkt.c
+    core\source\lobby\telemetryapi.c            core\source\misc\telemetryapi.c
+    core\source\lobby\tickerapi.c               core\source\misc\tickerapi.c
+
+        
+API deprecations
+
+    The following APIs and/or functionalities have been deprecated.  Client code referencing these APIs should
+    be updated as follows:
+
+    Contrib (All)
+        Stackdbg
+            Deprecated.
+
+        Winsake
+            PC titles should link directly against ws2_32.lib instead of winsake.lib.
+
+    DirtySock (All)
+        Favorites
+            Deprecated.
+    
+        LobbyApi
+            Deprecated LobbyApiControl() 'itim' selector.  Idle timeout is now specified by the server.
+
+        LobbyTagField
+            Deprecated TagFieldGetBulk().
+
+        LockerApi
+            Deprecated ability to specify LockerApiCreate() pServer parameter as NULL and have it default to
+            a hard-coded URL internally.  Please make sure the parameter is retrieved from a server
+            environment and not hard-coded at any point in the client.
+
+        LeagueApi
+            Deprecated LEAGUE_VIEW_AVAIL.  Replace references with LEAGUE_VIEW_TEAM.
+
+        TickerFilter
+            Deprecated TICKER_FILT_GAME_FIFA_WUSA, _OTHER, _ARGENTINA, and _GENERAL.
+        
+        WebOffer
+            Deprecated WebOfferCreditT.strNameOnCard[].  Any reference to this field should be removed.
+
+        XmlTrans
+            Deprecated.
+
+    DirtySock (PS3)
+        Deprecated support for PS3 SDK versions older than 110.006.
+
+    DirtySock (Xbox/Xenon)
+        LobbyLogin
+            Deprecated XBOX_REMAP support in LobbyLogin, use XBOX_ADDR_REMAP moving forward.
+
+    DirtySock (Xenon)
+        Removed code supporting XDKs previous to 3215.
+    
+        NetConnXenon
+            Deprecated NetConnStatus() selector+index behavior used for the following selectors:
+            
+                'gtag', 'invt', 'locl',
+                'serv', 'xnfo', 'xuid'.
+                
+            The index must now be passed in the new iData parameter instead of being accumulated into the
+            selector.
+
+
+API renaming or behavioral changes
+                    
+    The following APIs have been renamed, or the behavior has changed in a way that will require client code
+    changes for any user code using the APIs.  User code referencing these APIs should be updated as follows:        
+
+    DirtySock (All)
+        DirtyMem
+            DirtyMemDebugAlloc2() has been deprecated, and DirtyMemDebugAlloc() has been changed to include
+            the allocated pointer.  Previous uses of DirtyMemDebugAlloc2() should be changed to use
+            DirtyMemDebugAlloc(), and previous uses of DirtyMemDebugAlloc() can pass NULL in the new
+            parameter for compatibility with previous functionality.
+
+            DirtyMemDebugFree2() has been deprecated, and DirtyMemDebugFree() has been changed to include
+            the pointer to be freed. Previous uses of DirtyMemDebugFree2() should be changed to use
+            DirtyMemDebugFree(), and previous uses of DirtyMemDebugAlloc() can pass NULL in the new
+            parameter for compatibility with previous functionality.
+    
+        LobbyApi
+            LobbyApiInfoInt() has been renamed LobbyApiStatus(), and a buffer pointer and buffer length
+            parameter has been added.  Code previously using LobbyApiInfoInt() should be changed to use
+            LobbyApiStatus() and pass a NULL pointer and zero buffer length.
+
+            LobbyApiInfoPtr() has been renamed LobbyApiInfo().  Selectors 'autd', 'conf', 'list', 'lkey',
+            and 'perd' remain available in LobbyApiInfo(), other selectors now use LobbyApiStatus() and
+            copy their result into the provided buffer space.  Code using the referenced five selectors
+            should be changed from using LobbyApiInfoPtr() to LobbyApiInfo().  Code using other
+            LobbyApiInfoPtr() selectors will require the creation of a buffer object appropriate to
+            the selector type to pass to LobbyApiStatus() to get the results from.
+
+        LobbyLogger
+            LobbyLoggerControl() has had a new parameter, *pValue, added.  Pass NULL for compatibility
+            with previous functionality.
+
+        LockerApi
+            Added metadata parameter to LockerApiPutFile() and LockerApiUpdateFileInfo() calls.  Specify as
+            NULL to remain compatible with previous behavior.
+
+        NetGameDist
+            NetGameDistCreate() has had two new parameters, uInBufferSize and uOutBufferSize, added.
+            Pass GMDIST_DEFAULT_BUFFERSIZE_IN and GMDIST_DEFAULT_BUFFERSIZE_OUT, respectively, for
+            compatibility with previous behavior.
+            
+            The change to NetGameLink functions to use NetGameLinkRefT type means NetGameDistCreate()
+            using NetGameLinkSend/Recv/Stat procs directly will now need typecasting for these
+            functions.
+
+        NetGamePkt
+            Made NetGamePacketSyncT type private, and removed sync member from NetGamePacketT structure.
+            User code should not have been directly accessing this member previously.
+
+        PortTestApi    
+            PortTesterInfoInt(), PortTesterInfoPtr(), and PortTesterStatus() have been consolidated into
+            PortTesterStatus().  Client code referencing PortTesterStatus() with no parameters should
+            be changed to use PortTesterStatus() with the 'stat' selector.  Previous uses of
+            PortTesterInfoPtr() should now use use PortTesterStatus() with a buffer object capable of
+            holding the requested object.
+
+        ProtoPing
+            ProtoPingControl2() has been deprecated, and the *pValue parameter has been added to
+            ProtoPingControl().  Previous uses of ProtoPingControl2() should be changed to use
+            ProtoPingControl(), and previous uses of ProtoPingControl() can pass NULL in the new 
+            parameter for compatibility with previous functionality.
+
+        ProtoPingManager
+            Renamed LobbyPingManagerRefT to PingManagerRefT and LobbyPingManagerCallbackT to
+            PingManagerCallbackT.
+
+        NetConn(All)
+            Added a second NULL parameter to NetConnControl() to better match with SocketControl(), which
+            unrecognized selectors are passed through to.  Pass pValue2=NULL for compatibility with
+            previous functionality.
+
+            NetConnStatus2() has been deprecated, and the new iData parameter has been added to
+            NetConnStatus().  Previous uses of NetConnStatus2() should be changed to use NetConnStatus(),
+            and previous uses of NetConnStatus() can pass zero in iData for compatibility with previous
+            functionality.
+
+        TickerApi
+            Deprecated TickerApiConnect() pServer parameter.  TickerApiOnline() should be called previously
+            to TickerApiConnect() with the same parameter.
+
+        Voip(All)
+            VoipStatus2() has been deprecated, and the iValue parameter has been added to VoipStatus().
+            Previous uses of VoipStatus2() should be changed to use VoipStatus(), and previous uses of
+            VoipStatus() can pass zero in iValue for compatibility with previous functionality.
+

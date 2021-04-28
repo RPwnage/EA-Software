@@ -1,0 +1,99 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <!--
+        task-generatemodulewebreferences
+        
+    Use wsdl to generate proxy classes for ASP.NET web services.
+        The generated code is placed in ${workingdir}.
+  -->
+
+  <createtask name="task-generatemodulewebreferences">
+    <parameters>
+      <option name="module" value="Required"/>
+      <option name="group" value="Required"/>
+    </parameters>
+    <code>
+      <property
+          name="group-module"
+          value="${task-generatemodulewebreferences.group}.${task-generatemodulewebreferences.module}" />
+
+      <choose unless="@{PropertyExists('wsdl.exe')}" >
+        <do  if="${package.VisualStudio.version} lt 9.0" >
+          <property name="wsdl.exe" value="${package.VisualStudio.appdir}/SDK/v2.0/bin/wsdl.exe" />
+          <do unless="@{FileExists('${wsdl.exe}')}">
+            <!-- Windows SDK used to find tlbimp.exe. -->
+            <dependent name="WindowsSDK" />
+            <property name="wsdl.exe" value="${package.WindowsSDK.appdir}/bin/wsdl.exe" />
+          </do>
+        </do>
+        <do>
+          <!-- Windows SDK used to find tlbimp.exe. -->
+          <dependent name="WindowsSDK" />
+          <property name="wsdl.exe" value="${package.WindowsSDK.appdir}/bin/wsdl.exe" />
+        </do>
+      </choose>
+      <fail message="Unable to find wsdl.exe in '${wsdl.exe}'" unless="@{FileExists('${wsdl.exe}')}" />
+
+      <task name="GetModuleBaseType" Name="${${group-module}.buildtype}" />
+
+      <choose>
+        <do if="@{StrStartsWith('${GetModuleBaseType.RetVal}','CSharp')}" >
+          <property name="webref.lang" value="CS" />
+        </do>
+        <do if="@{StrStartsWith('${GetModuleBaseType.RetVal}','Managed')}" >
+          <property name="webref.lang" value="CPP" />
+        </do>
+        <do>
+          <fail message="Buildtype '${${group-module}.buildtype}' for module '${task-generatemodulewebreferences.module}' in group '${task-generatemodulewebreferences.group}' does not support web references." />
+        </do>
+      </choose>
+
+      <property
+          name="webcodedir"
+          value="${package.builddir}\${task-generatemodulewebreferences.module}\webreferences" />
+
+      <mkdir dir="${webcodedir}" />
+      <foreach property="webref" in="${group-module}.webreferences" item="OptionSet">
+        <!-- Generate web service wrapper. -->
+        <exec program='"${wsdl.exe}"' workingdir="${webcodedir}"
+    message="Converting '${webref.value}' ..."
+    stdout="${nant.verbose}" >
+          <args>
+            <arg value="/namespace:${webref.name}" />
+            <arg value="${webref.value}" />
+            <arg value="/language:${webref.lang}" />
+            <arg value="/nologo" />
+          </args>
+        </exec>
+      </foreach>
+
+      <!-- The system.web.dll and System.web.services.dll must be included so the code can compile -->
+      <!-- Dot Net frameworks version 3.0 and higher do not contain macorlib.dll, System.dll in reference directory-->
+      <fileset append="true"
+        name="${task-generatemodulewebreferences.group}.${task-generatemodulewebreferences.module}.assemblies" >
+        <includes name="System.Web.dll" asis="true" />
+        <includes name="System.Web.Services.dll" asis="true"/>
+      </fileset>
+
+      <!-- The generated code needs to compile with the module's source code -->
+      <do if="@{StrStartsWith('${GetModuleBaseType.RetVal}','CSharp')}" >
+        <fileset basedir="${webcodedir}" append="true"
+          name="${task-generatemodulewebreferences.group}.${task-generatemodulewebreferences.module}.sourcefiles" >
+          <includes name="**/*.cs" />
+        </fileset>
+      </do>
+
+      <!-- The generated header file's path needs to be added to the module's include dirs -->
+      <do if="@{StrStartsWith('${GetModuleBaseType.RetVal}','Managed')}" >
+        <property
+          name="${task-generatemodulewebreferences.group}.${task-generatemodulewebreferences.module}.includedirs" >
+          ${property.value}
+          ${webcodedir}
+        </property>
+      </do>
+    </code>
+  </createtask>
+</project>

@@ -1,0 +1,2198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build"> 
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="clean" value="exclude"/>
+    </optionset>
+    
+    <property name="xcode-postprocessing-strip" value="false" />
+    <property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+    
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.originClient.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.originClient.version"  value="@{PathGetFileName('${package.originClient.dir}')}"/>
+    <package name="originClient" targetversion="${package.originClient.version}"/>
+        
+    <!-- We should change the way the build works/relies on the IGO.xml file instead of making the IGO a full-fledge project -->
+    <!-- should be pointing to IGO\dev64 because of masterfile.xml -->
+    <property name="package.IGO.common" value="${package.originClient.dir}/../../IGO" />
+    <property name="package.IGO.lib" value="${package.IGO.common}/lib" />
+    <property name="package.IGO.bin" value="${package.IGO.common}/bin" />
+
+    <!-- ************************** -->
+    <!-- Additional Include scripts -->
+    <!-- ************************** -->
+    <include file="${package.originClient.dir}/scripts/targets/webwidget.xml" />
+    
+    <property name="platform" value="osx" />
+    
+    <property name="dirtysdk-samples" value="false" />
+    <property name="eaconfig.rtti" value="on" />
+    <property name="runtime.originClient.osx-xcode-postprocessing-strip" value="false" />
+    <property name="osx-base-sdk-version" value="10.7" />
+    <property name="cc.cpp11" value="on"/>
+  
+    <!-- ******************** -->
+    <!-- Package dependencies -->
+    <!-- ******************** -->
+    <dependent name="ActivePython" />
+    <dependent name="OriginVersion" />
+    <dependent name="OriginConfig" />
+    <dependent name="OriginLegacyApp" />
+    <dependent name="uitoolkit" />
+    <dependent name="Qt" />
+    <dependent name="openSSL" />
+    <dependent name="EAIO" />
+    <dependent name="engine" />
+    <dependent name="sdkService" />
+    <dependent name="LocalHost" />
+    <dependent name="libarchive" />
+    <dependent name="NSIS" />
+    <dependent name="OriginUtils" />
+    <dependent name="s3" />
+    <dependent name="SignTool" />
+    <dependent name="OriginBootstrap" />
+    <dependent name="OriginBootstrapShared" />
+    <dependent name="libjingle" />
+    <dependent name="OriginUIToolkit" />
+    
+    <do if="${config-system} == 'pc'" >
+        <dependent name="twitch" />
+        <dependent name="ICU" />
+        <dependent name="UpdateTool" />
+		<dependent name="IGOProxy"/>
+        <dependent name="BeaconService" />
+        <dependent name="EscalationClient" />
+        <dependent name="EAProxyInstaller" />
+        <dependent name="OriginCrashReporter" /> <!-- for language export target -->
+        <dependent name="TelemetryBreakpointHandler" />
+        <dependent name="OriginER" />
+		<property name="package.VisualStudio.platformtoolset" value="v120_xp"/>
+        <dependent name="OOACore" />
+    </do>
+    
+    <do if="${config-system} == 'osx'" >
+	    <dependent name="IGO" />
+        <!-- we need to depend on the below packages for the generate-code-all-dependents target. The target is a hack for OSX -->
+        <dependent name="ChatModel" />
+        <dependent name="webWidget" />
+        <dependent name="uitoolkit" />
+        <dependent name="services" />
+        <dependent name="BeaconService_OSX" />
+        <dependent name="BeaconServiceHelper_OSX" />        
+        <dependent name="EscalationClient_OSX" />
+        <dependent name="EscalationClientHelper_OSX" />
+    </do>
+    
+    <!-- ***************************** -->
+    <!-- Build Configuration properties-->
+    <!-- ***************************** -->
+  <!--property name="runtime.originClient.osx-base-sdk-version" value="10.7"/-->
+  
+  <BuildType name="originClient.buildtype" from="OriginDLL" if="${config-system} == 'pc'">
+    <option name="buildset.link.options">
+      ${option.value}
+    </option>
+    <option name="buildset.cc.defines">
+      ${option.value}
+      ${package.libjingle.extra-defines}
+      _WINSOCKAPI_
+      EASTL_API=EA_EXPORT
+      EACALLSTACK_API=EA_EXPORT
+      EAIO_API=EA_EXPORT
+      EASTDC_API=EA_EXPORT
+      ORIGIN_X
+    </option>
+    <option name="buildset.cc.options" if="${config-system} == pc">
+      ${option.value}
+      /FI ${package.originClient.dir}/common/source/OriginCommon.h
+    </option>
+
+  </BuildType>
+
+  <BuildType name="originClient.buildtype" from="OriginProgram" if="${config-system} == 'osx'">
+    <option name="buildset.link.options">
+      ${option.value}
+    </option>
+    <option name="buildset.cc.defines">
+      ${option.value}
+      ${package.libjingle.extra-defines}
+      ORIGIN_X
+    </option>
+    <option name="clanguage" value="off"/>
+  </BuildType>
+  
+  
+    <property name="runtime.originClient.buildtype" value="originClient.buildtype"/>
+  
+    <property name="runtime.buildmodules" value="originClient" />
+    
+    <property name="runtime.originClient.tempdir" value="${package.originClient.dir}/temp" />
+    
+    <do if="${config-system} == 'pc'">
+        <property name="package.OriginBootstrap.lang.res.dir" value="${package.OriginBootstrap.dir}/source/Resources/lang" />
+        <property name="package.OriginBootstrapShared.lang.res.dir" value="${package.OriginBootstrapShared.dir}/Resources/lang" />
+        <property name="package.OriginCrashReporter.lang.res.dir" value="${package.OriginCrashReporter.dir}/resources/lang" />
+        <property name="package.OriginER.lang.res.dir" value="${package.OriginER.dir}/Resources/lang" />
+        <property name="runtime.originClient.outputdir" value="${package.dir}/runtime"/>
+    </do>
+    
+    <do if="${config-system} == 'osx'">
+        <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+        <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+        <property name="runtime.originClient.xcode-osx-template-dir" value="${package.originClient.dir}/XCodeTemplate/originClient-xcode.template" />
+        <property name="runtime.originClient.xcodedir" value="${package.configbindir}/../.." />
+        <property name="runtime.originClient.xcodebuilddir" value="${runtime.${package.name}.xcodedir}/build" />
+        <property name="runtime.originClient.xcodeprojfile" value="${runtime.${package.name}.xcodedir}/${package.name}.xcodeproj" />
+        <property name="runtime.originClient.bundledir" value="${package.configbindir}/Origin.app" />
+    <property name="runtime.originClient.qtpluginsdir" value="${runtime.originClient.bundledir}/Contents/plugins" />
+    <property name="runtime.originClient.frameworksdir" value="${runtime.originClient.bundledir}/Contents/Frameworks" />
+    <property name="runtime.originClient.resourcesdir" value="${runtime.originClient.bundledir}/Contents/Resources" />
+    <property name="runtime.originClient.launchservicesdir" value="${runtime.originClient.bundledir}/Contents/Library/LaunchServices" />
+    <property name="runtime.originClient.outputdir" value="${runtime.originClient.bundledir}/Contents/MacOS" />
+    <property name="runtime.originClient.targetdir" value="${package.dir}/target" />
+    <property name="runtime.originClient.tempdir" value="${package.dir}/temp" />
+    <property name="runtime.originClient.appdir" value="${runtime.originClient.tempdir}/Origin.app" />
+    <property name="runtime.originClient.plist" value="${runtime.originClient.xcode-osx-template-dir}/Info.plist" />
+    <property name="runtime.originClient.plist.template" value="${runtime.originClient.plist}.template" />
+    <property name="runtime.originClient.osx-extra-link-options" value="-sectcreate __TEXT __info_plist ${runtime.originClient.plist} -ObjC -stdlib=libc++" />
+    </do>
+  
+    <property name="runtime.originClient.outputname" value="OriginClient"/>
+
+	<property name="qt.audio.dir" value="${runtime.originClient.outputdir}/audio" />
+    <property name="qt.imageformats.dir" value="${runtime.originClient.outputdir}/imageformats" />
+    <property name="qt.platforms.dir" value="${runtime.originClient.outputdir}/platforms" />
+    <property name="qt.mediaservice.dir" value="${runtime.originClient.outputdir}/mediaservice" />
+    <property name="qt.printsupport.dir" value="${runtime.originClient.outputdir}/printsupport" />
+    <property name="supported.languages" value="CHS_CN,CHT_CN,CZE_CZ,DAN_DK,DUT_NL,ENG_US,FIN_FI,FRE_FR,GER_DE,GRE_GR,HUN_HU,ITA_IT,JPN_JP,KOR_KR,NOR_NO,POL_PL,POR_BR,POR_PT,RUS_RU,SPA_ES,SPA_MX,SWE_SE,THA_TH" />
+    <property name="package.originClient.lang.res.dir" value="${package.originClient.dir}/resources/lang" />
+    
+    <property name="python.exe" value="python"/>
+    <!-- Windows needs ActivePython -->
+    <property name="python.exe" value="${package.ActivePython.exe}"  if="${config-system} == 'pc'"/>
+    
+    <!-- Installer properties -->
+    <property name="launcher.name" value="OriginSetup.exe" />
+    <property name="installer.name" value="Setup.exe" />
+    <property name="thin.launcher.name" value="OriginThinSetup.exe" />
+    <property name="nsi.special.arg" value="/Dspecial=release" if="@{PropertyExists('jenkins')}"/>
+    <property name="nsi.special.arg" value="" unless="@{PropertyExists('jenkins')}"/>
+    <property name="cert.args" value="/f ${package.SignTool.datadir}\ea_cert.pfx /p origin" unless="@{PropertyExists('jenkins')}"/>
+    <property name="cert.args" value="/sha1 ${cert.sha1}" if="@{PropertyExists('jenkins')}"/>
+    <property name="cert.args" value="${property.value} /t &quot;http://timestamp.verisign.com/scripts/timstamp.dll&quot;" if="${codesign.timestamp} == true"/>
+    <property name="cert.args.quoted" value="&quot;${cert.args}&quot;"/>
+    <property name="found.cert" value="false" />
+    <property name="installer.build.args" value="/DMAVEN /DINCLUDE_QT_LIBS /DQT_DIR=${package.Qt.distdir} /Dsigntool=${package.SignTool.exe} /Dcert.args=${cert.args.quoted} ${nsi.special.arg} /Doutfile=${runtime.originClient.targetdir}\${installer.name} EbisuInstaller.nsi" />
+    <property name="thin.installer.build.args" value="/DMAVEN /DINCLUDE_QT_LIBS /DQT_DIR=${package.Qt.distdir} /Dsigntool=${package.SignTool.exe} /Dcert.args=${cert.args.quoted} ${nsi.special.arg} /Doutfile=${runtime.originClient.targetdir}\${installer.name} /Dtype=thin EbisuInstaller.nsi" />
+    <property name="installerHelper.build.args" value="/DMAVEN /Doutfile=ExtractVersionInfo.exe ExtractVersionInfo.nsi" />
+    <property name="launcher.build.args" value="/DMAVEN /DINCLUDE_QT_LIBS /DQT_DIR=${package.Qt.distdir} /Dinfile=${runtime.originClient.targetdir}\${installer.name} /Doutfile=${runtime.originClient.targetdir}\${launcher.name} Launcher.nsi" />
+    <property name="thin.launcher.build.args" value="/DMAVEN /DINCLUDE_QT_LIBS /Dinfile=${runtime.originClient.targetdir}\${installer.name} /Doutfile=${runtime.originClient.targetdir}\${thin.launcher.name} Launcher.nsi" />
+    <property name="originUpdate.name" value="OriginUpdate" />
+    <property name="originUpdate.url" value="https://stage.download.dm.origin.com/origin" />
+    <property name="origin.version.dot.file" value="originVersionDot.txt" />
+    <property name="origin.version.file" value="originVersion.txt" />
+    <property name="qtlibs" if="${config-system} == 'pc'">
+        Qt5Core
+        Qt5Gui
+        Qt5OpenGL
+        Qt5Network
+        Qt5WebKit
+        Qt5Widgets
+        Qt5WebKitWidgets
+        Qt5PrintSupport
+        Qt5Positioning
+        Qt5Multimedia
+        Qt5MultimediaWidgets
+        Qt5Xml
+        Qt5XmlPatterns
+    </property>
+    
+    <!-- OS X wants OpenGL accerated WebKit -->
+    <property name="qtlibs" if="${config-system} == 'osx'">
+        QtCore
+        QtGui
+        QtOpenGL
+        QtNetwork
+        QtWebKit
+        QtWidgets
+        QtWebKitWidgets
+        QtPrintSupport
+        QtMultimedia
+        QtMultimediaWidgets
+        QtXml
+        QtXmlPatterns
+        QtOpenGL
+    </property>
+    
+    <!-- ************************* -->
+    <!-- Prebuild property targets -->
+    <!-- ************************* -->
+    
+    <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+    <target name="generate-code" depends="create-folders moc-compile ui-compile uitoolkit-compile-all webwidget-compile-all qt-rc-compile" />
+  
+  <property name="subpackage.list" >
+    ChatModel
+    webWidget
+    engine
+    services
+    OriginLegacyApp
+    uitoolkit
+    IGO
+  </property>
+  
+  <optionset name="config.settings">
+    <option name="config" value="${config}" />
+  </optionset>
+  
+    <property name="runtime.originClient.prebuildtarget" value="generate-code" />
+  
+    <property name="runtime.originClient.preprocess" value="update-plist" if="${config-system} == 'osx'" />
+    <property name="runtime.originClient.prebuildtarget" value="update-plist ${property.value}" if="${config-system} == 'osx'" />
+  
+    <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+    <property name="runtime.originClient.vcproj.pre-build-step">
+        ${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.originClient.prebuildtarget}
+    </property>
+    
+    <!-- ************************** -->
+    <!-- Postbuild property targets -->
+    <!-- ************************** -->
+    
+    <property name="postbuild.target.list" if="${config-system} == 'pc'" >
+      copy-to-runtime-${config-system}
+    </property>
+  
+    <property name="postbuild.target.list">
+      ${property.value}
+      fix-rpaths
+    </property>
+    
+    <property name="postbuild.target.list" if="${config-type} eq 'opt' || ${config-system}=='osx'">
+      ${property.value}
+      sign-exe
+    </property>
+    
+    <target name="post-build-tasks">
+      <foreach property="runtarget" item="String" in="${postbuild.target.list}">
+          <echo message="Post Build Task: ${runtarget}" />
+          <call target="${runtarget}" />
+      </foreach>
+    </target>
+    
+    <!-- NANT Postbuild target. Will execute this after compiling happens. -->
+    <property name="runtime.originClient.postbuildtarget" value="post-build-tasks" />
+    
+    <!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+    <property name="runtime.originClient.vcproj.post-build-step">
+        ${nant.location}/nant.exe -buildfile:${nant.project.buildfile} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:codesign.timestamp=${codesign.timestamp} ${runtime.originClient.postbuildtarget}
+    </property>
+    
+    <!-- ********************************************************** -->
+    <!-- Package USE dependencies                                     -->
+    <!-- inclusion into the project but does not affect build order -->
+    <!-- ********************************************************** -->
+    <property name="runtime.originClient.usedependencies" if="${config-system} == 'pc'">
+        openSSL
+        OriginVersion
+        Qt
+        coreallocator
+        ICU
+        Sonar
+    </property>
+    <property name="runtime.originClient.usedependencies" if="${config-system} == 'osx'">
+        openSSL
+        OriginVersion
+        Qt
+        coreallocator
+    </property>
+    <!-- ********************************************************** -->
+    <!-- Package BUILD dependencies                                 -->
+    <!-- inclusion into the project, affects build order             -->
+    <!-- ********************************************************** -->
+    <property name="runtime.originClient.builddependencies">
+        BugSentry
+        DirtySDK
+        EAAssert
+        EABase
+        EACallstack
+        EAIO
+        eajpeg
+        EAPatchClient
+        EASTL
+        EAStdC
+        EAThread
+        EATrace
+        engine
+        ExceptionHandler
+        libarchive
+        OriginConfig
+        OriginLegacyApp
+        PPMalloc
+        sdkService
+        LocalHost
+        services
+        TelemetryAPI
+        uitoolkit
+        UTFXml
+        webWidget
+        libjingle
+        ChatModel
+        LSXWrapper
+    </property>
+    
+    <property name="runtime.originClient.builddependencies" if="${config-system} == 'osx'" >
+        ${property.value}
+        zlib
+    </property>
+
+    <property name="runtime.originClient.builddependencies" if="${config-system} == 'pc'">
+        ${property.value}
+        UpdateTool
+        TelemetryBreakpointHandler
+        OriginCleanGenerated
+        BeaconService
+        EscalationClient
+        EAProxyInstaller
+        zlib
+        rtf2html
+    </property>
+  
+    <do if="${config-system} == 'osx'" >
+      <property name="runtime.originClient.osx-frameworks" >
+        -framework AppKit
+        -framework Carbon
+        -framework QuickTime
+        -framework CoreAudio
+        -framework IOKit
+        -framework SystemConfiguration
+        -framework Security
+        -framework ServiceManagement
+      </property>
+      <!-- Add the Qt frameworks according to the ${qtlibs} property -->
+      <foreach property="qtlib" item="String" in="${qtlibs}" >
+        <property name="runtime.originClient.osx-frameworks" >
+          ${property.value}
+          -framework ${package.Qt.libdir}/${qtlib}
+        </property>
+      </foreach>
+      
+    </do>
+    
+    <!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+    <property name="runtime.originClient.includedirs" >
+        ${package.originClient.dir}
+        ${package.originClient.dir}/common/source
+        ${package.originClient.dir}/utilities
+        ${package.originClient.dir}/widgets/login/source
+        ${package.originClient.dir}/widgets/logoutExit/source
+        ${package.originClient.dir}/widgets/messageArea/source
+        ${package.originClient.dir}/widgets/mygames/source
+        ${package.originClient.dir}/widgets/notifications/source
+        ${package.originClient.dir}/widgets/installer/source
+        ${package.originClient.dir}/widgets/client/source
+        ${package.originClient.dir}/widgets/social/source
+        ${package.originClient.dir}/widgets/motd/source
+        ${package.originClient.dir}/widgets/navigation/source
+        ${package.originClient.dir}/widgets/odc/source
+        ${package.originClient.dir}/widgets/igo/source
+        ${package.originClient.dir}/widgets/play/source
+        ${package.originClient.dir}/widgets/ito/source
+        ${package.originClient.dir}/widgets/profile/source
+        ${package.originClient.dir}/widgets/rtp/source
+		${package.originClient.dir}/widgets/saveBackupRestore/source
+        ${package.originClient.dir}/widgets/store/source
+        ${package.originClient.dir}/widgets/achievements/source
+        ${package.originClient.dir}/widgets/settings/source
+        ${package.originClient.dir}/widgets/broadcast/source
+        ${package.originClient.dir}/widgets/promoBrowser/source
+        ${package.originClient.dir}/widgets/pendingActions/source
+        ${ui.output.dir}
+        ${package.originClient.dir}/flows/
+        ${package.originClient.dir}/views/source
+        ${package.originClient.dir}/views/igo/source
+        ${package.originClient.dir}/views/ITO/source
+        ${package.originClient.dir}/views/notifications/source
+        ${package.originClient.dir}/jshelpers/source
+        ${package.originClient.dir}/jsinterface/audio
+        ${package.originClient.dir}/jsinterface/achievementManager
+        ${package.originClient.dir}/jsinterface/base/source
+        ${package.originClient.dir}/jsinterface/entitlementManager/source
+        ${package.originClient.dir}/jsinterface/games/source
+        ${package.originClient.dir}/jsinterface/contentOperationQueueController/source
+        ${package.originClient.dir}/jsinterface/nativeMenu/source
+        ${package.originClient.dir}/jsinterface/onlineStatus/source
+        ${package.originClient.dir}/jsinterface/dateFormat/source
+        ${package.originClient.dir}/jsinterface/originChat/source
+        ${package.originClient.dir}/jsinterface/originSocial/source
+        ${package.originClient.dir}/jsinterface/broadcast/source
+        ${package.originClient.dir}/jsinterface/capsLock/source
+        ${package.originClient.dir}/jsinterface/clientNavigation/source
+        ${package.originClient.dir}/jsinterface/clientSettings/source
+        ${package.originClient.dir}/jsinterface/originCommon/source
+        ${package.originClient.dir}/jsinterface/dialogs/source
+        ${package.originClient.dir}/jsinterface/originPageVisibility/source
+        ${package.originClient.dir}/jsinterface/originUser/source
+        ${package.originClient.dir}/jsinterface/userSettings/source
+        ${package.originClient.dir}/jsinterface/installDirectoryManager/source
+        ${package.originClient.dir}/jsinterface/productQuery/source
+        ${package.originClient.dir}/jsinterface/subscription
+        ${package.originClient.dir}/jsinterface/telemetryClient/source
+        ${package.originClient.dir}/jsinterface/voice/source
+        ${package.originClient.dir}/jsinterface/desktopServices/source
+        ${package.originClient.dir}/jsinterface/geolocationQuery/source
+        ${package.originClient.dir}/jsinterface/onTheHouseQuery/source
+        ${package.originClient.dir}/jsinterface/igo/source
+        ${package.originClient.dir}/websupport/source
+        ${package.originClient.dir}/store/source
+        ${package.originClient.dir}/tasks
+        ${package.engine.dir}/include
+        ${package.sdkService.dir}/include
+        ${package.LocalHost.dir}/include
+		${package.originClient.dir}/../../IGO
+    </property>
+    
+    <!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+    <fileset name="runtime.originClient.sourcefiles" basedir="${package.dir}">
+        <includes name="${package.originClient.dir}/common/source/**/*.cpp" />
+        <includes name="${package.originClient.dir}/common/source/**/*.mm" />
+        <includes name="${package.originClient.dir}/containers/source/**/*.cpp" />
+        <includes name="${package.originClient.dir}/flows/**/*.cpp" />
+        <includes name="${package.originClient.dir}/utilities/**/*.cpp" />
+        <includes name="${package.originClient.dir}/widgets/**/source/*.cpp" />
+        <includes name="${package.originClient.dir}/views/**/*.cpp" />
+        <includes name="${package.originClient.dir}/jshelpers/**/*.cpp" />
+        <includes name="${package.originClient.dir}/jsinterface/**/*.cpp" />
+        <includes name="${package.originClient.dir}/store/source/*.cpp" />
+        <includes name="${package.originClient.dir}/websupport/source/*.cpp" />
+        <includes name="${package.originClient.dir}/tasks/*.cpp" />
+    </fileset>
+    
+    <!-- strip out platform specific files -->
+    <fileset name="runtime.originClient.sourcefiles" basedir="${package.dir}" append="true"> 
+        <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+        <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    </fileset> 
+
+    <!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+    <fileset name="runtime.moc_sourcefiles" basedir="${package.originClient.dir}">
+        <includes name="common/source/OriginApplication.h" />
+        <includes name="common/source/TelemetryManager.h" />
+        <includes name="common/source/WebWidgetController.h" />
+        <includes name="common/source/DialogController.h" />
+        <includes name="common/source/PopOutController.h" />
+        <includes name="flows/AbstractFlow.h" />
+        <includes name="flows/ClientFlow.h" />
+        <includes name="flows/CloudRestoreFlow.h" />
+        <includes name="flows/CloudSyncFlow.h" />
+        <includes name="flows/ContentFlowController.h" />
+        <includes name="flows/CustomizeBoxartFlow.h" />
+        <includes name="flows/EntitleFreeGameFlow.h" />
+        <includes name="flows/FirstLaunchFlow.h" />
+        <includes name="flows/IGOFlow.h" />
+        <includes name="flows/ITOFlow.h" />
+        <includes name="flows/JoinMultiplayerFlow.h" />
+        <includes name="flows/InstallerFlow.h" />
+        <includes name="flows/LoginFlow.h" />
+        <includes name="flows/LogoutExitFlow.h" />
+        <includes name="flows/MOTDFlow.h" />
+        <includes name="flows/MainFlow.h" />
+        <includes name="flows/NonOriginGameFlow.h" />
+        <includes name="flows/PlayFlow.h" />
+        <includes name="flows/PendingActionFlow.h" />
+        <includes name="flows/RTPFlow.h" />
+		<includes name="flows/SaveBackupRestoreFlow.h" />
+        <includes name="flows/SSOFlow.h" />
+        <includes name="flows/CommandFlow.h" />
+        <includes name="flows/ToInvisibleFlow.h" />
+        <includes name="flows/ToVisibleFlow.h" />
+        <includes name="flows/SummonToGroupChannelFlow.h" />
+        <includes name="flows/SummonedToGroupChannelFlow.h" />
+        <includes name="flows/AcceptInviteAndOpenChannelFlow.h"/>
+        <includes name="flows/SingleLoginFlow.h" />
+        <includes name="jshelpers/source/AuthenticationJsHelper.h" />
+        <includes name="jshelpers/source/BuddyListJsHelper.h" />
+        <includes name="jshelpers/source/ChooseAvatarJsHelper.h" />
+        <includes name="jshelpers/source/CommonJsHelper.h" />
+        <includes name="jshelpers/source/CustomerSupportJsHelper.h" />
+        <includes name="jshelpers/source/ImageProcessingJsHelper.h" />
+        <includes name="jshelpers/source/MOTDJsHelper.h" />
+        <includes name="jshelpers/source/MyGameJsHelper.h" />
+        <includes name="jshelpers/source/PDLCJsHelper.h" />
+        <includes name="jshelpers/source/PromoJsHelper.h" />
+        <includes name="jshelpers/source/RedeemJsHelper.h" />
+        <includes name="jshelpers/source/SettingsJsHelper.h" />
+        <includes name="jshelpers/source/SocialJsHelper.h" />
+        <includes name="jshelpers/source/StoreJsHelper.h" />
+        
+        <includes name="jsinterface/broadcast/source/BroadcastProxy.h" />
+        <includes name="jsinterface/capsLock/source/CapsLockProxy.h" />
+        <includes name="jsinterface/clientNavigation/source/ClientNavigationProxy.h" />
+        <includes name="jsinterface/clientSettings/source/ClientSettingsProxy.h" />
+        <includes name="jsinterface/dateFormat/source/DateFormatProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementSetProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementSetReleaseInfoProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementSetExpansionProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementPortfolioProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementManagerProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementStatisticsProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementShareOperationProxyBase.h" />
+        <includes name="jsinterface/achievementManager/AchievementShareQueryOperationProxy.h" />
+        <includes name="jsinterface/achievementManager/AchievementShareSetOperationProxy.h" />
+        <includes name="jsinterface/audio/AudioPlayer.h" />
+        <includes name="jsinterface/debug/Debug.h" />
+        <includes name="jsinterface/entitlementManager/source/EntitlementCloudSaveBackupProxy.h" />
+        <includes name="jsinterface/entitlementManager/source/EntitlementCloudSaveProxy.h" />
+        <includes name="jsinterface/entitlementManager/source/EntitlementInstallFlowProxy.h" />
+        <includes name="jsinterface/entitlementManager/source/EntitlementManager.h" />
+        <includes name="jsinterface/entitlementManager/source/EntitlementProxy.h" />
+        <includes name="jsinterface/entitlementManager/source/EntitlementDialogProxy.h" />
+        <includes name="jsinterface/entitlementManager/source/EntitlementRemoteSyncProxy.h" />
+        <includes name="jsinterface/entitlementManager/source/NonOriginGameProxy.h" />
+        <includes name="jsinterface/entitlementManager/source/BoxartProxy.h" />
+        <includes name="jsinterface/dialogs/source/DialogProxy.h" />
+        <includes name="jsinterface/dialogs/source/PopOutProxy.h" />
+        <includes name="jsinterface/games/source/GamesManagerProxy.h" />
+        <includes name="jsinterface/games/source/GameProxy.h" />
+
+        <includes name="jsinterface/contentOperationQueueController/source/ContentOperationQueueControllerProxy.h" />
+        <includes name="jsinterface/nativeMenu/source/MenuProxy.h" />
+        <includes name="jsinterface/nativeMenu/source/MenuProxyFactory.h" />
+        <includes name="jsinterface/originCommon/source/OriginCommonProxy.h" />
+        <includes name="jsinterface/originPageVisibility/source/OriginPageVisibilityProxy.h" />
+        <includes name="jsinterface/onlineStatus/source/OnlineStatusProxy.h" />
+        <includes name="jsinterface/originChat/source/OriginChatProxy.h" />
+        <includes name="jsinterface/originChat/source/ConversationProxy.h" />
+        <includes name="jsinterface/originChat/source/ConversationRecordProxy.h" />
+        <includes name="jsinterface/originSocial/source/AbstractRosterView.h" />
+        <includes name="jsinterface/originSocial/source/RosterProxy.h" />        
+        <includes name="jsinterface/originSocial/source/ChatGroupProxy.h" />
+        <includes name="jsinterface/originSocial/source/ChatChannelProxy.h" />      
+        <includes name="jsinterface/originSocial/source/GroupListView.h" />
+        <includes name="jsinterface/originSocial/source/RosterProxy.h" />
+        <includes name="jsinterface/originSocial/source/OriginSocialProxy.h" />
+        <includes name="jsinterface/originSocial/source/SocialUserProxy.h" />
+        <includes name="jsinterface/originSocial/source/RemoteUserProxy.h" />
+        <includes name="jsinterface/originSocial/source/ConnectedUserProxy.h" />
+        <includes name="jsinterface/originSocial/source/ConnectionProxy.h" />
+        <includes name="jsinterface/originSocial/source/QueryOperationProxyBase.h" />
+        <includes name="jsinterface/originSocial/source/OwnedProductsQueryOperationProxy.h" />
+        <includes name="jsinterface/originSocial/source/UserContactsQueryOperationProxy.h" />
+        <includes name="jsinterface/originSocial/source/ShareAchievementsQueryOperationProxy.h" />
+        <includes name="jsinterface/originSocial/source/ToastHelper.h" />
+        <includes name="jsinterface/originUser/source/OriginUserProxy.h" />
+        <includes name="jsinterface/originSocial/source/SearchFriendsOperationProxy.h" />
+        <includes name="jsinterface/installDirectoryManager/source/InstallDirectoryManager.h" />
+        <includes name="jsinterface/productQuery/source/ProductQueryProxy.h" />
+        <includes name="jsinterface/productQuery/source/ProductQueryOperationProxy.h" />
+        <includes name="jsinterface/subscription/SubscriptionManagerProxy.h" />
+        <includes name="jsinterface/telemetryClient/source/TelemetryClientProxy.h" />
+        <includes name="jsinterface/geolocationQuery/source/GeolocationQueryProxy.h" />
+        <includes name="jsinterface/geolocationQuery/source/GeolocationQueryOperationProxy.h" />
+        <includes name="jsinterface/onTheHouseQuery/source/OnTheHouseQueryProxy.h" />
+        <includes name="jsinterface/onTheHouseQuery/source/OnTheHouseQueryOperationProxy.h" />
+        <includes name="jsinterface/voice/source/VoiceProxy.h" />
+        <includes name="jsinterface/desktopServices/source/DesktopServicesProxy.h" />
+        <includes name="jsinterface/igo/source/OriginIGOProxy.h" />
+        <includes name="utilities/CloudSaveDebugActions.h" />
+        <includes name="utilities/ExposedWidgetDetector.h" />
+        <includes name="tasks/ScheduledTask.h" />
+        <includes name="tasks/RestartGameTask.h" />
+        
+        <includes name="views/ITO/source/ITEPrepare.h" />
+        <includes name="views/ITO/source/ITEUIManager.h" />
+        
+        <includes name="views/notifications/source/ToastView.h" />
+        <includes name="views/notifications/source/AchievementToastView.h" />
+        <includes name="views/notifications/source/ActionableToastView.h" />
+        <includes name="views/notifications/source/HotkeyToastView.h" />
+        <includes name="views/notifications/source/MiniToastView.h" />
+        
+        <includes name="views/source/AchievementMiniView.h" />
+        <includes name="views/source/ChatWindowView.h" />
+        <includes name="views/source/InviteFriendsWindowView.h" />        
+        <includes name="views/source/GroupMembersWindowView.h" />        
+        <includes name="views/source/ClientMessageAreaView.h" />
+        <includes name="views/source/ClientSystemMenu.h" />
+        <includes name="views/source/CloudSyncView.h" />
+        <includes name="views/source/ClientView.h" />
+        <includes name="views/source/CodeRedemptionDebugView.h" />
+        <includes name="views/source/CreateGroupView.h" />
+        <includes name="views/source/CreateRoomView.h" />
+        <includes name="views/source/EnterRoomPasswordView.h" />
+        <includes name="views/source/ImageProcessingView.h" />
+        <includes name="views/source/CustomizeBoxartView.h" />
+        <includes name="views/source/CustomQMenu.h" />
+        <includes name="views/source/DirtyBitsTrafficDebugView.h" />
+        <includes name="views/source/DownloadDebugView.h" />
+        <includes name="views/source/EbisuSystemTray.h" />
+        <includes name="views/source/FriendsListView.h" />
+        <includes name="views/source/InstallerView.h" />
+        <includes name="views/source/InstallSpaceInfo.h" />
+        <includes name="views/source/LogoutExitView.h" />
+        <includes name="views/source/LoginSystemMenu.h" />
+        <includes name="views/source/NavBarView.h" />
+        <includes name="views/source/NonOriginGameView.h" />
+        <includes name="views/source/PDLCView.h" />
+        <includes name="views/source/PlayView.h" />
+        <includes name="views/source/PromoView.h" />
+        <includes name="views/source/MultiLaunchView.h" />
+        <includes name="views/source/SingleLoginView.h" />
+        <includes name="views/source/ShowEligibleFilesPopup.h" />
+        <includes name="views/source/SocialUserAreaView.h" />
+        <includes name="views/source/SpaceInfoWidget.h" />
+        <includes name="views/source/StoreView.h" />
+		<includes name="views/source/StoreWebPage.h" />
+        <includes name="views/source/SearchView.h" />
+        <includes name="views/source/ThirdPartyDDDialog.h" />   
+        <includes name="views/source/UpdateDebugView.h" />
+        <includes name="views/igo/source/IGOBroadcastingWidget.h"/>
+        <includes name="views/igo/source/IGOClock.h"/>
+        <includes name="views/igo/source/IGOLogo.h"/>
+        <includes name="views/igo/source/IGONavigation.h"/>
+        <includes name="views/igo/source/IGONuxSmall.h"/>
+        <includes name="views/igo/source/IGOTitle.h"/>
+        <includes name="views/igo/source/IGOWebBrowser.h"/>
+        <includes name="views/igo/source/IGOWebBrowserContextMenu.h"/>
+        <includes name="views/igo/source/IGOWebBrowserJsHelper.h"/>
+        <includes name="views/igo/source/IGOWebSslInfo.h"/>
+        <includes name="views/igo/source/IGOWebWidgetView.h"/>
+        <includes name="views/source/RemoveContactDialog.h"/>
+        <includes name="views/source/TwitchUrlContextMenu.h"/>
+        <includes name="views/source/WebBrowserTabs.h"/>
+        <includes name="views/source/ReportUserWidget.h"/>
+
+        <includes name="widgets/broadcast/source/BroadcastViewController.h" />
+        <includes name="widgets/client/source/AvailabilityMenuViewController.h" />
+        <includes name="widgets/client/source/CdnOverrideViewController.h" />
+        <includes name="widgets/client/source/ClientViewController.h" />
+        <includes name="widgets/client/source/ConfigIngestViewController.h" />
+        <includes name="widgets/client/source/CreateGroupViewController.h" />
+        <includes name="widgets/client/source/CreateRoomViewController.h" />
+        <includes name="widgets/client/source/DeleteGroupViewController.h" />
+        <includes name="widgets/client/source/DeleteRoomViewController.h" />
+        <includes name="widgets/client/source/EditGroupViewController.h" />
+        <includes name="widgets/client/source/EnterRoomPasswordViewController.h" />
+        <includes name="widgets/client/source/EulaPrintViewController.h" />
+        <includes name="widgets/client/source/FriendSearchViewController.h" />
+        <includes name="widgets/client/source/LeaveGroupViewController.h" />
+        <includes name="widgets/client/source/LocalContentViewController.h" />
+        <includes name="widgets/client/source/MainMenuController.h" />
+        <includes name="widgets/client/source/MainMenuControllerWin.h" />
+        <includes name="widgets/client/source/MainMenuControllerOSX.h" />
+        <includes name="widgets/client/source/MenuFlowWindowViewController.h" />
+        <includes name="widgets/client/source/MenuNotificationViewController.h" />
+        <includes name="widgets/client/source/NavBarViewController.h" />
+        <includes name="widgets/client/source/PDLCViewController.h" />
+        <includes name="widgets/client/source/ChangeAvatarViewController.h" />
+        <includes name="widgets/client/source/RemoveRoomUserViewController.h" />
+        <includes name="widgets/client/source/RemoveGroupUserViewController.h" />
+        <includes name="widgets/client/source/SocialUserAreaViewController.h" />
+        <includes name="widgets/client/source/MandatoryUpdateViewController.h" />
+        <includes name="widgets/client/source/NetPromoterWidget.h" />
+        <includes name="widgets/promoBrowser/source/PromoBrowserViewController.h" />
+        <includes name="widgets/debug/source/DownloadDebugViewController.h" />
+        <includes name="widgets/debug/source/UpdateDebugViewController.h" />
+        <includes name="widgets/social/source/ChatWindowManager.h" />
+        <includes name="widgets/social/source/ChatWindowViewController.h" />
+        <includes name="widgets/social/source/GroupInviteViewController.h" />
+        <includes name="widgets/social/source/TransferOwnerConfirmViewController.h" />
+        <includes name="widgets/social/source/AcceptGroupInviteViewController.h" />
+        <includes name="widgets/social/source/GroupMembersViewController.h" />
+        <includes name="widgets/messageArea/source/ClientMessageAreaManager.h" />
+        <includes name="widgets/messageArea/source/MessageAreaViewControllerBase.h" />
+        <includes name="widgets/messageArea/source/SecurityQuestionMessageAreaViewController.h" />
+        <includes name="widgets/messageArea/source/EmailVerificationMessageAreaViewController.h" />
+        <includes name="widgets/messageArea/source/OfflineMessageAreaViewController.h" />
+        <includes name="widgets/messageArea/source/SubscriptionMessageAreaViewController.h" />
+        <includes name="widgets/installer/source/InstallerViewController.h" />
+        <includes name="widgets/login/source/LoginViewController.h" />
+        <includes name="widgets/login/source/LoginWebPage.h" />
+        <includes name="widgets/login/source/SingleLoginViewController.h" />
+        <includes name="widgets/logoutExit/source/LogoutExitViewController.h" />
+        <includes name="widgets/motd/source/MOTDViewController.h" />
+        <includes name="widgets/mygames/source/NonOriginGameViewController.h" />
+        <includes name="widgets/mygames/source/GamePropertiesViewControllerManager.h" />
+        <includes name="widgets/mygames/source/CustomizeBoxartViewController.h" />
+        <includes name="widgets/notifications/source/FeatureCalloutController.h" />
+        <includes name="widgets/notifications/source/ToastViewController.h" />
+        <includes name="widgets/notifications/source/OriginToastManager.h" />
+        <includes name="widgets/notifications/source/OriginToastLayoutManager.h" />
+        <includes name="widgets/navigation/source/NavigationController.h" />
+        <includes name="widgets/igo/source/WebBrowserViewController.h" />
+        <includes name="widgets/odc/source/CodeRedemptionDebugViewController.h" />
+        <includes name="widgets/igo/source/IGOTooltipSliderWidget.h" />
+        <includes name="widgets/igo/source/IGOPinButton.h" />
+        <includes name="widgets/igo/source/IGOAchievementsViewController.h" />
+        <includes name="widgets/igo/source/IGOSettingsViewController.h" />
+        <includes name="widgets/igo/source/IGOSharedViewController.h" />
+        <includes name="widgets/igo/source/IGOSocialHubViewController.h" />
+        <includes name="widgets/igo/source/IGOSocialConversationViewController.h" />
+        <includes name="widgets/igo/source/IGOCustomerSupportViewController.h" />
+        <includes name="widgets/igo/source/IGOInviteFriendsToGameViewController.h" />
+        <includes name="widgets/igo/source/IGOKoreanTooMuchFunViewController.h" />
+        <includes name="widgets/igo/source/IGOErrorViewController.h" />
+        <includes name="widgets/igo/source/IGOWebInspectorController.h" />
+        <includes name="widgets/igo/source/IGOCodeRedemptionViewController.h" />
+        <includes name="widgets/ito/source/ITOViewController.h" />
+        <includes name="widgets/play/source/PlayViewController.h" />
+        <includes name="widgets/play/source/MultiContentProgressIntegrator.h" />
+        <includes name="widgets/rtp/source/RTPViewController.h" />
+		<includes name="widgets/saveBackupRestore/source/SaveBackupRestoreViewController.h" />
+        <includes name="widgets/cloudsaves/source/CloudSyncViewController.h" />
+        <includes name="widgets/cloudsaves/source/RemoteSyncViewController.h" />
+        <includes name="widgets/client/source/NetPromoterWidget.h" />
+        <includes name="widgets/client/source/NetPromoterViewController.h" />
+		<includes name="widgets/client/source/NetPromoterViewControllerGame.h" />
+        <includes name="widgets/store/source/StoreViewController.h" />
+        <includes name="widgets/achievements/source/AchievementsViewController.h" />
+        <includes name="widgets/settings/source/AccountSettingsViewController.h" />
+        <includes name="widgets/settings/source/ApplicationSettingsViewController.h" />
+        <includes name="widgets/settings/source/SettingsChangeEventHandler.h" />
+        <includes name="widgets/social/source/SocialViewController.h" />
+        <includes name="widgets/profile/source/ProfileViewController.h" />
+        <includes name="widgets/profile/source/SearchViewController.h" />
+        <includes name="widgets/profile/source/ViewControllerBase.h" />
+        <includes name="widgets/pendingActions/source/PendingActionLibraryOpenViewController.h" />
+        <includes name="widgets/pendingActions/source/PendingActionStoreOpenViewController.h" />
+        <includes name="widgets/pendingActions/source/PendingActionGameLaunchViewController.h" />
+        <includes name="widgets/pendingActions/source/PendingActionBaseViewController.h" />
+        <includes name="widgets/pendingActions/source/PendingActionCurrentTabViewController.h" />
+        <includes name="widgets/pendingActions/source/PendingActionGameDownloadViewController.h" />
+        <includes name="websupport/source/AuthenticatedWebUIController.h" />
+        <includes name="websupport/source/JavaScriptCommunicationManager.h" />
+        <includes name="websupport/source/NativeBehaviorManager.h" />
+        <includes name="websupport/source/OriginWebPopup.h" />
+        <includes name="websupport/source/OriginWebController.h" />
+        <includes name="websupport/source/PageErrorDetector.h" />
+        <includes name="websupport/source/PageErrorHandler.h" />
+    </fileset>
+    
+    <!-- strip out platform specific files -->
+    <fileset name="runtime.moc_sourcefiles" basedir="${package.originClient.dir}" append="true">
+        <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+        <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    </fileset>
+
+    <fileset name="runtime.ui_sourcefiles" basedir="${package.originClient.dir}">
+        <includes name="views/source/*.ui" />
+        <includes name="views/ITO/source/*.ui" />
+        <includes name="views/igo/source/*.ui" />     
+        <includes name="views/notifications/source/*.ui" />
+        <includes name="widgets/client/source/*.ui" />    
+        <includes name="widgets/igo/source/*.ui" />    
+    </fileset>
+    
+    <fileset name="runtime.originClient.libs" >
+        <group if="${config-system} =='pc'" >
+            <includes name="${package.IGO.lib}/IGO32${debug-suffix}.lib"/>
+            <includes name="${package.IGO.lib}/IGOIPC32${debug-suffix}.lib"/>
+            <includes name="${package.IGO.lib}/madCHook32${debug-suffix}.lib"/>
+            
+            <includes name="${package.openSSL.libdir}/libeay32${debug-suffix}.lib"/>
+            <includes name="${package.openSSL.libdir}/ssleay32${debug-suffix}.lib"/>
+            
+            <includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Xml${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5XmlPatterns${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Gui${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Network${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Core${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5WebKit${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5WebKitwidgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Widgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Test${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Positioning${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5PrintSupport${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Multimedia${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5MultimediaWidgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Sql${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/../plugins/platforms/qwindows${debug-suffix}.lib"/>
+            
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Crypt32.Lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/WtsApi32.Lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Psapi.Lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Secur32.Lib" />
+			<includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/userenv.lib" />
+			<includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/SetupAPI.lib" />
+            <includes name="${package.libarchive.dir}/Lib/archive_static.Lib"/>    
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Crypt32.Lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/WtsApi32.Lib" />
+            <includes name="${package.WindowsSDK.appdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/winhttp.lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Psapi.Lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Secur32.Lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/userenv.lib" />
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/SetupAPI.lib" />
+            <includes name="${package.WindowsSDK.appdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/ImageHlp.lib" />
+            <includes name="${package.libarchive.dir}/Lib/archive_static.Lib"/>    
+
+            <includes name="${package.ICU.libdir}/icuuc${debug-suffix}.lib" />
+        </group>
+        <group if="${config-system} == 'osx'" >
+            <includes name="${package.libarchive.dir}/Lib/libarchive${lib-suffix}" />
+        </group>
+    </fileset>
+    
+    <target name="dump">
+        <echo message="@{OptionSetGetValue('origin-dll-opt', 'cc.options')}" />
+    </target>
+    
+    <fileset name="runtime.originClient.headerfiles" basedir="${package.dir}">
+        <includes name="${package.originClient.dir}/**/*.h" />
+        <includes name="${package.originClient.dir}/**/*.js" />
+        <includes name="${package.originClient.dir}/**/*.html" />
+        <includes name="${package.originClient.dir}/**/*.css" />
+        <excludes name="${package.originClient.dir}/resources/compiledWidgets/**/*.*" />
+    </fileset>
+    
+    <property name="runtime.originClient.res.includedirs">
+        ${package.OriginVersion.dir}/include
+    </property>
+    
+    <do if="${config-system} == 'pc'">      
+        <fileset name="runtime.originClient.resourcefiles">
+            <includes name="${package.originClient.dir}/resources/originClient.rc" />
+        </fileset>
+    </do>
+    
+    <!-- construct the paths to include the moc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+        <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>    
+    
+    <!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+    <fileset name="runtime.qrc_sourcefiles" basedir="${package.originClient.dir}">
+        <includes name="${package.OriginLegacyApp.dir}/source/ui/ebisu.qrc"/>
+        <includes name="${package.originClient.dir}/resources/originClient.qrc" />
+        <includes name="${package.originClient.dir}/resources/originClient_locale*.qrc" />
+    </fileset>
+
+  <foreach property="widget" item="String" in="${widget.list}" >
+    <fileset name="runtime.qrc_sourcefiles" fromfileset="runtime.qrc_sourcefiles">
+        <includes name="${webwidgets.outputdir}/${widget}/${widget}.qrc" asis="true" />
+    </fileset>
+  </foreach>
+    
+    <!-- construct the paths to include the qrc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.qrc_sourcefiles">
+        <property name="sourcefile" value="${rc.output.dir}/qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.originClient.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+    
+    <!-- construct the paths to include the moc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+        <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.originClient.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+    
+    <!-- Fix rpath on the Mac. -->
+    <target name="fix-rpaths">
+        <!--do if="${config-system} == 'osx'">
+            <echo message="Fixing rpaths" />
+            <exec program="install_name_tool" commandline="-add_rpath @loader_path/../Frameworks ${runtime.originClient.outputdir}/${runtime.originClient.outputname}.dylib" failonerror="false" />
+        </do-->    
+    </target>
+    
+    <!-- Build InstallerDLL -->
+    <target name="installerdll">
+        <dependent name="InstallerDLL" />
+        <exec program="nant.exe" workingdir="${package.InstallerDLL.dir}" >
+          <args>
+            <arg value="-D:config=${config}-mt" />
+            <arg value="-D:jenkins=true" if="@{PropertyExists('jenkins')}"/>
+            <arg value="-D:codesign.timestamp=${codesign.timestamp}"/>
+            <arg value="slnruntime" />
+            <arg value="visualstudio" />
+          </args>
+        </exec>
+       
+        <copy file="${package.InstallerDLL.dir}/bin/InstallerDLL.dll" todir="${runtime.originClient.outputdir}" />
+        <copy file="${package.InstallerDLL.dir}/bin/InstallerDLL.pdb" todir="${runtime.originClient.outputdir}" />
+    </target>
+    
+    <!-- Build InstallerDLL -->
+    <target name="clean-installerdll">
+        <dependent name="InstallerDLL" />
+        <exec program="nant.exe" workingdir="${package.InstallerDLL.dir}" >
+          <args>
+            <arg value="-D:config=${config}-mt" />
+            <arg value="-D:jenkins=true" if="@{PropertyExists('jenkins')}"/>
+            <arg value="-D:codesign.timestamp=${codesign.timestamp}"/>
+            <arg value="clean" />
+          </args>
+        </exec>
+       
+        <delete file="${runtime.originClient.outputdir}/InstallerDLL.dll" />
+        <delete file="${runtime.originClient.outputdir}/InstallerDLL.pdb" />
+    </target>
+    
+    <!-- Build IGO 64-bit -->
+    <target name="IGO64">
+        <dependent name="IGO" />
+        <exec program="${nant.location}/nant.exe" workingdir="${package.IGO.dir}" >
+          <args>
+            <arg value="-D:config=${config-system}64-${config-compiler}-${config-name}" />
+            <arg value="-D:jenkins=true" if="@{PropertyExists('jenkins')}"/>
+            <arg value="-D:codesign.timestamp=${codesign.timestamp}"/>
+            <arg value="-masterconfigfile:${nant.project.masterconfigfile}"/>
+            <arg value="slnruntime" />
+            <arg value="visualstudio" />
+          </args>
+        </exec>
+        <copy todir="${runtime.originClient.outputdir}">
+            <fileset basedir="${package.IGO.bin}">
+                <includes name="x64/*.*" />
+                <includes name="igoproxy64${debug-suffix}.exe" />
+                <includes name="igo64${debug-suffix}.dll" />
+                <includes name="igoproxy64${debug-suffix}.pdb" />
+                <includes name="igo64${debug-suffix}.pdb" />
+            </fileset>
+        </copy>
+    </target>
+    
+    <target name="clean-all-generated">
+        <property name="clean.projects">
+            engine
+            sdkService
+            services
+            uitoolkit
+            IGO
+            TelemetryBreakpointHandler
+        </property>
+        
+        <foreach property="proj" item="String" in="${clean.projects}">
+            <dependent name="${proj}" />
+            <nant buildfile="${package.${proj}.dir}/${proj}.build" target="clean-generated" />
+        </foreach>
+        <call target="clean-generated" />
+        <call target="clean-webwidgets" />
+    </target>
+    
+    <!-- ODT used to be an embedded webwidget but has been moved. Perforce will leave empty dirs behind which the widget compiler step doesn't handle well. -->
+    <delete dir="${package.originClient.dir}/webWidgets/odt" /> 
+
+    <target name="create-folders">
+        <mkdir dir="${runtime.originClient.outputdir}" unless="@{DirectoryExists(${runtime.originClient.outputdir})}" />
+        <mkdir dir="${runtime.originClient.tempdir}" unless="@{DirectoryExists(${runtime.originClient.tempdir})}" />
+        <mkdir dir="${runtime.originClient.targetdir}" unless="@{DirectoryExists(${runtime.originClient.targetdir})}" />
+    </target>
+    
+    <!-- get the options from the current config -->
+    <property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.originClient.buildtype}','cc.defines')}"/>
+    <property name="runtime.moc_includedirs" value="${runtime.originClient.includedirs}"/>
+    
+    <target name="copy-to-runtime-pc">
+
+         <mkdir dir="${qt.audio.dir}" unless="@{DirectoryExists(${qt.audio.dir})}" />
+          <copy todir="${qt.audio.dir}" flatten="true">
+              <fileset>
+				  <includes name="${package.Qt.libdir}/../plugins/audio/qtaudio_windows${debug-suffix}.dll"/>
+				  <includes name="${package.Qt.libdir}/../plugins/audio/qtaudio_windows${debug-suffix}.pdb"/>
+            </fileset>
+          </copy>
+
+          <mkdir dir="${qt.mediaservice.dir}" unless="@{DirectoryExists(${qt.mediaservice.dir})}" />
+          <copy todir="${qt.mediaservice.dir}" flatten="true">
+              <fileset>
+                <includes name="${package.Qt.distdir}\plugins\mediaservice\dsengine${debug-suffix}.dll"/>
+                <includes name="${package.Qt.distdir}\plugins\mediaservice\qtmedia_audioengine${debug-suffix}.dll"/>
+                <includes name="${package.Qt.distdir}\plugins\mediaservice\wmfengine${debug-suffix}.dll"/>
+                <includes name="${package.Qt.distdir}\plugins\mediaservice\dsengine${debug-suffix}.pdb"/>
+                <includes name="${package.Qt.distdir}\plugins\mediaservice\qtmedia_audioengine${debug-suffix}.pdb"/>
+                <includes name="${package.Qt.distdir}\plugins\mediaservice\wmfengine${debug-suffix}.pdb"/>
+          </fileset>
+          </copy>
+      
+          <mkdir dir="${qt.imageformats.dir}" unless="@{DirectoryExists(${qt.imageformats.dir})}" />
+          <copy todir="${qt.imageformats.dir}" flatten="true">
+              <fileset>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qico${debug-suffix}.dll"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qjpeg${debug-suffix}.dll"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qgif${debug-suffix}.dll"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qmng${debug-suffix}.dll"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qsvg${debug-suffix}.dll"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qtga${debug-suffix}.dll"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qtiff${debug-suffix}.dll"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qwbmp${debug-suffix}.dll"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qico${debug-suffix}.pdb"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qjpeg${debug-suffix}.pdb"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qgif${debug-suffix}.pdb"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qmng${debug-suffix}.pdb"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qsvg${debug-suffix}.pdb"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qtga${debug-suffix}.pdb"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qtiff${debug-suffix}.pdb"/>
+                      <includes name="${package.Qt.distdir}\plugins\imageformats\qwbmp${debug-suffix}.pdb"/>
+            </fileset>
+          </copy>
+    
+          <mkdir dir="${qt.platforms.dir}" unless="@{DirectoryExists(${qt.platforms.dir})}" />
+          <copy todir="${qt.platforms.dir}" flatten="true">
+              <fileset>
+                  <includes name="${package.Qt.libdir}/../plugins/platforms/qwindows${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}/../plugins/platforms/qminimal${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}/../plugins/platforms/qwindows${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}/../plugins/platforms/qminimal${debug-suffix}.pdb"/>
+              </fileset>
+          </copy>
+    
+          <mkdir dir="${qt.printsupport.dir}" unless="@{DirectoryExists(${qt.printsupport.dir})}" />
+          <copy todir="${qt.printsupport.dir}" flatten="true">
+              <fileset>
+                  <includes name="${package.Qt.distdir}/plugins/printsupport/windowsprintersupport${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.distdir}/plugins/printsupport/windowsprintersupport${debug-suffix}.pdb"/>
+            </fileset>
+          </copy>
+    
+          <copy todir="${runtime.originClient.outputdir}" flatten="true">
+              <fileset>
+                  <includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5XmlPatterns${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5WebKit${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5OpenGL${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Positioning${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5WebKitWidgets${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5PrintSupport${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Multimedia${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5MultimediaWidgets${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Sql${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Quick${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Qml${debug-suffix}.dll"/>
+                  <includes name="${package.Qt.libdir}\Qt5Sensors${debug-suffix}.dll"/>
+
+                  <includes name="${package.ICU.bindir}\icuin51.dll"/>
+                  <includes name="${package.ICU.bindir}\icudt51.dll"/>
+                  <includes name="${package.ICU.bindir}\icuuc51.dll"/>
+                  <includes name="${package.ICU.bindir}\icuuc51d.dll"/>
+
+                  <includes name="${package.openSSL.bindir}\libeay32${debug-suffix}.dll"/>
+                  <includes name="${package.openSSL.bindir}\ssleay32${debug-suffix}.dll"/>
+                  <includes name="${package.IGO.bin}\IGO32${debug-suffix}.dll"/>
+                  <includes name="${package.IGO.bin}\IGOProxy${debug-suffix}.exe"/>
+
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_32_debug.dll" if="${debug-suffix} == 'd'"/>
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_32_release.dll" if="${debug-suffix} == ''"/>
+                  <includes name="${package.twitch.bin}\win32\avutil-ttv-51.dll"/>
+                  <includes name="${package.twitch.bin}\win32\libmfxsw32.dll"/>
+                  <includes name="${package.twitch.bin}\win32\libmp3lame-ttv.dll"/>
+                  <includes name="${package.twitch.bin}\win32\swresample-ttv-0.dll"/>
+         
+                  <includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5XmlPatterns${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5WebKit${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5OpenGL${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Positioning${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5WebKitWidgets${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5PrintSupport${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Multimedia${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5MultimediaWidgets${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Sql${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Quick${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Sensors${debug-suffix}.pdb"/>
+                  <includes name="${package.Qt.libdir}\Qt5Qml${debug-suffix}.pdb"/>
+
+
+                  <includes name="${package.IGO.bin}\IGO32${debug-suffix}.pdb"/>
+				  <includes name="${package.IGO.bin}\IGOProxy${debug-suffix}.pdb"/>
+                  
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_32_debug.pdb" if="${debug-suffix} == 'd'"/>
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_32_release.pdb" if="${debug-suffix} == ''"/>
+          </fileset>
+          </copy>  
+          
+        <mkdir dir="${runtime.originClient.outputdir}" unless="@{DirectoryExists(${runtime.originClient.outputdir})}" />  
+        
+        <copy file="${package.UpdateTool.bindir}\UpdateTool.exe" tofile="${runtime.originClient.outputdir}\UpdateTool.exe" />
+        <copy file="${package.BeaconService.dir}\bin\OriginWebHelperService.exe" tofile="${runtime.originClient.outputdir}\OriginWebHelperService.exe" />
+        <copy file="${package.EscalationClient.dir}\bin\OriginClientService.exe" tofile="${runtime.originClient.outputdir}\OriginClientService.exe" />
+        <copy file="${package.EAProxyInstaller.bindir}\EAProxyInstaller${debug-suffix}.exe" tofile="${runtime.originClient.outputdir}\EAProxyInstaller.exe" />
+        <copy file="${package.TelemetryBreakpointHandler.dir}\bin\TelemetryBreakpointHandler.exe" tofile="${runtime.originClient.outputdir}\TelemetryBreakpointHandler.exe" />
+        <copy file="${package.OOACore.dir}\bin\GetGameToken32.exe" tofile="${runtime.originClient.outputdir}\GetGameToken32.exe" />
+        <copy file="${package.OOACore.dir}\bin\GetGameToken64.exe" tofile="${runtime.originClient.outputdir}\GetGameToken64.exe" />
+    </target>
+    
+    <target name="copy-to-runtime-osx">
+        <property name="at" value='@' />
+        
+        <copy
+            file="${package.xcodedir}/build/${config-xcode-type}/${runtime.originClient.outputname}"
+            tofile="${runtime.originClient.outputdir}/${runtime.originClient.outputname}"
+            failonerror="false" if="@{PropertyExists('bootstrap')}" />
+        
+          <mkdir dir="${qt.imageformats.dir}" unless="@{DirectoryExists(${qt.imageformats.dir})}" />
+          <copy todir="${runtime.originClient.qtpluginsdir}/imageformats" >
+              <fileset basedir="${package.Qt.distdir}/plugins/imageformats">
+                  <includes name="*.*" />
+              </fileset>
+          </copy>
+          
+          <mkdir dir="${qt.imageformats.dir}" unless="@{DirectoryExists(${qt.imageformats.dir})}" />
+          <copy todir="${qt.imageformats.dir}" flatten="true">
+              <fileset>
+                  <group if="${config-system} == 'pc'">
+                      <includes name="${package.Qt.distdir}/plugins/imageformats/qico.dll"/>
+                      <includes name="${package.Qt.distdir}/plugins/imageformats/qjpeg.dll"/>
+                      <includes name="${package.Qt.distdir}/plugins/imageformats/qgif.dll"/>
+                      <includes name="${package.Qt.distdir}/plugins/imageformats/qmng.dll"/>
+                      <includes name="${package.Qt.distdir}/plugins/imageformats/qsvg.dll"/>
+                      <includes name="${package.Qt.distdir}/plugins/imageformats/qtga.dll"/>
+                      <includes name="${package.Qt.distdir}/plugins/imageformats/qtiff.dll"/>
+                      <includes name="${package.Qt.distdir}/plugins/imageformats/qwbmp.dll"/>
+                  </group>
+                  <group if="${config-system} == 'osx'"> <!-- HACK - NOT SURE YET -->
+                      <includes name="${package.Qt.distdir}/plugins/codecs/libqcncodecs.dylib"/>
+                      <includes name="${package.Qt.distdir}/plugins/codecs/libqjpcodecs.dylib"/>
+                      <includes name="${package.Qt.distdir}/plugins/codecs/libqkrcodecs.dylib"/>
+                      <includes name="${package.Qt.distdir}/plugins/codecs/libqtwcodecs.dylib"/>
+                  </group>
+              </fileset>
+          </copy>
+          
+          <echo message="Copying openSSL dylibs to bundle dir" />
+          <copy 
+            file="${package.openSSL.bindir}/libcrypto.1.0.0${debug-suffix}.dylib" 
+            tofile="${runtime.originClient.frameworksdir}/libcrypto.1.0.0.dylib" 
+          />
+          <copy 
+            file="${package.openSSL.bindir}/libssl.1.0.0${debug-suffix}.dylib" 
+            tofile="${runtime.originClient.frameworksdir}/libssl.1.0.0.dylib" 
+          />
+
+          <echo message="Copying Frameworks to bundle dir" />
+          <foreach property="lib" item="String" in="${qtlibs}">
+              <!--    the <copy> task is folliwng symlinks and copying the originals                    
+               <echo message="Copying ${lib}.framework." />
+               <copy todir="${runtime.originClient.frameworksdir}" >
+               <fileset basedir="${package.Qt.libdir}">
+               <includes name="${lib}.framework/**" />
+               </fileset>
+               </copy>
+               -->
+              <!--delete dir="${runtime.originClient.frameworksdir}/${lib}.framework" /-->
+              <exec program="rm">
+                  <args>
+                      <arg value="-dfR" />
+                      <arg value="${runtime.originClient.frameworksdir}/${lib}.framework" />
+                  </args>
+              </exec>                            
+              <exec program="cp">
+                  <args>
+                      <arg value="-f" />
+                      <arg value="-R" />
+                      <arg value="-P" />
+                      <arg value="${package.Qt.libdir}/${lib}.framework" />
+                      <arg value="${runtime.originClient.frameworksdir}" />
+                  </args>
+              </exec>                            
+              <exec program="chmod">
+                  <args>                                                                
+                      <arg value="-R" />                        
+                      <arg value="777" />
+                      <arg value="${runtime.originClient.frameworksdir}/${lib}.framework" />                        
+                  </args>
+              </exec>
+          </foreach>
+          
+          <echo message="Copying sounds to bundle" />
+          <mkdir dir="${runtime.originClient.resourcesdir}" unless="@{DirectoryExists(${runtime.originClient.resourcesdir})}" />
+          <copy todir="${runtime.originClient.resourcesdir}/sounds" >
+              <fileset basedir="${package.dir}/runtime/sounds">
+                  <includes name="*.*" />
+              </fileset>
+          </copy>
+        
+        <echo message="Copying IGO to exe dir" />
+        <exec program="cp" failonerror="false">
+          <args>
+            <arg value="-f" />
+            <arg value="-R" />
+            <arg value="-P" />
+            <arg value="${runtime.originClient.xcodedir}/SubProjects/IGO/dev/IGO/build/${config-xcode-type}/IGO.dylib" />
+            <arg value="${runtime.originClient.outputdir}" />
+          </args>
+        </exec>                            
+
+        <echo message="Copying OriginWebHelperImpl to exe dir" />
+        <exec program="cp" failonerror="false">
+          <args>
+            <arg value="-f" />
+            <arg value="-R" />
+            <arg value="-P" />
+            <arg value="${runtime.originClient.xcodedir}/SubProjects/BeaconService_OSX/dev/OriginWebHelperImpl/build/${config-xcode-type}/OriginWebHelperImpl.dylib" />
+            <arg value="${runtime.originClient.outputdir}" />
+          </args>
+        </exec>                            
+
+        <echo message="Copying OriginWebHelper to bundle dir" />
+        <mkdir dir="${runtime.originClient.launchservicesdir}" unless="@{DirectoryExists('${runtime.originClient.launchservicesdir}')}" />
+        <exec program="cp" failonerror="false">
+          <args>
+            <arg value="-f" />
+            <arg value="-R" />
+            <arg value="-P" />
+            <arg value="${runtime.originClient.xcodedir}/SubProjects/BeaconServiceHelper_OSX/dev/OriginWebHelper/build/${config-xcode-type}/OriginWebHelper.app/Content/MacOS/com.ea.origin.WebHelper" />
+            <arg value="${runtime.originClient.launchservicesdir}" />
+          </args>
+        </exec>                           
+
+        <echo message="Copying OriginESImp to exe dir" />
+        <exec program="cp" failonerror="false">
+          <args>
+            <arg value="-f" />
+            <arg value="-R" />
+            <arg value="-P" />
+            <arg value="${runtime.originClient.xcodedir}/SubProjects/EscalationClient_OSX/dev/OriginESImpl/build/${config-xcode-type}/OriginESImpl.dylib" />
+            <arg value="${runtime.originClient.outputdir}" />
+          </args>
+        </exec>                            
+
+        <echo message="Copying OriginESHelper to bundle dir" />
+        <mkdir dir="${runtime.originClient.launchservicesdir}" unless="@{DirectoryExists('${runtime.originClient.launchservicesdir}')}" />
+        <exec program="cp" failonerror="false">
+          <args>
+            <arg value="-f" />
+            <arg value="-R" />
+            <arg value="-P" />
+            <arg value="${runtime.originClient.xcodedir}/SubProjects/EscalationClientHelper_OSX/dev/OriginESHelper/build/${config-xcode-type}/OriginESHelper.app/Content/MacOS/com.ea.origin.ESHelper" />
+            <arg value="${runtime.originClient.launchservicesdir}" />
+          </args>
+        </exec>                            
+    </target>
+    
+    <target name="package-runtime">
+        <mkdir dir="${runtime.originClient.targetdir}" unless="@{DirectoryExists(${runtime.originClient.targetdir})}" />
+        <property name="zip.name" value="${runtime.originClient.targetdir}/${package.name}" />
+        <property name="zip.name" value="${property.value}-${sys.env.BUILD_NUMBER}" if="@{PropertyExists('jenkins')}"/>
+        <zip zipfile="${zip.name}.zip">
+            <fileset basedir="${runtime.originClient.outputdir}">
+                <includes name="**/*.*" />
+                <excludes name="**/*.map" />
+                <excludes name="**/*.ilk" />
+                <excludes name="**/*.pdb" />
+                <excludes name="**/*.exp" />
+                <excludes name="OriginClient.exe" />
+            </fileset>
+        </zip>
+    </target>
+    
+    <target name="create-update-osx">
+    <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+      <property name="config" value="${config}" />
+    </nant>
+    <property name="version_p_delimited" fromfile="${package.OriginVersion.version.file}" />
+    <property name="version_u_delimited" value="@{StrReplace('${version_p_delimited}', '.', '_')}"/>
+
+        <mkdir dir="${runtime.originClient.targetdir}" unless="@{DirectoryExists(${runtime.originClient.targetdir})}" />
+        <property name="zip.name" value="${runtime.originClient.targetdir}/OriginUpdate_${version_u_delimited}" />
+    <exec program="zip" workingdir="${runtime.originClient.appdir}" >
+      <args>
+        <arg value="-R" />
+        <arg value="${zip.name}.zip" />
+        <arg value="*" />
+      </args>
+    </exec>
+    </target>
+    
+    <target name="build-final-bundle">
+    <echo message="Copying Bootstrap bundle to ${runtime.originClient.targetdir}" />
+    <exec program="ditto" >
+      <args>
+        <arg value="${package.OriginBootstrap.xcodedir}/build/${config-xcode-type}/OriginBootstrap.app" />
+        <arg value="${runtime.originClient.appdir}" />
+      </args>
+    </exec>
+    <property name="dirs" >
+      Frameworks
+      Library
+      MacOS
+      plugins
+      Resources
+    </property>
+    <foreach property="dir" item="String" in="${dirs}" >
+      <echo message="Copying ${dir} to ${runtime.originClient.appdir}" />
+      <exec program="ditto" workingdir="${runtime.originClient.bundledir}/Contents" >
+        <args>
+          <arg value="${dir}" />
+          <arg value="${runtime.originClient.appdir}/Contents/${dir}" />
+        </args>
+      </exec>
+    </foreach>
+    <property name="sign.filelist" >
+      ${runtime.originClient.appdir}/Contents/Library/LaunchServices/com.ea.origin.WebHelper    
+      ${runtime.originClient.appdir}/Contents/Library/LaunchServices/com.ea.origin.ESHelper
+      ${runtime.originClient.appdir}/Contents/MacOS/IGO.dylib
+      ${runtime.originClient.appdir}/Contents/MacOS/OriginWebHelperImpl.dylib
+      ${runtime.originClient.appdir}/Contents/MacOS/OriginESImpl.dylib
+      ${runtime.originClient.appdir}/Contents/MacOS/Origin
+      ${runtime.originClient.appdir}/Contents/MacOS/OriginClient
+    </property>
+    <property name="sign.dirlist" >
+      ${runtime.originClient.appdir}
+    </property>
+    
+    <call target="codesign" />
+    
+    </target>
+    
+    <target name="installer">
+        <dependent name="ActivePython" />
+        <dependent name="wget" />
+        
+        <fail message="Cannot build an installer in debug config. Specify &quot;-D:config=pc-vc-dev-opt&quot; on the command line to use optimized config." unless="${config-type} == 'opt'" />
+        <delete>
+            <fileset basedir="${runtime.originClient.tempdir}">
+                <includes name="**/*"/>
+            </fileset>
+        </delete>
+        <mkdir dir="${runtime.originClient.tempdir}" unless="@{DirectoryExists(${runtime.originClient.tempdir})}" />
+        
+        <delete failonerror="false">
+            <fileset basedir="${sys.env.TEMP}">
+                <includes name="**/*"/>
+            </fileset>
+        </delete>
+        <mkdir dir="${sys.env.TEMP}" unless="@{DirectoryExists(${sys.env.TEMP})}" />
+        
+        <call target="installerdll" />
+        <call target="IGO64" />
+        <call target="sign-all-exe" />
+        
+        <!-- initialize to ~10MB -->
+        <property name="total_install_size" value="10000000" />
+
+        <copy todir="${runtime.originClient.tempdir}">
+            <fileset basedir="${runtime.originClient.outputdir}">
+                <includes name="audio/qtaudio_windows.dll"/>
+                <includes name="imageformats/qico.dll"/>
+                <includes name="imageformats/qjpeg.dll"/>
+                <includes name="imageformats/qgif.dll"/>
+                <includes name="imageformats/qmng.dll"/>
+                <includes name="imageformats/qsvg.dll"/>
+                <includes name="imageformats/qtga.dll"/>
+                <includes name="imageformats/qtiff.dll"/>
+                <includes name="imageformats/qwbmp.dll"/>
+                <includes name="platforms/qwindows.dll"/>
+                <includes name="platforms/qminimal.dll"/>
+                <includes name="printsupport/windowsprintersupport.dll"/>
+                <includes name="mediaservice\dsengine.dll"/>
+                <includes name="mediaservice\qtmedia_audioengine.dll"/>
+                <includes name="mediaservice\wmfengine.dll"/>
+                <includes name="legacyPM/lang/**" />
+                <includes name="sounds/*" />
+                <includes name="x64/avutil-ttv-51.dll" />
+                <includes name="x64/libmfxsw64.dll"/>
+                <includes name="x64/libmp3lame-ttv.dll"/>
+                <includes name="x64/swresample-ttv-0.dll"/>
+                <includes name="x64/twitchsdk_64_debug.dll" if="${debug-suffix} == 'd'"/>
+                <includes name="x64/twitchsdk_64_release.dll" if="${debug-suffix} == ''"/>
+                <includes name="legacyPM/CmdPortalClient.dll" />
+                <includes name="legacyPM/EACore.dll" />
+                <includes name="legacyPM/EACore_App.ini" />
+                <includes name="legacyPM/EACoreServer.exe" />
+                <includes name="legacyPM/EAProxyInstaller.exe" />
+                <includes name="legacyPM/Login.exe" />
+                <includes name="legacyPM/MessageDlg.exe" />
+                <includes name="legacyPM/OriginLegacyCLI.exe" />
+                <includes name="legacyPM/OriginUninstall.exe" />
+                <includes name="legacyPM/PatchProgress.exe" />
+                <!--includes name="legacyPM/phonon4.dll" /--> <!-- HACK - NOT SURE YET -->
+                <includes name="legacyPM/QtCore4.dll" />
+                <includes name="legacyPM/QtGui4.dll" />
+                <includes name="Origin.exe" />
+                <includes name="OriginClient.dll" />
+                <includes name="OriginWebHelperService.exe" />
+                <includes name="OriginClientService.exe" />
+                <includes name="OriginCrashReporter.exe" />
+                <includes name="OriginER.exe" />
+                <includes name="UpdateTool.exe" />
+                <includes name="EACore_App.ini" />
+                <includes name="EAProxyInstaller.exe" />
+                <includes name="igoproxy.exe" />
+                <includes name="GetGameToken32.exe" />
+                <includes name="GetGameToken64.exe" />
+                <includes name="igoproxy64.exe" />
+                <includes name="igo64.dll" />
+                <includes name="IGO32.dll" />
+                <includes name="twitchsdk_32_debug.dll" if="${debug-suffix} == 'd'"/>
+                <includes name="twitchsdk_32_release.dll" if="${debug-suffix} == ''"/>
+                <includes name="avutil-ttv-51.dll"/>
+                <includes name="libmfxsw32.dll"/>
+                <includes name="libmp3lame-ttv.dll"/>
+                <includes name="swresample-ttv-0.dll"/>
+                <includes name="InstallerDLL.dll" />
+                <includes name="libeay32.dll" />
+                <includes name="ssleay32.dll" />
+                <includes name="logreader.html" />
+                <includes name="winhttp.dll" />
+                <includes name="Origin.VisualElementsManifest.xml" />
+                <includes name="OriginER.VisualElementsManifest.xml" />
+                <includes name="OriginUninstall.exe" />
+                <includes name="vcredist_x86.exe"/>
+                <includes name="vcredist_x64.exe"/>
+            </fileset>
+        </copy>
+        <copy todir="${runtime.originClient.tempdir}">
+            <fileset basedir="${package.Qt.libdir}">
+                <includes name="Qt5Xml${debug-suffix}.dll"/>
+                <includes name="Qt5XmlPatterns${debug-suffix}.dll"/>
+                <includes name="Qt5Gui${debug-suffix}.dll"/>
+                <includes name="Qt5Network${debug-suffix}.dll"/>
+                <includes name="Qt5Core${debug-suffix}.dll"/>
+                <includes name="Qt5WebKit${debug-suffix}.dll"/>
+                <includes name="Qt5Widgets${debug-suffix}.dll"/>
+                <includes name="Qt5OpenGL${debug-suffix}.dll"/>
+                <includes name="Qt5Positioning${debug-suffix}.dll"/>
+				<includes name="Qt5WebKitWidgets${debug-suffix}.dll"/>
+				<includes name="Qt5PrintSupport${debug-suffix}.dll"/>
+                <includes name="Qt5Multimedia${debug-suffix}.dll"/>
+                <includes name="Qt5MultimediaWidgets${debug-suffix}.dll"/>
+                <includes name="Qt5Sql${debug-suffix}.dll"/>
+                <includes name="Qt5Quick${debug-suffix}.dll"/>
+                <includes name="Qt5Sensors${debug-suffix}.dll"/>
+                <includes name="Qt5Qml${debug-suffix}.dll"/>
+            </fileset>
+        </copy>
+        <copy todir="${runtime.originClient.tempdir}">
+            <fileset basedir="${package.ICU.bindir}">
+                  <includes name="icuin51.dll"/>
+                  <includes name="icudt51.dll"/>
+                  <includes name="icuuc51.dll"/>
+            </fileset>
+        </copy>
+        
+        <!-- Copy the plug-in DLL -->
+        <copy todir="${runtime.originClient.tempdir}\plugins">
+            <fileset basedir="${runtime.originClient.outputdir}\plugins">
+                  <includes name="ShiftDirectDownload\ShiftDirectDownload.dll"/>
+                  <includes name="OriginDeveloperTool\OriginDeveloperTool.dll"/>
+            </fileset>
+        </copy>
+
+        <copy todir="${runtime.originClient.tempdir}" >
+            <fileset basedir="${package.Qt.distdir}/../EA License" >
+                <includes name="3RDPARTYLICENSES.HTML" />
+                <includes name="3RDPARTYLICENSES_FR.HTML" />
+            </fileset>
+        </copy>
+
+        <!-- calculate install size decompressed -->
+        <foreach item="File" in="${runtime.originClient.tempdir}" property="filename">
+            <echo message="${filename}" />
+            <property name="filesize" value="@{FileGetSize(${filename})}"/>
+            <property name="total_install_size" value="@{MathAdd(${property.value},${filesize})}"/>
+            <echo message="${total_install_size}" />
+        </foreach>
+        
+        <foreach item="Folder" in="${runtime.originClient.tempdir}" property="foldername">
+            <echo message="${foldername}" />
+            <foreach item="File" in="${foldername}" property="filename">
+                <echo message="${filename}" />
+                <property name="filesize" value="@{FileGetSize(${filename})}"/>
+                <property name="total_install_size" value="@{MathAdd(${property.value},${filesize})}"/>
+                <echo message="${total_install_size}" />
+            </foreach>
+        </foreach>
+
+        <exec program="${package.ActivePython.exe}" >
+            <args>
+                <arg value="${package.OriginUtils.sourcedir}/python/getVersionString.py" />
+                <arg value="-f${runtime.originClient.tempdir}/Origin.exe" />
+                <arg value="-o${origin.version.file}" />
+                <arg value="-d_" />
+            </args>
+        </exec>
+        <property name="origin.version" fromfile="${origin.version.file}" />
+        <exec program="${package.ActivePython.exe}" >
+            <args>
+                <arg value="${package.OriginUtils.sourcedir}/python/getVersionString.py" />
+                <arg value="-f${runtime.originClient.tempdir}/Origin.exe" />
+                <arg value="-o${origin.version.dot.file}" />
+                <arg value="-d." />
+            </args>
+        </exec>
+        <property name="origin.dot.version" fromfile="${origin.version.dot.file}" />
+<!--        
+        <exec program="${package.ActivePython.exe}" >
+            <args>
+                <arg value="${package.OriginUtils.sourcedir}/python/updateAutoUpdateJSON.py" />
+                <arg value="-i${package.originClient.dir}/installer/JSONTemplate.json" />
+                <arg value="-o${runtime.originClient.tempdir}/OriginUpdate.json" />
+                <arg value="-v${origin.dot.version}" />
+                <arg value="-u${originUpdate.url}/${originUpdate.name}_${origin.version}.zip" />
+            </args>
+        </exec>
+-->
+        <mkdir dir="${runtime.originClient.targetdir}" unless="@{DirectoryExists(${runtime.originClient.targetdir})}" />
+        <delete>
+            <fileset basedir="${runtime.originClient.targetdir}">
+                <includes name="**/*" />
+            </fileset>
+        </delete>
+        <property name="zip.name" value="${runtime.originClient.targetdir}/${originUpdate.name}_${origin.version}.zip" />
+        <zip zipfile="${zip.name}">
+            <fileset basedir="${runtime.originClient.tempdir}">
+                <includes name="**/*.*" />
+                <excludes name="debug/**" />
+                <excludes name="LegacyPM/signLegacyFiles.bat" />
+                <excludes name="LegacyPM/IGO32.dll" />
+                <excludes name="EACore_integration.ini" />
+                <excludes name="OriginUpdate.json" />
+            </fileset>
+        </zip>
+
+        <echo message="${zip.name}" />
+        <property name="filesize" value="@{FileGetSize(${zip.name})}"/>
+        <property name="total_install_size" value="@{MathAdd(${property.value},${filesize})}"/>
+        <echo message="${total_install_size}" />
+        <!-- convert to KB -->
+        <property name="total_install_size" value="@{MathDiv(${property.value},1024)}"/>
+
+        <property name="installer.build.args" value="/Daddsize=${total_install_size} ${property.value}" />
+        <property name="thin.installer.build.args" value="/Daddsize=${total_install_size} ${property.value}" />
+        
+        <call target="build-full-installer" />
+        <call target="build-thin-installer" />
+        <call target="build-debug-package" />
+
+        <do if="@{PropertyExists('jenkins')}" >
+            <call target="archive" /> 
+            
+            <optionset name="s3.properties" >
+              <option name="build.folder" value="${runtime.originClient.targetdir}"/>
+              <option name="build.type" value="${origin.branch}"/>
+              <option name="build.version" value="${origin.dot.version}" />
+              <option name="config-system" value="${config-system}" />
+            </optionset>
+            <do if="${s3.upload??false} eq true">
+                <nant buildfile="${package.s3.dir}/s3.build" target="upload-build" optionset="s3.properties" failonerror="false" />
+                <property name="buildinfo.file" value="${runtime.originClient.targetdir}/buildinfo-${origin.dot.version}.json" />
+                <exec program="${package.wget.exe}" >
+                  <args>
+                    <arg value="--no-check-certificate" />
+                    <arg value="--auth-no-challenge" />
+                    <arg value="--http-user=${jenkins.admin.account}" />
+                    <arg value="--http-password=${jenkins.admin.password}" />
+                    <arg value="https://ebisu-build01:8443/hudson/job/${sys.env.JOB_NAME}/${sys.env.BUILD_NUMBER}/api/json" />
+                    <arg value="-O ${buildinfo.file}" />
+                  </args>
+                </exec>
+                <optionset name="s3.properties" >
+                  <option name="copy.dest" value="builds/${origin.branch}/buildinfo/@{PathGetFileName(${buildinfo.file})}"/>
+                  <option name="copy.file" value="${buildinfo.file}"/>
+                </optionset>
+                <nant buildfile="${package.s3.dir}/s3.build" target="copy-to-s3" optionset="s3.properties" failonerror="false"  if="@{PropertyTrue('s3.upload')}" />
+            </do>
+        </do>
+    </target>
+    
+    <!-- full installer build -->
+    <target name="build-full-installer">
+        <exec program="${package.NSIS.exe}" workingdir="${package.originClient.dir}/installer">
+            <args>
+                <arg value="${installerHelper.build.args}" />
+            </args>
+        </exec>
+        
+        <exec program="${package.NSIS.exe}" workingdir="${package.originClient.dir}/installer">
+            <args>
+                <arg value="${installer.build.args}" />
+            </args>
+        </exec>
+        
+        <sleep seconds="10" />
+        
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="Origin Installer" in="${runtime.originClient.targetdir}/Setup.exe" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+        
+        <exec program="${package.NSIS.exe}" workingdir="${package.originClient.dir}/installer">
+            <args>
+                <arg value="${launcher.build.args}" />
+            </args>
+        </exec>
+        
+        <sleep seconds="10" />
+        
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="Origin Installer" in="${runtime.originClient.targetdir}/OriginSetup.exe" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+    </target>
+    
+    <!-- thin installer build -->
+    <target name="build-thin-installer">
+        <exec program="${package.NSIS.exe}" workingdir="${package.originClient.dir}/installer">
+            <args>
+                <arg value="${thin.installer.build.args}" />
+            </args>
+        </exec>
+        
+        <sleep seconds="10" />
+        
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="Origin Installer" in="${runtime.originClient.targetdir}/Setup.exe" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+        
+        <exec program="${package.NSIS.exe}" workingdir="${package.originClient.dir}/installer">
+            <args>
+                <arg value="${thin.launcher.build.args}" />
+            </args>
+        </exec>
+        
+        <sleep seconds="10" />
+        
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="Origin Installer" in="${runtime.originClient.targetdir}/OriginThinSetup.exe" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+    </target>
+    
+    <target name="symstore-upload" >
+        <dependent name="SymPack" />
+    
+        <fileset name="pdb.files" basedir="${package.originClient.dir}/build">
+            <includes name="${runtime.originClient.outputdir}/*.pdb" />
+        </fileset>
+        
+        <property name="package.SymPack.pdbtag" value="OriginClient-${origin.branch}" />
+        <property name="package.SymPack.symbolserver" value="\\opqa-online.rws.ad.ea.com\Webserver\originsymstore" />
+        <foreach property="file" item="FileSet" in="pdb.files" >
+            <property name="package.SymPack.pdbfile" value="@{PathGetFileNameWithoutExtension(${file})}.*" />
+            <property name="package.SymPack.pdbpath" value="@{PathGetDirectoryName(${file})}" />
+            <call target="package.SymPack.StoreSymbol" force="true" />
+        </foreach>
+    </target>
+    
+    <target name="build-plugin-package">
+        <property name="plugins.zip.name" value="OriginPlugins_${origin.version}"/>
+		<property name="origin.version" fromfile="${origin.version.dot.file}" />
+        <zip zipfile="${runtime.originClient.targetdir}/${plugins.zip.name}.zip">
+            <fileset basedir="${runtime.originClient.outputdir}">
+                <includes name="plugins/ShiftDirectDownload/*.dll" />
+                <includes name="plugins/OriginDeveloperTool/*.dll" />
+            </fileset>
+        </zip>
+    </target>
+    
+    <target name="build-debug-package">
+        <property name="debug.pdb.zip.name" value="OriginDebug" />
+        <property name="origin.version" fromfile="${origin.version.dot.file}" />
+        <property name="debug.pdb.zip.name" value="${property.value}_${origin.version}" if="@{PropertyExists('jenkins')}"/>
+        <echo message="${package.originClient.builddir}" />
+        <zip zipfile="${runtime.originClient.targetdir}/${debug.pdb.zip.name}.zip">
+            <fileset basedir="${runtime.originClient.outputdir}">
+                <includes name="*.pdb" />
+                <includes name="plugins/*.pdb" />
+                <includes name="TelemetryBreakpointHandler.exe" />
+                <excludes name="Qt*.pdb" />
+            </fileset>
+        </zip>
+    </target>
+    
+    <target name="sign-all-exe">
+        <fileset name="signing.files" basedir="${runtime.originClient.outputdir}">
+            <includes name="${runtime.originClient.outputname}.dll" />
+            <includes name="Origin.exe" />
+            <includes name="EAProxyInstaller.exe" />
+            <includes name="IGO32.dll" />
+            <includes name="igo64.dll" />
+			<includes name="igoproxy.exe" />
+            <includes name="igoproxy64.exe" />
+            <includes name="UpdateTool.exe" />
+            <includes name="OriginWebHelperService.exe" />
+            <includes name="OriginClientService.exe" />
+            <includes name="OriginCrashReporter.exe" />
+            <includes name="OriginER.exe" />
+            <includes name="InstallerDLL.dll" />
+            <includes name="plugins/ShiftDirectDownload/ShiftDirectDownload.dll" />
+            <includes name="plugins/OriginDeveloperTool/OriginDeveloperTool.dll" />
+            <includes name="GetGameToken32.exe" />
+            <includes name="GetGameToken64.exe" />
+        </fileset>
+        
+        <foreach property="signfile" item="FileSet" in="signing.files">
+            <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="@{PathGetFileNameWithoutExtension('${signfile}')}" in="${signfile}" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+            <sleep seconds="2" />
+        </foreach>
+    </target>
+    
+  <!-- codesign - Signs the files listed in property 'sign.fileslist' and/or directories in 'sign.dirlist'. You must have one of these -->
+  <!-- properties defined before calling this function -->
+  <target name="codesign" >
+    <fail message="Property sign.filelist or sign.dirlist is not defined. You must define one of these properties for osx to tell us what to sign"
+      unless="@{PropertyExists('sign.filelist')} || @{PropertyExists('sign.filelist')}" />
+    
+    <property name="cert.name" value="OriginDev" />
+    <property name="cert.name" value="Developer ID Application: Electronic Arts Inc." if="@{PropertyExists('jenkins')}"/>
+
+    <foreach property="signfile" item="String" in="${sign.filelist}" if="@{PropertyExists('sign.filelist')}" >
+      <exec program="codesign" message="Signing ${signfile}" failonerror="false" if="@{FileExists('${signfile}')}==true" >
+        <args>
+          <arg value="-f" />
+          <arg value="-s" />
+          <arg value="&quot;${cert.name}&quot;" />
+          <arg value="${signfile}" />
+        </args>
+      </exec>
+    </foreach>
+    <foreach property="signdir" item="String" in="${sign.dirlist}" if="@{PropertyExists('sign.dirlist')}" >
+      <exec program="codesign" message="Signing ${signdir}" failonerror="false" if="@{DirectoryExists('${signdir}')}==true" >
+        <args>
+          <arg value="-f" />
+          <arg value="-s" />
+          <arg value="&quot;${cert.name}&quot;" />
+          <arg value="${signdir}" />
+        </args>
+      </exec>
+    </foreach>
+  </target>
+  
+    <target name="sign-exe">
+        <do if="${config-system} == 'pc'">
+            <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="&quot;@{PathGetFileNameWithoutExtension('${runtime.originClient.outputdir}/${runtime.originClient.outputname}.dll')}&quot;" in="${runtime.originClient.outputdir}/${runtime.originClient.outputname}.dll" timestamp="${codesign.timestamp}"/>
+        </do>
+        <do if="${config-system} == 'osx'" >
+          <call target="add-cert" />
+          <property name="sign.filelist" >
+            ${runtime.originClient.launchservicesdir}/com.ea.origin.WebHelper
+            ${runtime.originClient.launchservicesdir}/com.ea.origin.ESHelper
+            ${runtime.originClient.bundledir}/Contents/MacOS/IGO.dylib
+            ${runtime.originClient.bundledir}/Contents/MacOS/OriginWebHelperImpl.dylib
+            ${runtime.originClient.bundledir}/Contents/MacOS/OriginESImpl.dylib
+          </property>
+          <property name="sign.dirlist" >
+            ${runtime.originClient.bundledir}
+          </property>
+          <call target="codesign" />
+        </do>
+    </target>
+    
+  <target name="find-cert" >
+    <property name="certs.output.file" value="${package.configbindir}/../find-certs.txt" />
+    <echo message="certs.output.file=${certs.output.file}"/>
+    <!-- TODO - remove failonerror after switching to FW3. Causing projectizer to fail currently -->
+    <exec program="security" output="${certs.output.file}" stdout="false" workingdir="${package.originClient.dir}" failonerror="false" >
+      <args>
+        <arg value="find-certificate" />
+        <arg value="-c OriginDev" />
+      </args>
+    </exec>
+    <property name="certs.output" fromfile="${certs.output.file}" />
+    <do unless="@{StrIndexOf('${certs.output}','OriginDevCA')} == -1" >
+      <echo message="Found OriginDev key."  />
+      <property name="found.cert" value="true" />
+    </do>
+  </target>
+
+  <target name="add-cert" >
+    <call target="find-cert" />
+    <do if="${found.cert} == false" >
+      <echo message="Registering cert with keychain access. " />
+      <exec program="security" workingdir="${package.originClient.dir}" >
+        <args>
+          <arg value="add-trusted-cert" />
+          <arg value="cert/OriginDevCA.crt" />
+        </args>
+      </exec>
+      <exec program="security" workingdir="${package.originClient.dir}" >
+        <args>
+          <arg value="add-certificates" />
+          <arg value="cert/OriginDevCA.crt" />
+        </args>
+      </exec>
+      <exec program="certtool" workingdir="${package.originClient.dir}" failonerror="false" >
+        <args>
+          <arg value="i" />
+          <arg value="cert/OriginDev.cer" />
+          <arg value="r=cert/OriginDev.key" />
+        </args>
+      </exec>
+    </do>
+  </target>
+    
+    <target name="clean-runtime">
+        <delete>
+            <fileset basedir="${runtime.originClient.outputdir}">
+                <includes name="**" />
+                <excludes name="imageformats/*" />
+                <excludes name="x64/*" />
+                <excludes name="legacyPM/*" />
+                <excludes name="lang/*" />
+                <excludes name="sounds/*" />
+                <excludes name="EACore.ini" />
+                <excludes name="EACore_App.ini" />
+                <excludes name="logreader.html" />
+                <excludes name="winhttp.dll" />
+                <excludes name="vcredist*"/>
+            </fileset>
+        </delete>
+    </target>
+    
+    <!-- target to clean extra dirs for this package. --> 
+    <target name="clean-custom">
+      <call target="clean-igo" if="${config-system} == 'pc'" />
+      <delete dir="${runtime.originClient.targetdir}" if="@{DirectoryExists('${runtime.originClient.targetdir}')}" />
+      <delete dir="${runtime.originClient.tempdir}" if="@{DirectoryExists('${runtime.originClient.tempdir}')}" />
+      <call target="clean-webwidgets" force="true" />
+      <call target="clean-uitoolkit-all" />
+      <echo message="In clean custom"/>
+      <!-- for OSX we need to delete the build directory. -->
+      <delete dir="${nant.project.buildroot}" if="${config-system} == 'osx'" />
+      <delete dir="${package.originClient.dir}/XCodeOSXTemplate" />
+      <delete dir="${package.originClient.dir}/XCodeOSXTemplate_dylib" />
+      <delete>
+        <fileset basedir="${runtime.originClient.outputdir}">
+          <includes name="**/*.pdb" />
+        </fileset>
+      </delete>
+    </target>
+
+  <!-- OSX target to assemble a dmg -->
+  <target name="dmg">
+    <echo message="Creating ${package.name}.dmg in ${runtime.originClient.targetdir}." />
+      <mkdir dir="${runtime.originClient.targetdir}" unless="@{DirectoryExists(${runtime.originClient.targetdir})}" />
+      <delete file="target/${package.name}.dmg" />
+    <exec program="hdiutil" workingdir=".">
+      <args>
+        <arg value="create" />
+        <arg value="target/${package.name}.dmg" />
+        <arg value="-srcfolder" />
+        <arg value="${runtime.originClient.bundledir}" />
+      </args>
+    </exec>
+    </target>
+  
+  <!-- OSX target to pull symbols from application -->
+  <target name="dsym" >
+    <exec program="dsymutil" workingdir="${runtime.originClient.outputdir}">
+      <args>
+        <arg value="--out ${package.originClient.dir}/build/${runtime.originClient.outputname}.dSYM" />
+        <arg value="${runtime.originClient.outputdir}/${runtime.originClient.outputname}" />
+      </args>
+    </exec>
+  </target>
+ 
+
+    <!-- ************************* -->
+    <!-- Installer Language exporter target -->
+    <!-- You MUST specify the ${p4.clientspec} property on the command-line -->
+    <!-- ************************* -->
+    <target name="lang-export-installer">
+        <fail message="p4.clientspec not defined. Use -D:p4.clientspec=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('p4.clientspec')}" />
+        
+        <dependent name="raccoon" />
+        <dependent name="ActivePython" />
+        
+        <property name="lang.export.tempdir" value="${package.originClient.dir}/temp/lang" />
+        <mkdir dir="${lang.export.tempdir}" unless="@{DirectoryExists(${lang.export.tempdir})}" />
+        
+        
+        <!-- Command line to export languages -->
+        <exec program="${package.raccoon.bindir}/RaccoonCommandLine.exe" workingdir="${package.raccoon.bindir}">
+            <args>
+                <arg value="/source:&quot;hal2&quot;" />
+                <arg value="/sourcecategory:&quot;EA ACCESS Installer&quot;" />
+                <arg value="/sourceuser:&quot;EA_Access_Installer&quot;" />
+                <arg value="/sourcepassword:&quot;EA_Access_InstallerPassword&quot;" />
+                <arg value="/destination:&quot;nsis&quot;" />
+                <arg value="/destinationconnection:&quot;${lang.export.tempdir}/Translations.nsh&quot;" />
+                <arg value="/platforms:&quot;PC&quot;" />
+                <arg value="/config:nsis_mappings_config.xml" />
+                <arg value="/textmappings:Trim,EscapeNSIS" />
+                <arg value="/languages:${supported.languages}" />
+            </args>
+        </exec>
+        
+        <exec program="Python.exe" >
+            <args>
+                <arg value="${package.OriginUtils.sourcedir}/python/overwrite-strings-origininstaller.py" />
+                <arg value="." />
+                <arg value="//global_online/origin/DL/${package.name}/${package.originClient.version}/installer/language" />
+                <arg value="${p4.clientspec}" />
+                <arg value="hudson.online" />
+                <arg value="CrMbLmTXe" />
+                <arg value="submit" />
+            </args>
+        </exec>
+    </target>
+    
+    <!-- ************************* -->
+    <!-- Installer Language exporter target -->
+    <!-- You MUST specify the ${p4.clientspec} property on the command-line -->
+    <!-- ************************* -->
+    <target name="lang-export-new">
+        <fail message="p4.clientspec not defined. Use -D:p4.clientspec=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('p4.clientspec')}" />
+        
+        <dependent name="OriginUtils" />
+        <dependent name="LanguageDatabaseExporter" />
+        <property name="p4.client" value="${p4.clientspec}"/>
+        
+        <property name="lang.export.tempdir" value="${package.originClient.dir}/temp/lang" />
+        <delete>
+            <fileset basedir="${package.originClient.dir}/temp">
+                <includes name="lang/**"/>
+            </fileset>
+        </delete>
+        <mkdir dir="${lang.export.tempdir}" unless="@{DirectoryExists(${lang.export.tempdir})}" />
+        
+        <!-- Command line to export languages -->
+        <exec program="${package.LanguageDatabaseExporter.dir}/Deployment/LanguageDatabaseExporter.exe" workingdir="${lang.export.tempdir}">
+            <args>
+                <arg value="${package.originClient.dir}/language/hudson_lde_export.config" />
+                <arg value="--u EA_Access_Installer" />
+                <arg value="--p EA_Access_InstallerPassword" />
+            </args>
+        </exec>
+        
+        <!-- This is a bit of a hack to weed out some duplicate String names with the leading space -->
+        <delete>
+            <fileset basedir="${package.originClient.dir}/temp">
+                <includes name="lang/ *.*"/>
+            </fileset>
+        </delete>
+        
+        <do unless="@{PropertyExists('disable.p4')}">
+            <!-- revert any open files and set up the changelist -->
+            <p4revert files="//global_online/origin/${origin.branch}/..." change="default"/>
+            <p4change desc="Jenkins Language file Update" />
+            
+            <!-- Ebisu ${origin.branch} Strings -->
+            <property name="dest.dir" value="${package.originClient.lang.res.dir}" />
+            <property name="dest.p4.dir" value="//global_online/origin/${origin.branch}/originClient/${package.originClient.version}/resources/lang" />
+            <property name="dest.patterns" value="EbisuStrings ebisuStrings" />
+            
+            <call target="build-changelist" force="true" />
+            
+            <!-- Bootstrap client Strings -->
+            <property name="dest.dir" value="${package.OriginBootstrapShared.lang.res.dir}" />
+            <property name="dest.p4.dir" value="//global_online/origin/${origin.branch}/OriginBootstrapShared/${package.originClient.version}/Resources/lang" />
+            <property name="dest.patterns" value="BootstrapStrings" />
+            
+            <call target="build-changelist" force="true" />
+            
+            <!-- OriginCrashReporter Strings -->
+            <property name="dest.dir" value="${package.OriginCrashReporter.lang.res.dir}" />
+            <property name="dest.p4.dir" value="//global_online/origin/${origin.branch}/OriginCrashReporter/${package.originClient.version}/resources/lang" />
+            <property name="dest.patterns" value="CrashStrings" />
+            
+            <call target="build-changelist" force="true" />
+            
+            <!-- OriginER Strings -->
+            <property name="dest.dir" value="${package.OriginER.lang.res.dir}" />
+            <property name="dest.p4.dir" value="//global_online/origin/${origin.branch}/OriginER/${package.originClient.version}/Resources/lang" />
+            <property name="dest.patterns" value="OriginERStrings" />
+            
+            <call target="build-changelist" force="true" />
+            
+            <!-- revert any unchanged files and submit -->
+            <p4revert files="//global_online/origin/${origin.branch}/..." change="${p4.change}" onlyUnchanged="true"/>
+            <echo message="Changelist: ${p4.change}" if="@{PropertyExists('origindebug')}"/>
+            <p4submit change="${p4.change}" unless="@{StrIsEmpty('${p4.change}')}" failonerror="false"/>
+            <echo message="Changelist: ${p4.change}" if="@{PropertyExists('origindebug')}"/>
+            <p4change change="${p4.change}" delete="true" unless="@{StrIsEmpty('${p4.change}')}" failonerror="false"/>
+        </do>
+    </target>
+    
+    <!-- ************************* -->
+    <!-- Builds the changelist     -->
+    <!-- You must define these properties:    -->
+    <!-- dest.dir: the local path to where you want the files copied to.    -->
+    <!-- dest.p4.dir: the equivalent p4 path that you want to check these files into.    -->
+    <!-- dest.pattern: string you want to search for in the xml filenames to see what to copy to the dest.dir.    -->
+    <!-- ************************* -->
+    <target name="build-changelist">
+        <eval code="@{DirectoryGetFiles('${lang.export.tempdir}\XML','*.xml',' ')}" property="export.files" type="Function" />
+        <foreach property="file" item="String" in="${export.files}">
+            <property name="filename" value="@{PathGetFileName('${file}')}" />
+            <property name="filePath" value="@{StrConcat('${dest.dir}/','${filename}')}" />
+            <property name="p4.filePath" value="@{StrConcat('${dest.p4.dir}/','${filename}')}" />
+            <foreach property="searchString" item="String" in="${dest.patterns}">
+                <echo message="File: ${filename} StrIndexOf:@{StrIndexOf('${filename}','${searchString}')}" if="@{PropertyExists('origindebug')}"/>
+                <do if="@{StrIndexOf('${filename}','${searchString}')} == 0">
+                    <p4edit files="${p4.filePath}" change="${p4.change}" if="@{FileExists('${filePath}')}" />
+                    <p4add files="${p4.filePath}" type="binary" change="${p4.change}" unless="@{FileExists('${filePath}')}" />
+                    <copy file="${file}" tofile="${filePath}" overwrite="true" />
+                </do>
+            </foreach>
+        </foreach>
+    </target>
+    
+    <!-- Archives the build artifacts into one for easier posting on Jenkins -->
+    <target name="archive" >
+        <property name="origin.dot.version" fromfile="${origin.version.dot.file}" />
+        
+        <zip zipfile="${package.originClient.dir}/target/Origin-${origin.branch}-${origin.dot.version}.zip">
+          <fileset basedir="${runtime.originClient.targetdir}">
+            <includes name="OriginSetup.exe" />
+            <includes name="OriginThinSetup.exe" />
+            <includes name="OriginUpdate*.zip" />
+          </fileset>
+        </zip>
+    </target>
+    
+  <target name="install-osx-dev-cert">
+    <exec program="./CreateOriginDevCertificate.bash">
+    </exec>
+  </target>
+
+  <target name="clean-osx-es">
+    <exec program="sudo">
+      <arg value="launchctl" />
+      <arg value="remove" />
+      <arg value="com.ea.origin.ESHelper"/>
+    </exec>
+  </target>
+  
+  
+  
+  <target name="strip" >
+    <exec program="strip" message="Stripping ${runtime.originClient.outputdir}/${runtime.originClient.outputname}" >
+      <args>
+        <arg value="-u" />
+        <arg value="-r" />
+        <arg value="${runtime.originClient.outputdir}/${runtime.originClient.outputname}" />
+      </args>
+    </exec>
+  </target>
+  
+  <target name="custom-dmg">
+    <property name="dmg.contents.dir" value="${package.originClient.dir}/make_dmg/contents" />
+    <echo message="Creating custom dmg." />
+    <delete dir="${dmg.contents.dir}" if="@{DirectoryExists('${dmg.contents.dir}')}" />
+    <mkdir dir="${dmg.contents.dir}" unless="@{DirectoryExists('${dmg.contents.dir}')}" />
+    <exec program="ditto" >
+      <args>
+        <arg value="${runtime.originClient.appdir}" />
+        <arg value="${dmg.contents.dir}/@{PathGetFileName(${runtime.originClient.appdir})}" />
+      </args>
+    </exec>
+    <exec program="${package.originClient.dir}/make_dmg/build-origin-dmg.sh" workingdir="${package.originClient.dir}/make_dmg" />
+
+    <exec program="mv">
+      <args>
+        <arg value="${package.originClient.dir}/make_dmg/Origin.dmg" />
+        <arg value="${runtime.originClient.targetdir}" />
+      </args>
+    </exec>
+  </target>
+
+  <target name="finalize" >
+      <property name="dmg.contents.dir" value="${package.originClient.dir}/make_dmg/contents" />
+    
+      <foreach property="lib" item="String" in="${qtlibs}" >
+        <echo message="${runtime.originClient.frameworksdir}/${lib}.framework" />
+        <exec program="rm">
+          <args>
+            <arg value="-f" />
+            <arg value="${runtime.originClient.frameworksdir}/${lib}.framework/Headers" />
+          </args>
+        </exec>                            
+        <exec program="rm">
+          <args>
+            <arg value="-fR" />
+            <arg value="${runtime.originClient.frameworksdir}/${lib}.framework/Versions/4/Headers" />
+          </args>
+        </exec>                            
+        <delete>
+          <fileset basedir="${runtime.originClient.frameworksdir}/${lib}.framework" >
+            <includes name="${lib}_debug" />
+            <includes name="${lib}_debug.prl" />
+            <includes name="Versions/4/${lib}_debug" />
+          </fileset>
+        </delete>
+      </foreach>
+
+    <call target="dsym" />
+    
+    <!-- disabled stripping for the time being so that we can get meaning telemetry crash reports -->
+    <!-- this can be reinstated when we get proper archiving of dsym files with the build -->
+    <!--call target="strip" /-->
+    
+    <call target="build-final-bundle" />
+    <call target="create-update-osx" />
+    <call target="custom-dmg" />
+    <optionset name="s3.properties" >
+      <option name="build.folder" value="${runtime.originClient.targetdir}"/>
+      <option name="build.type" value="@{StrConcat('Mac-',${origin.branch})}"/>
+      <option name="build.version" value="${version_p_delimited}" />
+      <option name="config" value="${config}" />
+      <option name="config-system" value="${config-system}" />
+    </optionset>
+    <nant buildfile="${package.s3.dir}/s3.build" target="upload-build" optionset="s3.properties" if="@{PropertyExists('jenkins')}" failonerror="false"/>
+  </target>
+
+  <target name="update-plist" >
+    <echo message="Updating versions in plist files" />
+    <!-- Get the current version -->
+    <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+      <property name="config" value="${config}" />
+    </nant>
+    <property name="version" fromfile="${package.OriginVersion.version.file}" />
+    
+    <!-- Update the plist with the new version number -->
+    <property name="plist" value="" />
+    <property name="version.nextline" value="false" />
+    
+    <foreach property="line" item="Line" in="${runtime.originClient.plist.template}">
+      <!-- Check for CFBundleVersion in line and put the version in the next line -->
+      <do if="${version.nextline}" >
+        <property name="line" value="&lt;string&gt;${version}&lt;/string&gt;" />
+        <property name="version.nextline" value="false" />
+      </do>
+      <do if="@{StrIndexOf(${line},'CFBundleVersion')} != -1 || @{StrIndexOf(${line},'CFBundleShortVersionString')} != -1">
+        <property name="version.nextline" value="true" />
+      </do>
+      
+      <!-- Check for OriginDev in line and put the new cert in the next line -->
+      <do if="(@{StrIndexOf(${line},'OriginDev')} != -1) and @{PropertyExists('jenkins')}" >
+        <property name="line" value="@{StrReplace(${property.value},'OriginDev','Developer ID Application: Electronic Arts Inc.')}" />
+      </do>      
+      
+      <property name="plist" value="${property.value}&#10;${line}" />
+    </foreach>
+    <echo message="${plist}" file="${runtime.originClient.plist}" />
+  </target>
+
+    <target name="test">
+        <!-- Copy the plug-in DLL -->
+        <copy todir="${runtime.originClient.tempdir}\plugins">
+            <fileset basedir="${runtime.originClient.outputdir}\plugins">
+                  <includes name="ShiftDirectDownload\ShiftDirectDownload.dll"/>
+                  <includes name="OriginDeveloperTool\OriginDeveloperTool.dll"/>
+            </fileset>
+        </copy>
+    </target>
+
+  <!-- This enables the NANT built MadCHook  -->
+  <property name="module.MadCHook.dir" value="${package.IGO.common}/madCodeHook3" />
+  <include file="${module.MadCHook.dir}/MadCHook3.xml" if="${config-system} == 'pc'"/>
+
+  <!-- This enables the NANT built IGOIPC  -->
+  <property name="module.IGOIPC.dir" value="${package.IGO.common}/../IGOIPC" />
+  <include file="${module.IGOIPC.dir}/IGOIPC.xml" if="${config-system} == 'pc'"/>
+
+  <!-- This enables the NANT built IGO  -->
+  <property name="module.IGO.dir" value="${package.IGO.common}" />
+  <include file="${module.IGO.dir}/IGO.xml" if="${config-system} == 'pc'"/>
+  <call target="compile-fx" if="${config-system} == 'pc'"/>
+
+  <!-- This enables the NANT built IGOProxy (not working yet)
+  <property name="module.IGOProxy.dir" value="${package.IGO.dir}/../IGOProxy" />
+  <include file="${module.IGOProxy.dir}/IGOProxy.xml" if="${config-system} == 'pc'"/>
+  -->
+    
+</project>

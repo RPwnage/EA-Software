@@ -1,0 +1,213 @@
+<project name="originwebminispa">
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.originwebminispa.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.originwebminispa.version"  value="@{PathGetFileName('${package.originwebminispa.dir}')}"/>
+    <package name="originwebminispa" targetversion="${package.originwebminispa.version}"/>
+
+    <property name="package.originwebminispa.builddir" value="${package.originwebminispa.dir}/build"/>
+    <property name="version.file" value="${package.dir}/version.txt"/>
+
+
+
+    
+    <!-- NPM OPTIONS -->
+    <choose>
+        <do unless="@{PropertyExists('npm.registry')}">
+          <property name="npm.registry.option" value=""/>
+        </do>
+        <do>
+          <fail message="npm.registry can only be set to 'local' or 'offline'" unless="'${npm.registry}' eq 'offline' || '${npm.registry}' eq 'local'"/>
+          <property name="npm.registry.option" value="https://artifactory.eac.ad.ea.com/artifactory/api/npm/origin-npm-virtual" if="'${npm.registry}' eq 'local'"/>
+          <property name="npm.registry.option" value="http://localhost:4873" if="'${npm.registry}' eq 'offline'"/>
+          <property name="npm.registry.option" value="--registry=${property.value}"/>
+        </do>
+    </choose>
+    <property name="npm.options" value="${property.value} ${npm.registry.option}"/>
+    <!-- BOWER OPTIONS -->
+    <property name="bower.options" value=""/>
+    <property name="bower.options" value="${property.value} --offline" if="${bower.offline??false}"/>    
+    
+    <dependent name="npm"/>
+    
+    <echo message="islinux = ${islinux}"/>
+    <echo message="isOSX = ${isOSX}"/>
+
+
+    
+    <choose>
+        <do if="${isOSX} == true || ${islinux} == true">
+          <property name="sudo" value="sudo"/>
+          <property name="bower.cmd" value="bower"/>
+          <property name="grunt.cmd" value="grunt"/>
+        </do>
+        <do>
+          <property name="bower.cmd" value="${npm.root}/bower.cmd"/>
+          <property name="sudo" value=""/>
+          <property name="grunt.cmd" value="${npm.root}/grunt.cmd"/>
+        </do>
+    </choose>
+
+    <property name="components.dependencies" value="origin-i18n origin-jssdk eax-experimentsdk eax-experiments"/>
+    <property name="app.dependencies" value="origin-jssdk origin-i18n eax-experimentsdk eax-experiments origin-components origin-locale"/>
+
+    <optionset name="web.env">
+        <option name="PATH" value="${sys.env.PATH};${package.npm.dir}/dist"/>
+    </optionset>
+    
+    <mkdir dir="${package.originwebminispa.builddir}" unless="@{DirectoryExists(${package.originwebminispa.builddir})}"/>
+    
+    <target name="update-version-file">      
+      <fail message="p4.changelist not defined. Use -D:p4.changelist=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('p4.changelist')}" />
+
+      <property name="version" fromfile="${version.file}"/>
+      <property name="count" value="1" />
+
+      <property name="incrementBy" value="0" unless="@{PropertyExists('incrementBy')}" />
+
+      <foreach property="version.part" item="String" delim="." in="${version}" >
+        <property name="version.part.${count}" value="${version.part}" />
+        <property name="count" value="@{MathAdd(${property.value},1)}" />
+      </foreach>
+      
+      <property name="nextBuildNum" value="@{MathAdd('${p4.changelist}',${incrementBy})}" />
+
+      <property name="major" value="${version.part.1}" />
+      <property name="minor" value="${version.part.2}" />
+      <property name="patch" value="${version.part.3}" />
+      <property name="revision" value="${nextBuildNum}" />
+
+      <echo message="Updating version.txt counter to ${major}.${minor}.${patch}.${revision}" />
+      <attrib file="${version.file}" readonly="false"/>
+      <trycatch>
+        <try>
+          <echo message="${major}.${minor}.${patch}.${revision}" file="${version.file}"/>
+        </try>
+        <catch>
+          <fail message="Error:${trycatch.error}"/>
+        </catch>
+        <finally>
+          <attrib file="${version.file}" readonly="true"/>
+        </finally>
+      </trycatch>
+    </target>
+
+    <!-- This origin.exec allows you to be able to run a command on windows and unix -->
+    <createtask name="origin.exec">
+        <parameters>
+          <option name="sudo" value="false"/>
+          <option name="cmd" value="Required"/>
+          <option name="args" value=""/>
+          <option name="workingdir" value="."/>
+          <option name="failonerror" value="true"/>
+          <option name="force" value="false"/>
+        </parameters>
+        <code>
+          <exec program="${origin.exec.cmd}" workingdir="${origin.exec.workingdir}" failonerror="${origin.exec.failonerror}" if="${origin.exec.sudo} == false or (${islinux} == false and ${isOSX} == false)">
+            <env fromoptionset="web.env"/>
+            <args>
+              <arg value="${origin.exec.args}"/>
+              <arg value="--force" if="${origin.exec.force} == true"/>
+            </args>
+          </exec>
+          <exec program="sudo" workingdir="${origin.exec.workingdir}" failonerror="${origin.exec.failonerror}" if="${origin.exec.sudo}">
+            <env fromoptionset="web.env"/>
+            <args>
+              <arg value="${origin.exec.cmd}"/>
+              <arg value="${origin.exec.args}"/>
+              <arg value="--force" if="${origin.exec.force} == true"/>
+            </args>
+          </exec>
+        </code>
+    </createtask>
+    
+    <!--  This is used for versioning. The Maven pom.xml file will only use the version string in the pom file to determine what it will call the
+          uploaded file in the repository. We must edir the pom-temp.xmp file to embed the correct version number before deploying. -->
+    <target name="create-pom-file">
+      <fail message="Property 'originx.maven.branch' not defined. Use -D:originx.maven.branch=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('originx.maven.branch')}" />
+      <property name="dollar" value="$"/>
+      <property name="propstart" value="{"/>
+      <property name="propend" value="}"/>
+      <property name="version" fromfile="${version.file}"/>
+      <property name="pom-temp.contents" fromfile="${package.originwebminispa.dir}/pom-temp.xml" />
+      <property name="pom.file" value="${package.originwebminispa.dir}/pom.xml" />
+      <property name="pom-temp.contents" value="@{StrReplace(${property.value},'__ORIGIN_VERSION__',${version})}" />
+      <property name="pom-temp.contents" value="@{StrReplace(${property.value},'__ORIGINX_MAVEN_BRANCH__',${originx.maven.branch})}" />
+      <echo message="${pom-temp.contents}" file="${pom.file}"/>
+    </target>
+    
+    <target name="build">
+        <task name="npm-install-grunt" unless="${islinux}"/>
+        <task name="npm-install-grunt-cli" unless="${islinux}" />
+        <task name="npm-install-bower" unless="${islinux}"/>
+        <call target="build-component-packager" if="${jenkins??false}"/>
+        <call target="build-component-packager-dev-tools" if="${jenkins??false}"/>
+        <call target="eaxexp-build-component-packager" if="${jenkins??false}"/>
+        <task name="origin.exec" cmd="${npm.cmd}" args="${npm.options} install" workingdir="${package.originwebminispa.dir}" sudo="false"/>
+        <foreach property="module" item="String" in="origin-locale origin-jssdk origin-i18n experimentsdk eaxexperiments origin-components">
+            <echo message="Building in ${module}"/>
+            
+            <exec program="${bower.cmd}" failonerror="false" workingdir="${package.originwebminispa.dir}">
+                <env fromoptionset="web.env"/>
+                <args>
+                    <arg value="link"/>
+                    <arg value="${module}"/>
+					<arg value="--force"/>
+                </args>
+            </exec>
+        </foreach>
+        <exec program="${bower.cmd}" failonerror="false" workingdir="${package.originwebminispa.dir}">
+            <env fromoptionset="web.env"/>
+            <args>
+                <arg value="${bower.options} install"/>
+				<arg value="--force"/>
+            </args>
+        </exec>
+        <exec program="${grunt.cmd}" failonerror="false" workingdir="${package.originwebminispa.dir}">
+            <env fromoptionset="web.env"/>
+            <args>
+                <arg value=" --gruntfile Gruntfile-vm.js"/>
+                <arg value="--force"/>
+            </args>
+        </exec>
+    </target>
+    
+    <target name="clean">
+        <echo message="Cleaning Origin Automation minispa..."/>
+        <foreach property="subdir" item="String" in="dist/bower_components node_modules dist tmp .tmp">
+            <choose>
+              <do if="${islinux} == true || ${isOSX} == true">
+                <echo message="Cleaning ${package.originwebminispa.dir}/${subdir}"/>
+                <exec program="sudo">
+                  <args>
+                    <arg value="rm"/>
+                    <arg value="-rf"/>
+                    <arg value="${package.originwebminispa.dir}/${subdir}"/>
+                  </args>
+                </exec>
+              </do>
+              <do>
+                <echo message="Cleaning ${package.originwebminispa.dir}/${subdir}"/>
+                <exec program="rmdir" failonerror="false">
+                  <args>
+                    <arg value="/S"/>
+                    <arg value="/Q"/>
+                    <arg value="@{PathToWindows('${package.originwebminispa.dir}/${subdir}')}"/>
+                  </args>
+                </exec>
+              </do>
+            </choose>
+          </foreach>
+    </target>
+    
+    <target name="originwebminispa-deploy">
+      <dependent name="maven"/>
+      <task name="maven-deploy"/>
+    </target>
+</project>
+
+
+
+

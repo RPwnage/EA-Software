@@ -1,0 +1,27 @@
+var structNetGameUtilRefT =
+[
+    [ "addr", "d7/d31/structNetGameUtilRefT.html#a270d9b7360ef32cb8b1544c0340acb71", null ],
+    [ "advt", "d7/d31/structNetGameUtilRefT.html#aba52a2955d9b1018524c2eb5bf2d4c33", null ],
+    [ "advtfreq", "d7/d31/structNetGameUtilRefT.html#a5913164d9c2bb046d382039bd2066d6d", null ],
+    [ "clientid", "d7/d31/structNetGameUtilRefT.html#ab65f2a5f01183bef513a1801de3c7276", null ],
+    [ "comm", "d7/d31/structNetGameUtilRefT.html#a311b9a5cfce7a27f7aa08955fb0bcf1e", null ],
+    [ "find", "d7/d31/structNetGameUtilRefT.html#ad8562a340f8718e1fa9e221aaec95126", null ],
+    [ "hosting", "d7/d31/structNetGameUtilRefT.html#aaba6c2906f50cfbdcc1b989ca6697be6", null ],
+    [ "hostip", "d7/d31/structNetGameUtilRefT.html#a654acf799c1f8165f757ade25897938c", null ],
+    [ "hostport", "d7/d31/structNetGameUtilRefT.html#ab574978777c095a6a547ad72405b2c67", null ],
+    [ "kind", "d7/d31/structNetGameUtilRefT.html#a79182523376439a1f49fb03f94ada6de", null ],
+    [ "maxinp", "d7/d31/structNetGameUtilRefT.html#a2c571841b12d0fc435ecc9c15adb9306", null ],
+    [ "maxout", "d7/d31/structNetGameUtilRefT.html#abdf63d4d2d10a10e76f56aa2b2eb0e95", null ],
+    [ "maxwid", "d7/d31/structNetGameUtilRefT.html#a34ab57348ed3d8da91a676b4506716f6", null ],
+    [ "memgroup", "d7/d31/structNetGameUtilRefT.html#afc159e50ae29038a73cb76054df1d09e", null ],
+    [ "memgrpusrdata", "d7/d31/structNetGameUtilRefT.html#a11202b7c3475f573a6352c4d4654136c", null ],
+    [ "metatype", "d7/d31/structNetGameUtilRefT.html#a4bb9f75f778ca826407af990ee2b019e", null ],
+    [ "pConstruct", "d7/d31/structNetGameUtilRefT.html#ab495cdb0583c1ac68008ccfcdc497e95", null ],
+    [ "peerip", "d7/d31/structNetGameUtilRefT.html#a2dce3ef1677fb8058cea464b93aaf81b", null ],
+    [ "peerport", "d7/d31/structNetGameUtilRefT.html#a46cea639ce4bade18b80b7d349ef6b92", null ],
+    [ "pSocket", "d7/d31/structNetGameUtilRefT.html#acd5150250558e3d4fac9929d6472a39c", null ],
+    [ "rclientid", "d7/d31/structNetGameUtilRefT.html#a3a072d67e469e4227c799ef11cf605a8", null ],
+    [ "table", "d7/d31/structNetGameUtilRefT.html#ae11dd3be29bf99f2c314ca665bc7ade3", null ],
+    [ "uLocalAdvt", "d7/d31/structNetGameUtilRefT.html#a4024d9d38bb3126824707c4d701e6d9d", null ],
+    [ "unacklimit", "d7/d31/structNetGameUtilRefT.html#ae91aa0d7ca2b0f03f5da27136464ff76", null ]
+];

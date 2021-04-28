@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="90fa49ef-53a4-4ed3-9796-0596608969c2" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>Overview of elements found within package build scripts</para>
+    </introduction>
+
+    <section address="Overview">
+      <title>Overview</title>
+      <content>
+      	<para>Package <codeInline>*.build</codeInline> files are xml documents that must follow a specific structure.
+      	Build files have several elements that are required and others that are optional.
+      	</para>
+      	<para>A common group of elements found in build files are in the form of lists. These elements contain a list
+      	of file names, options, variables, etc. The three main types of list elements used in build scripts are,
+      	  <link xlink:href="361a891f-df73-8841-83d2-1eabf195266f">properties</link>,
+          <link xlink:href="be49d01d-d33d-1aa5-83f3-17c84aadc636">filesets</link>, and
+          <link xlink:href="cd0caf92-75c3-73da-b1ee-3009140fed96">optionsets</link>.
+      	</para>
+      	<para>Build files may also contain elements which represent a 
+      	  <link xlink:href="44df9582-e180-4d2f-bdaa-636ef7322d7b">Task</link> or
+      	  <link xlink:href="d3438e38-cdfb-4ca6-81a4-5373ce6083e6">Target</link>
+      	  and whose nested elements are executed sequentially.
+      	  One common example of this is pre- and post-build targets.
+      	</para>
+      	<alert class="note">
+        	<para>
+          Nant does not have any means to enforce conventions on property, fileset, or optionset names, 
+          however Framework has some naming conventions that must be followed to get correct build results. 
+          Script code that appears outside of Target or Task definitions is executed when the build file is loaded.
+        	</para>
+        </alert>
+      </content>
+      <sections>
+          <section address="RequiredElements">
+              <title>Required Elements</title>
+              <content>
+                  <para>
+                    Package build script must contain the <codeInline>project</codeInline> element as their root element and 
+                    within the project element they must contain a 
+                  	<link xlink:href="b9cfc512-1f15-bca9-a463-bd80f458132e">package</link> task.
+                </para>
+                <alert class="note">
+                	<para>
+                	While the package task is required the name and version number are taken from the package's directory name
+                	and the information provided in the build script is only used if the package lives outside of this directory structure.
+                	</para>
+                </alert>
+                <code language="xml" title =" ">
+                &lt;project default="build"&gt;
+                	&lt;!-- package task loads configuration package (eaconfig) --&gt;
+                	&lt;package name="MyPackage" targetversion="1.00.00"/&gt;
+                	. . . . . . . .
+                &lt;/project&gt;
+                </code>
+                <para>
+                  Buildable packages may be divided into <token>Module</token>s, which represent a build unit: library, program, etc.
+                </para>
+                <para>When a package is divided into modules the build script must contain a property named 
+                <token>buildgroup</token><codeInline>.buildmodules</codeInline>
+                containing a list of all the modules.</para>
+                <alert class="note">
+                  	<para>When using <link xlink:href="7d22f764-f010-44e4-99e1-cf0fec965062">Structured XML</link> the <codeInline>.buildmodules</codeInline> property
+                  	is populated automatically by Structured XML tasks.
+                	</para>
+                </alert>
+                <para>Each module must provide a property named 
+                	<token>groupname</token><link xlink:href="57b1e8ab-1c76-4b78-8708-010d6443c8c2">.buildtype</link>.
+                	The Buildtype value is the name of an optionset which is used to determine the module type: 'Library', 'Program', 'Utility', 'MakeStyle', etc.
+                	This Buildtype optionset also contains number of flags, compiler and linker options, and other data that are used during the build.
+                </para>
+                <alert class="note">
+                  	<para>In <link xlink:href="7d22f764-f010-44e4-99e1-cf0fec965062">Structured XML</link> the <codeInline>.buildtype</codeInline> property
+                 	is usually assumed from the name of the module element used.
+                	</para>
+                </alert>
+                <alert class="note">
+                  <para>
+                    Package build scripts should contain module descriptions, it is not recommended to execute targets or script 
+                    code that is part of the build process. This should be accomplished in <link xlink:href="4676e6fe-0f09-423d-a1ad-2e3d5d016eaf">pre/post process</link>
+                    steps.
+                  </para>
+                </alert>
+                
+              </content>
+          </section>
+          
+          <section address="Example">
+          	<title>Example Build Script</title>
+          	<content>
+          		<para>Here is a fragment of a build script showing how to declare packages and modules.</para>
+          		<code language="xml" title =" " source="ExampleFiles\Packages\BuildScriptRequiredElements.xml"/>
+          	</content>
+          </section>
+          
+          <section address="StructuredXmlExample">
+          	<title>Structured Xml Example</title>
+          	<content>
+          		<para>Here is the same example as above but using Structured Xml.</para>
+          		<code language="xml" title=" ">
+&lt;project default="build" xmlns="schemas/ea/framework3.xsd"&gt;
+	&lt;package name="MyPackage" targetversion="1.00.00"/&gt;
+         	
+	&lt;Library name="MyLibraryModule"&gt;
+  . . . . . . . .
+  Add properties and filesets to describe this Library module
+  . . . . . . . .
+	&lt;/Library&gt;
+         	
+	&lt;Utility name="MyUtilityModule"&gt;
+  . . . . . . . .
+  Add properties and filesets to describe this Utility module
+  . . . . . . . .       	
+	&lt;/Utility&gt;
+&lt;/project&gt;
+          		</code>
+          	</content>
+          </section>
+          
+          <section address="OtherBuildScriptElements">
+              <title>Other Build Script Elements</title>
+              <content>
+                  <para>Other some other categories of build script elements</para>
+                <list class="bullet">
+                  <listItem>
+                    <para>
+                      <link xlink:href="1611586c-c480-40c5-b4a7-497414a323ff"/>
+                    </para>
+                  </listItem>
+                  <listItem>
+                    <para>
+                      <link xlink:href="4676e6fe-0f09-423d-a1ad-2e3d5d016eaf"/>
+                    </para>
+                  </listItem>
+                </list>
+                <para>Information about specific types of modules, including their specific properties, fileset and optionsets.</para>
+                <list class="bullet">
+                  <listItem>
+                    <para>
+                      <link xlink:href="768e364e-96b9-495f-9f39-7d4f49d2d25a" />
+                    </para>
+                  </listItem>
+                  <listItem>
+                    <para>
+                      <link xlink:href="22dc7504-81ce-4a29-9cfb-fc413f00002e" />
+                    </para>
+                  </listItem>
+                  <listItem>
+                    <para>
+                      <link xlink:href="62dc9015-9df5-4ceb-8286-cae37a4a851f" />
+                    </para>
+                  </listItem>
+                  <listItem>
+                    <para>
+                      <link xlink:href="016c357f-86f5-4958-bea3-4bb85cff9031" />
+                    </para>
+                  </listItem>
+                  <listItem>
+                    <para>
+                      <link xlink:href="914e5337-1eba-4d6d-affe-600046d8b697" />
+                    </para>
+                  </listItem>
+                </list>
+              </content>
+          </section>
+      </sections>
+    </section>
+
+    <relatedTopics>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

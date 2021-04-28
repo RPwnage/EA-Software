@@ -1,0 +1,78 @@
+package com.ea.originx.automation.scripts.gdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroGDP;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPActionCTA;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPCarousel;
+import com.ea.originx.automation.lib.pageobjects.store.StorePage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test the 'Extra Content' carousel
+ * @author mdobre
+ */
+public class OABelowTheFoldExtraContent extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 3123725)
+    @Test(groups = {"gdp", "full_regression"})
+    public void testBelowTheFoldExtraContent(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        final EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.SIMS3_STARTER_PACK);
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+        final String carouselTitle = "Extra Content";
+        final String entitlementTile = "SimPoints";
+
+        logFlowPoint("Log into Origin with an existing account."); //1
+        logFlowPoint("Visit the Origin Store."); //2
+        logFlowPoint("Navigate to the GDP of a game with Extra Contents."); //3
+        logFlowPoint("Verify that the Extra Content Carousel shows edition agnostic game level titles."); //4
+        logFlowPoint("Verify there are no CTA's when hovering over the tiles."); //5
+        logFlowPoint("Verify the carousel can be scrolled from left to right to view more games."); //6
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+
+        //2
+        new NavigationSidebar(driver).clickStoreLink();
+        logPassFail(new StorePage(driver).verifyStorePageReached(), true);
+
+        //3
+        logPassFail(MacroGDP.loadGdpPage(driver, entitlement), true);
+
+        //4
+        GDPCarousel gdpCarousel = new GDPCarousel(driver, carouselTitle);
+        gdpCarousel.scrolltoGDPCarousel();
+        gdpCarousel.waitForCarouselToLoad();
+        logPassFail(gdpCarousel.verifyUniqueEditionTitlesOnTiles(), true);
+
+        //5
+        logPassFail(gdpCarousel.verifyNoCTADisplayed(), true);
+
+        //6
+        boolean isSecondIndicatorUncheckedBeforeNavigation = !gdpCarousel.verifyIndicatorChecked(2);
+        gdpCarousel.clickOnRightArrow();
+        boolean isSecondIndicatorCheckedAfterNavigation = gdpCarousel.verifyIndicatorChecked(2);
+        logPassFail(isSecondIndicatorUncheckedBeforeNavigation && isSecondIndicatorCheckedAfterNavigation, true);
+
+        //7
+        gdpCarousel.clickOnSpecificTile(entitlementTile);
+        logPassFail(Waits.pollingWait(() -> new GDPActionCTA(driver).verifyGameTitle(entitlementTile)), true);
+
+        softAssertAll();
+    }
+}

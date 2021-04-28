@@ -1,0 +1,148 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <property name="eaconfig.runtime.groupname" value="runtime" />
+  <property name="eaconfig.runtime.outputfolder" value="" />
+  <property name="eaconfig.runtime.sourcedir" value="source" />
+  <property name="eaconfig.runtime.usepackagelibs" value="false" />
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build')}' == 'exclude'">
+    <target name="build" description="Build the specific configuration">
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="eaconfig-build-graph" force="true" />
+      <nant-build configs="${config}"/>
+    </target>
+
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'buildall')}' == 'exclude'">
+    <target name="buildall" description="Build all the configurations">
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="eaconfig-build-graph-all" force="true" />
+      <nant-build configs="${eaconfig.build.configs}"/>
+    </target>
+  </do>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <!-- - - - - - - - - -helper targets - - - - - - - - - - - - - - - - - -->
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="eaconfig-build-caller" hidden="true" >
+    <call target="eaconfig-single-package-build-graph"/>
+    <eaconfig-build-caller build-target-name="${eaconfig.build.target}"/>
+    <!-- reset build graph in case we are chaining other targets-->
+    <init-build-graph
+      build-group-names="${eaconfig.build.group.names??${eaconfig.build.group}}"
+      build-configurations="dummy"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="eaconfig-buildall-caller" hidden="true" >
+    <call target="eaconfig-construct-persistent-properties"/>
+    <foreach item="String" in="${package.configs}" property="build-config-name">
+      <nant buildfile="${package.dir}/${package.name}.build"
+            target="${eaconfig.buildall.target}"
+            optionset="package-eaconfig-persistent-properties"
+            global-properties-action="initialize">
+        <property name="config" value="${build-config-name}"/>
+        <property name="package.configs" value="${package.configs}"/>
+        <property name="eaconfig.build.group" value="${eaconfig.build.group}" if="@{PropertyExists('eaconfig.build.group')}"/>
+        <property name="eaconfig.build.target" value="${eaconfig.buildall.target}"/>
+      </nant>
+    </foreach>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="eaconfig-build-graph" hidden="true" style="build">
+    <property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>
+    <init-build-graph
+      build-group-names="${eaconfig.build.group.names}"
+      build-configurations="${config}"/>
+    <load-package
+      build-group-names="${eaconfig.build.group.names}"
+      autobuild-target="${eaconfig.build.autobuild-target??load-package}"
+      process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+    <create-build-graph
+      build-group-names="${eaconfig.build.group.names}"
+      build-configurations="${config}"
+      process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+  </target>
+
+  <target name="eaconfig-single-package-build-graph" hidden="true" style="use">
+    <property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>
+    <init-build-graph
+      build-group-names="${eaconfig.build.group.names}"
+      build-configurations="${config}"/>
+    <load-package
+      build-group-names="${eaconfig.build.group.names}"
+      autobuild-target="${eaconfig.build.autobuild-target??load-package}"
+      process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+    <create-build-graph
+      build-group-names="${eaconfig.build.group.names}"
+      build-configurations="${config}"
+      process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+  </target>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="eaconfig-build-graph-all" hidden="true" style="build">
+    <!-- always add config into the list of all configurations include ${config} -->
+    <property name="eaconfig.build.configs" value ="@{DistinctItems('${config} ${eaconfig.build.configs??${package.configs}}')}"/>
+    <property name="eaconfig.build.autobuild-target" value="${eaconfig.build.autobuild-target??load-package}"/>
+    <property name="eaconfig.build.group" value="${eaconfig.build.group??runtime}"/>
+    
+    <property name="eaconfig.build.group.names" value ="${__eaconfig.build.groups??${eaconfig.build.group??runtime}}"/>
+    
+    <init-build-graph build-group-names="${eaconfig.build.group.names}"
+                      build-configurations="${eaconfig.build.configs}"/>
+    
+    <parallel.foreach item="String" in="${eaconfig.build.configs}" property="build-config-name">
+      <choose>
+        <do if="${build-config-name} == ${config}">
+          <call target="${eaconfig.buildall.target??load-package}" force="true" />
+        </do>
+        <do>
+          <nant buildfile="${nant.project.buildfile}" 
+                target="${eaconfig.buildall.target??load-package}" 
+                optionset="nant.commadline.properties" 
+                global-properties-action="initialize" 
+                start-new-build="false">
+            <property name="config" value="${build-config-name}"/>
+            <property name="package.configs" value="${eaconfig.build.configs}"/>
+            <property name="eaconfig.build.autobuild-target" value="${eaconfig.build.autobuild-target}"/>
+            <property name="eaconfig.build.group" value="${eaconfig.build.group}"/>
+            <property name="eaconfig.build.group.names" value="${eaconfig.build.group.names}"/>
+          </nant>
+        </do>
+      </choose>
+    </parallel.foreach>
+    
+    <create-build-graph build-group-names="${eaconfig.build.group.names}"
+                        build-configurations="${eaconfig.build.configs}"
+                        process-generation-data="${eaconfig.build.process-generation-data??false}"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="load-package" style="build" hidden="true">
+    <load-package build-group-names="${eaconfig.build.group.names??runtime}" autobuild-target="load-package"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="load-package-generate" style="build" hidden="true">
+    <property name="eaconfig.build.process-generation-data" value="true" readonly="true" />
+    <fail unless="${eaconfig.build.process-generation-data}" message="'load-package-generate' target unable to set property 'eaconfig.build.process-generation-data' to true"/>
+    <load-package build-group-names="${eaconfig.build.group.names??runtime}" autobuild-target="load-package-generate" process-generation-data="${eaconfig.build.process-generation-data}"/>
+  </target>
+
+</project>

@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build"> 
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+  <optionset name="config.targetoverrides" >
+    <option name="clean" value="exclude"/>
+  </optionset>
+
+  <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.engine.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.engine.version"  value="@{PathGetFileName('${package.engine.dir}')}"/>
+    <package name="engine" targetversion="${package.engine.version}"/>
+  
+  <!-- ******************** -->
+    <!-- Package dependencies -->
+    <!-- ******************** -->
+  <dependent name="OriginVersion" />
+  <dependent name="OriginConfig" />
+  <dependent name="Qt" />
+  <dependent name="openSSL" />
+  <dependent name="services" />
+  <dependent name="EscalationClient" if="${config-system} == 'pc'" />
+  <dependent name="OriginLegacyApp" />
+  <dependent name="libjingle" />
+  <dependent name="IGO" />
+  <dependent name="uitoolkit" />
+  <dependent name="webWidget" />
+  
+  <!-- ***************************** -->
+    <!-- Build Configuration properties-->
+    <!-- ***************************** -->
+    <BuildType name="engine.buildtype" from="OriginLibrary">
+        <option name="buildset.cc.defines">
+          ${option.value}
+          ${package.libjingle.extra-defines}
+        </option>
+    <option name="buildset.cc.defines" if="${config-system} == 'pc'">
+      ${option.value}
+      _WINSOCKAPI_
+      _LIB
+    </option>
+    <option name="buildset.cc.options" if="${config-system} == 'pc'">
+      ${option.value}
+      /FI ${package.engine.dir}/include/engine/OriginCommon.h
+    </option>
+	</BuildType>	
+    <property name="runtime.buildtype" value="engine.buildtype" />
+  
+  <target name="generate-code" depends="moc-compile ui-compile" />
+
+  <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+  <property name="runtime.prebuildtarget" value="generate-code" />
+  
+  <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+  <property name="runtime.vcproj.pre-build-step">
+    ${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.prebuildtarget}
+  </property>
+
+  <property name="runtime.builddependencies">
+    LSXWrapper
+  </property>
+  
+  <property name="runtime.usedependencies">
+    BugSentry
+    coreallocator
+    DirtySDK
+    sdkService
+    EAAssert
+    EABase
+    EACallstack
+    EAIO
+    EAPatchClient
+    EAStdC
+    EASTL
+    EAThread
+    EATrace
+
+    OOACore
+    ExceptionHandler
+    openSSL
+    OriginConfig
+    OriginLegacyApp
+    OriginVersion
+    PPMalloc
+    Qt
+    services
+    TelemetryAPI
+    libjingle
+    ChatModel
+    LSXWrapper
+  </property>
+
+	
+  <property name="runtime.usedependencies" if="${config-system} == 'osx'">
+    ${property.value}
+    zlib
+  </property>
+  
+  <property name="runtime.usedependencies" if="${config-system} == 'pc'">
+    ${property.value}
+    Sonar
+  </property>   
+
+  <property name="runtime.usedependencies" if="${config-system} == 'pc'">
+	${property.value}
+	EscalationClient
+  </property>
+
+  <property name="runtime.interfacedependencies" if="${config-system} == 'pc'">
+    zlib
+  </property>
+
+    <!-- OriginLegacyApp is being set as a use dependency on mac, and as a build dependency on windows, for now -->
+  <property name="runtime.usedependencies" if="${config-system} == 'osx'">
+    ${property.value}
+    OriginLegacyApp
+  </property>
+  
+  <!-- Windows-only stuff, should be removed soon -->
+  <property name="runtime.builddependencies" if="${config-platform} == 'pc-vc'">
+    ${property.value}
+    OriginLegacyApp
+  </property>
+  
+  <property name="runtime.includedirs" >
+    ${package.engine.dir}
+    ${package.engine.dir}/include
+    ${package.engine.dir}/include/engine
+    ${package.engine.dir}/include/engine/content
+    ${package.engine.dir}/include/engine/ito
+    ${package.engine.dir}/include/engine/igo
+    ${package.engine.dir}/controller/source
+    ${package.engine.dir}/model/source
+    ${package.engine.dir}/dirtybits/source
+    ${package.engine.dir}/social/source
+    ${package.engine.dir}/multiplayer/source
+    ${package.engine.dir}/config/source
+    ${package.engine.dir}/debug/source
+    ${package.engine.dir}/voice/source
+    ${package.engine.dir}/../..
+    ${package.engine.dir}/../../IGO
+    ${package.engine.dir}/igo/source
+    ${package.engine.dir}/plugin/source
+    ${package.uitoolkit.dir}/include
+    ${package.uitoolkit.dir}/include/Qt
+    ${package.webWidget.includedirs}
+    ${ui.output.dir}
+  </property>
+    
+  <!-- Windows-only stuff, should be removed soon, also this is a BAD UI DEPENDENCY -->
+  <property name="runtime.includedirs" if="${config-platform} == 'pc-vc'">
+    ${property.value}
+    ${package.dir}/../../originClient/dev/common/source
+    ${package.dir}/../../originClient/dev/widgets/logoutExit/source
+  </property>
+
+  <!-- common source files -->
+  <fileset name="runtime.sourcefiles" basedir="${package.dir}">
+    <includes name="${package.engine.dir}/achievements/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/backup/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/common/**/*.cpp" />
+    <includes name="${package.engine.dir}/content/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/controller/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/ito/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/model/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/utilities/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/cloudsaves/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/dirtybits/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/social/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/multiplayer/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/config/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/debug/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/voice/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/igo/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/../../IGOIPC/*.cpp" />
+    <includes name="${package.engine.dir}/plugin/source/**/*.cpp" />
+    <includes name="${package.engine.dir}/subscription/source/**/*.cpp" />
+
+      <group if="${config-system} == 'osx'">
+        <excludes name="${package.engine.dir}/cloudsaves/source/SubstitutionPathsWin.cpp" />
+        <includes name="${package.engine.dir}/controller/source/**/*.mm" optionset="ObjectiveCPPLibrary"/>
+        <includes name="${package.engine.dir}/cloudsaves/source/**/*.mm" optionset="ObjectiveCPPLibrary"/>
+        <includes name="${package.engine.dir}/igo/source/**/*.mm" optionset="ObjectiveCPPLibrary"/>
+        <includes name="${package.engine.dir}/../../IGO/DllMain.cpp"/>
+        <includes name="${package.engine.dir}/../../IGO/MacWindows.cpp" />
+    </group>
+  </fileset>
+  <fileset name="runtime.libs" >
+    <group if="${config-system} == 'pc'">
+      <includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Sql${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Xml${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Gui${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Network${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Core${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Designer${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5DesignerComponents${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5WebKit${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Widgets${debug-suffix}.lib"/>
+     </group>
+  </fileset>
+
+  <target name="dumpsources">
+    <foreach property="fname" item="FileSet" in="runtime.sourcefiles">
+      <echo message="source ${fname}" />
+    </foreach>
+  </target>
+  
+  <fileset name="runtime.headerfiles" basedir="${package.dir}">
+    <includes name="${package.engine.dir}/**/*.h" />
+  </fileset>
+      
+  <property name="runtime.res.includedirs">
+    ${package.engine.dir}/include
+  </property>
+
+  <fileset name="runtime.resourcefiles">
+  </fileset>
+  
+  <fileset name="runtime.ui_sourcefiles" basedir="${package.engine.dir}" append="true">
+    <includes name="**/*.ui" />
+  </fileset>
+
+  <!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+  <fileset name="runtime.moc_sourcefiles" basedir="${package.engine.dir}" append="true"> 
+    <includes name="include/engine/login/User.h" />
+    <includes name="include/engine/content/ContentOperationQueueController.h" />
+    <includes name="include/engine/content/Entitlement.h" />
+	<includes name="include/engine/content/EntitlementCache.h" />
+    <includes name="include/engine/content/BaseGamesController.h" />
+	<includes name="include/engine/content/CatalogDefinitionController.h" />
+    <includes name="include/engine/content/NucleusEntitlementController.h" />
+    <includes name="include/engine/content/ContentController.h" />
+    <includes name="include/engine/content/CustomBoxartController.h" />
+    <includes name="include/engine/content/NonOriginContentController.h" />
+	<includes name="include/engine/content/NonOriginContentCache.h" />
+    <includes name="include/engine/content/GamesController.h" />    
+    <includes name="include/engine/content/LocalContent.h" />
+    <includes name="include/engine/content/ContentConfiguration.h" />
+    <includes name="include/engine/content/CloudContent.h" />
+    <includes name="include/engine/content/OnTheHouseController.h" />
+    <includes name="include/engine/content/PlayFlow.h" /> 
+    <includes name="include/engine/content/ProductInfo.h" />
+    <includes name="include/engine/content/RetrieveDiPManifestHelper.h" />
+    <includes name="include/engine/content/UpdateCheckFlow.h" /> 
+    <includes name="include/engine/content/UserSpecificContentCache.h" />
+    <includes name="controller/source/ContentFolders.h" />
+    <includes name="include/engine/login/LoginController.h" />
+    <includes name="include/engine/igo/IGOTwitch.h" if="${config-system} == 'pc'"/>
+    <includes name="include/engine/igo/IGOController.h" />
+    <includes name="include/engine/igo/IGOQWidget.h" />
+    <includes name="include/engine/igo/IGOGameTracker.h" />
+    <includes name="include/engine/igo/IGOWindowManager.h" />
+    <includes name="include/engine/igo/IGOQtContainer.h" />
+    <includes name="include/engine/login/SingleLoginController.h" />
+    <includes name="include/engine/downloader/ContentInstallFlowDiP.h" />
+    <includes name="include/engine/downloader/ContentInstallFlowNonDiP.h" />
+    <includes name="include/engine/downloader/ContentServices.h" />
+    <includes name="include/engine/downloader/IContentInstallFlow.h" />
+    <includes name="include/engine/downloader/ContentInstallFlowState.h" />
+    <includes name="include/engine/downloader/DiPUpdate.h" />
+	<includes name="include/engine/downloader/DynamicDownloadController.h" />
+	<includes name="controller/source/DynamicDownloadControllerInternal.h" />
+	<includes name="include/engine/ito/InstallFlowManager.h" />
+	<includes name="include/engine/ito/SimpleStateMachine.h" />
+    <includes name="model/source/ContentProtocols.h" />
+    <includes name="model/source/ContentProtocolPackage.h" />
+    <includes name="model/source/ContentProtocolSingleFile.h" />
+    <includes name="model/source/Install.h" />
+    <includes name="model/source/InstallSession.h" />
+    <includes name="model/source/InstallProgress.h" />
+    <includes name="model/source/PatchBuilder.h" />
+    <includes name="include/engine/dirtybits/DirtyBitsClient.h" />
+    <includes name="include/engine/cloudsaves/AuthorizedS3TransferBatch.h"/>
+    <includes name="include/engine/cloudsaves/FilenameBlacklistManager.h"/>
+    <includes name="include/engine/cloudsaves/LocalStateCalculator.h"/>
+    <includes name="include/engine/cloudsaves/S3Operation.h"/>
+    <includes name="include/engine/cloudsaves/StagedS3DownloadBatch.h"/>
+    <includes name="include/engine/cloudsaves/RemotePull.h" />
+    <includes name="include/engine/cloudsaves/RemotePush.h" />
+    <includes name="include/engine/cloudsaves/RemoteSync.h" />
+    <includes name="include/engine/cloudsaves/RemoteSyncSession.h" />
+    <includes name="include/engine/cloudsaves/RemoteSyncManager.h" />
+    <includes name="include/engine/cloudsaves/RemoteUsageMonitor.h" />
+    <includes name="include/engine/cloudsaves/ClearRemoteStateRequest.h" />
+    <includes name="include/engine/cloudsaves/ClearRemoteStateManager.h" />
+    <includes name="include/engine/cloudsaves/UsageQuery.h" />
+    <includes name="include/engine/achievements/achievement.h" />
+    <includes name="include/engine/achievements/achievementset.h" />
+    <includes name="include/engine/achievements/achievementportfolio.h" />
+    <includes name="include/engine/achievements/achievementmanager.h" />
+    <includes name="include/engine/subscription/subscriptionmanager.h" />
+    <includes name="include/engine/social/AvatarManager.h" />
+    <includes name="include/engine/social/CommonTitlesController.h" />
+    <includes name="include/engine/social/Conversation.h" />
+    <includes name="include/engine/social/ConversationHistoryManager.h" />
+    <includes name="include/engine/social/ConversationManager.h" />
+    <includes name="include/engine/social/OnlineContactCounter.h" />
+    <includes name="include/engine/social/SdkPresenceController.h" />
+    <includes name="include/engine/social/SocialController.h" />
+    <includes name="include/engine/social/UserNamesCache.h" />
+    <includes name="include/engine/social/UserAvailabilityController.h" />
+    <includes name="include/engine/multiplayer/InviteController.h" />
+    <includes name="include/engine/multiplayer/JoinOperation.h" />
+    <includes name="include/engine/config/ConfigFile.h" />
+    <includes name="include/engine/config/ConfigIngestController.h" />
+    <includes name="include/engine/config/SharedNetworkOverride.h" />
+    <includes name="include/engine/config/SharedNetworkOverrideManager.h" />
+    <includes name="include/engine/debug/DownloadDebugDataCollector.h" />
+    <includes name="include/engine/debug/DownloadDebugDataManager.h" />
+    <includes name="include/engine/debug/CalculateUpdateDetailsHelper.h" />
+    <includes name="include/engine/voice/VoiceController.h" />
+    <includes name="include/engine/voice/VoiceClient.h" if="${config-system} == 'pc'"/>
+    <includes name="social/source/ConnectedUserPresenceStack.h" />
+    <includes name="social/source/InGameStatusWatcher.h" />
+    <includes name="social/source/UserIdleWatcher.h" />
+	<includes name="include/engine/updater/UpdateController.h" />
+	<includes name="include/engine/plugin/PluginManager.h" />
+	<includes name="plugin/source/Plugin.h" />
+  </fileset>
+
+  <!-- construct the paths to include the moc files into the build after generating. -->
+  <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+    <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+    <fileset name="runtime.sourcefiles" append="true">
+      <includes name="${sourcefile}" asis="true"/>
+    </fileset>
+  </foreach>
+  
+  <!-- get the options from the current config -->
+    <property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.buildtype}','cc.defines')}"/>
+  <property name="runtime.moc_includedirs" value="${runtime.includedirs}"/>
+  
+</project>

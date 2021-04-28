@@ -1,0 +1,2829 @@
+EADP Game Services DirtySDK 15.1.3.0.6 - January 11, 2018
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   5.01.00
+        Framework   7.10.00
+
+        Android     androidsdk 24.4.1-1-2
+                    androidndk r13b
+                    android_config 4.00.00
+        Capilano    CapilanoSDK 170608-proxy
+                    capilano_config 2.03.00
+        Kettle      kettlesdk 5.008.051-proxy
+                    kettle_config 2.06.02
+        iPhone      ios_config 1.07.00
+                    iphonesdk 8.0-proxy-3
+        OSX         UnixGCC 0.10.00
+                    osx_config 1.11.00
+        Linux/Unix  UnixClang  0.12.02-proxy
+        Win32       DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 14.0.23107-1-proxy
+                    WindowsSDK 10.0.10586-proxy
+
+    *** Important - First DirtySDK release with Speech-To-Text (STT) and Text-To-Speech (TTS) support ***
+    Support available for XboxOne only. PS4 and PC not yet supported
+
+New in this release:
+    DirtySDK (All)
+        NetGameLink
+            Added the number of naks sent to peer from us to the NetGameLinkStatT structure.
+
+        Voip
+            Added VoipSetTranscribedTextReceivedCallback() for voipgroup layer to register a callback used by
+            lower-level voip to notify about inbound transcribed text over voip connections.
+
+        VoipConnection
+            Added a per-connection outbound sequence number instead of the global one, needed to support a
+            scenario where transcribed text is not sent on ALL connections.
+
+        VoipDef
+            Added XoneSynthesizedSpeechCfgT to be used with VoipControl('voic').
+
+            Added VoipTranscribedTextReceivedCallbackT which is the prototype of the callback registered with
+            VoipSetTranscribedTextReceivedCallback() and VoipGroupSetTranscribedTextReceivedCallback().
+
+        VoipGroup
+            Added VoipGroupSetTranscribedTextReceivedCallback() for game code to register a callback used by
+            DS to notify about inbound transcribed text over voip connections.
+
+        VoipPacket
+            Added new VOIP_PACKET_STATUS_FLAG_STT, flagging that at least one user on the originating side as requested
+            transcribed text to be sent.
+
+            Added aRemoteClientId field to ReliableDataInfoT.  Required to uniquely identify who the reliable data is
+            for.
+
+        VoipHeadset
+            Added VoipHeadsetDisplayTranscribedText() to display transcribed text in system overlay.
+
+    DirtySDK (XboxOne)
+        UserApiXboxOne
+            Added support for retrieval of the TTS/STT settings that are a part of the profile data.
+
+            Added Accessibility field to UserApiProfileT.
+
+        VoipHeadsetXboxOne
+            Added support for leveraging new Text-to-speech (TTS) and Speech-to-text (STT) features in XboxOne XDK.
+                * Added 'ttos' control selector to be used by the game code to feed in text to be synthesized (from
+                  a speech-impaired user).
+                * Added 'stot' control selector to be used by the game code to enable local generation of transcribed
+                  text to be sent reliably to all remote peers that requested it (i.e. hearing-impaired user).
+                * Added 'voic' control selector with platform-specific params used for identifying "voice" used when
+                  producing synthesized speech.
+
+        VoipSerializationXboxOne
+            Added "game display name" property to the remote user object because we need to feed that into.
+            Windows::Xbox::UI::Accessibility::SendSpeechToTextString(). So that information is now part of the
+            user serialization.        
+    
+Changes/fixes in this release:
+    DirtySDK (All)
+        NetGameDist
+            Fixed parsing of the stat packet to prevent reading past the end of the buffer.
+
+        NetGameDistServ
+            Updated the stats structure to include more useful information and trimming the sizes down. There was no
+            need to include ping due to the fact that it can be derived from latency if needed. Added the send queue
+            length to allow detection when the queue is filling up at the lowest level. To allow us to get this I added
+            a fallthrough from NetGameDistStatus to NetGameLinkStatus. Added the packet loss and nak information as more
+            indicators to problems on the client->server connection.
+
+        VoipCommon
+            Changed VoipCommonStartup() to now take a new input parameter called pTextDataCb() invoked internally
+            when the system notifies readiness of newly locally generated transcribed text (ready for transmission
+            over the network).  
+
+        VoipConnection
+            Fixed setting/testing of the VOIP_PACKET_STATUS_FLAG_STT flag.  
+
+            Changed implementation to now pack and unpack target client id with reliable data. Allows for ignoring
+            inbound reliable data for which we are not the target when receiving voip MIC packet from the voipserver.
+
+        VoipHeadset
+            Changed VoipHeadsetCreate() to now take a new input parameter called pTextDataCb() invoked internally
+            when the system notifies readiness of newly generated transcribed text. 
+
+        VoipTunnel
+            Fixed the client flags to properly reset the VOIPTUNNEL_CLIENTFLAG_RECVVOICE when a user leaves the game.
+
+    DirtySDK (PC)
+        VoipPc
+            Changed implementation to align with new synopsis of VoipCommonStartup().
+
+    DirtySDK (PS4)
+        VoipPS4
+            Changed implementation to align with new synopsis of VoipCommonStartup().
+
+    DirtySDK (iOS/OSX)
+        DirtyNetUnix
+            Fixed a bug that broke IOS IPv6 compatibility, introduced in the 15.1.3.0.0 SDK release.
+
+    DirtySDK (XBoxOne)
+        VoipXboxOne
+            Changed implementation to align with new synopsis of VoipCommonStartup().
+
+            Changed implementation to properly support new Text-to-speech (TTS) and Speech-to-text (STT) features
+            in XboxOne. These changes became unavoidable with STT/TTS because without them it was nearly impossible
+            to play back successfully a very long input text. The inbound queue on the consumer side would just
+            continuously overflow.
+                * Changed VOIP_THREAD_SLEEP_DURATION from 18 ms to 20 ms.  It used to be 18 ms because we had
+                  problems pumping the voip thread at a sharp 20 ms rate. This problem was resolved by replacing
+                  calls to NetTick() with calls to NetTickUsec() in _VoipThread(). NetTick() does use the high
+                  res timer internally but it rounds up the result when it returns a ms value. The previous
+                  implementation ended up not being able to create a sharp 20 ms pump rate because it was
+                  subtracting two rounded up value. The new implementation is performing a single usec to
+                  msec conversion at the last minute when it is about to call NetConnSleep().
+                * Also, the priority of the _VoipThread() was changed from THREAD_PRIORITY_HIGHEST to
+                  THREAD_PRIORITY_TIME_CRITICAL. The new implementation is much closer to what MS does in the
+                  GameChat DLL.
+
+EADP Game Services DirtySDK 15.1.3.0.5 - November 6, 2017
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   5.01.00
+        Framework   7.01.00
+
+        Android     androidsdk 24.4.1-1-2
+                    androidndk r13b
+                    android_config 4.00.00
+        Capilano    CapilanoSDK 170302-proxy
+                    capilano_config 1.05.07
+        Kettle      kettlesdk 4.508.111-proxy
+                    kettle_config 2.01.00
+        iPhone      ios_config 1.07.00
+                    iphonesdk 8.0-proxy-3
+        OSX         UnixGCC 0.10.00
+                    osx_config 1.11.00
+        Linux/Unix  UnixClang  0.12.02-proxy
+        Win32       DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 14.0.23107-1-proxy
+                    WindowsSDK 10.0.10586-proxy
+
+New in this release:
+    DirtySDK (All)
+        ProtoWebSocket
+            Added APIs to allow sending of text data to the server. Our other APIs only allowed sending binary data
+            but the protocol also supports text, for more information see: https://tools.ietf.org/html/rfc6455#section-5.6
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        ConnApi
+            Fixed negative indexing when updating connection timers for the DirtyCast client.
+
+        MurmurHash3
+            Changed the function name of the internal implementation of rotl64 to prevent colliding on other systems
+            that might provide it.
+
+        ProtoHttp
+            Fixed a write callback bug when all data is available immediately, in which case the write callback was
+            completing the transaction before the data could be read.
+
+        ProtoTunnel
+            Fixed an Xbox One specific issue when a player is in multiple meshes with more than one server, e.g. in a
+            situation where a user is in a CC-assisted game group while being in a dedicated server game.  In such an
+            instance, the packets for the first server connected to would cease to flow when the second server
+            connection was established.
+
+    DirtySDK (PS4)
+        ProtoHttpPs4
+            Refactored the timeout behaviour to use our own timeouts rather than the native PS4 timeout system to better
+            match what we do on other systems.
+
+    DirtySDK (XboxOne)
+        ConnApi
+            Changed the size of a local variable used to store a SecureDeviceAddress as it could potentially be not
+            large enough for some theoretical networking conditions.
+
+        DirtyAddr
+            Changed DIRTYADDR_MACHINEADDR_MAXLEN from 127 to 372 for xboxone specifically to fix a rare issue
+            demonstrated in production where the SecureDeviceAddr blob would be clamped when stored in a DirtyAddrT
+            because too large. After discussing with MS, 372 was identified as the right size to avoid this kind
+            of issue. (See comment in the code for more details)
+
+        NetConnXboxOne
+            Fixed an issue with resume where if we didn't set the the status thread connectivity level to none will 
+            cause netconn to skip the xbl_wait state causing connection failures
+
+        ProtoHttpXboxOne
+            Fixed an issue where a redirect request would never be killed when redirection is disabled due to it never
+            going into the completed state.
+
+        VoipHeadsetXboxOne    
+            Fixed a potential crash in a race condition to create a chat participant for a bystander.
+
+EADP Game Services DirtySDK 15.1.3.0.4 - August 30, 2017
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   5.01.00
+        Framework   7.01.00
+
+        Android     androidsdk 24.4.1-1-2
+                    androidndk r13b
+                    android_config 4.00.00
+        Capilano    CapilanoSDK 10.0.14393.2156-proxy
+                    capilano_config 1.05.07
+        Kettle      kettlesdk 4.508.031-proxy
+                    kettle_config 2.01.00
+        iPhone      ios_config 1.07.00
+                    iphonesdk 8.0-proxy-3
+        OSX         UnixGCC 0.10.00
+                    osx_config 1.11.00
+        Linux/Unix  UnixClang  0.12.02-proxy
+        Win32       DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 14.0.23107-1-proxy
+                    WindowsSDK 10.0.10586-proxy
+
+New in this release:
+    DirtySDK (All)
+        ProtoHttp/ProtoHttp2
+            Added a timeout error (-7) when our module level timeout hits to allow the caller to differentiate between
+            errors at the lower protocols currently driven by HRESULT.
+
+        ProtoHttp2
+            Added support for HTTP/2 frame padding, see: https://tools.ietf.org/html/rfc7540#section-10.7
+
+        VoipTunnel
+            Added VoipTunnelStatus('talk') which returns the current count of "talking" clients, which is a client for
+            which the VoipTunnel detects inbound voip traffic.
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        Build
+            Changed the optimized buildtype to correctly derive from what buildtype we are current building (static /
+            dynamic) using ${dirtysdk-buildtype}.
+
+        CommUDP
+            Fixed an issue in CommUDPSend() where a full reliable buffer would prevent unreliable packets from being
+            sent.
+
+        Hpack
+            Fixed the string decode function to initialize the output to NULL to prevent from freeing stack memory
+            when there is temporary data still being pointed to from previous functions.
+
+        ProtoWebSocket
+            Updated the initial handshake receive to be copied into a temporary buffer and changed how it detects we
+            have the complete handshake header. Previously, if we get the HTTP/1.1 header data and some of the websocket
+            data combined in a single receive call, we have trouble getting into the open state as expected.
+
+    DirtySDK (XboxOne)
+        ProtoHttpXboxOne
+            Fixed the header parsing to replace the final \r\n with NULL characters to align with our other protohttp
+            implementations. This is required for the headers to be compatible with the ProtoHttpUtil header parsing
+            functions.
+            
+            Removed the memmove in recv that was causing performance issues. On Xbxone the memmove is not really necessary 
+            since we always allocate a buffer big enough for the full response.
+        
+        UserListApiXboxOne
+             Fixed a crash that happens when reading the XboxUserProfile results by adding null checks and exception handling.
+
+EADP Game Services DirtySDK 15.1.3.0.3 - July 12, 2017
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   5.01.00
+        Framework   7.01.00
+
+        Android     androidsdk 24.4.1-1-2
+                    androidndk r13b
+                    android_config 4.00.00
+        Capilano    CapilanoSDK 10.0.14393.2156-proxy
+                    capilano_config 1.05.07
+        Kettle      kettlesdk 4.508.001-pr-proxy
+                    kettle_config 2.01.00
+        iPhone      ios_config 1.07.00
+                    iphonesdk 8.0-proxy-3
+        OSX         UnixGCC 0.10.00
+                    osx_config 1.11.00
+        Linux/Unix  UnixClang  0.12.02-proxy
+        Win32       DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 14.0.23107-1-proxy
+                    WindowsSDK 10.0.10586-proxy
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        Build
+            Updated the voipaux sourcefiles includes to make that it adds the package.dir to the fromfile attribute.
+            The basedir only applies to the files in source.txt and not the fromfile call itself.
+
+        ConnApi
+            Updated ConnApiRemoveClient to validate the passed in index to ensure it is in the valid range we
+            support.
+
+            Removed the virtualization of the voip port when voip is disabled.
+            This allows for virtualization to only be done by modules that own the voip connection.
+
+        DirtyNet
+            Updated the async receive code to cleanup the packet queue entry when receiving data into it results
+            in an error, allowing it to be used again.
+
+        NetGameDistServ
+            Removed the notion of a "started" game as it proved to be completely broken.
+            When a game is started or stopped, the game code running on the client is in charge of exercising the
+            netgamedist flow control.
+
+        ProtoHttp2
+            Updated the processing of the url when using a proxy server, we needed to update the url after doing our
+            parsing.
+
+        ProtoHttpServ
+            Updated the URL length in the request data to 128 bytes.
+
+    DirtySDK (Unix)
+        DirtyNet
+            Updated SocketConnect logging to align with dirtynetwin which logs the remote address after translation.
+
+EADP Game Services DirtySDK 15.1.3.0.2 - June 1, 2017
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   5.01.00
+        Framework   7.01.00
+
+        Android     androidsdk 24.4.1-1-2
+                    androidndk r13b
+                    android_config 4.00.00
+        Capilano    CapilanoSDK 10.0.14393.2156-proxy
+                    capilano_config 1.05.07
+        Kettle      kettlesdk 4.508.001-pr-proxy
+                    kettle_config 2.01.00
+        iPhone      ios_config 1.07.00
+                    iphonesdk 8.0-proxy-3
+        OSX         UnixGCC 0.10.00
+                    osx_config 1.11.00
+        Linux/Unix  UnixClang  0.12.02-proxy
+        Win32       DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 14.0.23107-1-proxy
+                    WindowsSDK 10.0.10586-proxy
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        CommUDP
+            Added a reliable resend timer separate from our normal send timer to control when we resend reliable
+            packets. When customers mix reliable and unreliable packets, it didn't play well with the timer that
+            we had setup within commudp.
+
+        CryptBn
+            Updated the calculation of the big number bit length to use the correct builtin based on the
+            representation of uint64_t on our platform. On 32-bit platforms we were trying to calculate using
+            the unsigned long version when uint64_t is a unsigned long long on that platform.
+
+        CryptEcc
+            Updated the double and add operations for elliptic curve key generation to use a sliding window.
+            This algorithm is adapted from the one used for RSA Exponentiation which is discussed in the Handbook of
+            Applied Cryptography Chapter 14.6.
+
+        ProtoSSL
+            Updated the server handshake to make sure that we send the server key exchange for ECDHE ciphers
+            when client certs are enabled.
+
+            Fixed to add PKCS#1 1.5 padding validation to signature verification, added OBJ_sha384 and OBJ_sha512 to
+            ASN.1 parser table, now required for proper PKCS#1 signature validation.
+
+            Fixed to add overflow checking on ASN.1 length parsing.
+
+            Removed obsolete and unsafe OTG3 and GOS2011 CAs from trusted store.
+
+    DirtySDK (PS4)   
+        ProtoHttpPS4
+            Fixed an issue when a POST must be changed to a GET.
+
+            Refactored the creation and destruction of 1st party http contexts objects so that they only exist during requests. 
+            
+            Refactored the maximum number of times the net context could be shared from a hardcoded constant to a variable 
+            that can be set through ProtoHttpControl('mncs') or DirtyContextManagerControl('mncs').
+    
+            Fixed an issue where a socket is potential left open after a sceEpoll is destroyed without being unset.
+            
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Removed the use of the cached User^ and instead rely upon EAUser to provide the information we
+            previously relied upon the cached ref for.
+
+EADP Game Services DirtySDK 15.1.3.0.1 - April 11, 2017
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   5.01.00
+        Framework   7.01.00
+
+        Android     androidsdk 24.4.1-1-2
+                    androidndk r13b
+                    android_config 4.00.00
+        Capilano    CapilanoSDK 10.0.14393.2156-proxy
+                    capilano_config 1.05.07
+        Kettle      kettlesdk 4.508.001-pr-proxy
+                    kettle_config 2.01.00
+        iPhone      ios_config 1.07.00
+                    iphonesdk 8.0-proxy-3
+        OSX         UnixGCC 0.10.00
+                    osx_config 1.11.00
+        Linux/Unix  UnixClang  0.12.02-proxy
+        Win32       DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 14.0.23107-1-proxy
+                    WindowsSDK 10.0.10586-proxy
+                    
+Changes/fixes in this release:
+    DirtySDK (All)
+        CommUDP
+            Changed the #define for ESC_CAUSE_LOSS to not use the define statement as part of the PS4 4.5 SDK changes.
+            
+    DirtySDK (PS4)
+        DirtySessionManagerPS4
+            Changed the constant SCE_NP_PLAY_TOGETHER_MAX_ONLINE_ID_LIST_NUM to SCE_NP_PLAY_TOGETHER_MAX_INVITEE_LIST_NUM as part of the PS4 4.5 SDK changes.
+                  
+EADP Game Services DirtySDK 15.1.3.0.0 - March 31, 2017
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   5.01.00
+        Framework   7.01.00
+
+        Android     androidsdk 24.4.1-1-2
+                    androidndk r13b
+                    android_config 4.00.00
+        Capilano    CapilanoSDK 10.0.14393.2156-proxy
+                    capilano_config 1.05.07
+        Kettle      kettlesdk 4.008.131-proxy
+                    kettle_config 1.14.00
+        iPhone      ios_config 1.07.00
+                    iphonesdk 8.0-proxy-3
+        OSX         UnixGCC 0.10.00
+                    osx_config 1.11.00
+        Linux/Unix  UnixClang  0.12.02-proxy
+        Win32       DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 14.0.23107-1-proxy
+                    WindowsSDK 10.0.10586-proxy
+
+    *** Important - DirtyCast Failover Mode has been removed ***
+    Support of DirtyCast Failover mode has been removed in this release.
+    This feature has now been replaced by Connection Concierge.
+    
+    *** Important - Public API changes UserListApi PS4 ***
+    The profile mask is now not supported when querying for the block list.
+    Please specify a type mask of 0 instead.
+    
+    *** Important - Public API changes for ConnApi ***
+    Removed ConnApiStart().
+    Removed ConnApiStop().
+    Removed ConnApiRematch().
+    Removed ConnApiSetPresence().
+    
+    *** Important - PS4 User Identifier Changed ***
+    As part of Sony's SDK/API 4.0 Sony has deprecated APIs that use OnlineIds, in 
+    favor of replacement versions using the PS4 account ids. All DirtySDK calls to 
+    PSN have been switched to use PS4 account ids instead of OnlineIds.
+
+    *** Important - Public API changes for DirtyNet ***
+    Renamed SocketInfo('size') to SocketInfo('psiz')
+    Renamed SocketPacketQueueStatus('size') to SocketPacketQueueStatus('psiz')
+    Renamed SocketPacketQueueStatus('full') to SocketPacketQueueStatus('pful')
+
+    *** Important - WinRT/WinPRT ***
+    Removed WinRT and WinPRT support completely.
+    
+    *** Important - Modules removed from DirtySDK ***
+    The following modules have been migrated to the new LegacyDirtySDK package
+        LobbyLan
+        Sort
+        Tagfield
+        NetResource
+        WebOffer
+
+
+New in this release:
+    DirtySDK (ALL)
+        Build
+            Added exporting of the buildtype in our module's publicdata, which allowed dependent packages to easily find
+            our exported libs/dlls.
+
+            Enhanced build scripts to define headerfiles so the headers show correctly in Visual Studio.
+
+        CryptBn
+            Added a dedicated big number module based on the CryptRSA's implementation, this is used a basis for all
+            the crypto based math for RSA/ECC operations.
+
+        CryptEcc
+            Added this module to implement math for short Weierstrass curves using CryptBn. This is the basis for the
+            support of the P-256/P-384 curves we use within ProtoSSL.
+
+        ConnApi
+            Added more detail connection metrics which could be retrieved in the ConnApiInfoT struct as a ConnApiConnTimer with the following fields:
+                * uCreateSATime -  time it takes to resolve secure association (xbox one)
+                * uConnectTime  -  time it takes for intial connection attempt
+                * uDemangleTime -  time it takes to attempt demangling on the connection
+                * uDemangleConnectTime - time it takes to attempt a connection after demangling
+        
+        Hpack
+            Added a module to implement HTTP/2 Header compression support based on
+            https://tools.ietf.org/html/rfc7541. This module is used primarily by the new ProtoHttp2 module.
+
+        JsonParse
+            Added new JsonParse2() API, which handles allocation of required memory internally.
+
+            Added new getters supporting an error flag (JsonGetString2, JsonGetInteger2, JsonGetDat2, JsonGetBoolean2,
+            JsonGetEnum2), which can be leveraged to simplify parsing code that wants to validate whether fields were
+            present or not.  JsonGetInteger2 also supports min/max valudation.
+
+        Plat-str
+            Added new ds_memclr API that encapsulates memsetting memory to zero. In an attempt to prevent incorrect
+            uses of memsetting, we have introduced an API that encapsulates the more common case for memset. For cases
+            where memset to zero is not desired a ds_memset function was created so we can easily track conforming code.
+
+        ProtoHttp
+            Added support for http PATCH requests.
+
+        ProtoHttp2
+            Added a module to implement HTTP/2 based on https://tools.ietf.org/html/rfc7540.
+
+        ProtoHttpUtil
+            Added support for parsing the HTTP/2 style header which name begin with a leading ':' character.
+
+        ProtoSSL
+            Added support for setting TCP_NODELAY socket option on the ProtoSSL socket.
+
+            Added support for the elliptic curve client hello extension. This extension allows us to negotiate which
+            elliptic curves we support.
+
+            Added support for ECDHE Key Exchange and the following cipher suites:
+                PROTOSSL_CIPHER_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+                PROTOSSL_CIPHER_ECDHE_RSA_WITH_AES_256_CBC_SHA256
+                PROTOSSL_CIPHER_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+                PROTOSSL_CIPHER_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+                PROTOSSL_CIPHER_ECDHE_RSA_WITH_AES_128_CBC_SHA
+                PROTOSSL_CIPHER_ECDHE_RSA_WITH_AES_256_CBC_SHA
+            Due to the performance of our configured elliptic curves, these cipher suites are currently disabled by
+            default.
+
+        ProtoTunnel
+            Added new status selector 'vers' that can be used to query the prototunnel version negotiated on a specific
+            tunnel.
+
+        VoipCommon
+            Enhanced debug logging for voip muting using 'umic' and 'uspk' control selectors. And fixed incorrect
+            prefix in some other already existing debug traces.
+
+        VoipGroup
+            Enhanced logging for the low level connectivity id when resuming a connection.
+
+    DirtySDK (iOS)
+        Build
+            Added an objective-c fileset / source text for adding multiple files to build as objective-c filetype.
+            
+            Added the -Wno-deprecated-declarations flag to disable warnings cause by CHttp functions used in dirtynet.
+
+    DirtySDK (PS4)
+        DirtyContextManagerPS4
+            Added a system to share sceNetPools to make it possible to create more concurrent ProtoHttpRefTs.
+
+        DirtyErrPS4
+            Added errors from the Sony SSL/HTTP libraries.
+
+            Added missing errors from the Sony WebApi library.
+
+        DirtyWebApiPs4
+            Added server error message reporting when dealing with errors. We previously only reported the SDK side
+            errors but not the errors reported by the server. The server errors are not defined in a manner that we
+            can get the data from DirtyErr so we need to rely upon the data returned by the response information
+            struct.
+
+        NetConnPS4
+            Enhanced NetConnShutdown() with implicit IEAUser entries cleanup in case the game team is not calling
+            NetConnRemoveLocalUser() before calling NetConnShutdown(), or in case recent remove requests are still
+            pending in the internal request list when calling NetConnShutdown().
+
+        ProtoHttpPS4
+            Added support for http POSTs with no payload.
+
+            Added additional printf messages for debugging http headers.
+
+            Added error logging so we know what the exact Sony errors were when any error occurs.
+
+        VoipPS4
+            Added VoipControl('+pri') to be used to by game code to signal that the specified local user shall be 
+            included when internally calculating most restrictive voip privileges
+
+            Added VoipControl('-pri') to be used to by game code to signal that the specified local user shall not be
+            included when internally calculating most restrictive voip privileges.
+
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Enhanced NetConnShutdown() with implicit IEAUser entries cleanup in case the game team is not calling
+            NetConnRemoveLocalUser() before calling NetConnShutdown(), or in case recent remove requests are still
+            pending in the internal request list when calling NetConnShutdown().
+
+Changes/fixes in this release:
+    DirtySDK (ALL)
+        Build
+            Switched over to using Visual Studio 2015 by default.
+
+            Refactored contribs to unflatten the include structure. To prevent collisions with other libraries we
+            are adding extra directories to our include structure.
+            common/include  -> common/include/libsample
+            voipaux/include -> voipaux/include/voipaux
+
+        General
+            Refactored locations that use memcpy/memcpy_s to use ds_memcpy/ds_memcpy_s.
+
+        ConnApi
+            Removed ConnApiStart(), ConnApiStop(), ConnApiRematch(), ConnApiSetPresence(). Those functions are
+            leftovers from the xbox360 times... they have been no-op for a long period. They no longer need to exist.
+
+            Fixed the setting of the GameServer's VoIP connection id by setting to VOIP_CONNID_NONE to prevent
+            incorrect teardowns of any active VoIP Connections. When in a Game Group and a DirtyCast hosted game,
+            if we leave the game the VoIP connection would have been incorrectly torn down. This causes our VoIP port
+            to be devirtualized, which caused our subsequent VoIP connections a higher chance of getting into a bad
+            state. So instead we needed to indicate that the DirtyCast GameServer does not own any VoIP connections and
+            that we will only devirtualize the VoIP port when tearing down the connection.
+
+            Changed the virtualization of ports to be at the ConnApi level instead of the connection level. When doing
+            virtualization of ports at a connection level we can quickly run out of available ports. Since we know that
+            the virtualized ports do not change we can easily move this. With this change I updated our documentation
+            of how the client level ports are assigned to be more clear of what is happening.
+
+            Removed gameserver mode concept used for fallback. Fallback mode has been replaced with connection concierge.
+
+        DirtyLib
+            Changed to move platform-specific time code from plat-time to dirtylib.
+
+            Changed NetPrintfCode() to initilize string buffer separately from instantiation.  This is an optimization
+            to prevent the entire array from having to be memset at instantiation on every invocation.
+
+        DirtyMem
+            Removed these two external MEMIDs:  PLAYERSYNCSERVICE_MEMID ('plss')   &   TELEMETRYAPI_MEMID ('telm') 
+            Any external module using the dirtymem api is now assumed to be internally defining its own mem id.
+
+            Removed unused internal MEMIDS: PROTONAME_MEMID ('pnam')   &   PROTOARIES_MEMID ('pari')   &
+                                            FRIENDAPI_MEMID ('frnd')   &   DIRTYLSP_MEMID   ('dlsp')   &
+                                            COMMSER_MEMID   ('cser')
+
+        DirtyNet
+            Fixed error conversion logic in SockRecvfrom(). Socket type (stream vs dgram vs raw) is now taken
+            into account to determine what conversion to use.  The incorrrect logic proved to be problematic with
+            TCP sockets using async recv thread and being explicitly polled for recv by the client code instead
+            of just relying on recv callback invocation by the DS layer. 
+
+            Changed (renamed) SocketInfo('size') to SocketInfo('psiz')
+
+            Changed (renamed) SocketPacketQueueStatus('size') to SocketPacketQueueStatus('psiz')
+
+            Changed (renamed) SocketPacketQueueStatus('full') to SocketPacketQueueStatus('pful')
+
+            Fixed SocketPacketQueueStatus 'pdrp' and pmax' when using the SocketPacketQueueAlloc code path.
+            
+            Changed SocketAddrMapTranslate to accept addresses of the same type without reporting an error.
+
+        DirtySock
+            Removed the LobbyLan, Sort, Tagfield, NetResource and WebOffer modules. 
+            These can now be found in the LegacyDirtySDK package.
+
+            Fixed potential threading issues with modules with updates calling through NetConnIdle.
+
+        JsonParse
+            Fixed JsonFind() to prevent reading outside the parse buffer.
+
+            Fixed JsonParse() to return zero if the parse buffer is too small.
+
+        NetConn
+            Changed NetConn to track NetConnStartups and Shutdowns with a reference count. Copied the handling on some 
+            NetConnStartup params over to NetConnConnect options.
+
+        NetGameUtil
+            Fixed NetGameUtilConnect() and NetGameUtilAdvert() to correctly handle failing calls to
+            _NetGameUtilAdvtConstruct().
+
+            Fixed local error codes possibly conflictig with COMM_* error codes in NetGameUtilConnect().
+
+            Changed implementation to eliminate code duplication: advt ref validation code
+            is now centralized in _NetGameUtilAdvtConstruct().
+
+        Plat-str
+            Changed to replace use of strncpy() with inline implementation in ds_strnzcpy(), for improved performance
+            when copying a string into a large buffer.  The standard version will fill any unwritten parts of the
+            destination buffer with zeros.
+
+        ProtoHttpServ
+            Changed strLocation (redirection location) to ProtoHttpServeResponseT.
+
+        ProtoMangle
+            Updated logging to know what ports are bound and what currently module ref that logs belong to
+
+        QosApi
+            Removed unused tagfield include.
+
+            Changed the default packet queue length to 12 (up from 10), in testing this covers the most extreme case 
+            of _QosApiRecvCB NetCritTry never succeeding.
+
+            Added logging describing packet queue health, a warning will be printed if the queue is close to being 
+            full.
+
+            Fixed a print which indicated both FW probes were sent to the same address, when they in fact have not.
+
+        VoipCommon
+            Fixed a potential race condition between the main thread and the voip thread when altering the voip channel
+            config. The bApplyChannelConfig variable was being set to TRUE before propagating the change down to the
+            voip layer with VoipControl('chan'). Under some timing conditions, that could result in the voip thread
+            applying the voip channel config with the old values instead of the new values because the data structures
+            involved were not yet updated.
+
+        VoipGroup
+            Fixed some coding standard violations, arrays are required to be prefixed with "a"
+
+        VoipTunnel
+            Changed to using qsort for sorting our internal lookup table.
+
+            Changed suspended data not found logging to be at a higher verbosity as we assume this something that doesn't happen often and can be quite spammy
+
+    DirtySDK (PS4)
+        DirtyContextManagerPS4
+            Fixed a bug which prevented the manager from properly cleaning itself up on shutdown.
+
+            Changed to Sony API using PSN account ids.
+
+        DirtyLibPS4
+            Changed mutex creation to attempt to fallback to an unnamed mutex when create returns
+            SCE_KERNEL_ERROR_EAGAIN.
+
+        DirtyUserPS4
+            Removed unused tagfield include.
+
+            Changed to Sony API using PSN account ids.
+
+        DirtyWebApiPS4
+            Fixed DIRTYSESSMGR_MEMID being incorrectly used instead of DIRTYWEBAPI_MEMID.
+
+            Changed mutex creation to attempt to fallback to an unnamed mutex when create returns
+            SCE_KERNEL_ERROR_EAGAIN.
+
+            Removed the SDK 2.5 checks as we are long past the days of titles allowed to ship on those old SDKs.
+            
+            Removed deferred delete list.
+            
+            Changed to Sony API using PSN account ids.
+
+        NetConnPS4
+            Fixed multiple cosmetic issues to improve code readability and alignment with coding convention.
+
+            Fixed an inconsistent error code in NetConnShutdown.
+
+            Changed to Sony API using PSN account ids.
+
+        PrivilegeApiPS4 
+            Changed to Sony API using PSN account ids.
+
+        ProtoHttpPS4
+            Fixed the dumping of the POST data payload, we needed to use the size instead of the result of send.
+
+            Changed the HTTP connection template creation to disable gzip decompression. ProtoHttp does not offer this
+            type of functionality which causes some isues when trying to read gzipped compressed bodies from the
+            server.
+
+            Fixed an issue where large headers were not processed properly.
+
+            Fixed a possible truncation of a url when formatting a request.
+
+            Fixed an issue with long urls getting truncated.
+
+            Refactored to deactivate the Sony library's automated handling of redirections and cookies in order to 
+            provide the exact same behavior as other platforms.
+
+            Fixed the handling of binary certs.
+
+            Fixed the http headers to be associated with the sceRequest rather than the sceTemplate to make sure the 
+            headers are cleared at the appropriate times. This prevents the http library from running out of memory 
+            after a few uses of a protohttp reference.
+
+        UserApiPS4
+            Changed to Sony API using PSN account ids.
+
+        UserListApiPS4
+            Changed to Sony API using PSN account ids.
+
+        VoipPS4
+            Changed to Sony API using PSN account ids.
+
+        VoipHeadsetPS4
+            Fixed dirtysdk incorrectly requiring a voip user to be a member of a blaze mesh for his privacy settings
+            to contribute to the calculation of the most restrictive voip setting on the console in scenarios where
+            multiple users are locally signed-in. DirtySDK now only requires the user to be authenticated with blaz
+            for his privacy settings to contribute to the calculation of the most restrictive voip setting. The
+            rational being that a blaze authenticated user is implicitly a user interacting with the game UI and
+            therefore a "particiapting user" as defined by Sony.
+
+            Changed initialization of Sony voice lib to leverage the new sceVoiceSetThreadsParams() api
+            (introduced is SDK 3.50) to specify the priority and the affinity of the internal voice and audio port
+            threads. This replaces the usage of ephemeral high-priority threads for calling sceVoiceStart() and
+            sceVoiceCreatePort() such that internal threads inherit of the right attributes.
+
+            Changed _VoipHeadsetUpdateChatPrivileges() to now take the new +pri / -pri config into account when
+            calculating pHeadset->bSharedPrivilege.
+
+    DirtySDK (Unix)
+        DirtyNetUnix
+            Fixed to revert address selection to prefer IPv4 addresses on non-Apple platforms.  Apple platforms
+            continue to prefer IPv6 addresses, a fix that was required for iOS10 compatibility.
+
+        NetConnUnix
+            Fixed an inconsistent error code in NetConnShutdown.
+
+    DirtySDK (XboxOne)
+        DirtyAddrXboxOne
+            Removed TagField usage as TagField will be moving to the LegacyDirtySDK.
+
+            Fixed an off-by-1 error for decoding binary7 Xbox One addresses.
+
+        DirtyUserXboxOne
+            Removed TagField usage as TagField will be moving to the LegacyDirtySDK.
+
+        ProtoHttpXboxone
+            Refactored implementation to use a request killlist where terminated requests are queued until they
+            complete for good. That is replacing the former explicit abort operations.
+
+            Changed the implementation with the introduction of a state machine to track asynchronous evolution
+            of a specific xmlhttp object.
+
+
+EADP Game Services DirtySDK 2015 Winter 2.3.0 - October 19, 2016
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   4.03.01
+        Framework   6.04.01
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 10.0.14393.1058-proxy
+                    capilano_config 1.05.03
+        Kettle      kettlesdk 3.508.041-proxy
+                    kettle_config 1.06.00
+        iPhone      ios_config 1.03.00
+                    iphonesdk 8.0-proxy-2
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.12.02-proxy
+        Win32/WinRT/WinPRT
+                    DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 11.0.50727-1-proxy
+                    WindowsSDK 8.0.50727-4-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+
+    *** Important: The CommTAPI and CommSer modules have been removed ***
+
+    *** Important: The CryptSSC2 module has been removed, for string encrypt/decrypt please use CryptArc4 ***
+    
+    *** Important: The SOCKET_ASYNCRECVTHREAD = 0 support has been removed ***
+
+New in this release:
+    DirtySDK (All)
+        ConnApi
+            Added a new control selector 'dtif' that can be used to override the default timeout value for XB1
+            security association creation or the demangling timeout on other platforms (in a cc-assisted or failover
+            context).
+
+       DirtyNet
+            Added support for TCP keep-alive settings using the 'keep' control.  In some environments we need to be able
+            to tweak the keep-alive settings to ensure that firewalls and other external parties do not close our
+            connections without notifying us.
+
+            Added SocketHostnameCacheDel, which deletes an entry from the hostname cache (internal use only).
+
+            Added debug print when a lookup is refcounted.
+
+        NetConn
+            Added ability to allow users to override the cpu affinity of our internal threads with a netconn startup
+            param "-affinity".
+
+        Platform
+            Added ds_strtoull function to convert strings to uint64_t.
+
+            Added support for using EABase to drive the platform.h defines.
+
+        ProtoSSL
+            Added support for the ALPN extension (Application Level Protocol Negotiation) on both the client & server
+            side.  This extension helps negotiate a protocol between the client & server; see the spec at
+            https://tools.ietf.org/html/rfc7301.
+
+            Added ProtoSSLControl() 'resu' selector, to enable/disable SSL session resume (enabled by default,
+            preserving previous behavior).
+
+            Added support for setting the keep alive settings for the TCP socket. To support this I've added
+            an 'skep' option and followed the same pattern as the other socket options that we set for this module.
+
+        QosApi
+            Added ability to configure much of qosapi with QosApiControl, via the BlazeSDK util component this provides
+            us with many options to tweak QOS behaviors post ship.  New selectors are:
+            'bpco' - if used overrides config from server, this will be the number of bandwidth probes used for tests
+            'bpso' - if used overrides config from server, this will be the size of bandwidth probes used for tests
+            'isyt' - sets the maximum number of ms to wait to initially synchronize all latency requests
+            'lpco' - if used overrides config from server, this will be the number of latency probes used for tests
+            'pque' - passed to SocketControl 'pque' if not 0, otherwise the numpackets will be passed to SocketControl
+                     'pque'
+            'rbuf' - passed to SocketControl 'rbuf'
+            'repc' - sets the number of extra probes sent (in addition to those which received no response) on a re-issue
+            'sado' - set the override address to send the http requests to when issuing a service request, overrides
+                     parameter passed to QosApiServiceRequest
+            'salp' - if TRUE use old logic of sending all latency probes at once (default FALSE)
+            'sbuf' - passed to SocketControl 'sbuf'
+            'sprt' - set the override port to send the http requests to when issuing a service request, overrides
+                     parameter passed to QosApiServiceRequest
+            'tgbp' - sets the minimum number of ms between sending latency probes to the same site.
+            'ussl' - if TRUE use https else http for setup communication (defaults TRUE)
+
+    DirtySDK (PS4)
+        DirtySessionManagerPS4
+            Added new status selectors for PlayTogther support. New selectors are:
+            'pthe' - poll this selector to check if the client has received the PlayTogether event
+            'ptil' - if a PlayTogether event has been received use this selector to retrieve the invite list            
+        
+        NetConnPS4
+            Added a new startup parameter "-checktick" on PS4 to control how we initialize DirtyEventManager.  The new
+            startup parameter will control if we fail our initialization of DirtyEventManager in the case that we have
+            potentially missed events because the EASystemEventMessageDispatcher has been ticked. By default we will
+            not check if the dispatcher has been ticked so teams don't need to worry about aligning the startup of the
+            two systems.
+
+        ProtoHttpPS4
+            Added protohttpps4 for native support of HTTP and SSL.
+            
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Added extra mapping from sandbox to environment to prevent having the title download storage figure out the
+            environment:
+            * EARW.3 -> CERT
+            * XDP1.0 -> PROD (EA Access Testing)
+
+Changes/fixes in this release:
+    DirtySDK (ALL)
+        Build
+            Changed to set the optionset to the C++ build type when building those types of files.  With newer packages
+            we see that our C++ files were trying to be built as C and causing us to generate some compiler errors due
+            to that.
+
+        ConnApi
+            Changed to move the virtualization of ports to be handled at the connapi layer instead of having the
+            network adapter deal with it.
+
+        DirtyCert
+            Changed to move DirtyCert updating to the internal NetLib idle thread.  To make integration easier for our
+            customers, this makes it possible to use ProtoHttp without the need to poll NetConnIdle.  The major
+            requirement that ProtoHttp depended on was DirtyCert, which needs to be updated in case we needed to pull
+            down any CA certs.
+
+        DirtyNet
+            Fixed to no longer refcount HostentT refs that are in the list but are in a done state.
+
+        JsonParse
+            Fixed crash issue parsing json with leading whitespace.
+
+        ProtoHttp
+            Fixed a bug in both ProtoHttpGetNextHeader() and ProtoHttpFindHeaderValue(), when dealing with an empty
+            header.
+
+        ProtoHttpServ
+            Fixed an issue which could lead an http client to hang indefinately or until timeout when the client
+            requested a keep-alive.
+
+            Fixed a cert cache issue where it was possible to reconnect to a server with a cached cert using IP address
+            instead of name.
+
+        ProtoTunnel
+            Fixed to initialize the sockaddr used in _ProtoTunnelRecvCallback to prevent address translation spam.
+
+        QosApi
+            Changed to improve latency tests accuracy in poor network conditions; latency is now done in parallel
+            across all ping sites, preventing random lag spikes from effecting one result.
+
+            Changed to improve logging by making it more configurable with QosApiControl('spam') - set the verbosity of
+            the module, default 1 (0 errors, 1 debug info, 2 extended debug info, 3 per probe info).
+
+            Changed public APIs QosApiCreate and QosApiServiceRequest to simplify API and better reflect data types
+            being passed.
+
+            Removed unused defines QOSAPI_STATUS_XB_*, QOSAPI_LISTENFL_*, and QOSAPI_RESPONSE_MAXSIZE.
+
+            Removed and replaced QOSAPI_REQUESTFL_* with QosApiRequestTypeE.
+
+        VoipConnection
+             Fixed coverity warning about potential out of bound access of pConnection->VoipMicrPacket[] array when
+             user index is VOIP_SHARED_USER_INDEX (0xFF on PC).
+
+             Fixed a bug in use of memset, which resulted in target buffer not being cleared.
+
+        VoipTunnel
+            Removed deprecated flags and fields that were set for deprecation since v9
+            * VOIPTUNNEL_CLIENTFLAG_BROADCASTING_VOICE
+            * VOIPTUNNEL_GAMEFLAG_MAX_VOICES_REACHED
+            * VoipTunnelGameT.iNumClientsBroadcasting
+
+        XmlFormat
+            Fixed access to unitialized variable coverity warning.
+
+    DirtySDK (PS4)
+        DirtySessionManagerPS4
+            Fixed to try to catch configuration errors with dirtysessionmanager as we want to send failures back to
+            bring it to the attention of integrators.
+
+            Fixed an issue where the return value was not properly being set because of a bad enclosure of assignment.
+
+    DirtySDK (Unix)
+        Build
+            Removed voiptunnel.c from unix specific sources as this is already part of main source list.
+
+        DirtyNetUnix
+            Fixed _SocketLookupThread to prefer IPv6 addresses, when available.  This fixes compatibility with iOS10.
+
+            Fixed SocketConnect to scrub a hostname cache entry when connect() returns an EHOSTUNREACH error.  This
+            type of error happens when switching from an IPv4 to an IPv6 connection or vice versa.
+
+    DirtySDK (XboxOne)
+        Build
+            Changed to use sdkreferences task when depending on any of the extension assemblies on XboxOne.
+
+        ProtoMangleXboxOne
+            Fixed a potential issue where an IPv6 user mapping might get updated instead of added.
+
+        NetConnXboxOne
+            Fixed to handle the AsyncStatus::Started case when calling DownloadBlobAsync.  FIFA was seeing instances
+            where we would crash when getting a AsyncStatus::Started due to the fact that we don't handle and just kill
+            the async operation.  After discussing this with Microsoft their suggestion was just to ignore this status
+            as you should expect to get another callback when the operation actually finishes.
+           
+            Fixed an issue were a failed environment check would not properly trigger a retry, leaving netconn stuck in
+            ~env state indefinitely. 
+           
+
+EADP Game Services DirtySDK 2015 Winter 2.2.3 - September 19, 2016
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   3.04.00
+        Framework   5.05.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 10.0.10586.1203-proxy
+                    capilano_config 1.03.03
+        Kettle      kettlesdk 3.508.041-proxy
+                    kettle_config 1.06.00
+        iPhone      ios_config 1.03.00
+                    iphonesdk 8.0-proxy-2
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.12.01-proxy
+        Win32/WinRT/WinPRT
+                    DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 11.0.50727-1-proxy
+                    WindowsSDK 8.0.50727-1-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+
+New in this release
+    DirtySDK (All)
+        DirtyNet
+            Added support for TCP keep-alive settings using the 'keep' control
+            
+
+EADP Game Services DirtySDK 2015 Winter 2.2.2 - September 06, 2016
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   3.04.00
+        Framework   5.05.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 10.0.10586.1203-proxy
+                    capilano_config 1.03.03
+        Kettle      kettlesdk 3.508.041-proxy
+                    kettle_config 1.06.00
+        iPhone      ios_config 1.03.00
+                    iphonesdk 8.0-proxy-2
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.12.01-proxy
+        Win32/WinRT/WinPRT
+                    DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 11.0.50727-1-proxy
+                    WindowsSDK 8.0.50727-1-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+                    
+New in this release:
+    DirtySDK (All)
+        ProtoSSL
+            Added ProtoSSLStat() 'rsao' selector to signal that there is currently an RSA operation ongoing.
+     
+Changes/fixes in this release:
+    DirtySDK (All)
+        ProtoTunnel
+            Fixed a knock-on  in cl 1174902 when faced with discarding an out-of-order packet that could not be
+            recovered.  This would cause a stream reset that broke the connection.  This fix reverts part of that
+            change to make the out-of-order packet discard safe and not break the connection. In doing so it undoes
+            the original fix, meaning some other resolution for that issue will be required moving forward.
+     
+    DirtySDK (PC)
+        VoipPC
+            Fixed intermittently broken voip on PC caused by bad initialization of the VoIP user identifier.
+        
+    DirtySDK (Unix)
+        NetConnUnix
+            Fixed to check for NULL terminator when parsing /proc/cpuinfo in the case we have a truncated string
+            (does not include \n).  This caused issues on newer hardware where the flags field grew larger than 512,
+            which caused a crash from the loop never exiting.
+
+
+EADP Game Services DirtySDK 2015 Winter 2.2.1 - July 13, 2016
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   3.04.00
+        Framework   5.05.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 10.0.10586.1203-proxy
+                    capilano_config 1.03.03
+        Kettle      kettlesdk 3.508.041-proxy
+                    kettle_config 1.06.00
+        iPhone      ios_config 1.03.00
+                    iphonesdk 8.0-proxy-2
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.12.01-proxy
+        Win32/WinRT/WinPRT
+                    DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 11.0.50727-1-proxy
+                    WindowsSDK 8.0.50727-1-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+
+Changes/fixes in this release:
+    DirtySDK (PS4)
+        DirtySessionManagerPS4
+            Changed DirtySessionManager to better catch configuration errors and service it back to integrators.
+
+        VoipHeadsetPS4
+            Fixed _VoipHeadsetUpdateChatPrivileges() to ignore non-participating user.  This fix is necessary to comply
+            with TRC R4061G in PS4-TestCase_for_TRC1.5_e stating: A non-voip-restricted user in a game should not see
+            his voip blocked because of a voip-restricted user signed-in on the console but not participating in the
+            game.
+
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Fixed potential crash in the lambda expression performed when the DownloadBlobAsync()  operation completes
+            with completion status AsyncStatus::Canceled.  The code incorrectly uses a reference that was invalidated
+            when the operation cancellation was initiated.
+
+        ProtoHttpXboxOne
+            Fixed a potential external cleanup issue by adding a timeout to stop waiting for the E_ABORT that might
+            never come.  Instead after 5 second time we will fake the E_ABORT Event ourselves.
+
+    DirtySDK (Unix)
+        DirtyNetUnix
+            Removed the use of  AI_V4MAPPED flag when ai_family is AF_UNSPEC.
+
+
+EADP Game Services DirtySDK 2015 Winter 2.2.0 - June 09, 2016
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   3.04.00
+        Framework   5.05.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 10.0.10586.1203-proxy
+                    capilano_config 1.03.03
+        Kettle      kettlesdk 3.508.041-proxy
+                    kettle_config 1.06.00
+        iPhone      ios_config 1.03.00
+                    iphonesdk 8.0-proxy-2
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.12.01-proxy
+        Win32/WinRT/WinPRT
+                    DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 11.0.50727-1-proxy
+                    WindowsSDK 8.0.50727-1-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+New in this release:
+    DirtySDK (All)
+        Build
+            Enabled shadow variable warnings on targets that doesn't set this by default.
+
+        DirtyLib
+            Added NetPrintRateLimit, implementing automated rate limiting of redundant lines of NetPrintf output.
+            Identical sequences of lines are suppressed for up to 100ms, or when a new line of text is printed.
+            The number of suppressions is appended to the line of text.  Lines of text over 256 characters are
+            not rate-limited.
+
+        DirtyNet
+            Added SocketPacketQueueStatus('full') to query if socket inbound packet queue is full or not.
+
+            Added SocketPacketQueueStatus('size') to query current size (in packets) of socket inbound packet queue.
+
+            Added IPv6 support definitions and includes.
+
+            Added SocketAddressMap functionality, moved here from dirtynetxboxone, for general IPv6 support.  IPv6
+            addresses are mapped to pseudo-IPv4 addresses for public consumption.
+
+        NetConn
+            Added standard error code for NetConnStartup.
+
+        ProtoHttpServ
+            Added function to log via the logging callback at varying verbosity levels.
+
+        ProtoSSL
+            Added debug output of certificate signature type when validating a certificate.
+
+        QosApi
+            Added code to leverage the new support for SocketControl('pque') on physical sockets (non-virtual). QosApi
+            is now using a socket with a 10-deep recv paquet queue to eliminate the possibility of inducing artificial
+            latency resulting from inbound latency probes remaining in the system socket receive buffer because the
+            1-deep queue was full. (Happens when the critical section cannot be entered in the recv callback registered
+            by qosapi - _QosApiRecvCB())
+
+    DirtySDK (Android/iOS/PC/Unix/XboxOne)
+        DirtyNetWin
+            Added IPv6 support, switched to using IPv6 sockets internally, leveraging dual-protocol stack functionality
+            to continue to support IPv4.  Added IPv6 name resolution support to SocketLookup().  IPv4 names continue
+            to be preferred when available.
+
+    DirtySDK(WinRT)
+        DirtyNet
+            Added new define INADDR_LOOPBACK for WinRT configurations
+
+    DirtySDK(XboxOne)
+        NetConnXboxOne
+            Added a new XBLWait state so make sure we wait for the connectivity level to become xbox live.
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        Build
+            Moved the contents of dirtysock-initialize.xml to Initialize.xml file and tell the package to
+            initializeself. This makes it so the package will include Initialize.xml automatically without us needing
+            to do it explicitly.
+
+            Changed implementation to now export the DIRTYCODE_LOGGING defines based on the
+            dirtysdk_debug_enable / dirtysdk_debug_disable build properties.
+
+            Removed hhc.exe from the SDK and depend on the userdoc package to provide this when building documentation.
+
+            Removed unused macro / defines
+
+            Removed unused release build scripts
+
+        ConnApi
+            Fixed the GameServer's bAllocated flag to be correctly set TRUE during client initialization.
+
+        CryptGCM
+            Fixed crash in _CryptGcmDecrypt() when passed a negative length.  This condition is rare and has been seen
+            when an SSL server incorrectly sends an unencrypted alert message when aborting a connection.
+
+        DirtyLib
+            Changed to move/consolidate NetPrintfCode and NetPrintfHook to dirtylib from platform-specific files.
+
+            Moved DIRTY_TOKEN_PASTE and DIRTY_CONCATENATE_HELPER here from dirtynet.h as a better fit.
+
+        DirtyNet
+            Fixed implementation to skip empty hostname cache entries before checking for expiration, to eliminate
+            confusing debug output.
+
+            Refactored recv path for physical sockets (non-virtual):
+              * Replaced hard-coded 1-deep queue with configurable n-deep queue.
+              * Performed appropriate changes for all flavors (win, x1, ps4, unix) to be as close as possible
+                (eliminated unjustified platform specificities)
+              * Simplified recv path logic in terms of what is done in the context of SocketrecvFrom() vs in the
+                context of socketrecvthread
+
+            Standardized verbosity tracking and usage (spam levels).
+
+        JsonParse
+            Added handling for JSON strings inside of JsonSeekObjectEnd.
+
+        Plat-str
+            Cleanup and better support of IPv6 address printing.
+
+        ProtoAdvt
+            Fixed a couple of places that didn't initialize a sockaddr struct before use.
+
+        ProtoHttpServ
+            Changed all the logging to use the logging callback so we get in the applications that run this module.
+
+        ProtoSSL
+            Fixed a bug when requesting an SSLv3 connection where the requested cipher list would be empty, causing
+            the connection to fail.  This is only relevant to test setups as DirtySDK clients do not request SSLv3
+            by default.
+
+        ProtoTunnel
+            Removed tunnel mode concept from prototunnel.
+
+    DirtySDK (PC)
+        DirtyNetWin
+            Removed DirtyNetXboxOne. Consolidated win and xboxone implementations in a single file called DirtyNetWin
+            to achieve reduction of code duplication.
+
+        VoipConnection
+            Fixed the voip data to not be processed if there is no listening device attached to prevent TTY spam on PC.
+
+    DirtySDK (PS4)
+        Build
+            Removed unsupported defines as part of the PS4 3.500 SDK upgrade. The ORBIS_SDK_VERSION was replaced by
+            SCE_ORBIS_SDK_VERSION.
+
+            Removed very old version checks that are no longer needed.
+
+            Removed the privilege checks for asynchronous multiplayer as this is not supported on the newer SDK.
+
+            Changed implementation to now set the config-vs-version on PS4 to support the use case of Frostbite titles.
+            Make sure to only set the VS2015 compiler flags for vc compilers.
+
+            Fixed PS4 compiler warnings introduced in the PS4 3.500 upgrade, reported by a customer (Unreachable code
+            and checking NULL on arrays).
+
+        DirtyNetPS4
+            Added handling of sceNpWebApiDeleteRequest failures.
+
+        DirtySessionManagerPS4
+            Fixed potential mem leaks caused by the changeable data never being released when it exists.
+
+            Fixed implementation of DirtySessionManagerControl('gchg') to invoke
+            _DirtySessionManagerSetChangeableSessionData() instead of _DirtySessionManagerSetSessionData().
+
+        DirtyWebApiPS4
+            Changed where iThreadLife is set to DirtyWebApiCreate (main thread).
+
+        NetConn
+            Fixed implementation to check the result code of sceAppContentAppParamGetInt() when querying for trial
+            status.
+
+        UserApiPS4
+            Fixed a double counting problem when a first party query fails.
+
+    DirtySDK (XboxOne)
+        Build
+            Fixed compiler warnings introduced by upgrading to the March XDK.
+              * Fixed shadow variable usage in 'poll' selector (dirtynetxboxone)
+              * Fixed an incorrect implementation of SocketRecvfrom the pBuf parameter is non-const (dirtynetxboxone)
+              * Remove unused variables on platforms they are not used on (connapi, user, privilege)
+              * Use a conditional instead of assigning an integer to a boolean in C++ (voipxboxone)
+              * Remove printing of serialization size as that was the only use of the variable and not very helpful to
+                logging.
+              * Suppress warning in T2Host relating to changing of sizes between compilers and alignment attributes
+              * Assign the enumeration to the correct value instead of treating it as an integer (privilege)
+              * Switch from while(1) to for (;;) to prevent a constant expression warning (SampleCore)
+              * Remove unused variable (connapi, SampleCore)
+
+        DirtyLibWin
+            Changed to statically initialize nettick frequency to a safe value, so any calls to NetTick() on Xbox One
+            before NetConnStartup() will not crash.
+
+        DirtyNetXboxOne
+            Switched to using DirtyNet functions for Address Map functionality that were previously internal.
+
+            Removed DirtyNetXboxOne. Consolidated win and xboxone implementations in a single file called DirtyNetWin
+            to achieve reduction of code duplication.
+
+        VoipHeadsetXboxOne
+            Refactored bad rep check query to use normal lambda expressions.
+
+
+EADP Game Services DirtySDK 2015 Winter 2.1.0 - March 31, 2016
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   3.04.00
+        Framework   5.05.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 10.0.10586.1100.0-proxy
+                    capilano_config 1.03.03
+        Kettle      kettlesdk 3.008.211-proxy
+                    kettle_config 1.05.00
+        iPhone      ios_config 1.03.00
+                    iphonesdk 8.0-proxy-2
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.12.01-proxy
+        Win32/WinRT/WinPRT
+                    DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 11.0.50727-1-proxy
+                    WindowsSDK 8.0.50727-1-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+
+    *** Important - Xbox One XSAPI 2.0 Support ***
+    This version of DirtySDK supports XSAPI 2.0 which is not backwards compatible with XSAPI 1.0.
+    Integrators will need to build against XSAPI 2.0.
+
+    *** Important - ConnApi client uId of 0 is now considered invalid ***
+    ConnApi client with a uId of 0 will now be consider invalid and will be ignore by ConnApi.
+
+    *** Important - First DirtySDK version compatible with the Connection Concierge feature ***
+    This version of DirtySDK includes a large amount of changes that were introduced specifically for interoperability
+    with the Connection Concierge tech (https://docs.developer.ea.com/display/TEAMS/Connection+Concierge+Project).
+    Regardless of your game leveraging Connection Concierge or not, those changes should be transparent to you.
+
+New in this release:
+    DirtySDK (All)
+        CommUdp
+            Added backwards-compatible update to protocol to allow versioning, defined previous version as 1.0 and new
+            version as 1.1.
+
+            Added larger subpacket support (increased from a maximum of 250 bytes to 1530 bytes) for connections
+            negotiated to commudp protocol version 1.1 or higher.  Subpackets requiring 250 bytes or fewer continue to
+            use one byte of encoding, while larger subpackets require two bytes.  This allows packet redundancy, when
+            combined with raising the default redundancy limit, for larger packets.
+
+        ConnApi
+            Added the ability to specify a user index when activating the P2P connection forced failure debug
+            option ('!res'). Setting the index to -1 will affect all users like the old behavior.
+
+            Added support for hosted connections (obtained from Connection Concierge). New code paths were added
+            to use connection IDs received from Connection Concierge when setting up game connections, voip
+            connections and tunnels. Related public api changes:
+             * Added multiple new fields to ConnApiClientInfoT.
+             * Added CONNAPI_CCMODE_* defines.
+             * Added a new 'ccmd' control selector to specify the Connection Concierge mode associated with
+               the connapi instance.
+
+        DirtyNet
+            Added prints to track virtual port addition and deletion.
+
+            Added packet drop and packet high water to packet queue.
+
+            Added SocketInfo() 'pdrp' and 'pmax' selectors.
+
+        JsonParse
+            Added support for JSON payloads greater than 64k.
+
+            Added support for JsonParse taking a length of -1, in which case strlen is used to calculate the size of
+            the input JSON buffer.
+
+            Added support for JsonParse to take a null parse buffer, in which case the size in bytes required for the
+            parse buffer are calculated and returned.
+
+        ProtoHttpServ
+            Added support for a 'spam' control to control the amount of logging with do within the module.
+
+            Added a request timeout to cover situations where the remote side stops sending or receiving, defaulting
+            to 30 seconds.
+
+            Added a ProtoHttpServControl('idle') selector to set the idle/keep-alive timeout.
+
+            Added PROTOHTTPSERV_FLAG_LOOPBACK.
+
+            Added ProtoHttpServCreate2() which has an additional uFlags parameter.
+
+        ProtoTunnel
+            Added a new 'actv' status selector to get the number of active tunnels on based on a specific prototunnel
+            version.
+
+            Added a new 'vset' status selector to get a comma delimited list of versions we support to report to the
+            CCS.
+
+            Added PROTOTUNNEL_VERSION, PROTOTUNNEL_VERSION_MIN, PROTOTUNNEL_VERSION_MAX to the public header file.
+
+        Voip
+            Added support for one way muting.
+
+        VoipCommon
+            Added a new 'vcid' control selector to assign a local 32-bit identifier to a specific voip connection.
+
+        VoipConnection
+            Added support for hosted connections (obtained from Connection Concierge). New code paths were added
+            to use connection IDs received from Connection Concierge when setting up voip connections.
+            Related public api changes:
+                * New uRemoteClientId field added to VoipConnectionT.
+                * Renamed uClientId field to uLocalClientId in VoipConnectionT.
+
+        VoipGroup
+            Added support for hosted connections (obtained from Connection Concierge). New code paths were added
+            to use connection IDs received from Connection Concierge when setting up voip connections.
+            Related public api changes:
+                * Added VOIPGROUP_CCMODE_* defines.
+                * Added a new 'ccmd' control selector to specify the Connection Concierge mode associated with
+                  the voipgroup.
+                * Added VoipGroupConnect2() which takes an additional bIsConnectivityHosted input parameter and an
+                  additional uLowLevelConnectivityId input parameter.
+                * Added VoipGroupResume2() which takes an additional uLowLevelConnectivityId input parameter. For
+                  Connection Conncierge support specifically.
+
+        VoipTunnel
+            Added support for allowing voiptunnel clients to exist in multiple games. This functionality to used to
+            mimic how Blaze handles clients in Games and Game Groups. Related public api changes:
+                * Added VOIPTUNNEL_MAXSUSPENDED.
+                * Added VoipTunnelSuspendInfoT.
+                * Added iNumSuspended field to VoipTunnelClientT.
+
+            Added support for a unique game identifier that can be specified when creating the game in the
+            voiptunnel. New API functions were added to allow users to work with this identifier. Related public
+            api changes:
+                * Added VoipTunnelGameListAdd2().
+                * Added iGameIdx input param to VoipTunnelClientListDel().
+                * Added VoipTunnelGameListMatchIndex().
+                * Added VoipTunnelGameListMatchId().
+
+    DirtySDK (PS4)
+        DirtyNet
+            Added missing definition for INADDR_LOOPBACK for PS4, needed in protohttpserv.
+
+        VoipHeadsetPS4
+            Added the ability to configure voice lib thread attributes. You can override the settings with your
+            Blazeserver util.cfg.
+
+    DirtySDK (PS4/XboxOne)
+        NetConn
+            Added a new 'eusr' selector that returns the IEAUser object at a given index.
+
+    DirtySDK (XboxOne)
+        DirtyNetXboxOne
+            Added functionality to remap IPv6 addresses to existing IPv4 virtual addresses. It was demonstrated that
+            this update is possible in a cable pull scenario.
+
+        ProtoMangleXboxOne
+            Added processing for updates of secure associations which the are already in a completed state to update
+            the IPv6 address mappings.
+
+        Voip
+            Added bad reputation auto muting support in order to better satisfy XR-086. This feature will be on by default.
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        Build
+            Fixed doc build errors.
+
+            Fixed warnings generated by VS2015 Update 1
+
+            Changed the build scripts to use the config-vs-version property to better handle changing between versions
+            of Visual Studio.
+
+        ConnApi
+            Fixed how we increment the client count.
+
+            Fixed the 'cadr' selector to return the prototunnel address used.
+
+            Removed CONNAPI_STATUS_CLSE as it is no longer used.
+
+            Fixed an issue that caused the previous mute settings not to be properly retained when resuming a voip
+            connection.
+
+            Fixed an issue where a game group would use the wrong voip port when joining a game session, then a
+            game group, then leaving the game session.
+
+            Fixed ConnApiControl 'adve' selector, when disabling advertising, to also destroy the NetGameUtil ref
+            if it has already been created.
+
+        DirtyCert
+            Fixed to not issue a redundant preload request if a preload request is already in the queue.
+
+            Fixed a bug where a successful preload triggered by a validation failure would result in a failed
+            transaction, because the subsequent on-demand request would be considered to fail due to adding a
+            redundant CA.
+
+        DirtyNet
+            Fixed to include missing return in 'pque' selector that caused misleading debug warning.
+
+            Changed packet queue max size from 127 to 1024.
+
+        JsonFormat
+            Fixed _JsonUpdateHeader() to prevent buffer offset from exceeding the buffer size during an overflow
+            condition.  This fixes a possible memory stomp on a subsequent call to a JsonFormat method.
+
+        JsonParse
+            Fixed a bug when executing a JsonFind against an element in an unclosed array; the find would skip past the
+            end of the parse buffer data and access uninitialized memory.
+
+            Fixed a bug where executing a JsonFind against an unclosed element, containing a name but no value, would
+            result in returning a pointer to the beginning of the Json buffer.
+
+            Fixed some other cases where the parse buffer could be accessed after the terminator.
+
+            Fixed one issue each in the decode and escape lookup tables.
+
+            Fixed to ensure after calling JsonParse that the parse buffer is always zero terminated.  If this is not
+            possible, zero is returned.
+
+            Changed name of JsonGetListItemEnd to JsonGetObjectEnd to better match JSON naming conventions.  A #define
+            wrapper supporting the old name is included to maintain compatibility with previous code.
+
+        NetConn
+            Fixed documentation error in header for NetConnIdle.
+
+        Plat-time
+            Fixed a bug in weekday calculation in ds_secstotime.
+
+        ProtoHttpManager
+            Fixed to use consistent modulename as prefix to debug output.
+
+        ProtoHttpServ
+            Removed code in _ProtoHttpServUpdateRecvBody() that set the received body flag true when receiving a
+            chunked transfer without any initial data.
+
+            Changed the ProtoHttpServControl('time') selector to set the request timeout.
+
+            Fixed a typo in the default idle timeout value, which was supposed to be five minutes but was in fact much
+            longer.
+
+            Changed size of ProtoHttpServRequestT.strContentType[] from 32 to 64 to match what we use for
+            ProtoHttpServResponseT
+
+            Changed the code in the _ProtoHttpServParseHeader to skip all the URI / TYPE information that is in the header
+            This fixes an issue with skipping the first valid header value when parsing
+
+        ProtoTunnel
+            Fixed two issues when attempting to switch keys.  The first issue was on the side receiving a packet
+            encrypted by the new key, in ProtoTunnelValidatePacket(), which was not using the new crypto state to try
+            decrypting the packet.  The second issue was on the sending side, where a new HMAC was not being calculated
+            when the new key was chosen.  These issues caused failures in scenarios with players in a game and a
+            gamegroup, when players left either the game or the gamegroup, and could not maintain their p2p
+            connections.
+
+            Fixed an issue where a large stream offset could cause a rematch to fail due to out-of-order discard.  The
+            send stream offset is now reset to zero when a new key is selected, matching the behavior of the rematch
+            code on the receive side, which already assumes a stream offset of zero.
+
+            Fixed possible issues with crypto setup by making sure send/recv states are both initialized all of the
+            time when switching keys.
+
+            Fixed a bug which broke a reconnection scenario where one side of a connection was already active, while
+            the other was not.  The bug was due to an incorrect change of hard-coded return values in
+            _ProtoTunnelDecryptAndValidatePacket2(), introduced along with the addition of ProtoTunnel 1.1 protocol
+            support.
+
+            Removed usage of hard-coded values. Replaced with explicit defines for packet decrypt flow.
+
+            Changed _ProtoTunnelDecryptAndValidatePacket() to return a VALIDATE error if an attempt to recover an out
+            of order packet fails.
+
+            Changed to implementation to simplify error returns from _ProtoTunnelRecvData() and error handling of
+            values returned by that function in _ProtoTunnelRecv().
+
+            Fixed a bug in _ProtoTunnelFindTunnel(), where a failed match of an inactive tunnel would print an error
+            message, but continue on with the tunnel index as if the match had succeeded.  This would cause some
+            parameters (port, addr) to be updated incorrectly before the packet was subsequently rejected, which was
+            mostly harmless but could cause some confusing temporary side effects particularly in the debug printing.
+
+            Fixed various documentation and debug printing items.
+
+        ProtoWebSocket
+            Fixed some documentation errors regarding several TODOs in the code.
+
+        VoipCommon
+            Fixed a potential memory stomp when setting voip channel information for a user index which is out of range.
+
+            Fixed the channel selection functions to properly include attempts to modify the VOIP_SHARED_USER_INDEX.
+
+        VoipGroup
+            Fixed a bug during the transition from a gamegroup to a game so that the proper mute status from the game
+            group would transfer over into the game.
+
+        VoipTunnel
+            Remove support for the 'dcst' control which was used to set a DirtyCast hack. We now support this
+            functionality by default as there exists no configuration we were disable the hack.
+
+            Fixed a possible memory leak detected by Coverity, in a situation when trying to create a VoipTunnel object
+            and running out of memory.
+
+    DirtySDK (iOS)
+        Plat-time
+            Fixed broken NetPrintf time stamps.
+
+    DirtySDK (PC)
+        DirtyNetWin
+            Fixed the usage of the socket select() function to be compatible with Berkley sockets.
+
+    DirtySDK (XboxOne)
+        Build
+            Removed support for the XboxOne ADK
+
+        DirtyNetXboxOne
+            Fixed the usage of the socket select() function to be compatible with Berkley sockets.
+
+        NetConnXboxOne
+            Fixed an issue where token acquisition did not reset properly after a cable pull and a reconnect, leading
+            to a report that the token acquisition failed when it had not been attempted.
+
+EADP Game Services DirtySDK 2015 Winter 2.0.0 - October 22, 2015
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   2.25.03
+        Framework   3.32.02
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 6.2.13332.0-proxy
+                    capilano_config 1.02.00
+        Kettle      kettlesdk 3.008.041-proxy
+                    kettle_config 1.03.01
+        iPhone      ios_config 1.01.05
+                    iphonesdk 7.0-proxy-5
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.12.01-proxy
+        Win32/WinRT/WinPRT
+                    DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 11.0.50727-1-proxy
+                    WindowsSDK 8.0.50727-1-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+
+    *** Important - DIRTYSDK_IEAUSER_ENABLED compile switch no longer supported ***
+    Deprecated DIRTYSDK_IEAUSER_ENABLED compile switch such that IEAUser integration can no longer be turned off at
+    compile time when using DirtySDK NetConn for PS4 or XBoxOne.
+
+    *** Important - Gen 3 platform specific code has been removed ***
+    Gen3 support was deprecated in 15.1.1.1.0. The remaining Gen 3 specific code have now been removed.
+
+New in this release:
+    DirtySDK (All)
+        Build
+            Added support for structured xml libs-external when Framework is version 3.33.00 or higher.
+
+            Added support for Visual Studio 2015. To enable support the vsversion property needs to be
+            set to "2015" when building as the new warning suppressions are not backwards compatible.
+
+            Added new build property dirtysdk-contrib that allows enabling the contribs to build Without
+            samples. If dirtysdk-contrib does not need to be specified when dirtysdk-samples is true.
+
+        CryptSTP1
+            Removed CryptSTP1 support.
+
+        Displist
+            Removed Displist support.
+
+        Hasher
+            Removed Hasher support.
+
+        NetGameLink
+            Added verbosity setting to reduce QoS data spam in the logs unless desired.
+
+            Added the reception time in ticks of the packet to NetGamePacketHeadT metadata.
+
+        ProtoHttpServ
+            Added a new callback for processing the incoming header. This callback allows us to opt out of further
+            processing if we know that request data is malformed based on header information.
+
+            Added support for handling the 'Expect: 100-continue' header if sent by clients. ProtoHttpServ will always
+            just send back the 100 status code and will not reject requests based on the expect header. If a payload is
+            too large it can be rejected using the new header processing callback.
+
+        ProtoAries
+            Removed ProtoAries support.
+
+        ProtoHttpUtil
+            Added support for decoding url-encoded strings.
+
+            Added support for parsing query parameters similar to what we use for parsing header information.
+
+    DirtySDK (Android)
+        Plat-Time
+            Added Android implementation to ds_plattimetotime().
+
+    DirtySDK (PS4)
+        DirtySessionManagerPS4
+            Added support for ps4 session changeable data.
+
+            Added new server-driven mode (all operations that are executed from a server are now disabled, i.e.
+            everything except what is necessary for invitation). DirtySessionManagerBinaryHeaderT and
+            DirtySessionManagerChangeableBinaryHeaderT are now public (PS4 only). This is to enable a compile time
+            check to ensure the Blaze Server's structs are equivalent to those. C++ static assert are used in the
+            Blaze client code (game manager) and they rely on those structures being public.
+
+            Added new status selectors:
+                'gcda' - to get the active session's changeable binary data size
+                'gpcd' - to get the pending session's changeable binary data size
+                'gagm' - to get the active changeable data game mode
+                'gpgm' - to get the pending changeable data game mode
+                'gagt' - to get the active binary data game type
+                'gpgt' - to get the pending binary data game type
+                'lsts' - to get the last status code returned from the calls to the Sony APIs
+
+            Added new control selectors:
+                'gchg' - to queue getting the changeable binary data into the pending session
+                'serv' - to turn on server-driven session - in that mode, this client tech no longer honors any
+                         client request for operations that are now owned by the server
+                'sess' - to set session identifier (server-driven mode only)
+                'spgm' - to set the pending session game mode
+                'spgt' - to set the pending session game type
+
+    DirtySDK (PS4/XboxOne)
+        NetConn
+            Added a new status selector 'eusr' which will return the IEAUser given a dirtysock user index.
+
+        VoipHeadset
+            Added new status selector 'sact' to determine if the shared device is active (Kinect/PS Camera).
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        Build
+            Removed the AddDirtySDKLibsToModule task, external libraries are now added to the
+            package.DirtySDK.dirtysock.libs.external fileset instead.
+
+            Fixed 'NULL is defined to be 0' warning in platform.h by using #if defined instead of #ifdef.
+
+            Removed the DIRTYCODE_API from typedefs, definitions do not need to be exported for dynamic libraries.
+
+            Fixed an issue with how our C++ filesets are organized which caused files to be built both static and
+            dynamic instead of based on the build configuration.
+
+        NetGameDist
+            Fixed NetGameDistInputQueryMulti() and NetGameDistInputCheck() to always poll NetGameDistUpdate() for
+            new packet data if no remote inputs are available.  Previously, NetGameDistUpdate() would not be polled
+            if there were no local input packets queued for sending, but this behavior had a negative impact in
+            multi mode, requiring the caller poll NetGameDistUpdate() themselves if they had no inputs to send.  To
+            fix that issue and simplify the code, the (minor) optimization of not calling NetGameDistUpdate() if no
+            local input packets are queued, when in non-multi mode, was removed.
+
+            Fixed NetGameDistInputQueryMulti() to be safer in the event the caller calling the function following a
+            queue overrun.  In the event of a queue overrun it is possible to lose multi inputs that have a delta
+            value that is not one (the default) assigned.  A delta greater than one that is lost will point the
+            paired input queue pointer into unallocated buffer space, resulting in an invalid input with a length
+            of zero.  This would result in a memcpy of -1 bytes which would result in a memory stomp and subsequent
+            crash.  This scenario is now detected and handled safely; although the caller should still detect the
+            overflow error and shut the game down, this condition will no longer cause a crash.
+
+            Fixed NetGameDistInputCheck() to return "ready to receive" in multi mode if remote inputs are
+            available, regardless of whether there are local inputs queued for sending or not.  This issue would
+            cause titles calling NetGameDistInputCheck() to incorrectly not receive data that was available if they
+            were not sending a steady stream of inputs themselves.
+
+        ProtoHttpServ
+            Changed to update the data that is based through the various callbacks for handling the request and
+            responses.  Instead of using the same type, specific request and response types have been created.
+
+            Changed the read/write callbacks to be receive/send to be clearer for integrators.
+
+            Changed the request callback to allow to be called continuously if more processing time is needed based on
+            the result.
+
+            Changed the logging callback to no longer return a result.
+
+        ProtoMangle
+            Fixed a Valgrind warning by initializing a variable and preventing the possibility of copying garbage data
+            to a buffer.
+
+        ProtoTunnel
+            Removed 1.0 protocol support and remaining Xbox 360 code.
+
+            Removed ability to conditionally compile out HMAC.
+
+            Fixed issue with _ProtoTunnelFindTunnel() not detecting a port change during handshake.
+
+        Voip
+            Removed Gen3 only parameter for VoipStartup().
+
+            Changed the way we update voip channel settings. We now update it right when we get a ping and mic packet
+            with the new channel information instead of in voip idle.  This also addresses potential multi-threading
+            issue with applying channel configs.
+
+        VoipCommon
+            Fixed shared channel configs not being recalculated after a channel reset.
+
+            Fixed a situation where channel configs are applied before we have any registered user.
+
+        VoipConnection
+            Fixed a wrong usage of ds_memcpy.
+
+        VoipGroup
+            Fixed an issue with mute flags being inconsistent or reset when player join both a game group and a game
+            session.
+
+            Fixed an issues with mute flag consistency across multiple voip groups when a user is a part of more than
+            one at the same time.
+
+            Fixed an issue where joining a second voip group or leaving an additional voip group would mute or unmute
+            all players respectively.
+
+            Changed 'umic' and 'uspk' control selectors to deprecated.
+
+        WebOffer
+            Changed the signature of WebOfferGetBusy2 to take the strDefaultMessage as a const char * instead of char *
+            to prevent a writable strings warning on PS4.
+
+    DirtySDK (PC)
+        ProtoPingPC
+            Fixed an issue on Windows XP where the ProtoPingIcmpResponseT structure was too small (the size required
+            turns out to not be documented explicitly).  Adding a 32 byte buffer to the structure resolved the issue.
+
+    DirtySDK (PS4)
+        DirtyNetPS4
+            Changed implementation such that socket receive thread now runs at high priority.
+
+        DirtySessionManagerPS4
+            Changed the dirtysessionmanger callback not to block when we have dirtywebapi queuing enabled.
+
+        DirtyWebApiPS4
+            Fixed a race condition where the webapi thread sometimes would miss the signal to wake up.
+
+        NetConnPS4
+            Removed internal automatic detection of system users by NetConn.  Usage of NetConnAddLocalUser() and
+            NetConnRemoveLocalUser() is now mandatory. Implicit: Also removed 'cuis' and 'csiu' status selectors
+            for converting system index into dirtysdk index (or opposite).
+
+            Changed the method to determine what error state NetConn enters to more accurately reflect the reason we
+            could not go online in a multiple user scenario.
+
+        VoipPS4
+            Changed implementation such that voip thread now runs at high priority.
+
+        VoipHeadsetPS4
+            Fixed initialization of voice lib thread priorities. sceVoiceStart() and sceVoiceCreatePort() are now
+            being called from dedicated ephemeral high-priority threads to force internal Sony threads to also
+            execute as high priority threads. This bug fix is required to eliminate crackling voice during heavy
+            processing scenarios (game play).
+
+            Changed voice lib initialization to comply with voice lib doc and to mimic what is done in Sony samples.
+
+            Fixed _VoipHeadsetUpdateDecoderConnections() not being called when pHeadset->bSharedPrivilege changes.
+
+            Changed implementation to flush the internal buffer of the decoder port when it is no longer connected to
+            any speaker port. This is required to avoid "old voice" being played back when the decoder port is being
+            reconnected to a speaker port.
+
+    DirtySDK (Unix)
+        DirtyNetUnix
+            Fixed to prevent the logging of ENOTCONN errors when shutting down the socket to prevent unnecessary spam.
+
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Removed internal automatic detection of system users by NetConn.  Usage of NetConnAddLocalUser() and
+            NetConnRemoveLocalUser() is now mandatory.  Implicit: Also removed 'cuis' and 'csiu' status selectors
+            for converting system index into dirtysdk index (or opposite).
+
+            Refactored NetConnXboxOne to reduced complexity.
+
+        ProtoHttpXboxOne
+            Refactored the status function to be consistent with other platforms. Certain selectors are only handled
+            when the state of the module is ST_BODY or ST_DONE.
+
+        ProtoMangleXboxOne
+            Fixed _ProtoMangleRemoteHostAddRef() and _ProtoMangleRemoteHostDelRef() such that multi-threaded usage of
+            refRemoteHostRefCountMap is now guarded by the critical section.
+
+            Fixed implementation to now try-catch around usage of method used to compare two secure device addresses to
+            gracefully handle rare cases where a COMException is thrown.
+
+            Fixed implementation to now try-catch around SecureDeviceAddress::FromBytes().
+
+        UserApiXboxOne
+            Changed to using the AsyncOp refs to track the progress of requests. This prevents an issue where the
+            previous bitfield might get stomped on in certain conditions and makes the code clearer to understand.
+
+        VoipXboxOne
+            Changed to move VoIP state destruction to NetConnIdle shutdown callback.  This move is because the VoIP
+            thread can become blocked in Microsoft Chat code for over ten seconds in certain loss-of-network scenarios.
+            This was causing long stalls when trying to VoipShutdown() upon loss of network.  Also added guard on
+            VoipStartup() to ensure it is not called in a state where the module has not been shut down (VoipShutdown()
+            already had the corresponding guard on the module having been started).
+
+
+EADP Game Services DirtySDK 2015 Winter 1.1.0 - July 09, 2015
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   2.25.01
+        Framework   3.32.02
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 6.2.12999.0-1-proxy
+                    capilano_config 1.01.02
+        Kettle      kettlesdk 2.508.081-proxy
+                    kettle_config 1.03.00
+        iPhone      ios_config 1.01.05
+                    iphonesdk 7.0-proxy-5
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.12.01-proxy
+        Win32/WinRT/WinPRT
+                    DotNet 4.0
+                    DotNetSDK 2.0-4
+                    VisualStudio 11.0.50727-1-proxy
+                    WindowsSDK 8.0.50727-1-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+
+    *** Important - Gen3 platforms (PlayStation 3 and Xbox 360) no longer supported ***
+    The Winter 1.0.x stability branch should be used for any further development on these platforms.
+
+New in this release:
+    DirtySDK (All)
+        Build
+            Removed Gen3 Support.
+
+        ConnAPI
+            Added support to gate the voip connection based on QoS validation. The 'estv' selector can be used to
+            ungate the voip connection.
+
+        ProtoHttp
+            Added returning of http status code as part of the 'hres' status selector.
+
+        ProtoSSL
+            Added signature_algorithms hello extension support, enabled by default.  Some servers require this
+            extension to be present before accepting a connection request.
+
+            Added validation of supported signature algorithms upon receiving a CertificateRequest handshake message.
+
+        XmlParse
+            Added support for 64-bit integers via XmlContentGetInteger64 and XmlAttribGetInteger64.
+
+    DirtySDK (PC)
+        NetConnWin
+             Added support querying for MAC address with valid IP using the 'ethr'/'macx' when non-zero is passed into
+             iData.
+
+    DirtySDK (PS4)
+        DirtyNetPS4
+            Added 'spam' selector support to change debug verbosity.
+
+        NetConnPS4
+            Added an error message for when PRX is not loaded for the sceNpAuthCreateAsyncRequest call.
+
+        VoipHeadsetPS4
+            Added support for the following bitrates: 14400, 16000 and 22533.  The default bitrate has been increased
+            from 7300 to 16000.
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        Build
+            Changed DirtySDK build scripts to use Framework Structured XML.
+
+        DirtyCert
+            Changed requesting certificates use format state field with "ST=" instead of "S=", which is the default
+            OpenSSL nomenclature.
+
+        NetConn
+            Changed NetConnDisconnect() to also abort UPnP operations.
+
+        ProtoHttp
+            Changed default PUT/POST behavior to not reuse a previous connection (keep-alive).  When making a PUT or
+            POST request and utilizing a keep-alive connection, it is possible for the server to close the connection
+            and for that connection close to be "in flight" when issuing the request.  This results in the request
+            being failed when the connection close is received.  Because a PUT or POST request can result in modifying
+            server state, it may not be automatically re-issued.  Not using keep-alive avoids this complication.  A new
+            ProtoHttpControl('rput') selector has been added to disable this behavior if the caller is willing to deal
+            with this complication in trade for getting connection reuse on a PUT/POST.
+
+        ProtoSSL
+            Fixed incorrect CertificateVerify formatting when using TLS1.2.  This fixes client certificate support that
+            was previously broken when connecting to a server supporting TLS1.2.
+
+            Fixed an error with 'hres' selector not returning the right hresult in some cases.
+
+        ProtoTunnel
+            Fixed diagnostic output in _ProtoTunnelFindTunnel(), when re-matching addr/port, to include correct tunnel
+            index instead of the max tunnel index.
+
+    DirtySDK (PC/XboxOne)
+        DirtyLibWin
+            Fixed debug print on QueryPerformanceCounter() failure that was comparing against the wrong result code.
+
+    DirtySDK (PS4)
+        PrivilegeApiPS4
+            Fixed a logical error that prevented a dialog from being appropriately terminated when aborted and the
+            reference is not destroyed.
+
+        DirtyWebApiPS4
+            Fixed an issue where we were using the wrong critical section for handling errors which ended up in a
+            deadlock if another request was made before the response was handled.
+
+        DirtySessionManagerPS4
+            Changed 'gses' control selector to now guard against passing in "INVALID".
+
+        VoipHeadsetPS4
+            Fixed the wrong user index being set when polling for voice.
+
+    DirtySDK (PS4/XboxOne)
+        NetConn
+            Added ability to pass -1 into NetConnRemoveLocalUser(), in which case an internal lookup will be performed.
+
+            Added a new selector 'iusr' than can be used to retrieve the index given the IEAUser UserId.
+
+        VoipHeadset
+            Fixed voipheadsetDeleteLocalUser() to also clear the last headset status.
+
+            Fixed a situation where channel configs are applied before we have any registered user with voipheadset.
+
+    DirtySDK (PS4/Unix)
+        DirtyNet
+            Fixed SocketConnect() to copy the remote address when performing an non-blocking connect
+            (SCE_NET_EINPROGRESS/SYS_NET_EINPROGRESS/EINPROGRESS) for ps4/ps3/unix.
+
+    DirtySDK (Unix)
+        DirtyLibUnix
+            Fixed NetTickUsec() to use proper scale for seconds.
+
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Changed the environment to be mapped to the sandbox ID. If it can't be mapped it will default back to TMS
+            RETAIL -> PROD
+            CERT -> CERT
+            EARW.1 -> TEST
+
+EADP Game Services DirtySDK 2015 Winter 1.0.1 - June 05, 2015
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   2.19.00
+        Framework   3.25.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 6.2.12710.0-1-proxy
+                    capilano_config 1.01.00
+        Kettle      kettlesdk 2.508.051-proxy
+                    kettle_config 1.02.00
+        iPhone      ios_config 1.01.05
+                    iphonesdk 7.0-proxy-5
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.07.00
+        PS3         ps3sdk 470.001-lite
+                    PlayStation3NpEx 470.001
+        Win32/WinRT/WinPRT
+                    DotNetSDK 4.0
+                    VisualStudio 11.0.50727-proxy
+                    WindowsSDK 8.0.50727-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+        Xenon       XenonSDK 2.0.21256.3-proxy
+
+    *** Important - ProtoTunnel format modified - backward compatibility broken ***
+    Th Winter 1.0 release of DirtySDK introduced a new ProtoTunnel protocol version - 1.1.  By default, this
+    is the version used for all platforms except for Xbox 360.  ProtoTunnel v1.1 is not compatible with v1.0,
+    and Xbox 360 is not compatible with v1.1.  Please make sure to rebuild any game servers in addition to
+    game clients when upgrading to this release from a version older than Winter 1.0.
+
+New in this release:
+    DirtySDK (PS4)
+        NetConnPS4
+            Added NetConnRegisterNpStateCallback() to receive callbacks directly from NP State events.
+
+Changes/fixes in this release:
+    DirtySDK (All)
+        NetGameLink
+            Fixed a rare latency estimation issue at start of connection when local and remote clocks are close to but
+            not quite synchronized.
+
+    DirtySDK (PC)
+        VoipPC
+            Fixed VoipCommonUpdateRemoteStatus() not being invoked from the VoipThread.
+
+            Fixed bPrivileged not defaulting to TRUE.
+
+        VoipCommon
+            Removed unnecessary PC specificities.
+
+    DirtySDK (PS3)
+        VoipHeadsetPS3
+            Fixed implementation to no longer wait for the user to be in a participating state for acquiring and
+            playing voice.  Without this change, there is some potential for garbled voice at connection establishment.
+
+    DirtySDK (PS4)
+        VoipHeadsetPS4
+            Changed VoIP muting based on privileges back to be the most restrictive between local users. It will
+            be reverted back to be muted on a per player basis once Sony provides us a way to check whether VoIP
+            is being played back on the TV or headsets.
+
+    DirtySDK (XboxOne)
+        ConnApi
+            Fixed _ConnApiInitClientConnectionState() to not reset ip address if it was already resolved (required for
+            host migration to succeed with peer hosted topology when p2p voip is active before host migration).
+
+        NetConnXBoxOne
+            Fixed the value of the internet connectivity state to reset after a resume to prevent the user from getting
+            stuck in an offline state after a NetConnDisconnect()/NetConnConnect().
+
+        UserListApiXBoxOne
+            Fixed the queueing of UserListApiIsFriendAsync() requests which return success codes but then behaved
+            strangely when more than one request was active.
+
+            Fixed a possible memory leak on shutdown.
+
+    DirtySDK (PC/PS3/Unix/XboxOne)
+        DirtyLib
+            Fixed a rare thread safety issue in SocketLookup around
+            refcounting
+
+
+EADP Game Services DirtySDK 2015 Winter 1.0.0 - April 9, 2015
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   2.19.00
+        Framework   3.25.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 6.2.12128.0-proxy
+                    capilano_config 1.01.00
+        Kettle      kettlesdk 2.000.121-proxy
+                    kettle_config 1.02.00
+        iPhone      ios_config 1.01.05
+                    iphonesdk 7.0-proxy-5
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.07.00
+        PS3         ps3sdk 450.001-lite
+                    PlayStation3NpEx 450.001
+        Win32/WinRT/WinPRT
+                    DotNetSDK 4.0
+                    VisualStudio 11.0.50727-proxy
+                    WindowsSDK 8.0.50727-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+        Xenon       XenonSDK 2.0.21256.3-proxy
+
+    *** Important - Please update your QOS servers from your Blaze server configurations ***
+    The changes to the qosapi requires the new version of the QOS servers in order to function properly.
+    Contact GOSOPS for information about the most up to date QOS servers.
+
+    *** Important - ProtoTunnel format modified - backward compatibility broken ***
+    This release of DirtySDK introduces a new ProtoTunnel protocol version - 1.1.  By default, this is the
+    version used for all platforms except for Xbox 360.  ProtoTunnel v1.1 is not compatible with v1.0, and
+    Xbox 360 is not compatible with v1.1.  Please make sure to rebuild any game servers in addition to game
+    clients when upgrading to this release.
+
+New in this release:
+
+    DirtySDK (All)
+        ProtoTunnel
+            Added support for the new 1.1 version of the ProtoTunnel protocol, with the following features:
+                - Introduces backwards compatibility for future protocol versions.
+                - Control packet data data used in handshaking is still authenticated, but is now unencrypted.
+                - Adds fast matching (and re-matching, when the source addr and/or port changes) of packet data to the
+                  correct endpoint.
+                - Version 1.0 can still be selected and is the default for Xbox 360 operation.  Xbox 360 is not
+                  compatible with 1.1 or later versions of the protocol.
+                - Version 1.0 is compatible with the previous ProtoTunnel protocol.
+
+        CommUDP
+            Added a packet received flag which can be accessed through NetGameUtilStatus('pkrc'). The flag is stored in
+            ConnApiClientT GameInfo.uConnFlags. This part of the more specific join error task GOSREQ-184.
+
+    DirtySDK (PS3)
+        NetConnPS3
+            Added 'nper' selector to NetConnStatus() to allow the user to differentiate a user logging out from PSN
+            from PSN disconnect.
+
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Added a critical section to protect against NetConnStatus('xusr') being called from the voip thread.
+
+        VoipHeadsetXboxOne
+            Added support for MS voip bystanders (cert requirement).
+
+    DirtySDK (Xenon)
+        ConnApiXenon
+            Added ConnApiControl('xonl') which can be used to tell ConnApiXenon to no longer attempt game connectivity
+            but to only perform Xsession management.
+
+            Added _ConnApiMoveToNextState() for improved logging of ConnApiXenon state transitions.
+
+Changes/fixes in this release:
+
+    DirtySDK (All)
+        CryptRSA
+            Refactored to make modular exponentiation an iterative process.  This allows it to be spread out over
+            multiple updates, which is useful as the operation can take significant amounts of clock time and is
+            blocking.  As part of this change, roughly 12k of temporary state that used to be on the stack is now
+            moved to the RSA state.
+
+            Switched to use 64-bit math on Linux and PS4, improving execution time on those platforms.
+
+        DirtyCert
+            Switched to new gosca.ea.com endpoint using certificate issued against GOS2015 CA.
+
+        DirtySessionManager
+            Renamed DirtySessionManagerComplete() to DirtySessionManagerGetSecureIp(), and made that new function
+            xenon-only.
+
+        NetConn
+            Changed UPnP initialization: if peerport netconn param is not specified, netconn now configures
+            protoupnp with default port 3659 instead of default port 0.
+
+        NetGameDist
+            Fixed _strNetGameDistDataType to also cover GMDIST_DATA_NODATA.
+
+        ProtoHttp
+            Changes to harden protohttp against multi-threaded calls into update, send, and recv functions from
+            interfering with one another.
+
+        ProtoSSL
+            Enabled ServerName Hello Extension by default.
+
+            Refactored to take advantage of iteratve modular exponentation for SendClientKeyExchange and
+            SendCertificateVerify operations.
+
+            Switched CA provider flag from GOS2013 CA to GOS2015 CA.  This allows the new DirtyCert endpoint to
+            provision CA certificates.
+
+        QosApi
+            Refactored qosapi to improve maintainability, this is extensive changes throughout the
+            implementation.
+
+            Changed qosapi so that the different phases of the qos process (latency, bandwidth, firewall)
+            do not have dependencies on one another.  In the past firewall could only be done after
+            bandwidth, and qos phases would have an impact on the error status of other qos phases.
+
+            Changed qosapi to use the new ip reported by the server rather than the IP address discovered
+            by the DNS lookup. The old behavior prevented XBox One from successfully querying the NAT type,
+            due to DNS round robin issues.
+
+            Removed the client to client methods QosApiListen() and QosApiRequest() from the qosapi.
+
+        VoipConnection
+            Fixed incorrect array size for LocalUsers
+
+    DirtySDK (PS3)
+        DirtyNetPS3
+            Fixed a race condition that causes memory corruption when calling NetConnShutdown() while a
+            hostname lookup is in progress.  NetConnShutdown() now waits until all hostname threads are
+            finished.
+
+    DirtySDK (PS4)
+        DirtySessionManagerPS4
+            Removed DirtySessionManagerComplete().
+
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Fixed a case where the connectivity level can be stuck because of a missing notification from
+            Microsoft. When logging out after a resume event it seems that we sometimes do not receive an
+            XBoxLiveAccess notification when logging back in after the resume. This fix forces a check of
+            the network state after 5 seconds.
+
+    DirtySDK (Xenon)
+        ConnApiXenon
+            Changed implementation to guarantee that _ConnApiUpdateDemangle() will never be performed before
+            XSessionCreate() or XSesssionMigrateHost() completes (on both session host and session members).
+            Failure to enforce such a serialization can lead to 2 potential problems:  secure address being
+            resolved with an invalid session id (if primary session creation is not complete) or connapi
+            exiting ST_MIGRATE state prematurely before firing SESSEVENT (if secondary session migration is
+            not complete).
+
+            Changed ConnApiUpdate() such that _ConnApiUpdateDemangle() cannot be called when a session
+            creation or a session migration is pending.
+
+            Removed usage of ConnApiSessionManagerStatus('idle') at the beginning of _ConnApiUpdateDemangle():
+            no longer required now that calls to _ConnApiUpdateDemangle() from ConnApiUpdate() are limited to
+            states where it is allowed.
+
+            Fixed _ConnApiInitClientList() to properly initialize pConnApi->GameServer.ClientInfo.strTunnelKey
+            (inspired from connapi.c) This fix is minor because the tunnel key is not used on xenon anyway.
+
+        ConnApiXenonSessionManager
+            Enhanced implementation of ConnApiXenonSessionManagerComplete() to make it clear that
+            ConnApiXenonSessionManagerGetSecureIp() CANNOT return "in-progress".
+
+            Fixed implementation of ConnApiXenonSessionManagerComplete() to return the right secure ip address for the
+            console specified as input. It used to return pRef->iAddrPrimary which is not guaranteed to match the
+            specified console.
+
+            Renamed ConnApiXenonSessionManagerComplete() to ConnApiXenonSessionManagerGetSecureIp()
+
+            Removed ConnApiXenonSessionManagerControl('conn') which was dead code because the 'conn' selector is no
+            longer supported in DirtySessionManager.
+
+        DirtySessionManagerXenon
+            Renamed DirtySessionManagerComplete() to DirtySessionManagerGetSecureIp().
+
+        VoipXenon
+            Fixed implementation of VoipSetLocalUser() to properly setup the VoipUserT to be passed to
+            _VoipRegisterLocalTalker(). Without this fix, wrong xuids are registered with XHV resulting
+             in calls to  pXHVEngine->SubmitIncomingChatData() intermittently failing with ERROR_INVALID_FUNCTION.
+
+
+EADP Game Services DirtySDK 2015 Winter 0.3.0 - March 16, 2015
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   2.19.00
+        Framework   3.25.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.07
+        Capilano    CapilanoSDK 6.2.12128.0-proxy
+                    capilano_config 1.01.00
+        Kettle      kettlesdk 2.000.121-proxy
+                    kettle_config 1.02.00
+        iPhone      ios_config 1.01.05
+                    iphonesdk 7.0-proxy-5
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.07.00
+        PS3         ps3sdk 450.001-lite
+                    PlayStation3NpEx 450.001
+        Win32/WinRT/WinPRT
+                    DotNetSDK 4.0
+                    VisualStudio 11.0.50727-proxy
+                    WindowsSDK 8.0.50727-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+        Xenon       XenonSDK 2.0.21256.3-proxy
+
+New in this release:
+
+    DirtySDK (All)
+        CommUDP
+            Added a metric to track packet loss prevented by a redundancy mechanic.
+
+        DirtyLib
+            Added new NetTickUsec() to return microsecond-precision tick counter for profiling purposes.
+
+        ProtoSSL
+            Added GOS2015 SHA2 CA.
+
+            Added VeriSign 2008 Universal SHA2 CA.
+
+        VoipConnection
+            Added support for piggy-backing reliable data over voip traffic (data packets and ping packets)
+                * Added VoipConnectionReliableBroadcastUser() and VoipConnectionReliableBroadcastOpaque().
+                * Added LinkedReliableDataT.
+                * Extended VoipConnectionT and VoipConnectionlistT for reliable data support.
+                * Changed synopsis of VoipConnectRecvVoiceCbT.
+
+        VoipHeadset
+            Added support for piggy-backing reliable data over voip traffic (data packets and ping packets)
+                * Changed to adapt to change in synopsis of VoipConnectRecvVoiceCbT.
+
+        VoipPacket
+            Added support for piggy-backing reliable data over voip traffic (data packets and ping packets)
+                * Added new constants, and ReliableDataInfoT, ReliableDataT, ReliableAckT.
+
+        VoipPriv
+            Added support for piggy-backing reliable data over voip traffic (data packets and ping packets)
+                * Changed implementation of VOIP_CopyUser() to use ds_memcpy_s() instead of ds_strnzcpy().
+                * Changed VoipUserExT to be conditionally compiled in for XBOXONE only.
+
+    DirtySDK (PS4)
+        DirtyWebApiPS4
+            Added DirtyWebApiUpdate to issue callbacks from same thread as NetConnIdle. This feature can be enabled
+            or disabled with 'qcal' control selector. By default the feature is disabled.
+
+    DirtySDK (XboxOne)
+        VoipXboxOne
+            Added support for piggy-backing reliable data over voip traffic (data packets and ping packets)
+                * Added call to VoipConnectionReliableBroadcastUser() from VoipActivateLocalUser().
+
+    DirtySDK (Xenon)
+       ConnApiXenon
+        Removed the dependency of the CONNAPI_MAXCLIENT from the function ConnApiUpdateDemangle().
+
+Changes/fixes in this release:
+
+    DirtySDK (iOS)
+        DirtyLib
+            Fixed incorrect critical section length for iOS64
+
+    DirtySDK (PC)
+        Build
+            Fixed compilation warnings for deprecated winsock2 calls with WindowsSDK 8.1
+
+    DirtySDK (PS3)
+        NetConnPS3
+            Fixed the processing of the SCE_NP_MANAGER_STATUS_OFFLINE event when we are early on in the connection
+            process to prevent us from becoming stuck in +con when PSN is down.
+
+            Fixed the handling of cellNetCtlNetStartDialogUnloadAsync() which was being treated as a synchronous
+            function.
+
+    DirtySDK (PS4)
+        VoipPS4
+            Changed the chat permission to applied on a player to player basis when not using the Playstation Camera
+
+    DirtySDK (WinRT)
+        DirtyLibWinRT
+            Fixed incorrect thread priority initialization in NetLibCreate().
+
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Fixed a build error that occurs when IEAUSER is not used.
+
+        PrivilegeApiXboxOne
+            Fixed a memory stomp.
+
+    DirtySDK (Xenon)
+        Build
+            Fixed a build break in the post build step of ATGFramework, which is used for the Xenon samples.
+
+        ConnApiXenon
+            Fixed secure address resolution not being done for new connections to be established after host migration.
+
+        FriendApiXenon
+            Fixed a potential issue where friend data could be populated in the incorrect slot.
+
+
+EADP Game Services DirtySDK 2015 Winter 0.2.0 - January 28, 2015
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   2.19.00
+        Framework   3.25.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.05-1
+        Capilano    CapilanoSDK 6.2.11785.0-proxy
+                    capilano_config 1.00.14
+        Kettle      kettlesdk 2.000.091-proxy
+                    kettle_config 1.01.08
+        iPhone      ios_config 1.01.05
+                    iphonesdk 7.0-proxy-5
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.07.00
+        PS3         ps3sdk 450.001-lite
+                    PlayStation3NpEx 450.001
+        Win32/WinRT/WinPRT
+                    DotNetSDK 4.0
+                    VisualStudio 11.0.50727-proxy
+                    WindowsSDK 8.0.50727-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+        Xenon       XenonSDK 2.0.21256.3-proxy
+
+New in this release:
+
+    DirtySDK (All)
+        PrivilegeApi
+            Added PRIVILEGEAPI_PRIV_INVALID privilege for ease of use.
+
+    DirtySDK (PC)
+        VoipSpeex
+            Added the dll export tag to extern const VoipCodecDefT VoipSpeex_CodecDef.
+
+    DirtySDK (PS3)
+        NetConnPS3
+            Added logging for connection status changes.
+
+    DirtySDK (PS4)
+        DirtySessionMangerPS4
+            Added session lock support (prevent user from joining). A PS4 session can not be locked/unlocked
+            using the 'lock' selector.
+
+        NetConnPS4
+           Added logging for connection status changes.
+
+    DirtySDK (XboxOne)
+        NetConnXboxOne
+            Removed automatic reset user list support when IEAUSER is used.
+
+            Added logging for connection status changes
+
+        UserApiXboxOne
+            Added Support for ProfileChanged Event. Please use the new UserApiNotifyDataT::ProfileUpdateData type
+            and UserApiNotifyTypeE::USERAPI_NOTIFY_PROFILE_UPDATE to listen for the event.
+
+    DirtySDK (Xenon)
+        NetConnXenon
+            Added logging for connection status changes
+
+Changes/fixes in this release:
+
+    DirtySDK (All)
+        ConnApi
+            Fixed a bug where ConnApi will tried to initialize clients with NULL machine address.
+
+        DirtyMem
+            Fixed to export DirtyMemAlloc and DirtyMemFree when building as a DLL.
+
+            Added include of <stdlib.h> to prevent malloc() and free() calls for default memory allocators compiling
+            out when building as a DLL.
+
+        DirtyPng
+            Fixed a wrong usage of ds_strnzcpy that leads to a memory stomp.
+
+        NetConn
+            Fixed NetConnStatus() not propagating the iData parameter to SocketInfo() for selectors that are passed
+            through.
+
+        ProtoHttp
+            Fixed a memory pointer issue when sending chunked http transaction faster than the network can keep up
+            that could lead to potentially sending parts of uninitialized memory over the network.
+
+            Changed to check status of open keep-alive connection in the DONE state, to detect server-closed
+            connections when they are closed, rather than waiting until the ProtoHttp ref is used in a new transaction
+            or destroyed.
+
+        VoipConnection
+            Fixed an integration error. VoipConnectionStartup() will now have a max player check. If for any reason
+            voip system is not started properly voip setup will be skipped by Blaze.
+
+    DirtySDK (iOS)
+        DirtyLib
+            Fixed wrong critical section length for iOS64.
+
+    DirtySDK (PS4)
+        DirtyWebApiPS4
+            Changed priority and scheduling setting of internal threads in favor of less aggressive threading
+            patterns to avoid negatively impacting game with unnecessary thread switches during game play.
+
+        NetConnPS4
+            Fixed an error which prevents users from going online if PSN does not respond quickly to the parental
+            settings query.
+
+        PrivilegeApiPS4
+            Fixed an integration error, which caused _PrivilegeApiUpdateDialogStatus callback not to be removed properly.
+
+    DirtySDK (XboxOne)
+        ProtoMangleXboxOne
+            Fixed a potential crash if a client is removed and re-added while corresponding security association
+            creation is in progress.
+
+
+EADP Game Services DirtySDK 2015 Winter 0.1.0 - December 4, 2014
+
+    This SDK release was built using the following compiler packages:
+
+        EA Config   2.19.00
+        Framework   3.25.00
+
+        Android     androidsdk 18-2
+                    androidndk r9c
+                    android_config 1.06.05-1
+        Capilano    CapilanoSDK 6.2.11785.0-proxy
+                    capilano_config 1.00.14
+        Kettle      kettlesdk 2.000.071-proxy
+                    kettle_config 1.01.07
+        iPhone      ios_config 1.01.05
+                    iphonesdk 7.0-proxy-5
+        OSX         UnixGCC 0.05.00
+                    osx_config 1.00.01
+        Linux/Unix  UnixClang  0.07.00
+        PS3         ps3sdk 450.001-lite
+                    PlayStation3NpEx 450.001
+        Win32/WinRT/WinPRT
+                    DotNetSDK 4.0
+                    VisualStudio 11.0.50727-proxy
+                    WindowsSDK 8.0.50727-proxy
+                    WindowsPhoneSDK 8.0.9900-proxy
+        Xenon       XenonSDK 2.0.21256.3-proxy
+
+    *** Important - Complementary integration guidelines available on Confluence ***
+        DirtySDK 2015 Winter Upgrade available here:
+        https://docs.developer.ea.com/display/dirtysock/DirtySDK+2015+Winter+Upgrade+Guide
+
+New in this release:
+
+    DirtySDK (All)
+        ProtoSSL
+            Added support for AES-128-GCM-SHA256 and AES-256-GCM-SHA384 cipher suites.
+
+            Added two obsolete alternate definitions for sha1withRSAEncryption for compatibility with some software
+            that generates certificates using these object IDs, for example makecert.exe in WindowsSDK.
+
+        ProtoTunnel
+            Enhanced debug logging for the 'bnds' selector.
+
+        Voip
+            Enhanced API for user registration to better support MLU (Multiple Local Users) scenarios. Every local user
+            should now be registered with the voip sub-system using VoipSetLocalUser() in order for its headset status
+            info to be available for queries. To additionally get fully functional voip, local users must be further
+            activated with VoipActivateLocalUser(), which promotes the user to a "participating" state. Basically any
+            user being pulled into the game should be a participating user. Associated public api impact:
+                * New synopsis for VoipSetLocalUser()
+                * New function to promote local users to "participating" state: VoipActivateLocalUser()
+
+        VoipGroup
+            Enhanced VoipGroup api. It was re-aligned with changes to the voip api called out above.
+                * New function to promote local users to "participating" state: VoipGroupActivateLocalUser()
+
+    DirtySDK (PC)
+        DirtyErrPC
+            Added DirtyErrPC implementation with pc-specific errors.
+
+        ProtoPingPC
+            Added a new version of protoping for PC, using ICMPSendEcho2() API.  This API allows use of ICMP when an
+            application is run without administrator privilege, which is required for use of RAW sockets employed with
+            protoping.c.
+
+    DirtySDK (PS4)
+        VoipHeadsetPS4
+            Enhanced _VoipHeadsetIsLocalVoiceFrameReady() to detect voice readiness quicker.
+
+            Added '-pbk' and '+pbk' selectors to better support our voip channel feature under MLU scenarios.
+
+    DirtySDK (WinRT/WintPRT)
+        DirtyLibWinRT
+            Enhanced NetPrintfCode() to use OutputDebugStringA() instead of OutputDebugStringW().
+
+    DirtySDK (XboxOne)
+        UserApiXboxOne
+            Added support for the 'avsz' selector. Now different profile pictures sizes can be fetched.
+
+        VoipXboxOne
+            Added selectors:
+            VoipStatus 'pcac' - returns true if party chat is active
+            VoipStatus 'pcsu' - returns true if party chat is currently suspended
+            VoipControl 'pcsu' - takes iValue as a bool, TRUE suspend party chat, FALSE resume it
+            In order for VoipControl 'pcsu' to work you must add to the appxmanifest.xml:
+            <mx:Extension Category="xbox.multiplayer">
+                <mx:XboxMultiplayer CanSuppressPartyChat="true" />
+            </mx:Extension>
+
+Changes/fixes in this release:
+
+    DirtySDK (All)
+        General
+            Replaced APIs deprecated by Microsoft with generic equivalents.
+
+        ConnApi
+            Changed synopsis of ConnApiOnline(): it no longer has a pSelfAddr parameter.
+
+            Changed ConnApiUserInfoT.uClientFlags to ConnApiUserInfoT.uFlags.
+
+            Changed ConnApiClientInfoT.uMachineId to ConnApiCLientInfoT.uId.
+
+            Removed multiple virtual machine mode: connapi 'mvtm' status and control selectors no longer exist.
+            The implementation is now multiple-virtual-machine capable by default.
+
+            Removed ConnApiUserInfoT, ConnApiAddUser() and ConnApiRemoveUser() for all platforms except xbox360.
+
+            Removed ConnApiFindClient(), then renamed ConnApiFindClientById() to ConnApiFindClient().
+
+            Removed ConnApiClientInfoT.strUniqueId
+
+            Removed _ConnApiDefaultCallback() and made the debug logging client-centric instead of user-centric.
+
+        DirtyNet
+            Changed all dirtynet files to log unsupported status selectors the same way.
+
+        NetGameLink
+            Changed implementation to avoid code duplication: moved packet loss calculation logics into a static
+            function.
+
+            Changed the names of several member variables in the NetGameLinkStatT structure. The changes are listed below:
+            bps  to outbps
+            rps  to outrps
+            nps  to outnps
+            pps  to outpps
+            rpps to outrpps
+
+        ProtoSSL
+            Changed to request TLS1.2 instead of TLS1.1.  Servers are still allowed to select any version from TLS1.2
+            down to SSLv3.
+
+            Changed to use 64-bit time for certificate expiration checking, so certificates created with expiration
+            times far in the future won't fail validation.
+
+            Changed to harden protossl against multi-threaded use causing obscure secure failures.
+
+        VoipConnection
+            Removed platform specificities in _VoipConnectionInit().
+
+        VoipPacket
+            Changed value of VOIP_PACKET_STATUS_FLAG_METADATA from 2 to 1.
+
+    DirtySDK (PS4)
+        DirtyWebApiPS4
+            Removed DirtyWebApiCreate()/DirtyWebApiCreateEx() and renamed DirtyWebApiCreateEx2() to
+            DirtyWebApiCreate().
+
+            Changed WebApi threads to only wakeup when there are jobs queued.
+
+        VoipHeadsetPS4
+            Fixed establishment of connections between a decoder port and all local speaker ports when a user is added
+            after a decoder was created.
+
+    DirtySDK (XboxOne)
+        DirtyNetXboxOne
+            Fixed _SocketAddrMapGet() to no longer include the port value when trying to match an input ipv6 address
+            with an existing mapping. This change is required for multi-hub test bench to be functional on xboxone:
+            because hubs all bind to different game port, the inbound traffic source port may not be same as the ipv6
+            address mapped when resolving secure device address for the local console.
+
+        VoipHeadsetXboxOne
+            Deprecated support for pre-March2014 XDKs (_XDK_VER < 10698).
+
+            Replaced VOIPHEADSET_VOICELIB_DEBUG with VOIPHEADSET_DEBUG.
+
+    DirtySDK (Xenon)
+        ConnnApiXenon
+            Changed internal usage of some control selectors: moved call to ConnApiXenonManagerControl('self')
+            and VoipGroupControl('lusr') from ConnApiOnline() to _ConnApiInitClientList()
+
+            Fixed connapixenon to properly update the remote tunnel port with the peer's internally bound port
+            when the internal address (i.e. internal to NAT scope) is used to reach that peer.
+
+            Fixed a logical error forcing the voip connection attempt to fail early.

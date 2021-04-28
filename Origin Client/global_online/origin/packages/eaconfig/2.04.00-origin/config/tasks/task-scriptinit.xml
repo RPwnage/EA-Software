@@ -1,0 +1,63 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <taskdef assembly="${nant.project.temproot}/eaconfig/script-init-verify.dll">
+    <sources>
+      <includes name="./source/script-init-verify.cs"/>
+      <includes name="./source/set-public-data.cs"/>
+    </sources>
+  </taskdef>
+
+  <createtask name="ScriptInit">
+    <parameters>
+      <option name="PackageName" value="Required" />
+      <option name="IncludeDirs" />
+      <option name="Libs" />
+    </parameters>
+    <code>
+      <echo message="ScriptInit('${ScriptInit.PackageName}', '${ScriptInit.IncludeDirs}', '${ScriptInit.Libs}')" if="${nant.verbose}"/>
+
+      <property name="package.${ScriptInit.PackageName}.includedirs" unless="@{StrIsEmpty(${ScriptInit.IncludeDirs})}">
+        ${ScriptInit.IncludeDirs}
+      </property>
+      <property name="package.${ScriptInit.PackageName}.includedirs" if="@{StrIsEmpty(${ScriptInit.IncludeDirs})}">
+        ${package.${ScriptInit.PackageName}.dir}/include
+      </property>
+
+      <choose>
+        <do unless="@{StrIsEmpty(${ScriptInit.Libs})}">
+          <fileset name="package.${ScriptInit.PackageName}.libs">
+            <includes name="${ScriptInit.Libs}" />
+          </fileset>
+        </do>
+        <do>
+          <!-- Verify that ScriptInitTask is applied properly -->
+          <script-init-verify package-name="${ScriptInit.PackageName}" output-property-name="include-default-library"/>
+          <do if="${include-default-library}">
+            <property name="package.${ScriptInit.PackageName}.default.scriptinit.lib" value="${package.${ScriptInit.PackageName}.builddir}/${config}/lib/${lib-prefix}${ScriptInit.PackageName}${lib-suffix}"/>
+            <fileset name="package.${ScriptInit.PackageName}.libs">
+              <includes name="${package.${ScriptInit.PackageName}.default.scriptinit.lib}"/>
+            </fileset>
+          </do>
+        </do>
+      </choose>
+    </code>
+  </createtask>
+
+  <!-- Example usage
+  <task name="ScriptInit" PackageName="mypackage" />
+  <task name="ScriptInit" PackageName="mypackage" IncludeDirs="include" />
+  <task name="ScriptInit" PackageName="mypackage" Libs="lib" />
+  <task name="ScriptInit" PackageName="mypackage">
+    <IncludeDirs>
+      include
+    </IncludeDirs>
+    <Libs>
+      lib
+    </Libs>
+  </task>
+-->
+
+</project>

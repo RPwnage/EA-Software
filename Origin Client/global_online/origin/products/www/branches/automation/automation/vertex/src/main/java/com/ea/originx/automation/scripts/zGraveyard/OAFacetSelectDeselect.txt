@@ -1,0 +1,94 @@
+package com.ea.originx.automation.scripts.browsegames;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.store.BrowseGamesPage;
+import com.ea.originx.automation.lib.pageobjects.store.StoreFacet;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test browse games store facet - select/deselect menu options
+ *
+ * @author palui
+ */
+public class OAFacetSelectDeselect extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 2998165)
+    @Test(groups = {"browsegames", "full_regression"})
+    public void testFacetSelectDeselect(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        UserAccount userAccount = AccountManager.getRandomAccount();
+        String userName = userAccount.getUsername();
+        userAccount.cleanFriends(); // prevent chat window pop-ups from covering the store facet
+
+        logFlowPoint("Launch Origin client and login as user: " + userName); //1
+        logFlowPoint("Navigate to 'Browse Games' page"); //2
+        logFlowPoint("Click store facet filter 'Price - Under $5'. Verify the filter option is checked"); //3
+        logFlowPoint("Verify all store game tile prices are under $5"); //4
+        logFlowPoint("Click store facet filter 'Price - Under $5' again. Verify the filter option is unchecked"); //5
+        logFlowPoint("Verify some store game tile prices can now be over $5"); //6
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Verified login successful as user: " + userName);
+        } else {
+            logFailExit("Failed: Cannot login as user: " + userName);
+        }
+
+        //2
+        NavigationSidebar navSideBar = new NavigationSidebar(driver);
+        BrowseGamesPage browseGamesPage = navSideBar.gotoBrowseGamesPage();
+        browseGamesPage.waitForGamesToLoad();
+        if (browseGamesPage.verifyBrowseGamesPageReached()) {
+            logPass("Verified 'Browse Games' page opens successfully");
+        } else {
+            logFail("Failed: Cannot open 'Browse Games' page");
+        }
+
+        //3
+        StoreFacet storeFacet = new StoreFacet(driver);
+        storeFacet.clickOption("Price", "Under $5");
+        storeFacet.scrollToOption("Price", "Under $5");
+        if (storeFacet.isOptionChecked("Price", "Under $5")) {
+            logPass("Verified 'Price - Under $5' is checked successfully");
+        } else {
+            logFailExit("Failed: Cannot check 'Price - Under $5'");
+        }
+
+        //4
+        if (browseGamesPage.verifyAllStoreGamePricesUnder(5.0f)) {
+            logPass("Verified all store game tile prices are under $5");
+        } else {
+            logFail("Failed: Not all store game tile prices are under $5");
+        }
+
+        //5
+        storeFacet.clickOption("Price", "Under $5");
+        storeFacet.scrollToOption("Price", "Under $5");
+        if (!storeFacet.isOptionChecked("Price", "Under $5")) {
+            logPass("Verified 'Price - Under $5' is unchecked successfuly");
+        } else {
+            logFailExit("Failed: Cannot uncheck 'Price - Under $5'");
+        }
+
+        //6
+        if (!browseGamesPage.verifyAllStoreGamePricesUnder(5.0f)) {
+            logPass("Verified some store game tile prices are not under $5");
+        } else {
+            logFail("Failed: All store game tile prices are still under $5");
+        }
+
+        softAssertAll();
+    }
+}

@@ -1,0 +1,167 @@
+package com.ea.originx.automation.lib.pageobjects.store;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+import com.ea.originx.automation.lib.pageobjects.dialog.CheckoutConfirmation;
+import com.ea.originx.automation.lib.pageobjects.template.EAXVxSiteTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import com.google.gson.Gson;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Page object that represents the 'Free Games Trials' page.
+ *
+ * @author nvarthakavi
+ */
+public class FreeGamesTrialsPage extends EAXVxSiteTemplate {
+
+    private static final By TITLE_LOCATOR = By.cssSelector(".origin-store-paragraph-pagetitle[description='Trials']");
+
+    private static final String FREE_GAME_TRIAL_TILE_CSS = ".origin-store-freegames-program .origin-store-program-offer";
+    private static final By FREE_GAME_TRIAL_TILES_LOCATOR = By.cssSelector(FREE_GAME_TRIAL_TILE_CSS);
+    protected static final String FREE_GAME_TRIAL_TILE_CSS_TMPL = FREE_GAME_TRIAL_TILE_CSS + "[offer-id='%s']";
+
+    /**
+     * Constructor
+     *
+     * @param driver Selenium WebDriver
+     */
+    public FreeGamesTrialsPage(WebDriver driver) {
+        super(driver);
+    }
+
+    /**
+     * Verify the trials page is reached.
+     *
+     * @return true if the page is displayed, false otherwise
+     */
+    public boolean verifyFreeGamesTrialPageReached() {
+        return waitIsElementVisible(TITLE_LOCATOR);
+    }
+
+    /**
+     * Get all 'Free Games Trial' tile WebElements.
+     *
+     * @return List of all 'Free Games Trial' tile WebElements on this 'Free
+     * Games Trials' page
+     */
+    private List<WebElement> getAllFreeGamesTrialTileElements() {
+        waitForAngularHttpComplete();
+        waitForPageToLoad();
+        List<WebElement> currentFreeGamesTrialTileElements = driver.findElements(FREE_GAME_TRIAL_TILES_LOCATOR);
+        int numRetries = 5;
+        for (int i = 0; i < numRetries; i++) {
+            if (!currentFreeGamesTrialTileElements.isEmpty()) {
+                return currentFreeGamesTrialTileElements;
+            }
+            Waits.sleep(1000);
+            currentFreeGamesTrialTileElements = driver.findElements(FREE_GAME_TRIAL_TILES_LOCATOR);
+        }
+        throw new RuntimeException("No free game tile elements found");
+    }
+
+    /**
+     * Get all 'Free Games Trial' tile objects.
+     *
+     * @return List of all 'Free Games Trial' tiles on this 'Free Games Trials'
+     * page
+     */
+    public List<TrialTile> getAllFreeGamesTrialTiles() {
+        List<TrialTile> trialTiles = getAllFreeGamesTrialTileElements().
+                stream().map(webElement -> new TrialTile(driver, webElement)).collect(Collectors.toList());
+        return trialTiles;
+    }
+
+    /**
+     * Get the first 'Free Game Trial' tile on the page that is not a 'Third
+     * Party' entitlement.
+     *
+     * @return The first 'Free Game Trial' tile on the page that is not 'Third
+     * Party' entitlements.
+     */
+    public TrialTile getFirstNonThirdPartyTrialTile() throws JSONException {
+        jsExec.executeScript("return angular.reloadWithDebugInfo()"); // reloads page with angular debug info
+        Waits.pollingWait(() -> verifyFreeGamesTrialPageReached());
+        Waits.pollingWait(() -> waitForFreeGamesTilesToLoad());
+
+        List<WebElement> trialTiles = driver.findElements(FREE_GAME_TRIAL_TILES_LOCATOR);
+
+        for (int i = 0; i < trialTiles.size(); i++) {
+            WebElement element = trialTiles.get(i);
+            Object obj = jsExec.executeScript("return angular.element(arguments[0]).scope().model", element);
+            String json = new Gson().toJson(obj); // convert 'json look-a-like string' into an actual json string
+            if (new JSONObject(json).getString("isThirdPartyTitle") == "false") {
+                return new TrialTile(driver, element);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get a specific 'Free Games Trial' tile element given its offer ID.
+     *
+     * @param offerId Entitlement offer ID
+     * @return 'Free Games Trial' tile WebElement for the given offer ID on this
+     * 'Free Games Trials' page tab, or throw NoSuchElementException
+     */
+    private WebElement getFreeGamesTrialTileElement(String offerId) {
+        scrollToElement(waitForElementVisible(By.cssSelector(String.format(FREE_GAME_TRIAL_TILE_CSS_TMPL, offerId)))); //added this scroll as the element is hidden
+        return driver.findElement(By.cssSelector(String.format(FREE_GAME_TRIAL_TILE_CSS_TMPL, offerId)));
+    }
+
+    /**
+     * Get a specific 'Free Games Trial' tile object given its offer ID.
+     *
+     * @param offerId Entitlement offer ID.
+     * @return 'Trial Tile' for the given offer ID on this 'Free Games Trials'
+     * page, or throw NoSuchElementException
+     */
+    public TrialTile getFreeGamesTrialTile(String offerId) {
+        return new TrialTile(driver, getFreeGamesTrialTileElement(offerId));
+    }
+
+    /**
+     * Get a list of all 'Free Games Trial' tile offer IDs.
+     *
+     * @return List of all 'Free Games Trial' tile offer IDs on this 'Free Games
+     * Trials' page
+     */
+    public List<String> getAllOfferIds() {
+        List<WebElement> freeGamesTrialTileElements = getAllFreeGamesTrialTileElements();
+        List<String> offerids = new ArrayList<>();
+        for (WebElement freeGamesTrialTile : freeGamesTrialTileElements) {
+            offerids.add(freeGamesTrialTile.getAttribute("offer-id"));
+        }
+        return offerids;
+    }
+
+    /**
+     * Add the given 'Free Games Trial' tile to the library by clicking the
+     * corresponding 'Get It Now' button.
+     *
+     * @param offerId The offer ID of the entitlement to be selected to add to
+     * the 'Game Library'.
+     */
+    public void addTrialGameToLibrary(String offerId) {
+        TrialTile trialTile = getFreeGamesTrialTile(offerId);
+        trialTile.clickGetItNowButton();
+        CheckoutConfirmation checkoutConfirmation = new CheckoutConfirmation(driver);
+        checkoutConfirmation.waitForVisible();
+        checkoutConfirmation.clickCloseCircle();
+    }
+
+    /**
+     * Wait for all the tiles to load.
+     *
+     * @return true if the tiles are stabilized, false otherwise
+     */
+    public boolean waitForFreeGamesTilesToLoad() {
+        return waitForAnimationComplete(FREE_GAME_TRIAL_TILES_LOCATOR);
+    }
+}

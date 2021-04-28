@@ -1,0 +1,87 @@
+<project>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="build-installer">
+
+    <property name="outdir" value="${package.dir}\bin"/>
+
+
+    <script language="C#">
+      <code>
+        <![CDATA[
+          // returns the numeric portion of the version consisting of three number sequences separated by dots
+          private static int[] ExtractNumericVersion(string version_string) {
+            var regex = new System.Text.RegularExpressions.Regex(@"(\s*)(?<major>\d+)[.](?<minor>\d+)[.](?<fix>\d+)(\s*)");
+            var match = regex.Match(version_string);
+            if (match.Success) {
+              return new int[]{ 
+                Int32.Parse(match.Groups["major"].Value),
+                Int32.Parse(match.Groups["minor"].Value), 
+                Int32.Parse(match.Groups["fix"].Value) };
+            }
+            return new int[]{ 0, 0, 0 };
+          }
+        
+          // This script simply compares package version against assembly version
+          public static void ScriptMain(Project project) {
+            string target_version_string = project.Properties["package.targetversion"];
+            string assembly_version_string = project.Properties["nant.version"];
+            
+            // we ignore version comparision when version is dev
+            if (target_version_string == "dev") {
+              project.Properties.Add("TargetVersionEqualsAssemblyVersion", "True");
+              return;
+            }
+            
+            int[] target_version = ExtractNumericVersion(target_version_string);
+            int[] assembly_version = ExtractNumericVersion(assembly_version_string);
+            
+            bool versionsEqual = (
+		target_version.Length == 3 && assembly_version.Length == 3
+		&& target_version[0] == assembly_version[0]
+                && target_version[1] == assembly_version[1]
+                && target_version[2] == assembly_version[2]);
+            project.Properties.Add("TargetVersionEqualsAssemblyVersion", versionsEqual.ToString());
+          }
+        ]]>
+      </code>
+    </script>
+    <fail unless="${TargetVersionEqualsAssemblyVersion}" 
+          message="Package version (${package.targetversion}) does not match assembly version (${nant.version}),
+          you may need to update VersionInfo.cs and rebuild"/>
+    
+    <exec message="Building Registration Utility in '${outdir}', log to '${Framework.logDir}\Installer.RegFramework.log'"
+    program="${package.dir}/external/NSIS/makensis.exe">
+      <arg value='/O"${Framework.logDir}\Installer.RegFramework.log"'/>
+      <arg value='/v3'/>
+      <arg value='/DOUTDIR="${outdir}" '/>
+      <arg value='/DNAME="${package.name}"'/>
+      <arg value='/DVERSION="${package.targetversion}"'/>
+      <arg value='"RegFramework.nsi"'/>
+      <inputs>
+        <includes name="**"/>
+        <includes name="${outdir}/*"/>
+        <excludes name="${outdir}/RegFramework.exe"/>
+      </inputs>
+      <outputs basedir="${outdir}">
+        <includes name="RegFramework.exe"/>
+      </outputs>
+    </exec>
+
+    <exec message="Building Installer in '${Framework.installerDir}', log to '${Framework.logDir}\Installer.Framework.log'"
+          program="${package.dir}/external/NSIS/makensis.exe">
+      <arg value='/O"${Framework.logDir}\Installer.Framework.log"' />
+      <arg value='/v3' />
+      <arg value='/DOUTDIR="${Framework.installerDir}" '/>
+      <arg value='/DNAME="${package.name}"' />
+      <arg value='/DVERSION="${package.targetversion}"' />
+      <arg value='"Framework.nsi"' />
+    </exec>
+
+    <echo message="
+*** --------------------------------------------------------------------------- Installer Build Done
+*** Path  : '${Framework.installerDir}\${package.name}-${package.targetversion}.exe}'" />
+  </target>
+
+
+</project>

@@ -1,0 +1,37 @@
+void exampleEnumerator()
+{
+   OriginHandleT handle;
+   uint32_t TotalCount;
+
+   // Call the function to retrieve a handle that allows the friends to be retrieved.
+   // Data associated with this query is only valid for as long as the handle exists.
+   OriginErrorT err = OriginQueryFriendsSync(OriginGetDefaultUser(), &TotalCount, 10000, &handle);
+
+   if (err == ORIGIN_SUCCESS)
+   {
+       uint32_t total, available;
+
+       // Check that there is data available
+       err = OriginGetEnumerateStatus(handle, &total, &available);
+
+       if (err == ORIGIN_SUCCESS)
+       {
+           // This shows a locally allocated data structure by way of example.
+           OriginFriendT * Friends = new OriginFriendT[TotalCount];
+           uint32_t count;
+
+           // Read data from enumerator using the handle.
+           err = OriginReadEnumeration(handle, Friends, TotalCount, 0, ORIGIN_READ_ALL_DATA, &count);
+
+           if (err == ORIGIN_SUCCESS)
+           {
+               for (uint32_t i=0; i<count; i++)
+                   printf("UserId: %I64d, Persona: %S", Friends[i].UserId, Friends[i].Persona);
+           }
+           delete[] Friends;
+       }
+   }
+
+   // By destroying the handle, the data associated with it becomes invalid.
+   err = OriginDestroyHandle(handle);
+}

@@ -1,0 +1,146 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.CheckoutConfirmation;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.ReviewOrderPage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test checks if a subscribed user is able to add a Vault game to 'Game Library' through CTA
+ *
+ * @author cbalea
+ */
+public class OAPDPHeroUnownedSubscriber extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12312)
+    @Test(groups = {"full_regression", "client_only", "pdp"})
+    public void testPDPHeroUnownedSubscriber(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        final EntitlementInfo entitlementInfo = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_PREMIUM);
+        final String entitlementName = entitlementInfo.getName();
+
+        logFlowPoint("Log into origin with a fresh account"); //1
+        logFlowPoint("Purchase an Origin Access Subscription"); //2
+        logFlowPoint("Navigate to a PDP of an entitlement in the Vault"); //3
+        logFlowPoint("Verify the CTA indicates the entitlement is available through Origin Access"); //4
+        logFlowPoint("Click on the CTA and verify checkout dialog is displayed"); //5
+        logFlowPoint("Navigate to the Game Library and verify the entitlement was added successfully"); //6
+        logFlowPoint("Navigate back to the same PDP"); // 7
+        logFlowPoint("Click on the 'You can also purchase separately' button and verify there is an option to purchase the entitlement"); //8
+        logFlowPoint("Click on the buy button, and verify the checkout flow begins"); //9
+        logFlowPoint("Verify the legal links and copy are visible"); //10
+        logFlowPoint("Verify clicking on the legal links opens a browser"); //11
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with newly registered account " + userAccount.getUsername());
+        } else {
+            logFailExit("Could not log into Origin with the user " + userAccount.getUsername());
+        }
+
+        //2
+        if (MacroOriginAccess.purchaseOriginAccess(driver)) {
+            logPass("Successfully Purchased Origin Access.");
+        } else {
+            logFailExit("Could not Purchase Origin Access.");
+        }
+
+        //3
+        if (MacroPDP.loadPdpPage(driver, entitlementInfo)) {
+            logPass("Successfully navigated to the PDP for " + entitlementName);
+        } else {
+            logFailExit("Could not navigate to the PDP for " + entitlementName);
+        }
+
+        //4
+        PDPHeroActionCTA pdpHeroActionCTA = new PDPHeroActionCTA(driver);
+
+        if (pdpHeroActionCTA.verifyDirectAcquisitionButtonVisible()) {
+            logPass("CTA '" + pdpHeroActionCTA.getDirectAcquisitionButtonText() + "' is displayed for entitlement after purchasing Origin Access");
+        } else {
+            logFailExit("CTA is not displayed for entitlement after purchasing Origin Access");
+        }
+
+        //5
+        pdpHeroActionCTA.clickDirectAcquisitionButton();
+        CheckoutConfirmation checkoutConfirmation = new CheckoutConfirmation(driver);
+        if (checkoutConfirmation.isDialogVisible()) {
+            logPass("On clicking the CTA, verified that the entitlement was added to 'Game Library'");
+        } else {
+            logFail("On clicking the CTA, entitlement was not added to 'Game Library'");
+        }
+
+        //6
+        checkoutConfirmation.clickCloseCircle();
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        GameLibrary gameLibrary = navBar.gotoGameLibrary();
+        if (gameLibrary.isGameTileVisibleByName(entitlementName)) {
+            logPass("Verified " + entitlementName + " is displayed in 'Game Library'");
+        } else {
+            logFailExit("Failed to display " + entitlementName + " in 'Game Library'");
+        }
+
+        //7
+        if (MacroPDP.loadPdpPage(driver, entitlementInfo)) {
+            logPass("Successfully navigated to the PDP for " + entitlementName);
+        } else {
+            logFailExit("Could not navigate to the PDP for " + entitlementName);
+        }
+
+        //8
+        pdpHeroActionCTA.unhideBuyButtonViaYouCanPurchaseLink();
+        if (pdpHeroActionCTA.verifyBuyButtonVisible()) {
+            logPass("On Clicking the 'You Can Also Purchase' Link, verified that the 'Buy' button is displayed");
+        } else {
+            logFailExit("On Clicking the 'You Can Also Purchase' Link, 'Buy' button is displayed");
+        }
+
+        //9
+        pdpHeroActionCTA.clickBuyButton();
+        if (MacroPurchase.handlePaymentInfoPage(driver)) {
+            logPass("On clicking the 'Buy' button, verified the checkout flow is displayed");
+        } else {
+            logFailExit("On clicking the 'Buy' button, the checkout flow failed to start");
+        }
+
+        //10
+        ReviewOrderPage reviewOrderPage = new ReviewOrderPage(driver);
+        reviewOrderPage.waitForReviewOrderPageToLoad();
+        if (reviewOrderPage.verifyEntitlementPurchaseTermsOfServiceText()) {
+            logPass("Verified Terms of Service text is correct");
+        } else {
+            logFailExit("Terms of Service text is incorrect");
+        }
+
+        //11
+        if (reviewOrderPage.verifyAllTermsOfServiceLinks()) {
+            logPass("Verified all the Terms of Service Links open to an external browser");
+        } else {
+            logFailExit("One or more of the Terms of Service Link does not open to an external browser");
+        }
+
+        softAssertAll();
+    }
+}

@@ -1,0 +1,187 @@
+package com.ea.originx.automation.scripts.gifting;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.helpers.UserAccountHelper;
+import com.ea.originx.automation.lib.macroaction.MacroGifting;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.account.AccountSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.account.MyGiftsPage;
+import com.ea.originx.automation.lib.pageobjects.account.MyGiftsPageOpenedGiftTile;
+import com.ea.originx.automation.lib.pageobjects.discover.OpenGiftPage;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.webdrivers.BrowserType;
+import java.util.ArrayList;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.resources.OSInfo;
+import com.ea.vx.originclient.resources.OriginClientConstants;
+
+/**
+ * Tests opening gift from my gifts tab in my account page.
+ *
+ * @author rchoi
+ * @author sbentley
+ */
+public class OAMyAccountOpenGift extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 561400)
+    @Test(groups = {"gifting", "full_regression", "int_only"})
+    public void testMyAccountOpenGift(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount giftSender = AccountManagerHelper.getUnentitledUserAccountWithCountry(OriginClientConstants.COUNTRY_CANADA);
+        final String giftSenderName = giftSender.getUsername();
+        UserAccount giftReceiver = AccountManagerHelper.registerNewThrowAwayAccountThroughREST(OriginClientConstants.COUNTRY_CANADA);
+        final String giftReceiverName = giftReceiver.getUsername();
+
+        giftSender.cleanFriends();
+        UserAccountHelper.addFriends(giftSender, giftReceiver);
+
+        final String giftMessage = "Hello";
+
+        EntitlementInfo giftedEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_PREMIUM);
+        final String giftedEntitlementName = giftedEntitlement.getName();
+
+        logFlowPoint("Log into Origin as gift sender"); //1
+        logFlowPoint("Gift a game to gift receiver account"); //2
+        logFlowPoint("Log into gift receiver account on Account Settings page");  //3
+        logFlowPoint("Navigated to My Account - My Gifts Page and Verify there is a gift in the 'Unopened Gifts' section"); //4
+        logFlowPoint("Verify username for gift sender and the text for the gift states that you have an unopened gift from the gift sender"); //5
+        logFlowPoint("Verify there is text below the bolded giftor text that prompts you to open the gift"); //6
+        logFlowPoint("Click on 'Open it' and verify it starts the gift unveiling flow"); //7
+        logFlowPoint("Verify opened gift exists by looking at entitlement name and gift sender name"); //8
+        logFlowPoint("Verify name of gift sender exists in Date Message"); //9
+        logFlowPoint("Verify the date in date message"); //10
+        logFlowPoint("Verify the message from the gift sender appears below the title"); //11
+        logFlowPoint("Verify the status of the gift appears to the right"); //12
+
+        // 1
+        WebDriver driver = startClientObject(context, client, ORIGIN_CLIENT_DEFAULT_PARAM, "/can/en-us");
+        if (MacroLogin.startLogin(driver, giftSender)) {
+            logPass("Successfully login in as gift sender " + giftSenderName);
+        } else {
+            logFailExit("Could not login in as gift sender " + giftSenderName);
+        }
+
+        // 2
+        if (MacroGifting.purchaseGiftForFriend(driver, giftedEntitlement, giftReceiverName, giftMessage)) {
+            logPass("Gifted " + giftedEntitlementName + " to the newly created account: " + giftReceiverName);
+        } else {
+            logFailExit("Could not gift " + giftedEntitlementName + " to the throwaway account");
+        }
+
+        // 3
+        AccountSettingsPage accountSettingsPage1;
+        if (ContextHelper.isOriginClientTesing(context)) {
+            driver = client.getAnotherBrowserWebDriver(BrowserType.CHROME);
+            accountSettingsPage1 = new AccountSettingsPage(driver);
+            accountSettingsPage1.navigateToIndexPage();
+            accountSettingsPage1.login(giftReceiver);
+        } else {
+            MiniProfile miniProfile = new MiniProfile(driver);
+            miniProfile.selectSignOut();
+            MacroLogin.startLogin(driver, giftReceiver);
+            miniProfile.selectAccountBilling();
+            sleep(10000); //Wait for tab to open
+            ArrayList<String> tabs = new ArrayList<String>(driver.getWindowHandles());
+            driver.switchTo().window(tabs.get(1));
+            accountSettingsPage1 = new AccountSettingsPage(driver);
+        }
+
+        if (accountSettingsPage1.verifyAccountSettingsPageReached()) {
+            logPass("Successfully logged into My Accounts page");
+        } else {
+            logFailExit("Failed to log into My Accounts page");
+        }
+
+        //4
+        accountSettingsPage1.navigateToMyGiftsPage();
+        MyGiftsPage giftsPage = new MyGiftsPage(driver);
+        boolean accountMyGiftOpensForUnopened = giftsPage.verifyMyGiftsPageSectionReached();
+        if (accountMyGiftOpensForUnopened && giftsPage.verifyUnopenedGifts()) {
+            logPass("Verified there is a gift in the 'Unopened Gifts' section");
+        } else {
+            logFail("Failed to find a gift in the 'Unopened Gifts' section");
+        }
+
+        // 5
+        if (giftsPage.verifyMostRecentUnopenedGiftFromMessageHeader(giftSenderName)) {
+            logPass("Verified username for gift sender and the text for the gift states that you have an unopened gift from the gift sender");
+        } else {
+            logFail("Failed to verify username for gift sender or the text for the gift states that you have an unopened gift from the gift sender");
+        }
+
+        // 6
+        if (giftsPage.verifyMostRecentUnopenedGiftsMessageExists()) {
+            logPass("Verified there is text below the bolded giftor text that prompts you to open the gift");
+        } else {
+            logFail("Failed to find text below the bolded giftor text that prompts you to open the gift");
+        }
+
+        // 7
+        giftsPage.clickLastUnopenedGiftsOpenButton();
+        sleep(10000); // Wait for tab to open
+        ArrayList<String> tabs = new ArrayList<>(driver.getWindowHandles());
+        driver.switchTo().window(tabs.get(1));
+        driver.get("https://beta.intregration.www.origin.com/gift/receive/" + giftedEntitlement.getOfferId() + "?automation=true&cmsstage=" + OSInfo.getCMSStage());
+        OpenGiftPage openGiftPage = new OpenGiftPage(driver);
+        if (openGiftPage.waitForVisible()) {
+            logPass("Verified it starts the gift unveiling flow");
+        } else {
+            logFailExit("Failed to start the gift unveiling flow");
+        }
+        openGiftPage.clickDownloadLater();
+        driver.close();
+        driver.switchTo().window(tabs.get(0));
+        accountSettingsPage1.navigateToMyGiftsPage();
+
+        // 8
+        MyGiftsPageOpenedGiftTile openedGift = giftsPage.getOpenedGift(giftedEntitlementName, giftSenderName);
+        if (openedGift != null) {
+            logPass("Verified opened gift exists by looking at entitlement name and gift sender name");
+        } else {
+            logFailExit("Could not find opened gift by looking at entitlement name and gift sender name");
+        }
+
+        // 9
+        if (openedGift.verifyGiftSenderNameInDateMessage(giftSenderName)) {
+            logPass("Verified name of gift sender exists in Date Message");
+        } else {
+            logFailExit("Could not verified name of gift sender in Date Message");
+        }
+
+        // 10
+        if (openedGift.verifyDateInDateMessage()) {
+            logPass("Verified the date in date message");
+        } else {
+            logFail("Could not verify the date in date message");
+        }
+
+        // 11
+        if (openedGift.verifyMessageDetail(giftMessage)) {
+            logPass("Verified the message from the gift sender appears below the title");
+        } else {
+            logFail("Could not the message from the gift sender appears below the title");
+        }
+
+        // 12
+        if (openedGift.verifyStatusExist()) {
+            logPass("Verified the status of the gift appears to the right");
+        } else {
+            logFail("Could not verify the status of the gift appears to the right");
+        }
+
+        softAssertAll();
+    }
+}

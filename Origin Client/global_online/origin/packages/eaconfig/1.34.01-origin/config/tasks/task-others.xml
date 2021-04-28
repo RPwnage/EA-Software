@@ -1,0 +1,373 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+    <createtask name="ToolbuildConfig">
+        <parameters>
+            <option name="ConfigName" value="Required" />
+        </parameters>
+        <code>
+            <property name="_temp_platform" value ="pc"/>
+            <property name="_temp_platform" value ="pc64" if="@{StrStartsWith('${ToolbuildConfig.ConfigName}','pc64-')}"/>
+            <property name="ToolbuildConfig.RetVal" value="${_temp_platform}-vc-tool-dev-opt"/>
+            <choose>
+                <do if="@{StrEndsWith('${ToolbuildConfig.ConfigName}','debug-opt')}">
+                    <property name="ToolbuildConfig.RetVal" value="${_temp_platform}-vc-tool-dev-debug-opt"/>
+                 </do>
+                <do if="@{StrEndsWith('${ToolbuildConfig.ConfigName}','debug')}">
+                    <property name="ToolbuildConfig.RetVal" value="${_temp_platform}-vc-tool-dev-debug"/>
+                </do>
+            </choose>
+           <eval code="@{PropertyUndefine('_temp_platform')}" type='Function' />
+        </code>
+    </createtask>
+
+    <createtask name="EchoOptionSet">
+		<parameters>
+			<option name="Name" value="Required" />
+		</parameters>
+		<code>
+			<echo>Echoing optionset ${EchoOptionSet.Name}</echo>
+			<foreach item="OptionSet" in="${EchoOptionSet.Name}" property="option">
+				<echo>${option.name}=${option.value}</echo>
+			</foreach>
+		</code>
+	</createtask>
+	
+	<createtask name="EchoFileSet">
+		<parameters>
+			<option name="Name" value="Required" />
+		</parameters>
+		<code>
+			<echo>Echoing fileset ${EchoFileSet.Name}</echo>
+			<foreach item="FileSet" in="${EchoFileSet.Name}" property="filename">
+				<echo>${filename}</echo>
+			</foreach>
+		</code>
+	</createtask>
+	
+	<createtask name="GetModuleBaseType">
+		<parameters>
+			<option name="Name" value="Required" />
+		</parameters>
+		<code>
+		
+			<!-- The buildtype name is remaned to avoid the default Nant names of Program and Library.  When these
+			default names are removed from Nant, we can use the passed in names. -->
+			<do if="${GetModuleBaseType.Name} == 'Program'" >
+				<property name="GetModuleBaseType.Name" value="StdProgram" />
+			</do>
+			<do if="${GetModuleBaseType.Name} == 'Library'" >
+				<property name="GetModuleBaseType.Name" value="StdLibrary" />
+			</do> 
+					
+			<property name="GetModuleBaseType.build.task" 
+				value="@{OptionSetGetValue('${GetModuleBaseType.Name}', 'build.tasks')}"/>
+			
+			<choose>
+				<do if="@{StrIndexOf('${GetModuleBaseType.build.task}', 'lib')} != -1">
+					<property name="GetModuleBaseType.RetVal" value="StdLibrary"/>
+				</do>
+				<do if="@{StrIndexOf('${GetModuleBaseType.build.task}', 'makestyle')} != -1">
+					<property name="GetModuleBaseType.RetVal" value="MakeStyle"/>
+				</do>
+				<do if="@{StrIndexOf('${GetModuleBaseType.build.task}', 'csc')} != -1">
+					<property name="GetModuleBaseType.csc.target" 
+						value="@{OptionSetGetValue('${GetModuleBaseType.Name}', 'csc.target')}"/>
+					<property name="GetModuleBaseType.RetVal" value="CSharpLibrary" 
+						if="${GetModuleBaseType.csc.target} == 'library'"/>
+					<property name="GetModuleBaseType.RetVal" value="CSharpProgram" 
+						if="${GetModuleBaseType.csc.target} == 'exe'"/>
+					<property name="GetModuleBaseType.RetVal" value="CSharpWindowsProgram" 
+						if="${GetModuleBaseType.csc.target} == 'winexe'"/>
+				</do>
+				<do if="@{StrIndexOf('${GetModuleBaseType.build.task}', 'fsc')} != -1">
+					<property name="GetModuleBaseType.fsc.target"
+						value="@{OptionSetGetValue('${GetModuleBaseType.Name}', 'fsc.target')}"/>
+					<property name="GetModuleBaseType.RetVal" value="FSharpLibrary"
+						if="${GetModuleBaseType.fsc.target} == 'library'"/>
+					<property name="GetModuleBaseType.RetVal" value="FSharpProgram"
+						if="${GetModuleBaseType.fsc.target} == 'exe'"/>
+					<property name="GetModuleBaseType.RetVal" value="FSharpWindowsProgram"
+						if="${GetModuleBaseType.fsc.target} == 'winexe'"/>
+				</do>
+				<do if="@{StrIndexOf('${GetModuleBaseType.build.task}', 'link')} != -1">
+					<property name="GetModuleBaseType.cc.defines" 
+						value="@{OptionSetGetValue('${GetModuleBaseType.Name}', 'cc.defines')}"/>
+					<property name="GetModuleBaseType.cc.options" 
+						value="@{OptionSetGetValue('${GetModuleBaseType.Name}', 'cc.options')}"/>
+					<property name="GetModuleBaseType.link.options" 
+						value="@{OptionSetGetValue('${GetModuleBaseType.Name}', 'link.options')}"/>
+					<choose>
+						<do if="@{StrIndexOf('${GetModuleBaseType.cc.options}', 'clr')} != -1">
+							<property name="GetModuleBaseType.RetVal" value="ManagedCppAssembly" 
+								if="@{StrIndexOf('${GetModuleBaseType.link.options}', '-dll')} != -1"/>
+							<property name="GetModuleBaseType.RetVal" value="ManagedCppProgram" 
+								unless="@{StrIndexOf('${GetModuleBaseType.link.options}', '-dll')} != -1"/>
+						</do>
+						<do if="@{StrIndexOf('${GetModuleBaseType.link.options}', '-dll')} != -1">
+							<property name="GetModuleBaseType.RetVal" value="DynamicLibrary"/>
+						</do>
+						<do if="@{StrIndexOf('${GetModuleBaseType.link.options}', '-mprx')} != -1">
+							<property name="GetModuleBaseType.RetVal" value="DynamicLibrary"/>
+						</do>
+            <do if="@{StrIndexOf('${GetModuleBaseType.link.options}', '-oformat=fsprx')} != -1">
+              <property name="GetModuleBaseType.RetVal" value="DynamicLibrary"/>
+            </do>
+            <do if="@{StrIndexOf('${GetModuleBaseType.link.options}', '-oformat=prx')} != -1">
+              <property name="GetModuleBaseType.RetVal" value="DynamicLibrary"/>
+            </do>
+            <do if="@{StrIndexOf('${GetModuleBaseType.cc.defines}', '_WINDOWS')} != -1">
+							<property name="GetModuleBaseType.RetVal" value="WindowsProgram"/>
+						</do>
+						<do>
+							<property name="GetModuleBaseType.RetVal" value="StdProgram"/>
+						</do>
+					</choose>
+				</do>
+				<do>		
+					<property name="GetModuleBaseType.RetVal" value="StdLibrary"/>
+				</do>
+			</choose>
+		</code>
+	</createtask>
+	
+    <createtask name="AddNetworkLibsToModule">
+        <parameters>
+            <option name="module" value="Required"/>  <!-- Need to pass in the group name as well.  That is pass in <group> or <group>.<module_name> for this variable. -->
+        </parameters>
+        <code>
+            <property name="debugcode.enabled" value="false"/>
+            <property name="debugcode.enabled" value="true" if="@{OptionSetGetValue('config-options-common', 'usedebuglibs')} == 'on'"/>
+
+            <property name="libsuffix" value=""/>
+            <property name="libsuffix" value="d" if="${debugcode.enabled}==true"/>
+
+            <do if="${config-system} == pc or ${config-system} == pc64">
+                <property name="package.isusingvc8" value="" if="'${package.VisualStudio.version}' gte '8.0.0'"/>
+                <choose>
+                    <do unless="@{PropertyExists('package.isusingvc8')}">
+                        <property name="package.eaconfig.vcdir" value="${package.VisualStudio.appdir}\VC7"/>
+                    </do>
+                    <do>
+                        <property name="package.eaconfig.vcdir" value="${package.VisualStudio.appdir}\VC"/>
+                    </do>
+                </choose>
+                <fileset name="${AddNetworkLibsToModule.module}.libs" append="true">
+                    <includes name="${eaconfig.PlatformSDK.dir.lib}/WS2_32.Lib" if="${config-system} == pc"/>
+                    <includes name="${eaconfig.PlatformSDK.dir.lib}/WS2_32.Lib" if="${config-system} == pc64"/>
+                </fileset>
+            </do> <!-- end if pc -->
+
+            <do if="${config-system} == xenon">
+                <dependent name="xenonsdk"/>
+                <fileset name="${AddNetworkLibsToModule.module}.libs" append="true">
+                   <includes name="${package.xenonsdk.appdir}/lib/xbox/xnet${libsuffix}.lib"/>
+                </fileset>
+            </do> <!-- end if xenon -->
+        </code>
+	</createtask>
+	
+	<createtask name="CommaSeparateList" >
+		<parameters>
+			<option name="MixedList" value="Required" />
+			<option name="Result" value="Required" />
+		</parameters>
+		<code>
+			<script language="c#" >
+				<code><![CDATA[
+					public static void ScriptMain(Project project)
+					{
+						char[] delims = {' ', ';', ',', '\n', '\t'};
+						String input = project.Properties["CommaSeparateList.MixedList"];
+						StringBuilder output = new StringBuilder();
+						Regex r = new Regex(@"((\s+)|(,)|(;))+");
+						project.Properties.Add(project.Properties["CommaSeparateList.Result"], r.Replace(input.Trim(), ",").Trim(delims));
+					}
+				]]></code>
+			</script>
+		</code>
+	</createtask>
+
+  <createtask name="ApplyConvertSystemIncludesToCCOptions">
+    <parameters>
+      <option name="BuildTypeName" value="Required" />
+      <option name="FileSetName" value="Required" />
+    </parameters>
+    <code>
+      <!-- Apply to master buildoptionset -->
+      <task name="__private_ConvertSystemIncludesToCCOptions" buildtype="${ApplyConvertSystemIncludesToCCOptions.BuildTypeName}"/>
+
+
+      <!-- Apply to file custom option sets -->
+      <script language="c#" >
+        <code>
+          <![CDATA[
+          public static void ScriptMain(Project project)
+          {
+            string filesetName = project.Properties["ApplyConvertSystemIncludesToCCOptions.FileSetName"];
+            System.Collections.Specialized.StringCollection names = new System.Collections.Specialized.StringCollection();
+            System.Text.StringBuilder sb = new StringBuilder();
+            if(!String.IsNullOrEmpty(filesetName))
+            {
+              foreach (FileItem fi in project.NamedFileSets[filesetName].FileItems)
+              {
+                if(fi.OptionSetName != null && !names.Contains(fi.OptionSetName))
+                {
+                  sb.AppendLine(fi.OptionSetName);
+                  names.Add(fi.OptionSetName);
+                }
+              }
+            }
+            project.Properties.Add("ApplyConvertSystemIncludesToCCOptions-Custom-Option-Sets", sb.ToString());
+          }
+        ]]>
+        </code>
+      </script>
+
+      <foreach item="String" in="${ApplyConvertSystemIncludesToCCOptions-Custom-Option-Sets}" property="__tmp_optionSetName">        
+        <task name="__private_ConvertSystemIncludesToCCOptions" buildtype="${__tmp_optionSetName}"/>
+      </foreach>
+    </code>
+  </createtask>
+
+  <createtask name="Resolve_PCH_Templates">
+    <parameters>
+      <option name="BuildTypeName" value="Required" />
+      <option name="PchFile" value="Required" />
+      <option name="PchHeaderFile" value="Required" />
+      <option name="OutputDir" value="Required" />
+      <option name="FileSetName" value="Required" />
+    </parameters>
+    <code>
+      <script language="c#" >
+        <code>
+          <![CDATA[
+          public static void ScriptMain(Project project)
+          {
+            string pchHeaderFile = project.Properties["Resolve_PCH_Templates.PchHeaderFile"];
+            string pchFile = project.Properties["Resolve_PCH_Templates.PchFile"];
+            string outputDir = project.Properties["Resolve_PCH_Templates.OutputDir"];
+            string filesetName = project.Properties["Resolve_PCH_Templates.FileSetName"];            
+            
+            System.Collections.Specialized.StringCollection names = 
+                                             new System.Collections.Specialized.StringCollection();
+
+            Replaceoptionset(project, project.Properties["Resolve_PCH_Templates.BuildTypeName"], pchHeaderFile, pchFile, null, names);
+            
+            if(!String.IsNullOrEmpty(filesetName) && !String.IsNullOrEmpty(pchFile))
+            {                            
+                foreach (FileItem fi in project.NamedFileSets[filesetName].FileItems)
+                {
+                    Replaceoptionset(project, fi.OptionSetName, pchHeaderFile, pchFile, outputDir, names);
+                }
+            }            
+          }
+          
+          public static void Replaceoptionset(Project project, string optionsetName, string pchHeaderFile, string pchFile, string outputDir, System.Collections.Specialized.StringCollection names)
+          {
+              if(optionsetName != null && !names.Contains(optionsetName))
+              {             
+                  if(project.NamedOptionSets[optionsetName] != null)
+                  {
+                      OptionSet optionSet = project.NamedOptionSets[optionsetName];
+                      if(optionSet != null)
+                      {                        
+                          string ccOptions = optionSet.Options["cc.options"];
+                          if(!String.IsNullOrEmpty(ccOptions))
+                          {       
+                              if(String.IsNullOrEmpty(pchHeaderFile))
+                              {
+                                 ccOptions = ccOptions.Replace("\"%pchheaderfile%\"",   String.Empty);
+                              }
+                              else
+                              {
+                                 ccOptions = ccOptions.Replace("%pchheaderfile%",   NAnt.Core.Util.PathNormalizer.Normalize(NAnt.Core.Util.PathNormalizer.StripQuotes(pchHeaderFile), false));
+                              }
+                              pchFile = NAnt.Core.Util.PathNormalizer.Normalize(NAnt.Core.Util.PathNormalizer.StripQuotes(pchFile), false);
+                              ccOptions = ccOptions.Replace("%pchfile%",  pchFile);
+                              if(!String.IsNullOrEmpty(outputDir))
+                              {
+                                   ccOptions = ccOptions.Replace("%outputdir%", NAnt.Core.Util.PathNormalizer.Normalize(NAnt.Core.Util.PathNormalizer.StripQuotes(outputDir), false));
+                              }
+                              optionSet.Options["cc.options"] = ccOptions;
+
+                              string createPch = optionSet.Options["create-pch"];
+                              if(createPch != null && createPch == "on")
+                              {
+                                //Assign this option to use in nant compiler task  dependency 
+                                optionSet.Options["pch-file"] = pchFile;
+                              }
+                          }                        
+                          names.Add(optionsetName);
+                      }
+                  }                  
+              }          
+          }
+          
+        ]]>
+        </code>
+      </script>
+    </code>
+  </createtask>
+
+  <createtask name="UpdateLinkOptionsWithBaseAddAndDefFile">
+    <parameters>
+      <option name="BuildTypeName" value="Required" />
+    </parameters>
+    <code>
+      <do if="${config-system}=='pc' or ${config-system}=='pc64' or ${config-system}=='xenon'">
+        <do if="${build.buildtype.base}=='StdProgram' or ${build.buildtype.base}=='DynamicLibrary'">
+
+          <property name="__private_extra_link_options" value=""/>
+
+          <!-- Definition file -->
+          <choose>
+            <do if="@{PropertyExists('${groupname}.definition-file.${config-system}')}">
+              <property name="__private_extra_link_options">
+                ${property.value}
+                -DEF:${${groupname}.definition-file.${config-system}}
+              </property>
+            </do>
+            <do if="@{PropertyExists('${groupname}.definition-file')}">
+              <property name="__private_extra_link_options">
+                ${property.value}
+                -DEF:${${groupname}.definition-file}
+              </property>
+            </do>
+          </choose>
+
+          <!-- Base address -->
+          <choose>
+            <do if="@{PropertyExists('${groupname}.base-address.${config-system}')}">
+              <property name="__private_extra_link_options">
+                ${property.value}
+                -BASE:${${groupname}.base-address.${config-system}}
+              </property>
+            </do>
+            <do if="@{PropertyExists('${groupname}.base-address')}">
+              <property name="__private_extra_link_options">
+                ${property.value}
+                -BASE:${${groupname}.base-address}
+              </property>
+            </do>
+          </choose>
+
+          <!-- Now we add these extra link options to the build set -->
+          <do unless="@{StrIsEmpty('${__private_extra_link_options}')}">
+            <optionset name="${AddBaseAddressAndDefFileToLinkOptions.BuildTypeName}">
+              <option name="link.options">
+                @{OptionSetGetValue('${AddBaseAddressAndDefFileToLinkOptions.BuildTypeName}', 'link.options')}
+                ${__private_extra_link_options}
+              </option>
+            </optionset>
+          </do>
+
+        </do>  <!-- do if StdProgram or DynamicLibrary -->
+      </do>  <!-- do if config-system==pc / pc64 / xenon -->
+    </code>
+  </createtask>
+
+
+</project>

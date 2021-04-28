@@ -1,0 +1,93 @@
+//--------------------------------------------------------------------------------------
+// Before handling window messages, DXUT passes incoming windows 
+// messages to the application through this callback function. If the application sets 
+// *pbNoFurtherProcessing to TRUE, then DXUT will not process this message.
+//--------------------------------------------------------------------------------------
+LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, bool* pbNoFurtherProcessing,
+    void* pUserContext)
+{
+    MSG msg = { 0 };
+    msg.hwnd = hWnd;
+    msg.message = uMsg;
+    msg.wParam = wParam;
+    msg.lParam = lParam;
+
+    // ////////////////////////////////////////////////////////////////////
+    // ORIGIN IGO API SUPPORT
+    // //////////////////////////////////////////////////////////////////// 
+    // OIG event handling (mouse & keyboard)   
+    bool igoIngestedMessage = OriginIGOProcessEvents(&msg);
+    
+    // make the mouse cursor visble when the IGO is active
+    CURSORINFO pci = { 0 };
+    pci.cbSize = sizeof(CURSORINFO);
+    GetCursorInfo(&pci);
+    bool isCursorVisible = pci.flags == CURSOR_SHOWING;
+
+    // ////////////////////////////////////////////////////////////////////
+    // IGO will use SetCursor() to change the cursor shape!!!
+    // ////////////////////////////////////////////////////////////////////
+
+    // little bit more complicated because of DXUT's own showCursor handling....
+    if (gIsIGOVisible && !isCursorVisible)
+    {
+        while (ShowCursor(FALSE) > 0)
+        {
+        }
+        // -1 now
+        while (ShowCursor(TRUE) < 0)
+        {
+        }
+        // 0 now
+    }
+    else
+    {
+        // otherwise hide the mouse cursor
+        if (!gIsIGOVisible && isCursorVisible)
+        {
+            while (ShowCursor(FALSE) > 0)
+            {
+            }
+            // -1 now
+            while (ShowCursor(TRUE) < 0)
+            {
+            }
+            // 0 now
+
+            if (!DXUTIsWindowed())
+                ShowCursor(FALSE); // -1 now
+        }
+    }
+
+    if (!igoIngestedMessage)
+    {
+        // Always allow dialog resource manager calls to handle global messages
+        // so GUI state is updated correctly
+        *pbNoFurtherProcessing = g_DialogResourceManager.MsgProc(hWnd, uMsg, wParam, lParam);
+        if (*pbNoFurtherProcessing)
+            return 0;
+
+        if (g_SettingsDlg.IsActive())
+        {
+            g_SettingsDlg.MsgProc(hWnd, uMsg, wParam, lParam);
+            return 0;
+        }
+
+        // Give the dialogs a chance to handle the message first
+        *pbNoFurtherProcessing = g_HUD.MsgProc(hWnd, uMsg, wParam, lParam);
+        if (*pbNoFurtherProcessing)
+            return 0;
+        *pbNoFurtherProcessing = g_SampleUI.MsgProc(hWnd, uMsg, wParam, lParam);
+        if (*pbNoFurtherProcessing)
+            return 0;
+
+        g_LightControl[g_nActiveLight].HandleMessages(hWnd, uMsg, wParam, lParam);
+
+        // Pass all remaining windows messages to camera so it can respond to user input
+        g_Camera.HandleMessages(hWnd, uMsg, wParam, lParam);
+    }
+    else
+        *pbNoFurtherProcessing = true;  // messages were handled by IGO
+
+    return 0;
+}

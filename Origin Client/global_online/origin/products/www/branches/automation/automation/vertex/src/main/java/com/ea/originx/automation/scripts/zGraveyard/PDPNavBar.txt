@@ -1,0 +1,301 @@
+package com.ea.originx.automation.lib.pageobjects.store;
+
+import com.ea.originx.automation.lib.pageobjects.template.EAXVxSiteTemplate;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+
+/**
+ * Page object that represents the 'PDP Navigation Bar' object. A PDPNavbar object contains 'Navigation'
+ * links.
+ *
+ * @author palui
+ */
+public class PDPNavBar extends EAXVxSiteTemplate {
+
+    protected static final String NAVBAR_CSS = "#storecontent origin-store-pdp-nav .store-pdp-nav-bar";
+    protected static final By NAVBAR_LOCATOR = By.cssSelector(NAVBAR_CSS);
+
+    protected static final String NAVBAR_PINNED_CSS = NAVBAR_CSS + ".store-pdp-nav-bar-pinned";
+    protected static final By NAVBAR_PINNED_LOCATOR = By.cssSelector(NAVBAR_PINNED_CSS);
+
+    protected static final String NAVBAR_PACK_ART_CSS = NAVBAR_CSS + " .store-pdp-nav-mini-poster img";
+    protected static final By NAVBAR_PACK_ART_LOCATOR = By.cssSelector(NAVBAR_PACK_ART_CSS);
+
+    protected static final String NAVBAR_NAV_CSS = NAVBAR_CSS + " .otknavbar .otknav";
+    protected static final String NAV_LINKS_CSS = NAVBAR_NAV_CSS + " > li.otkpill";
+    protected static final By NAV_LINKS_LOCATOR = By.cssSelector(NAV_LINKS_CSS + " > a");
+
+    protected static final String NAV_LINK_PARENT_CSS_TMPL = NAV_LINKS_CSS + ":nth-of-type(%s)";
+    protected static final String NAV_LINK_CSS_TMPL = NAV_LINK_PARENT_CSS_TMPL + " > a";
+
+    protected static final String NAV_MORE_DROPDOWN_CSS = NAVBAR_NAV_CSS + " > li.otkpill-overflow.otkdropdown";
+    protected static final String NAV_MORE_LINKS_CSS = NAV_MORE_DROPDOWN_CSS + " li";
+    protected static final By NAV_MORE_LINKS_LOCATOR = By.cssSelector(NAV_MORE_LINKS_CSS + " > a");
+
+    protected static final String NAV_MORE_LINK_CSS_TMPL = NAV_MORE_LINKS_CSS + ":nth-of-type(%s) > a";
+
+    protected static final By NAV_MORE_DROPDOWN_BUTTON_LOCATOR = By.cssSelector(NAV_MORE_DROPDOWN_CSS + " > a");
+
+    private List<PDPNavLink> navLinks = null; // List of navigation links each with an index and a label
+
+    private static final Logger _log = LogManager.getLogger(MethodHandles.lookup().lookupClass());
+
+    /**
+     * Inner class representing a PDP 'Navigation' link object.
+     */
+    public class PDPNavLink {
+
+        int index; // link index (starting from 1)
+        String label; // link label
+
+        By linkLocator; // to locate link when visible on the navigation bar
+        By linkParentLocator; // to locate link's parent - to check if link is hidden under the 'More' dropdown menu
+        By moreLinkLocator; // to locate link when hidden under the 'More' dropdwon menu
+
+        /**
+         * Constructor - PDPNavLink a navigation link
+         *
+         * @param index Index of the PDP Navigation Link within the Navigation
+         * Bar (starting from 1)
+         * @param label Text label of the link (Configuration, can be different
+         * for different offer)<br>
+         * Can include: Screenshots and Videos, Compare Editions, Overview,
+         * Feature, Label, System Requirements, Related Products, ...
+         */
+        public PDPNavLink(int index, String label) {
+            this.index = index;
+            this.label = label;
+            this.linkLocator = By.cssSelector(String.format(NAV_LINK_CSS_TMPL, index));
+            this.linkParentLocator = By.cssSelector(String.format(NAV_LINK_PARENT_CSS_TMPL, index));
+            this.moreLinkLocator = By.cssSelector(String.format(NAV_MORE_LINK_CSS_TMPL, index));
+        }
+
+        /**
+         * Get the index of the PDP 'Navigation' link within the 'PDP Navigation Bar'.
+         * @return Index of the PDPNavLink within the PDPNavBar (starting from
+         * 1)
+         */
+        public int getIndex() {
+            return index;
+        }
+
+        /**
+         * Get the label of the PDP 'Navigation' link.
+         *
+         * @return Label of the PDPNavLink
+         */
+        public String getLabel() {
+            return label;
+        }
+
+        /**
+         * Get the locator for the link on the 'Navigation Bar'.
+         *
+         * @return Link locator
+         */
+        public By getLinkLocator() {
+            return linkLocator;
+        }
+
+        /**
+         * Get the locator of the parent of the 'PDPNavLink'.
+         *
+         * @return Parent locator
+         */
+        public By getLinkParentLocator() {
+            return linkParentLocator;
+        }
+
+        /**
+         * Get the locator for the link at the 'More' menu.
+         *
+         * @return Link locator under the 'More' dropdown menu
+         */
+        public By getMoreLinkLocator() {
+            return moreLinkLocator;
+        }
+
+        /**
+         * Check if the link is hidden at the navigation bar (if hidden, the
+         * parent has class attribute "ng-hide").
+         *
+         * @return true if menu item hidden (under 'More') at the navigation
+         * bar, false otherwise
+         */
+        private boolean isHidden() {
+            WebElement parent = waitForElementPresent(linkParentLocator);
+            return parent.getAttribute("class").contains("ng-hide");
+        }
+
+        /**
+         * Click on a link. If the link is hidden, click it at the 'More'
+         * menu.
+         */
+        public void click() {
+            if (isHidden()) {
+                // access from the 'More' dropdown menu
+                waitForElementClickable(NAV_MORE_DROPDOWN_BUTTON_LOCATOR).click();
+                waitForElementClickable(getMoreLinkLocator()).click();
+            } else {
+                waitForElementClickable(getLinkLocator()).click();
+            }
+        }
+    }  // End of inner class PDPNavLink
+
+    /**
+     * Constructor - PDPNavBar the navigation bar
+     *
+     * @param driver Selenium WebDriver
+     */
+    public PDPNavBar(WebDriver driver) {
+        super(driver);
+    }
+
+    /**
+     * Check if the 'PDP Navigation Bar' is visible.
+     *
+     * @return true if navigation bar is visible, false otherwise
+     */
+    public boolean isVisible() {
+        return waitIsElementVisible(NAVBAR_LOCATOR);
+    }
+
+    /**
+     * Check if the 'PDP Navigation Bar' is visible and pinned.
+     *
+     * @return true if navigation bar is visible and pinned, false otherwise
+     */
+    public boolean isPinned() {
+        return waitIsElementVisible(NAVBAR_PINNED_LOCATOR);
+    }
+
+    /**
+     * Re-populate navLinks, the private list of PDPNavLink's that stores the
+     * index, label and derived locators of each link.
+     */
+    public void refreshNavLinks() {
+        if (!isVisible()) {
+            String errorMessage = "Error populating navLinks: PDP navigation bar is not visible";
+            _log.error(errorMessage);
+            throw new RuntimeException(errorMessage);
+        }
+        navLinks = new ArrayList<>(); // re-initialize
+        List<WebElement> navLinkElements = driver.findElements(NAV_LINKS_LOCATOR); // include links not visible
+        int index = 1;
+        for (WebElement element : navLinkElements) {
+            // Skip the last entry if it is 'More'
+            String label = element.getAttribute("textContent"); // use getAttr so text retrieved even if element hidden
+            if (index < navLinkElements.size() || !label.equalsIgnoreCase("More")) {
+                PDPNavLink link = new PDPNavLink(index++, element.getAttribute("textContent"));
+                navLinks.add(link);
+            }
+        }
+    }
+
+    /**
+     * Populate if necessary navLinks - the private list of PDPNavLink's that
+     * stores the index, label and derived locators of each link.<br>
+     * Note: this method does not re-populate if already populated. Use method
+     * refreshNavLinks() if force re-populate is needed.
+     */
+    public void populateNavLinks() {
+        if (navLinks == null) {
+            refreshNavLinks();
+        }
+    }
+
+    /**
+     * Get list of navigation link labels at the 'PDP Navigation Bar'.
+     *
+     * @return List of the navigation link labels
+     */
+    public List<String> getNavLinkLabels() {
+        populateNavLinks();
+        List<String> labels = new ArrayList<>();
+        for (PDPNavLink link : navLinks) {
+            String label = link.getLabel();
+            labels.add(label);
+        }
+        return labels;
+    }
+
+    /**
+     * Find PDPNavLink object with matching label.
+     *
+     * @param label Label to match
+     * @return PDPNavLink with matching label, or null if not found
+     */
+    public PDPNavLink findNavLink(String label) {
+        populateNavLinks();
+        for (PDPNavLink link : navLinks) {
+            if (link.getLabel().equalsIgnoreCase(label)) {
+                return link;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Click the PDP 'Navigation' link with matching label.
+     *
+     * @param label Label of the navigation link to click
+     */
+    public void clickNavLink(String label) {
+        populateNavLinks();
+        findNavLink(label).click();
+    }
+
+    /**
+     * Scroll past the PDP Hero to the 'PDP Navigation Bar'.
+     */
+    public void scrollToNavBar() {
+        scrollToElement(waitForElementPresent(NAVBAR_LOCATOR));
+        scrollByVerticalOffset(10); // Kludge to get the nav bar to full scroll past PDPHero and to pin
+    }
+
+    //////////////////////////////////////////////////////
+    // PDP Navigation Bar Pack Art
+    //////////////////////////////////////////////////////
+    /**
+     * Verify the 'PDP Navigation Bar' pack art is visible (visible if the
+     * Navigation Bar has been pinned).<br>
+     * This pack art is smaller than the one at the PDP hero. Click on this will
+     * scroll to the top (PDP Hero section) of the PDP page.
+     *
+     * @return true if the navigation bar pack art is visible, false otherwise
+     */
+    public boolean verifyNavBarPackArtVisible() {
+        return waitIsElementVisible(NAVBAR_PACK_ART_LOCATOR);
+    }
+
+    /**
+     * Get WebElement of the 'PDP Navigation Bar' pack art.
+     *
+     * @return WebElement of the pack art
+     */
+    private WebElement getNavBarPackArtWebElement() {
+        return waitForElementClickable(NAVBAR_PACK_ART_LOCATOR);
+    }
+
+    /**
+     * Get 'src' attribute of the 'PDP Navigation Bar' pack art.
+     *
+     * @return 'src' attribute of the pack art
+     */
+    public String getNavBarPackArtSrc() {
+        return getNavBarPackArtWebElement().getAttribute("src");
+    }
+
+    /**
+     * Click the 'PDP Navigation Bar' pack art (to go to the 'PDP Hero' section).
+     */
+    public void clickNavBarPackArt() {
+        getNavBarPackArtWebElement().click();
+    }
+}

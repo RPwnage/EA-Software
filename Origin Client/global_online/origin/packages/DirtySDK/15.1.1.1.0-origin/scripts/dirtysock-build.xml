@@ -1,0 +1,200 @@
+<project>
+    <fileset name="dirtybuild-fileset-c" basedir="${package.dir}">
+        <includes fromfile="${package.dir}/scripts/project/${dirtyplat}/source.txt" unless="${dirtysdk-novoip??false} and @{FileExists('${package.dir}/scripts/project/${dirtyplat}/source-novoip.txt')}"/>
+        <includes fromfile="${package.dir}/scripts/project/${dirtyplat}/source-novoip.txt" if="${dirtysdk-novoip??false} and @{FileExists('${package.dir}/scripts/project/${dirtyplat}/source-novoip.txt')}"/>
+        <includes fromfile="${package.dir}/scripts/project/source.txt"/>
+    </fileset>
+
+    <fileset name="dirtybuild-fileset-cpp" basedir="${package.dir}">
+        <includes fromfile="${package.dir}/scripts/project/${dirtyplat}/sourcecpp.txt" if="@{FileExists('${package.dir}/scripts/project/${dirtyplat}/sourcecpp.txt')}"/>
+    </fileset>
+
+    <property name="dirtysdk-is-winrt" local="true" value="${config-system} == 'capilano' or ${config-system} == 'winrt' or ${config-system} == 'winprt'"/>
+
+    <Library name="dirtysock" frompartial="DSLibrary">
+        <sourcefiles basedir="${package.dir}">
+            <includes fromfileset="dirtybuild-fileset-cpp" if="${dirtysdk-is-winrt} and not ${Dll??false}" optionset="WinRTCppLibrary"/>
+            <includes fromfileset="dirtybuild-fileset-cpp" if="${dirtysdk-is-winrt} and ${Dll??false}" optionset="WinRTRuntimeComponent"/>
+            <includes fromfileset="dirtybuild-fileset-cpp" unless="${dirtysdk-is-winrt}"/>
+
+            <includes fromfileset="dirtybuild-fileset-c"/>
+        </sourcefiles>
+
+        <includedirs>
+            <!-- public include directories -->
+            ${package.DirtySDK.dirtysock.includedirs}
+
+            <!-- private include directories -->
+            ${package.dir}/source/dirtysock
+            ${package.dir}/source/friend
+            ${package.dir}/source/misc
+            ${package.dir}/source/voip
+
+            <do if="${config-system} == 'xenon'">
+                ${package.dir}/source/proto/xenon
+            </do>
+        </includedirs>
+
+        <headerfiles>
+            <includes name="${package.dir}/include/DirtySDK/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/buddy/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/comm/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/comm/${dirtyplat}/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/crypt/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/dirtysock/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/dirtysock/${dirtyplat}/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/friend/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/game/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/game/${dirtyplat}/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/graph/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/misc/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/misc/${dirtyplat}/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/proto/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/voip/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/web/*.h"/>
+            <includes name="${package.dir}/include/DirtySDK/xml/*.h"/>
+            <includes name="${package.dir}/source/**/${dirtyplat}/*.h"/>
+        </headerfiles>
+
+        <usingdirs value="${package.CapilanoSDK.kitdir}/Extensions/Xbox Services API/8.0/References/CommonConfiguration/neutral" if="${config-system} == 'capilano'"/>
+
+        <assemblies>
+            <includes name="${package.CapilanoSDK.kitdir}/Extensions/Xbox Services API/8.0/References/CommonConfiguration/neutral/Microsoft.Xbox.Services.winmd" optionset="copy-local" if="${config-system} == 'capilano'"/>
+        </assemblies>
+
+        <dependencies>
+            <auto>
+                <do if="${config-system} == 'kettle'">
+                    EABase
+                    EAAssert
+                    EAMessage
+                    EASTL
+                    coreallocator
+                    EAThread
+                    PPMalloc
+                    EASystemEventMessageDispatcher
+                    IEASystemEventMessageDispatcher
+
+                    <do unless="${dirtysdk-noieauser??false}">
+                        IEAUser
+                    </do>
+                </do>
+
+                <do if="${config-system} == 'capilano' and not ${dirtysdk-noieauser??false}" >
+                    EABase
+                    EASTL
+                    IEAUser
+                </do>
+
+                <do if="${config-platform} == 'ps3-sn'">
+                    PlayStation3NPEx
+                </do>
+            </auto>
+        </dependencies>
+
+        <libraries if="${Dll??false}" append="true">
+            <includes name="iphlpapi.lib" asis="true" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+            <includes name="winmm.lib" asis="true" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+            <includes name="ws2_32.lib" asis="true" if="${config-system} == 'pc' or ${config-system} == 'pc64'" />
+            <includes name="tapi32.lib" asis="true" if="${config-system} == 'pc' or ${config-system} == 'pc64'" />
+            <includes name="bcrypt.lib" asis="true" if="${config-system} == 'capilano'"/>
+        </libraries>
+
+        <config>
+            <defines>
+                <do if="${dirtysdk_debug_enable??false}">
+                    DIRTYCODE_LOGGING=1
+                </do>
+
+                <do if="${dirtysdk_debug_disable??false}">
+                    DIRTYCODE_LOGGING=0
+                </do>
+
+                <!-- If we don't define it, the netgamedist code will set its own default -->
+                <do if="@{PropertyExists('dirtysdk-distpktwindow-size')}">
+                    PACKET_WINDOW=${dirtysdk-distpktwindow-size}
+                </do>
+
+                <do if="${config-system} == 'android' or ${config-system} == 'kettle' or ${config-system} == 'unix' or ${config-system} == 'unix64'">
+                    _GNU_SOURCE
+                    LINUX
+                </do>
+
+                <do if="(${config-platform} == 'capilano-vc' or ${config-system} == 'kettle') and not ${dirtysdk-noieauser??false}">
+                    DIRTYSDK_IEAUSER_ENABLED
+                </do>
+
+                <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                    WINSOCK_API_LINKAGE=
+                </do>
+
+                <do if="${config-system} == 'xenon' and not ${dirtysdk-noxhttp??false}">
+                    DIRTYSDK_XHTTP_ENABLED
+                </do>
+            </defines>
+
+            <warningsuppression>
+                <!-- ================= Common Clang & GCC  =================== -->
+                <do if="${config-compiler} == 'clang' or ${config-compiler} == 'gcc'">
+                    -Wno-unused-parameter
+                </do>
+
+                <!-- ================= GCC  =================== -->
+                <do if="${config-compiler} == 'gcc'">
+                    -Wno-unused-but-set-variable
+                </do>
+
+                <!-- ================= Common Clang OSX  =================== -->
+                <do if="${config-system} == 'iphone' or ${config-system} == 'osx'">
+                    -Wno-pointer-sign
+                </do>
+
+                <!-- ================= PS3 ================= -->
+                <do if="${config-platform} == 'ps3-sn'">
+                    --diag_suppress=189     <!-- enumerated type mixed with another type -->
+                    --diag_suppress=552     <!-- variable was set but never used -->
+                    --diag_suppress=1421    <!-- trigraph support is disabled -->
+                </do>
+
+                <!-- ================= Common MSVC  =================== -->
+                <do if="${config-compiler} == 'vc'">
+                    -wd4054     <!-- type cast from function pointer to void pointer -->
+                    -wd4055     <!-- data/void pointer cast to function pointer (type casting does *not* suppress this warning) -->
+                    -wd4127     <!-- conditional expression is constant -->
+                    -wd4255     <!-- no function prototype given: converting () to (void) [disabled for VC++ headers] -->
+                    -wd4295     <!-- array is too small to include terminating null character -->
+                    -wd4310     <!-- cast truncates constant value -->
+                    -wd4548     <!-- expression before comma has no effect (required because FD_SET macro generates this warning) -->
+                </do>
+
+                <!-- =================  PC & PC64 =================== -->
+                <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                    -wd4201     <!-- nonstandard extension used : nameless struct/union (some windows headers generate this warning) -->
+                </do>
+
+                <!-- ================= XENON =================== -->
+                <do if="${config-system} == 'xenon'">
+                    -wd4214     <!-- nonstandard extension used; bitfield types other than int [disabled for xhv2.h header] -->
+                </do>
+
+                <!-- ================= Common CAPILANO & WINRT =================== -->
+                <do if="${config-system} == 'capilano' or ${config-system} == 'winrt' or ${config-system} == 'winprt'">
+                    -wd4265     <!-- class has virtual functions, but destructor is not virtual -->
+                    -wd4625     <!-- copy constructor could not be generated because a base class copy constructor is inaccessible -->
+                    -wd4626     <!-- assignment operator could not be generated because a base class assignment operator is inaccessible -->
+                </do>
+
+                <!-- ================= WINRT =================== -->
+                <do if="${config-system} == 'winrt' or ${config-system} == 'winprt'">
+                    -wd4574     <!-- 'NULL' is defined to be '0': did you mean to use '#if NULL'?    (when platform.h included from a .cpp file) -->
+                </do>
+
+                <!-- ================= CAPILANO =================== -->
+                <do if="${config-system} == 'capilano'">
+                    -wd4986     <!-- exception specification does not match previous declaration -->
+                    -wd4555     <!-- expression has no effect; expected expression with side-effect -->
+                </do>
+            </warningsuppression>
+        </config>
+    </Library>
+</project>

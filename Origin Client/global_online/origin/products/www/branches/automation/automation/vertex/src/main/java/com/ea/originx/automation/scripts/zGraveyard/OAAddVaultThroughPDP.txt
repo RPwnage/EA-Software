@@ -1,0 +1,73 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.CheckoutConfirmation;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessNUXFullPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.VaultPage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test adding a vault entitlement to the Game Library through the PDP
+ * 
+ * @author mdobre
+ */
+public class OAAddVaultThroughPDP extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 3103329)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testAddVaultThroughPDP(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+        
+        final EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_PREMIUM);
+        final String offerId = entitlement.getOfferId();
+        final String entitlementName = entitlement.getName();
+        
+        logFlowPoint("Launch Origin and login as newly registered user."); //1
+        logFlowPoint("Purchase Origin Access."); //2
+        logFlowPoint("Navigate to the PDP of a game in the vault."); //3
+        logFlowPoint("Add a vault entitlement to the game library."); //4
+        logFlowPoint("Navigate to the Game Library and verify the added game appears."); //5
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+
+        //2
+        logPassFail(MacroOriginAccess.purchaseOriginAccess(driver), true);
+
+        //3
+        OriginAccessNUXFullPage originAccessNUXFullPage = new OriginAccessNUXFullPage(driver);
+        if (originAccessNUXFullPage.verifyPageReached()) {
+            originAccessNUXFullPage.clickSkipNuxGoToVaultLink();
+        }
+        logPassFail(new VaultPage(driver).verifyPageReached(), true);
+
+        //4
+        MacroOriginAccess.addEntitlementAndHandleDialogs(driver, offerId);
+        logPassFail(new CheckoutConfirmation(driver).waitIsClose(), true);
+        
+        //5
+        new NavigationSidebar(driver).clickGameLibraryLink();
+        logPassFail(MacroGameLibrary.verifyGameInLibrary(driver, entitlementName), true);
+        
+        softAssertAll();
+    }
+}

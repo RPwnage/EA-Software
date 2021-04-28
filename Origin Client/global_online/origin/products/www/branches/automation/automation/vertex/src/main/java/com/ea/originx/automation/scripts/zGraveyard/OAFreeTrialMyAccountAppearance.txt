@@ -1,0 +1,98 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.helpers.StringHelper;
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.account.AccountSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.account.OriginAccessSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.account.OriginAccessSettingsPage.ORIGIN_ACCESS_PLAN;
+import com.ea.originx.automation.lib.pageobjects.dialog.OriginAccessIntroDialog;
+import com.ea.originx.automation.lib.pageobjects.dialog.SelectOriginAccessPlanDialog;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the OriginAccess Settings Page in My Account Details during a
+ * free-trial
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeTrialMyAccountAppearance extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 39603)
+    @Test(groups = {"originaccess", "full_regression", "int_only"})
+    public void testFreeTrialMyAccountAppearance(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+
+        logFlowPoint("Login as a newly registered user"); //1
+        logFlowPoint("Purchase Origin Access Free Trial(default Yearly Plan) using Visa"); //2
+        logFlowPoint("Navigate to My-Account:Origin Access Page and verify the top banner message indicates correct duration, end-date and price"); //3
+        logFlowPoint("In Payment Billing Section of Origin Access Tab,verify the membership type, bill date and payment method are correct"); //4
+
+        final WebDriver driver = startClientObject(context, client);
+
+        //1
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged as new user (" + username + ")");
+        } else {
+            logFailExit("Could not log in as a as new user(" + username + ")");
+        }
+
+        //2
+        MacroOriginAccess.openOriginAccessPlanSelectionDialog(driver);
+        SelectOriginAccessPlanDialog selectOriginAccessPlanDialog = new SelectOriginAccessPlanDialog(driver);
+        String selectedPlan = selectOriginAccessPlanDialog.getSelectedPlan(); // to get the selected plan to use in flow#4
+        double price = StringHelper.extractNumberFromText(selectedPlan); // extract price from the plan and extract the value to verify the price in flow#4
+        selectOriginAccessPlanDialog.clickNext();
+        if (MacroPurchase.completePurchase(driver)) {
+            logPass("Successfully purchase 7-Day Free trial-Yearly Plan with payment method Visa");
+        } else {
+            logFailExit("Failed: Cannot buy 7-Day Free trial-Yearly Plan with payment method Visa");
+        }
+        driver.switchTo().defaultContent();
+        OriginAccessIntroDialog originAccessIntroDialog = new OriginAccessIntroDialog(driver);
+        if (originAccessIntroDialog.waitIsVisible()) {
+            originAccessIntroDialog.clickCloseCircle();
+        }
+
+        //3
+        AccountSettingsPage accountSettingsPage = new AccountSettingsPage(driver);
+        accountSettingsPage.navigateToIndexPage();
+        accountSettingsPage.gotoOriginAccessSection();
+        OriginAccessSettingsPage originAccessSettingsPage = new OriginAccessSettingsPage(driver);
+        boolean isBannerMessageDate = originAccessSettingsPage.verifyUpdatePlanBannerMessageDate(ORIGIN_ACCESS_PLAN.TRIAL);
+        boolean isBannerMessagePlan = originAccessSettingsPage.verifyBannerMessagePlan(selectedPlan);
+        if (isBannerMessageDate && isBannerMessagePlan) {
+            logPass("Verified the banner message at the top indicates correct duration, end-date and price");
+        } else {
+            logFailExit("Failed: the banner message at the top did not indicate correct duration, end-date and price");
+        }
+
+        //4
+        boolean isBillingDate = originAccessSettingsPage.verifyEndDate(ORIGIN_ACCESS_PLAN.TRIAL);
+        boolean isPlanDuration = originAccessSettingsPage.verifyPlanType(selectedPlan);
+        boolean isPlanPrice = originAccessSettingsPage.verifyPlanPrice(price);
+        boolean isPaymentMethod = originAccessSettingsPage.verifyPaymentMethod("visa");
+        if (isBillingDate && isPlanDuration && isPlanPrice && isPaymentMethod) {
+            logPass("Verified in the Payment-Section under Origin-Access Page, the membership type, the bill date and payment method is as expected");
+        } else {
+            logFailExit("Failed:In the PaymentSection under Origin Access Page, the membership type, the bill date and payment method is incorrect");
+        }
+
+        softAssertAll();
+
+    }
+
+}

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<project>
+	<!-- ************************* -->
+	<!-- WebWidget Properties      -->
+	<!-- ************************* -->  
+	<property name="webwidgets.sourcedir" value="${package.originClient.dir}/webWidgets" />
+	<property name="webwidgets.outputdir" value="${package.originClient.dir}/resources/compiledWidgets" />
+
+	<property name="widget.list" value="" />
+	<foreach property="widget.path" item="Directory" in="${webwidgets.sourcedir}">
+	<property name="widget" value="@{PathGetFileNameWithoutExtension('${widget.path}')}" />
+	<property name="widget.list" value="${property.value} ${widget}" />
+	</foreach>
+
+	<!-- ************************* -->
+	<!-- WebWidget Targets         -->
+	<!-- ************************* -->  
+
+	<target name="clean-webwidgets">
+	  <echo message="Cleaning webwidget outputdir." />
+	  <echo message="outputdir: ${webwidgets.outputdir}" if="@{PropertyExists('origindebug')}"/>
+	  <delete dir="${webwidgets.outputdir}" if="@{DirectoryExists('${webwidgets.outputdir}')}"/>
+	</target>
+
+	<target name="webwidget-compile">
+	  <fail unless="@{PropertyExists('widget')}" message="Property 'widget' not defined" />
+	  <dependent name="ActivePython" />
+    <depends property="webwidget-compile.dobuild">
+      <inputs>
+        <includes name="${webwidgets.sourcedir}/${widget}/**/*" />
+        <includes name="${package.originClient.lang.res.dir}/**/*" />
+      </inputs>
+      <outputs>
+        <includes name="${webwidgets.outputdir}/${widget}/**/*" />
+      </outputs>
+    </depends>
+    
+    <do if="${webwidget-compile.dobuild}">
+      <!-- widget compiler does not work if the directory exists so delete it -->
+      <delete dir="${webwidgets.outputdir}/${widget}" if="@{DirectoryExists('${webwidgets.outputdir}/${widget}')}"/>
+      <mkdir dir="${webwidgets.outputdir}" unless="@{DirectoryExists('${webwidgets.outputdir}')}" />
+      <echo message="Compiling ${widget} webwidget." />
+      <exec program="${python.exe}" workingdir="${package.OriginUtils.python.widgetcompiler.sourcedir}" >
+      <args>
+        <arg value="${package.OriginUtils.python.widgetcompiler}" />
+        <arg value="${webwidgets.sourcedir}/${widget}" />
+        <arg value="--strings-dir=${package.originClient.lang.res.dir}" />
+        <arg value="--output-format=qrc" />
+        <arg value="--output=${webwidgets.outputdir}/${widget}" />
+      </args>
+      </exec>
+    </do>
+	</target>
+  
+	<createtask name="clean-uitoolkit">
+		<parameters>
+			<option name="widget" value="Required"/>
+		</parameters>
+		<code>
+			<echo message="Cleaning ${webwidgets.sourcedir}/${clean-uitoolkit.widget}/uitoolkit." />
+			<delete dir="${webwidgets.sourcedir}/${clean-uitoolkit.widget}/uitoolkit" if="@{DirectoryExists('${webwidgets.sourcedir}/${clean-uitoolkit.widget}/uitoolkit')}"/>
+		</code>
+	</createtask>
+
+	<target name="clean-uitoolkit-all">
+		<foreach property="widget.dir" item="Directory" in="${webwidgets.sourcedir}">
+			<property name="widget" value="@{PathGetFileNameWithoutExtension(${widget.dir})}"/>
+			<task name="clean-uitoolkit" widget="${widget}" if="@{FileExists('${webwidgets.sourcedir}/${widget}/dependfile.txt')}"/>
+		</foreach>
+	</target>
+
+	<createtask name="uitoolkit-compile">
+		<parameters>
+			<option name="widget" value="Required"/>
+		</parameters>
+		<code>
+			<depends property="uitoolkit-compile.dobuild">
+				<inputs>
+					<includes name="${webwidgets.sourcedir}/${uitoolkit-compile.widget}/dependfile.txt" />
+					<includes name="${package.OriginUIToolkit.dir}/**" />
+				</inputs>
+				<outputs>
+					<includes name="${webwidgets.outputdir}/${uitoolkit-compile.widget}/uitoolkit/**" />
+				</outputs>
+			</depends>
+			
+			<do if="${uitoolkit-compile.dobuild}">
+				<echo message="Building OriginUIToolkit for ${uitoolkit-compile.widget}"/>
+				<task name="buildtk" components.dir="${package.OriginUIToolkit.dir}/components" output.dir="${webwidgets.sourcedir}/${uitoolkit-compile.widget}"/>
+			</do>
+			<do unless="${uitoolkit-compile.dobuild}">
+				<echo message="${uitoolkit-compile.widget} up to date. Skipped OriginUIToolkit compile."/>
+			</do>
+		</code>
+	</createtask>
+	
+	<target name="uitoolkit-compile-all">
+	  <echo message="-- OriginUIToolkit compile Start --"/>
+		<foreach property="widget.dir" item="Directory" in="${webwidgets.sourcedir}">
+			<property name="widget" value="@{PathGetFileNameWithoutExtension(${widget.dir})}"/>
+			<task name="uitoolkit-compile" widget="${widget}" if="@{FileExists('${webwidgets.sourcedir}/${widget}/dependfile.txt')}"/>
+		</foreach>
+	  <echo message="-- OriginUIToolkit compile End --"/>
+	</target>
+  <!-- webwidget-compile-update: compiles a new webwidget and signs it. Do not use ~/ to specify the home directory. Use /Users/username/ instead. NANT has some troubles with ~ -->
+  <!-- You must specify the ww.sourcedir, ww.passwd and ww.key. -->
+	<target name="webwidget-compile-update">
+	  <fail unless="@{PropertyExists('ww.sourcedir')}" message="Property 'webwidgets.sourcedir' not defined. use -D:ww.sourcedir='path to webwidget source root'." />
+    <fail unless="@{PropertyExists('ww.passwd')}" message="Property 'ww.passwd' not defined if ww.key is defined. use -D:ww.passwd=secretpassword." />
+    <fail unless="@{PropertyExists('ww.key')}" message="Property 'ww.key' not defined Use -D:ww.key=/Users/hudson/widget-private-key.pem." />
+    <fail unless="@{PropertyExists('ww.name')}" message="Property 'ww.name' not defined Use -D:ww.name=mygames." />
+   
+	  <property name="webwidgets.outputdir" value="${package.originClient.dir}/resources/compiledWidgets" />
+   
+	  <dependent name="ActivePython" />
+	  <!-- widget compiler does not work if the directory exists so delete it -->
+	  <delete dir="${webwidgets.outputdir}/${ww.name}" if="@{DirectoryExists('${webwidgets.outputdir}/${ww.name}')}"/>
+	  <mkdir dir="${webwidgets.outputdir}" unless="@{DirectoryExists('${webwidgets.outputdir}')}" />
+	  <echo message="Compiling ${ww.name} webwidget from ${ww.sourcedir}." />
+	  <exec program="${python.exe}" workingdir="${package.OriginUtils.python.widgetcompiler.sourcedir}" >
+		<args>
+		  <arg value="${package.OriginUtils.python.widgetcompiler}" />
+		  <arg value="--strings-dir ${package.originClient.lang.res.dir}" />
+		  <arg value="-o ${webwidgets.outputdir}/${ww.name}.wgt" />
+		  <arg value="${ww.sourcedir}" />
+		  <arg value="--private-key ${ww.key}" />
+		  <arg value="--passphrase ${ww.passwd}" />
+		</args>
+		<inputs>
+		  <includes name="${ww.sourcedir}/**/*" />
+		  <includes name="${package.originClient.lang.res.dir}/**/*" />
+		</inputs>
+		<outputs>
+		  <includes name="${runtime.originClient.targetdir}/${ww.name}.wgt" />
+		</outputs>
+	  </exec>
+    <echo message="WGT file generated at ${webwidgets.outputdir}/${ww.name}.wgt" />
+	</target>
+
+	<target name="webwidget-compile-all" >
+	  <foreach property="widget" item="String" in="${widget.list}">
+		
+		<call target="webwidget-compile" force="true" />
+	  </foreach>
+	</target>
+	
+</project>

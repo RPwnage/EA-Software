@@ -1,0 +1,210 @@
+<project>
+  <!-- This is for Origin team use only, not distribution use. If building a distribution, please use perforce pathspec to sync generate-code-dist.xml to generate-code.xml-->
+  <target name="generate-code" depends="compile-xsd compile-errorfiles"/>
+  <target name="pregenerate-code" depends="compile-version"/>
+  <target name="generate-code-all" depends="compile-version compile-xsd compile-errorfiles"/>
+  <property name="package.OriginSDK.generatecode" value="true"/>
+  <include file="version.xml"/>
+  <property name="generated.xsd2cpp" value="false"/>
+  <property name="generated.ErrorFileCompiler" value="false"/>
+  <property name="generated.version" value="false"/>
+
+  <fileset name="sourcefiles.xsd2cpp" basedir="${package.OriginSDK.dir}">
+    <includes name="src/messages/lsx.xsd" />
+  </fileset>
+
+  <fileset name="sourcefiles.ErrorFileCompiler" basedir="${package.OriginSDK.dir}">
+    <includes name="include/OriginSDK/OriginError.h" />
+  </fileset>
+
+    <target name="compile-xsd" >
+    <namedlock name="compilexsd">
+      <do if="${generated.xsd2cpp} == false">
+        <dependent name="xsd2cpp"/>
+        <foreach property="file" item="FileSet" in="sourcefiles.xsd2cpp">
+          <task name="xsd2cpp.generate_cpp" filename="${file}" output_dir="${package.OriginSDK.dir}/src/generated/xsd2cpp" config="sdk"/>
+        </foreach>
+        <task name="xsd2cpp.zGenerated" output_dir="${package.OriginSDK.dir}/src/generated/xsd2cpp"/>
+        <property name="generated.xsd2cpp" value="true"/>
+      </do>
+    </namedlock>
+  </target>
+
+  <target name="compile-errorfiles" >
+    <namedlock name="compileerrorfile">
+      <do if="${generated.ErrorFileCompiler} == false">
+        <dependent name="ErrorFileCompiler"/>
+        <mkdir dir="${runtime.generatedfiles}" unless="@{DirectoryExists('${runtime.generatedfiles}')}" />
+        <foreach property="file" item="FileSet" in="sourcefiles.ErrorFileCompiler">
+          <task name="ErrorFileCompiler.generate" filename="${file}" output_dir="${runtime.generatedfiles}"/>
+        </foreach>
+        <property name="generated.ErrorFileCompiler" value="true"/>
+      </do>
+    </namedlock>
+  </target>
+
+  <target name="compile-version">
+    <namedlock name="compilercfiles">
+      <do if="${generated.version} == false">
+        <property name="version_with_commas" value="@{StrReplace(${OriginSDK.VersionName},'.',',')}"/>
+        <property name="minversion_with_commas" value="@{StrReplace(${OriginSDK.MinOriginVersion},'.',',')}"/>
+        <property name="rcfile">
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "windows.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE
+BEGIN
+    "#include ""windows.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION ${version_with_commas}
+ PRODUCTVERSION ${version_with_commas}
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Electronic Arts"
+            VALUE "FileDescription", "Connection library between a game, and Origin"
+            VALUE "FileVersion", "${OriginSDK.VersionName}"
+            VALUE "InternalName", "OriginSDK.dll"
+            VALUE "LegalCopyright", "Copyright (C) 2013"
+            VALUE "OriginalFilename", "OriginSDK.dll"
+            VALUE "ProductName", "OriginSDK"
+            VALUE "ProductVersion", "${OriginSDK.VersionName}"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+#endif    // English (United States) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+        </property>
+        <property name="versionfile">
+/// \defgroup defs Version
+/// \brief This module contains the Version information for the Origin SDK.
+
+// This file is generated from the values in scripts/version.xml
+// Generation happens in scripts/generate-code.xml
+#ifndef __ORIGIN_VERSION_H__
+#define __ORIGIN_VERSION_H__
+
+/// \ingroup defs
+/// \brief The version number of this SDK.
+///
+#define ORIGIN_SDK_VERSION              ${OriginSDK.ProtocolVersion}
+
+/// \ingroup defs
+/// \brief The version string that the Origin Client will see in an connection attempt.
+///
+#ifdef ORIGIN_PLATFORM_INTERFACE
+#define ORIGIN_SDK_VERSION_STR          "${OriginSDK.VersionName}.DRM"
+#else
+#define ORIGIN_SDK_VERSION_STR          "${OriginSDK.VersionName}"
+#endif
+
+/// \ingroup defs
+/// \brief This converts the component parts of a version number into a single number.
+///
+#define ORIGIN_VERSION(a,b,c,d)         ((a)&lt;&lt;24) + ((b)&lt;&lt;20) + ((c)&lt;&lt;12) + (d)
+
+/// \ingroup defs
+/// \brief The minimal version of the Origin necessary to run this SDK.
+///
+/// \note This will change for each release. Please Update When Necessary.
+#define ORIGIN_MIN_ORIGIN_VERSION       ORIGIN_VERSION(${minversion_with_commas})
+
+/// \ingroup defs
+/// \brief The is the numeric version of the Origin SDK for comparison
+///
+#define ORIGIN_SDK_VERSION_NO           ORIGIN_VERSION(${version_with_commas})
+#endif
+    </property>
+        <property name="rcfile" value="@{StrTrim(${rcfile})}"/>
+        <property name="versionfile" value="@{StrTrim(${versionfile})}"/>
+        <echo message="${rcfile}" file="${package.OriginSDK.dir}/OriginSDK.rc"/>
+        <echo message="${versionfile}" file="${package.OriginSDK.dir}/include/OriginSDK/OriginVersion.h"/>
+        <property name="generated.version" value="true"/>
+      </do>
+    </namedlock>
+  </target>
+
+  <target name="publish">
+    <delete dir="${package.OriginSDK.dir}/publish"/>
+    <exec program="publish.bat" commandline="version"/>
+      <zip zipfile="${package.OriginSDK.dir}/publish/OriginSDK.zip">
+        <fileset basedir="${package.OriginSDK.dir}/publish/OriginSDK">
+          <includes name="**/**" />
+        </fileset>
+      </zip>
+  </target>
+
+</project>

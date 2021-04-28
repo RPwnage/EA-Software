@@ -1,0 +1,128 @@
+package com.ea.originx.automation.scripts.wishlist;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.macroaction.MacroWishlist;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileHeader;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileWishlistTab;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test for removing wishlist items from the PDP 'Buy' button dropdown
+ *
+ * @author palui
+ */
+public class OAWishlistRemoveFromPDP extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 11702)
+    @Test(groups = {"wishlist", "full_regression"})
+    public void testWishlistRemoveFromPDP(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.STAR_WARS_BATTLEFRONT);
+        final String entitlementName = entitlement.getName();
+        final String entitlementOfferId = entitlement.getOfferId();
+
+        UserAccount user = AccountManagerHelper.createNewThrowAwayAccount("Canada");
+        final String username = user.getUsername();
+
+        logFlowPoint("Launch Origin and login as newly registered user: " + username); //1
+        logFlowPoint(String.format("Open PDP page for '%s'. From the 'Buy' button dropdown, add '%s' to the wishlist", entitlementName, entitlementName)); //2
+        logFlowPoint(String.format("Open profile for '%s' and navigate to the 'Wishlist' tab", username)); //3
+        logFlowPoint(String.format("Verify '%s' appears in the 'Wishlist' tab", entitlementName)); //4
+        logFlowPoint(String.format("Open PDP page again for '%s'. From the 'Buy' button dropdown, remove game from the wishlist", entitlementName)); //5
+        logFlowPoint(String.format("Verify '%s' removed from the user's profile 'Wishlist' tab", entitlementName)); //6
+        logFlowPoint(String.format("Open PDP page again for '%s'. From the 'Buy' button dropdown, add game to the wishlist again", entitlementName)); //7
+        logFlowPoint(String.format("Verify '%s' again appears at the user's profile 'Wishlist' tab", entitlementName)); //8
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, user)) {
+            logPass("Verified login successful to newly registered user: " + username);
+        } else {
+            logFailExit("Failed: Cannot login to newly registered user: " + username);
+        }
+
+        //2
+        if (MacroWishlist.addToWishlist(driver, entitlement)) {
+            logPass(String.format("Verified '%s' has been added (through the PDP dropdown) to the wishlist", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot add '%s' (through the PDP dropdown) to the wishlist", entitlementName));
+        }
+
+        //3
+        MiniProfile miniProfile = new MiniProfile(driver);
+        miniProfile.selectViewMyProfile();
+        ProfileHeader profileHeader = new ProfileHeader(driver);
+        profileHeader.openWishlistTab();
+        if (profileHeader.verifyWishlistActive()) {
+            logPass(String.format("Verified 'Wishlist' tab opens at the 'Profile' page of %s", username));
+        } else {
+            logFailExit(String.format("Failed: Cannot open the 'Wishlist' tab at the 'Profile' page of %s", username));
+        }
+
+        //4
+        profileHeader.waitForWishlistTabToLoad();
+        ProfileWishlistTab wishlistTab = new ProfileWishlistTab(driver);
+        boolean isAdded = Waits.pollingWait(() -> wishlistTab.verifyTilesExist(entitlementOfferId));
+        if (isAdded) {
+            logPass(String.format("Verified '%s' appears in the 'Wishlist' tab", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: '%s' does not appear in the 'Wishlist' tab", entitlementName));
+        }
+
+        //5
+        if (MacroWishlist.removeFromWishlist(driver, entitlement)) {
+            logPass(String.format("Verified '%s' has been removed (through the PDP dropdown) from the wishlist", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot remove '%s' (through the PDP dropdown) from the wishlist", entitlementName));
+        }
+
+        //6
+        miniProfile.selectViewMyProfile();
+        profileHeader = new ProfileHeader(driver);
+        profileHeader.openWishlistTab();
+        profileHeader.waitForWishlistTabToLoad();
+        ProfileWishlistTab wishlistTab2 = new ProfileWishlistTab(driver);
+        boolean isRemoved = Waits.pollingWait(() -> !wishlistTab2.verifyTilesExist(entitlementOfferId));
+        if (isRemoved) {
+            logPass(String.format("Verified '%s' has been removed from the user's profile 'Wishlist' tab", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot remove '%s' from the user's profile 'Wishlist' tab", entitlementName));
+        }
+
+        //7
+        if (MacroWishlist.addToWishlist(driver, entitlement)) {
+            logPass(String.format("Verified '%s' has been added back (through the PDP dropdown) to the wishlist", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot add '%s' back (through the PDP dropdown) to the wishlist", entitlementName));
+        }
+
+        //8
+        miniProfile.selectViewMyProfile();
+        profileHeader.openWishlistTab();
+        profileHeader.waitForWishlistTabToLoad();
+        ProfileWishlistTab wishlistTab3 = new ProfileWishlistTab(driver);
+        boolean isAddedBack = Waits.pollingWait(() -> wishlistTab3.verifyTilesExist(entitlementOfferId));
+        if (isAddedBack) {
+            logPass(String.format("Verified '%s' has been added back the user's profile 'Wishlist' tab", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: '%s' does not re-appear at the user's profile 'Wishlist' tab", entitlementName));
+        }
+
+        softAssertAll();
+    }
+}

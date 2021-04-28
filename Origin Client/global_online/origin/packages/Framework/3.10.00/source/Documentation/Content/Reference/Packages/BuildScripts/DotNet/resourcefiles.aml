@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="6c9476a0-1e11-4acf-9e91-9cfc1d79d616" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>
+        This topic describes how to add embedded and non embedded resource files for a DotNet module
+      </para>
+    </introduction>
+    <section>
+      <title>Usage</title>
+      <content>
+        <list class="bullet">
+          <listItem>
+            <para>
+              Define a <token>fileset</token> with name <token>groupname</token><codeInline>.resourcefiles</codeInline> to set embedded resources.
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              Define a <token>fileset</token> with name <token>groupname</token><codeInline>.resourcefiles.notembed</codeInline> to set non embedded resources.
+            </para>
+          </listItem>
+        </list>
+        <alert class="note">
+          <para>
+            If <codeInline>resourcefiles</codeInline> fileset is not oprovided explicitly Framework will add default values
+            using following patterns:
+          </para>
+          <list class="bullet">
+            <listItem>
+              <para>
+                <codeInline>"${package.dir}/${groupsourcedir}/**/*.ico"</codeInline>
+              </para>
+            </listItem>
+          </list>
+          <para>Where ${groupsourcedir} equals to</para>
+          <list class="bullet">
+            <listItem>
+              <para>
+                <codeInline>${eaconfig.${module.buildgroup}.sourcedir"}/${module.name};</codeInline> - for packages with modules
+              </para>
+            </listItem>
+            <listItem>
+              <para>
+                <codeInline>${eaconfig.${module.buildgroup}.sourcedir"}</codeInline>  -for packages without modules.
+              </para>
+            </listItem>
+          </list>
+        </alert>
+
+        <para>Additional settings can affect resourcefiles build</para>
+        <list class="bullet">
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.resourcefiles.basedir</codeInline> - this property will be used as a base directory for resource files. 
+              It does not affect expansion of the &lt;includes/&gt; elements. Base directory is also used to set &lt;Link&gt; path for resource files.
+            </para>
+            <alert class="note">
+              <para>
+                <link xlink:href="be49d01d-d33d-1aa5-83f3-17c84aadc636">&lt;fileset/&gt;</link>
+                task in Framework 3 allows set separate <codeInline>basedir</codeInline> attribute for each &lt;includes/&gt;, which lets to set
+                different &lt;Link&gt; paths for subsets of files in the <codeInline>.resourcefiles</codeInline> filesets.
+            </para>
+            </alert>
+            <alert class="note">
+              <para>THere is no need to use <codeInline>.resourcefiles.basedir</codeInline> property. Base directories can be set through fileset attributes.
+              This property is DEPRECATED.
+            </para>
+            </alert>
+          </listItem>
+          <listItem>
+            <para>
+              <token>groupname</token><codeInline>.resourcefiles.prefix</codeInline> - this property is used to make logical resource name for resx resources
+            </para>
+            <code language="c#" title=" ">
+              // Resx args
+              foreach (FileItem fileItem in Resources.ResxFiles.FileItems)
+              {
+                string prefix = GetFormNamespace(fileItem.FileName); // try and get it from matching form
+                string className = GetFormClassName(fileItem.FileName);
+                if (prefix == null)
+                {
+                  prefix = Resources.Prefix;
+                }
+                  string tmpResourcePath = Path.ChangeExtension(fileItem.FileName, "resources");
+                  string manifestResourceName = Path.GetFileName(tmpResourcePath);
+                if (prefix != "")
+                {
+                  string actualFileName = Path.GetFileNameWithoutExtension(fileItem.FileName);
+                  if (className != null)
+                      manifestResourceName = manifestResourceName.Replace(actualFileName, prefix + "." + className);
+                  else
+                      manifestResourceName = manifestResourceName.Replace(actualFileName, prefix + "." + actualFileName);
+                }
+                string resourceoption = tmpResourcePath + "," + manifestResourceName;
+                WriteOption(writer, "resource", resourceoption);
+              }
+            </code>
+          </listItem>
+        </list>
+        <list class="bullet">
+          <listItem>
+            <para>
+              Use 'optionset' attribute in the fileset &lt;includes&gt; element to assign different "Copy To Output Directory" actions to subsets of content files.
+            </para>
+            <para>
+              Valid action values are
+            </para>
+            <list class="bullet">
+              <listItem>
+                <para>
+                  <legacyBold>copy-always</legacyBold>
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  <legacyBold>copy-if-newer</legacyBold>
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  <legacyBold>do-not-copy</legacyBold>
+                </para>
+              </listItem>
+            </list>
+
+            <alert class="note">
+              <para>Files with extension <legacyBold><codeInline>.settings</codeInline></legacyBold> or <legacyBold>
+                  <codeInline>.config</codeInline>
+                </legacyBold> are assigned build action <legacyBold>
+                <codeInline>None</codeInline>
+              </legacyBold> when these files are defined using <codeInline>resourcefiles</codeInline> fileset. 
+              When these filese are defined using <link xlink:href="363aafd0-0f50-410e-bfcd-67eb893a7b97"/> fileset build action will be 
+              <codeInline>Content</codeInline>
+            </para>
+            </alert>
+          </listItem>
+
+        </list>
+      </content>
+    </section>
+    <section>
+      <title>Example</title>
+      <content>
+        <code language="xml" title=" ">
+
+          .          &lt;property name="runtime.MyModule.buildtype" value="CSharpProgram" /&gt;
+          .
+          .          &lt;fileset name="runtime.MyModule.resourcefiles" basedir="${package.dir}/Resources"&gt;
+          .              &lt;includes name="**.resx"/&gt;
+          .          &lt;/fileset>
+
+        </code>
+      </content>
+    </section>
+
+    <relatedTopics>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

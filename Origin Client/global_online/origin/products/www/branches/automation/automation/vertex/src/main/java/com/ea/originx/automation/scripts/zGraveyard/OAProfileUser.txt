@@ -1,0 +1,85 @@
+package com.ea.originx.automation.scripts.zGraveyard;
+
+import com.ea.vx.originclient.account.*;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import static com.ea.vx.originclient.utils.Waits.waitForPageThatStartsWith;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.discover.DiscoverPage;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileHeader;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileOfflinePage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test to verify user profile navigation
+ *
+ * @author palui
+ */
+public class OAProfileUser extends EAXVxTestTemplate {
+
+    @Test(groups = {"profile", "client_only", "full_regression"})
+    public void testProfileUser(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        Criteria criteria = new Criteria.CriteriaBuilder().build();
+        UserAccount userAccount = AccountManager.getInstance().requestWithCriteria(criteria, 60);
+        logFlowPoint("Launch Origin and login as user: " + userAccount.getUsername()); //1
+        logFlowPoint("Click 'View My Profile' at the 'Mini Profile' dropdown (bottom left) and verify 'Profile' page opens"); //2
+        logFlowPoint("Go offline and verify 'Profile Offline' page opens"); //3
+        logFlowPoint("Click 'Go Online' button on the 'Profile Offline' to go back to the 'Profile' page"); //4
+
+        // 1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with the user.");
+        } else {
+            logFailExit("Could not log into Origin with the user.");
+        }
+
+        //2
+        MiniProfile miniProfile = new MiniProfile(driver);
+        miniProfile.waitForPageToLoad();
+        miniProfile.selectProfileDropdownMenuItem("View My Profile");
+        ProfileHeader profileHeader = new ProfileHeader(driver);
+        if (profileHeader.verifyOnProfilePage()) {
+            logPass("Verified 'Profile' page opens");
+        } else {
+            logFailExit("Failed: Cannot open the 'Profile' page through the 'Mini Profile' menu");
+        }
+
+        //3
+        DiscoverPage discoverPage = new DiscoverPage(driver);
+        discoverPage.waitForPageToLoad();
+        new MainMenu(driver).selectGoOffline();
+        waitForPageThatStartsWith(driver, "https", 120);
+        sleep(1000); // Pause for display to stablize
+
+        ProfileOfflinePage profileOfflinePage = new ProfileOfflinePage(driver);
+        boolean onOfflinePage = profileOfflinePage.verifyOnOfflinePage();
+        boolean verifiedOfflinePageHeader = profileOfflinePage.verifyOfflineHeader();
+        boolean onProfilePage = profileHeader.verifyOnProfilePage();
+        if (!onProfilePage && onOfflinePage && verifiedOfflinePageHeader) {
+            logPass("Verified 'Profile Offline' page opens successfully");
+        } else {
+            logFailExit("Failed: Cannot open 'Profile Offline' page");
+        }
+
+        //4
+        profileOfflinePage.clickGoOnline();
+        sleep(1000); // Pause for display to stablize
+        onOfflinePage = profileOfflinePage.verifyOnOfflinePage();
+        onProfilePage = profileHeader.verifyOnProfilePage();
+        if (onProfilePage && !onOfflinePage) {
+            logPass("Verified 'Go Online' successful and 'Profile' page re-opens");
+        } else {
+            logFailExit("Failed: Clicking 'Go Online' does not go back online to the 'Profile' page");
+        }
+        softAssertAll();
+    }
+}

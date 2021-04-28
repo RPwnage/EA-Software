@@ -1,0 +1,60 @@
+<project>
+  <property name="reg_path" value="${sys.env.PATH}"/>
+  <do if="${config-system} != 'osx'">
+    <dependent name="ActivePython"/>
+    <property name="python_version" value="2.7"/>
+    <property name="python_version" value="2.7.13.2716" if="@{StrCompare(${package.ActivePython.version},'2.7.13.2716')} == 0"/>
+    <property name="python_version" value="2.6" if="@{StrStartsWith(${package.ActivePython.version},'2.6')}"/>
+    <property name="sep" value=";"/>
+    <property name="package.OriginPython.exe" value="${package.ActivePython.exe}"/>
+    <property name="reg_path" value="${sys.env.PATH};@{PathGetDirectoryName(${package.ActivePython.exe})}"/>
+  </do>
+  <do if="${config-system} == 'osx'">
+    <property name="python_version" value="2.7"/>
+    <property name="package.OriginPython.exe" value="python2.7"/>
+    <property name="sep" value=":"/>
+  </do>
+  <!-- Python zip folder can be shared between 2.6 and 2.7 but I named it 2.7 in case that has to change at some point
+       Compiled extensions cannot be shared  -->
+  <property name="pure_python_libraries" value="${package.OriginPython.dir}/pure_python_libraries/packages-2.7.zip"/>
+  <property name="compiled_libraries" value="${package.OriginPython.dir}/compiled_libraries/${python_version}/"/>
+  
+  <property name="package.OriginPython.pythonpath" value="${pure_python_libraries}${sep}${compiled_libraries}"/>
+
+  <createtask name="OriginPython.exec">
+    <parameters>
+      <option name="script" value="required"/>
+      <option name="args" value=""/>
+    </parameters>
+    <code>
+      <exec program="${package.OriginPython.exe}">
+        <args>
+          <arg value="${OriginPython.exec.script}"/>
+          <arg value="${OriginPython.exec.args}"/>
+        </args>
+        <env>
+          <option name="PYTHONPATH" value="${package.OriginPython.pythonpath}"/>
+          <option name="PATH" value="${reg_path}"/>
+        </env>
+      </exec>
+    </code>
+  </createtask>
+  
+  <createtask name="OriginPython.createmodule">
+    <parameters>
+      <option name="output_dir" value="required"/>      
+    </parameters>    
+    <code>
+      <property name="module_text">
+#This module was auto-generated from ${package.OriginPython.dir}
+#This module is used to set the system path to use the python packages in OriginPython.
+#Import this module before using any packages in OriginPython.
+import sys
+sys.path.append(r"${pure_python_libraries}")
+sys.path.append(r"${compiled_libraries}")
+      </property>
+      <echo message="${module_text}" file="${OriginPython.createmodule.output_dir}/OriginPython.py" if="!@{FileExists('${OriginPython.createmodule.output_dir}/OriginPython.py')}"/>
+    </code>
+  </createtask>
+
+</project>

@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="168b0614-6da1-45a6-9775-67454754b41f" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>Configuration settings for a platform can be isolated in a separate 'platform config' package</para>
+    </introduction>
+
+    <section address="Overview">
+      <title>Overview</title>
+      <content>
+        <para>Until recently all configurations were listed in a single configuration package 
+        (eaconfig) and platform specific build settings were defined in the same configuration package.
+      </para>
+        <para>
+          With the rapid increase in the number of different mobile platforms we are building this model is no longer sustainable. 
+          The Framework (NAnt) package was changed to support a new model where the main configuration package (eaconfig) would contain generic 
+          tasks and targets. Platform specific settings and tasks can be delegated to separate platform configuration packages.
+        </para>
+        <para>
+          This new model is completely backwards compatible, i.e. old configuration packages are loaded the same way 
+          as before the change. Both loading models can be mixed in a single configuration package, for example, 
+          eaconfig contains full definitions for all console and PC configurations, but definitions for mobile platforms are 
+          redirected to separate platform configuration packages.
+        </para>
+      </content>
+    </section>
+    <section address="PlatformLoader">
+      <title>How does platform configuration loader work?</title>
+      <content>
+        <para>
+          Before this change was introduced nant would determine the location of the configuration package specified in 
+          <link xlink:href="f37789dd-0c99-456f-b4f9-78b72286a034"/>, and then load the file <codeInline>config/${config}.xml</codeInline>.
+        </para>
+        <para>
+          Support for separate per-platform configuration packages brings the following change:
+        </para>
+        <list class="bullet">
+          <listItem>
+            <para>nant determines the location of the configuration package.</para>
+          </listItem>
+          <listItem>
+            <para>nant looks for the following file in the configuration package: <codeInline>"config/platformloader/load.xml"</codeInline></para>
+          </listItem>
+          <listItem>
+            <para>
+              If load.xml is <legacyBold>NOT</legacyBold> present, nant will load <codeInline>config/${config}.xml</codeInline> file as it was traditionally done.</para>
+          </listItem>
+          <listItem>
+            <para>If <codeInline>"config/platformloader/load.xml"</codeInline> file is present, nant will load this file. 
+            Then it is up to the configuration package to determine how it loads a particular configuration.</para>
+          </listItem>
+
+        </list>
+      </content>
+    </section>
+    <section address="Implementation">
+      <title>Implementation of platform configurations in eaconfig</title>
+      <content>
+        <para>Loading of the configuration package is now implemented in eaconfig itself. Here is how it works:</para>
+        <list class="bullet">
+          <listItem>
+            <para>Eaconfig determines <legacyBold>
+              <codeInline>platform name</codeInline>
+            </legacyBold> by extracting the part of the configuration name preceeding the dash. 
+            For example, for pc-vc-dev-debug configuration, <legacyBold>
+              <codeInline>platform name</codeInline>
+            </legacyBold>  will be "pc".</para>
+          </listItem>
+          <listItem>
+            <para>
+              Then eaconfig will look for a package named <legacyBold>
+                <codeInline>[platform name]_config</codeInline>
+              </legacyBold>  (for pc platform package name will be <codeInline>pc_config</codeInline> ) 
+              in <link xlink:href="f37789dd-0c99-456f-b4f9-78b72286a034"/>.
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              If <legacyBold>
+              <codeInline>[platform name]_config</codeInline>
+            </legacyBold> package is present in masterconfig, Framework will load the file:
+             <codeInline>[platform name]_config/[version]/config/${config}.xml</codeInline> 
+            </para>
+          </listItem>
+          <listItem>
+            <para>
+              If <legacyBold><codeInline>[platform name]_config</codeInline></legacyBold> 
+              is <legacyBold>NOT</legacyBold> present in masterconfig, 
+              Framework will load a file from the main configuration package, for example
+              : <codeInline>eaconfig/[version]/config/${config}.xml</codeInline>
+            </para>
+          </listItem>
+        </list>
+        <para>
+          This is the implementation of load.xml file in eaconfig:
+        </para>
+        <code language="xml" title=" ">
+          
+.          &lt;!-- 
+.              (c) Electronic Arts. All Rights Reserved.
+.          --&gt;
+.          &lt;project&gt;
+.
+.            &lt;include file="./../global/init.xml" /&gt;
+.
+.            &lt;!-- LoadPlatformConfig task performes following steps:
+.                 1. loads platform config package if one is set in masterconfig or local configuration file.
+.                 2. Loads settings from platform config package.
+.                 3. Loads appropriate 'configset' file from eaconfig
+.                 4. Loads 'global/combine.xml'
+.                 5. Loads 'targets/target-init.xml'
+.            --&gt;
+.            &lt;LoadPlatformConfig&gt;
+.              &lt;include&gt;
+.                ./../configset/${config-configset-file}.xml
+.                ./../global/combine.xml
+.                ./../targets/target-init.xml
+.              &lt;/include&gt;
+.            &lt;/LoadPlatformConfig&gt;
+.
+.          &lt;/project&gt;
+          
+        </code>
+        </content>
+    </section>
+    <section address="PlatformConfigPackageImpl">
+      <title>Implementation of platform configuration package</title>
+      <content>
+        <para>
+          Platform configuration packages contain the same platform specific files that eaconfig would. 
+          For example, for platform named xx, xx_config package may look like:
+        </para>
+        <code language="none" title=" ">
+.               xx_config
+.                      dev
+.                          config                    
+.                              options
+.                                  GenerateOptions.cs
+.                              platform
+.                                   xx-gcc.xml
+.                              xx-gcc-debug.xml
+.                              xx-gcc-opt.xml
+.                              xx-gcc-debug-opt.xml
+.                              xx-gcc-profile.xml  
+.                          scripts
+.                              Initialize.xml   
+.                          xx_config.build
+.                          Manifest.xml  
+        </code>
+        <para>
+          GenerateOptions.cs file contains option generation logic for platform xx, for example:
+        </para>
+        <code language="c#" title=" ">
+.          [TaskName("GenerateOptions_xx")]
+.          public class GenerateOptions : GeneratePlatformOptions
+.          {
+.              protected override void SetPlatformOptions()
+.              {
+.                  AddOption(OptionType.link_Options, "--output \"%linkoutputname%\"");
+. 
+.                  AddOptionIf("optimization", "on", OptionType.cc_Options, "--inline -O2);
+.                  AddOptionIf("optimization", "off", OptionType.cc_Options, "-O0");
+. 
+.                  AddOptionIf("debugsymbols", "on", OptionType.cc_Options, "--debug");
+.              }
+.          }
+        </code>
+        <para>
+          This file is automatically compiled into C# assembly using 
+          <link xlink:href="f9f8dce9-4768-7794-2a82-e0affa1821ef">&lt;taskdef&gt;</link> task invoked in the Initialize.xml file:
+        </para>
+        <code language="xml" title=" ">
+.          &lt;project&gt;
+.            &lt;!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.            Make the tasks available to the clients of this package.
+.            - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  --&gt;
+.            &lt;taskbuilddef assembly="${package.xx_config.builddir}/xx_config.dll" referenceconfigassemby="true"&gt;
+.              &lt;sources&gt;
+.                &lt;includes name="${package.xx_config.dir}/config/**.cs"/&gt;
+.              &lt;/sources&gt;
+.            &lt;/taskbuilddef&gt;
+. 
+.            &lt;include file="${package.xx_config.dir}/config/platform/xx-gcc.xml"/&gt;
+.          &lt;/project&gt;        
+        </code>
+      </content>
+    </section>
+    <section address="GameConfigurationAndPlafromConfig">
+      <title>Game configuration files and platform config loader</title>
+      <content>
+        <para>
+          Game configuration files can be layered on top of eaconfig with platform configuration support.
+        </para>
+        <para>
+          For example:
+        </para>
+        <code language="none" title=" ">
+          
+.            gameconfig
+.                   version
+.                       config
+.                           configset
+.                               debug.xml
+.                               debug-opt.xml
+.                               opt.xml
+.                               profiles.xml
+.                           platform
+.                               xx-gcc.xml
+.                           platformloader
+.                               load.xml
+.                        Manifest.xml
+.                        gameconfig.build 
+        </code>
+        <para>
+          Where load.xml can look like:
+        </para>
+        <code language="xml" title=" ">
+          
+.            &lt;project&gt;
+. 
+.              &lt;dependent name="eaconfig"/&gt;
+.              &lt;include file="${package.eaconfig.dir}/config/global/init.xml"/&gt;
+. 
+.              &lt;LoadPlatformConfig&gt;
+.                &lt;include&gt;
+.                  ./../platform/${config-platform-load-name}-${config-compiler}.xml
+.                  ./../configset/${config-configset-file}.xml"
+.                  ./../platform/${config-platform-load-name}-${config-compiler}-postconfig.xml
+.                  ${package.eaconfig.dir}/config/global/combine.xml
+.                  ${package.eaconfig.dir}/config/targets/target-init.xml
+.                &lt;/include&gt;
+.              &lt;/LoadPlatformConfig&gt;
+. 
+.            &lt;/project&gt;
+
+        </code>
+      </content>
+    </section>
+
+    <relatedTopics>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

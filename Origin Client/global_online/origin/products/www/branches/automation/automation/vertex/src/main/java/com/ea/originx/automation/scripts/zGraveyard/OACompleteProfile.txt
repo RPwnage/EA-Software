@@ -1,0 +1,128 @@
+package com.ea.originx.automation.scripts.myhome;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.TakeOverPage;
+import com.ea.originx.automation.lib.pageobjects.discover.CompleteProfile;
+import com.ea.originx.automation.lib.pageobjects.discover.DiscoverPage;
+import com.ea.originx.automation.lib.pageobjects.login.LoginPage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the Complete Profile feature
+ *
+ * @author mkalaivanan
+ */
+public class OACompleteProfile extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 9978)
+    @Test(groups = {"myhome", "full_regression"})
+    public void testCompleteProfile(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        logFlowPoint("Create a new user with no first name and last name and unchecking 'Allow Gamers to find me by email' : " + userAccount.getUsername()); //1
+        logFlowPoint("Navigate to myhome page");//2
+        logFlowPoint("Scroll to the Complete Profile Page and Verify there are tasks to Complete Profile"); //3
+        logFlowPoint("Verify all visible tasks have an image"); //4
+        logFlowPoint("Verify all visible tasks have a task name"); //5
+        logFlowPoint("Verify all visible tasks have a description of the task to do"); //6
+        logFlowPoint("Verify all visible tasks have a CTA button to complete it"); //7
+        logFlowPoint("Click on CTA Button on Verify Email Address task abd verify there is an completed indication"); //8
+        logFlowPoint("Verify the task is automatically removed from the list"); //9
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+
+        userAccount.setFirstName("");
+        userAccount.setLastName("");
+        new LoginPage(driver).clickRegistrationLink();
+        MacroLogin.quickRegister(userAccount, driver, true);
+        if (MacroLogin.verifyMiniProfileUsername(driver, userAccount.getUsername())) {
+            logPass("User created and logged in successfully");
+        } else {
+            logFailExit("User not logged in successfully");
+        }
+
+        //2
+        DiscoverPage discoverPage = new NavigationSidebar(driver).gotoDiscoverPage();
+        new TakeOverPage(driver).closeIfOpen();
+
+        discoverPage.waitForPage();
+        if (discoverPage.verifyDiscoverPageReached()) {
+            logPass("Successfully navigated to the Discover Page");
+        } else {
+            logFailExit("Could not navigate to the Discover Page");
+        }
+
+        //3
+        CompleteProfile completeProfileSection = new CompleteProfile(driver);
+        completeProfileSection.waitForPageToLoad();
+        completeProfileSection.waitForPageScroll(15);
+        completeProfileSection.scrollToCompleteYourAccountSection();
+        if (completeProfileSection.getVisibleTasksCount() > 0) {
+            logPass("Scrolled to Complete Profile section and tasks are visible to complete profile");
+        } else {
+            logFailExit("No tasks are visible to complete the profile");
+        }
+
+        //4
+        if (completeProfileSection.verifyTaskImageExistsForAllVisibleTasks()) {
+            logPass("All visible tasks have an image");
+        } else {
+            logFail("One or more visible task has no image");
+        }
+
+        //5
+        if (completeProfileSection.verifyTaskNameExistsForAllVisibleTasks()) {
+            logPass("All visible tasks have name as title");
+        } else {
+            logFail("One or more visible task has no name in its title");
+        }
+
+        //6
+        if (completeProfileSection.verifyTaskDescriptionExistsForAllVisibleTasks()) {
+            logPass("All visible tasks have no related description");
+        } else {
+            logFail("One or more visible task has no related description");
+        }
+
+        //7
+        if (completeProfileSection.verifyTaskCtaButtonForAllVisibleTasks()) {
+            logPass("All visible tasks have CTA button");
+        } else {
+            logFail("One or more visible task have no CTA ");
+        }
+
+        //8
+        completeProfileSection.clickCtaButtonVerifyEmailAddressTask();
+        boolean isCompletedIndicatorVisible = completeProfileSection.verifyCtaCompletionIndicatorOnVerifyEmailAddressTask();
+
+        if (isCompletedIndicatorVisible) {
+            logPass("The task shows an indication that it has been completed");
+        } else {
+            logFail("Task does not show indication that it has been completed");
+        }
+
+        //9
+        boolean tileRemoved = Waits.pollingWait(() -> !completeProfileSection.verifyEmailAddressTaskVisible());
+        if (tileRemoved) {
+            logPass("The task is automatically removed from the list successfully");
+        } else {
+            logFail("Task is not automatically removed from the list");
+        }
+        softAssertAll();
+    }
+
+}

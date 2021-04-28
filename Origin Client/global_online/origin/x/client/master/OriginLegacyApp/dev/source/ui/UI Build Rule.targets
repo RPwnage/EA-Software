@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <PropertyPageSchema
+      Include="$(MSBuildThisFileDirectory)$(MSBuildThisFileName).xml" />
+    <AvailableItemName
+      Include="UI_Build_Rule">
+      <Targets>_UI_Build_Rule</Targets>
+    </AvailableItemName>
+  </ItemGroup>
+  <UsingTask
+    TaskName="UI_Build_Rule"
+    TaskFactory="XamlTaskFactory"
+    AssemblyName="Microsoft.Build.Tasks.v4.0">
+    <Task>$(MSBuildThisFileDirectory)$(MSBuildThisFileName).xml</Task>
+  </UsingTask>
+  <Target
+    Name="_UI_Build_Rule"
+    BeforeTargets="$(UI_Build_RuleBeforeTargets)"
+    AfterTargets="$(UI_Build_RuleAfterTargets)"
+    Condition="'@(UI_Build_Rule)' != ''"
+    DependsOnTargets="$(UI_Build_RuleDependsOn);ComputeUI_Build_RuleOutput"
+    Outputs="%(UI_Build_Rule.Outputs)"
+    Inputs="%(UI_Build_Rule.Identity);%(UI_Build_Rule.AdditionalDependencies);$(MSBuildProjectFile)">
+    <ItemGroup
+      Condition="'@(SelectedFiles)' != ''">
+      <UI_Build_Rule
+        Remove="@(UI_Build_Rule)"
+        Condition="'%(Identity)' != '@(SelectedFiles)'" />
+    </ItemGroup>
+    <ItemGroup>
+      <UI_Build_Rule_tlog
+        Include="%(UI_Build_Rule.Outputs)"
+        Condition="'%(UI_Build_Rule.Outputs)' != '' and '%(UI_Build_Rule.ExcludedFromBuild)' != 'true'">
+        <Source>@(UI_Build_Rule, '|')</Source>
+      </UI_Build_Rule_tlog>
+    </ItemGroup>
+    <Message
+      Importance="High"
+      Text="%(UI_Build_Rule.ExecutionDescription)" />
+    <WriteLinesToFile
+      Condition="'@(UI_Build_Rule_tlog)' != '' and '%(UI_Build_Rule_tlog.ExcludedFromBuild)' != 'true'"
+      File="$(IntDir)$(ProjectName).write.1.tlog"
+      Lines="^%(UI_Build_Rule_tlog.Source);@(UI_Build_Rule_tlog-&gt;'%(Fullpath)')" />
+    <UI_Build_Rule
+      Condition="'@(UI_Build_Rule)' != '' and '%(UI_Build_Rule.ExcludedFromBuild)' != 'true'"
+      CommandLineTemplate="%(UI_Build_Rule.CommandLineTemplate)"
+      AdditionalOptions="%(UI_Build_Rule.AdditionalOptions)"
+      Inputs="%(UI_Build_Rule.Identity)" />
+  </Target>
+  <PropertyGroup>
+    <ComputeLinkInputsTargets>
+            $(ComputeLinkInputsTargets);
+            ComputeUI_Build_RuleOutput;
+          </ComputeLinkInputsTargets>
+    <ComputeLibInputsTargets>
+            $(ComputeLibInputsTargets);
+            ComputeUI_Build_RuleOutput;
+          </ComputeLibInputsTargets>
+  </PropertyGroup>
+  <Target
+    Name="ComputeUI_Build_RuleOutput"
+    Condition="'@(UI_Build_Rule)' != ''">
+    <ItemGroup>
+      <UI_Build_RuleDirsToMake
+        Condition="'@(UI_Build_Rule)' != '' and '%(UI_Build_Rule.ExcludedFromBuild)' != 'true'"
+        Include="%(UI_Build_Rule.Outputs)" />
+      <Link
+        Include="%(UI_Build_RuleDirsToMake.Identity)"
+        Condition="'%(Extension)'=='.obj' or '%(Extension)'=='.res' or '%(Extension)'=='.rsc' or '%(Extension)'=='.lib'" />
+      <Lib
+        Include="%(UI_Build_RuleDirsToMake.Identity)"
+        Condition="'%(Extension)'=='.obj' or '%(Extension)'=='.res' or '%(Extension)'=='.rsc' or '%(Extension)'=='.lib'" />
+      <ImpLib
+        Include="%(UI_Build_RuleDirsToMake.Identity)"
+        Condition="'%(Extension)'=='.obj' or '%(Extension)'=='.res' or '%(Extension)'=='.rsc' or '%(Extension)'=='.lib'" />
+    </ItemGroup>
+    <MakeDir
+      Directories="@(UI_Build_RuleDirsToMake-&gt;'%(RootDir)%(Directory)')" />
+  </Target>
+</Project>

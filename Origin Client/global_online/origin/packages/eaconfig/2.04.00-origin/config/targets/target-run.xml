@@ -1,0 +1,605 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'run')}' == 'exclude'">
+    <target name="run" description="Runs the executables for a specific configuration" depends="build">
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig-run-target-name" value="eaconfig-run" />
+      <call target="eaconfig-run-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'runall')}' == 'exclude' AND '@{OptionSetGetValue('eaconfig.targets', 'run')}' == 'exclude'">
+    <target name="runall" description="Run the program for each configuration">
+      <property name="eaconfig.buildall.target" value="run" />
+      <property name="eaconfig-run-target-name" value="eaconfig-run" />
+      <call target="eaconfig-buildall-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'run-fast')}' == 'exclude' AND '@{OptionSetGetValue('eaconfig.targets', 'run')}' == 'exclude'">
+    <target name="run-fast" description="Runs the executables for a specific configuration">
+      <property name="eaconfig.build.group" value="runtime" />
+      <property name="eaconfig-run-target-name" value="eaconfig-run" />
+      <call target="eaconfig-run-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.pc')}">
+    <target name="eaconfig-run.pc" description="Run the current component on PC" hidden="true">
+      <dependent name="EARunner"/>
+      <property name="local-executable" value="@{PathCombine('${eaconfig-run-programfolder}', '${eaconfig-run-programname}')}${eaconfig-run-programextension}"/>
+
+      <exec
+        workingdir="${eaconfig-run-workingdir}"
+        program="${package.EARunner.dir}\bin\Win32\Release\EARunner_Win32.exe"
+        >
+        <args>
+          <arg value="-tr ${eaconfig-run-response-timeout}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+          <arg value="-tu ${eaconfig-run-timeout}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+          <arg value="-d ${eaconfig-run-workingdir}" unless="@{StrIsEmpty('${eaconfig-run-workingdir}')}" />
+          <arg value="&quot;${local-executable}&quot;"/>
+          <arg value="${eaconfig-run-args}"/>
+        </args>
+      </exec>
+    </target>
+  </do>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.pc64')}">
+    <target name="eaconfig-run.pc64" description="Run the current component on PC" hidden="true">
+      <dependent name="EARunner"/>
+      <property name="local-executable" value="@{PathCombine('${eaconfig-run-programfolder}', '${eaconfig-run-programname}')}${eaconfig-run-programextension}"/>
+      <exec unless="${eaconfig-run-PROCESSOR_ARCHITECTURE}==x86"
+        workingdir="${eaconfig-run-workingdir}"
+        program="${package.EARunner.dir}\bin\Win64\Release\EARunner_Win64.exe"
+        >
+        <args>
+          <arg value="-tr ${eaconfig-run-response-timeout}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+          <arg value="-tu ${eaconfig-run-timeout}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+          <arg value="-d ${eaconfig-run-workingdir}" unless="@{StrIsEmpty('${eaconfig-run-workingdir}')}" />
+          <arg value="&quot;${local-executable}&quot;"/>
+          <arg value="${eaconfig-run-args}"/>
+        </args>
+      </exec>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.winrt')}">
+    <target name="eaconfig-run.winrt" description="Run the current component on PC" hidden="true">
+      <dependent name="EARunner" />
+
+      <property name="appxdeployfolder" value="@{PathCombine('${eaconfig-run-programfolder}', 'AppX')}" />
+
+		  
+      <!-- Execute the app  -->
+      <exec
+          program="${package.EARunner.dir}\bin\Win32\Release\EARunner_WinRT.exe"
+          workingdir="${eaconfig-run-programfolder}" >
+        <args>
+          <arg value="-tr ${eaconfig-run-response-timeout}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+          <arg value="-tu ${eaconfig-run-timeout}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+          <arg value="@{PathToWindows('@{PathCombine('${appxdeployfolder}', '${eaconfig-run-programname}')}${eaconfig-run-programextension}')}"/>
+          <arg value="${eaconfig-run-args}"/>
+        </args>
+      </exec>
+    </target>
+  </do>    
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.winprt')}">
+    <target name="eaconfig-run.winprt" description="Run the current component on PC" hidden="true">
+
+		<dependent name="EARunner" />
+		<dependent name="VisualStudio"/>
+        <dependent name="EATestPrintServer" />
+        <dependent name="EATest"/>
+		
+		<property name="package.sln.startupproject" value="${modulename}"/>
+		
+		<property name="devenv" value="${package.VisualStudio.devenv.com}"/>
+		<property name="vcxproj-file" value="@{PathToWindows(@{PathCombine('${package.builddir}', '${modulename}.vcxproj')})}"/>
+		<property name="sln-file" value="@{PathToWindows(@{PathCombine('${package.builddir}', '${package.name}.sln')})}"/>	
+        
+         <!-- HACK: This is required because the WinPRT SDK doesn't always initalize the VS extensions properly.
+					We will remove this when Microsoft has resolved the issue with there WinPRT SDK.
+		 -->
+		 <start filename='${sln-file}'></start>
+         <sleep seconds="5"/>
+         <start filename="taskkill.exe">
+            <args>
+                <arg value='/im devenv.exe' />
+            </args>
+         </start>
+         <sleep seconds="1"/>
+                
+        <parallel.do>
+            <do>            
+                <exec program="${package.EATestPrintServer.server-exe}">   <!-- TODO: use mono on non-windows platforms -->
+                    <args>
+                        <arg value="30"/>
+                    </args>
+                </exec>
+            </do>
+            
+            <do>
+                <!-- Run the app -->
+                <exec
+                    program="${devenv}"
+                    workingdir="${eaconfig-run-programfolder}" >
+
+                    <args>
+                        <arg value="${sln-file}"/>
+                        <arg value="/project ${vcxproj-file}"/>
+                        <arg value="/runexit"/>
+                    </args>
+
+                </exec>
+            </do>
+            
+        </parallel.do>
+    </target>
+  </do>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.xenon')}">
+    <target name="eaconfig-run.xenon" description="Run the current component on Xenon" hidden="true">
+      <dependent name="xenonsdk" />
+      <dependent name="EARunner" />
+
+      <property name="eaconfig-run-datafileexts"  value="${${groupname}.run.datafileexts}" if="@{PropertyExists('${groupname}.run.datafileexts')}" />
+      <property name="eaconfig-run-datafileexts"  value="*.xbo *.xfn *.xsh *.ebo *.txt *.ttc *.ffs *.inl *.ttf *.fx *.rx2 *.json *.xml"  unless="@{PropertyExists('${groupname}.run.datafileexts')}" />
+
+      <property name="eaconfig-run-bindir" value="${package.xenonsdk.appdir}/bin/win32" />
+      <property name="xenon-outputfolder" value="xe:\${modulename}\${config}"/>
+
+      <trycatch>
+        <try>
+          <!-- copy the data files over to the xenon (this could probably
+                         read directly off of the test.${package.name}.test-data-fileset 
+                         object to avoid the ambiguity
+                         -->
+          <exec
+            workingdir="${eaconfig-run-workingdir}"
+  program="${eaconfig-run-bindir}/xbcp"
+  unless="@{StrIsEmpty('${eaconfig-run-workingdir}')}"
+          >
+            <arg value="/y /t /f /r /s /q /d"/>
+            <arg value="/X:${eaconfig-run-console}" unless="@{StrIsEmpty('${eaconfig-run-console}')}" />
+            <arg value="${eaconfig-run-datafileexts}"/>
+            <arg value="${xenon-outputfolder}"/>
+          </exec>
+        </try>
+        <catch>
+          <echo message="No data files to copy"/>
+        </catch>
+      </trycatch>
+
+      <!-- Copy program files to the Xenon -->
+      <exec
+        workingdir="${eaconfig-run-programfolder}"
+  program="${eaconfig-run-bindir}/xbcp"
+      >
+        <arg value="/y /t /f"/>
+        <arg value="/X:${eaconfig-run-console}" unless="@{StrIsEmpty('${eaconfig-run-console}')}" />
+        <arg value="*.exe"/>
+        <arg value="*${eaconfig-run-programextension}"/>
+        <arg value="${xenon-outputfolder}"/>
+      </exec>
+
+      <!-- Execute the program on the Xenon -->
+      <exec
+          program="${package.EARunner.dir}\bin\Win32\Release\EARunner_Xenon.exe"
+          workingdir="${eaconfig-run-programfolder}" >
+        <env>
+          <option name="PATH" value="${sys.env.PATH};${eaconfig-run-bindir};"/>
+        </env>
+        <args>
+          <arg value="-x ${eaconfig-run-console}" unless="@{StrIsEmpty('${eaconfig-run-console}')}" />
+          <arg value="-tr ${eaconfig-run-response-timeout}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+          <arg value="-tu ${eaconfig-run-timeout}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+          <arg value="@{PathCombine('${xenon-outputfolder}', '${eaconfig-run-programname}${eaconfig-run-programextension}')}"/>
+          <arg value="${eaconfig-run-args}"/>
+        </args>
+      </exec>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.ps3')}">
+    <target name="eaconfig-run.ps3" description="Run the current component on PS3" hidden="true">
+      <property name="eaconfig-run-console" value="" unless="@{PropertyExists('eaconfig-run-console')}" />
+
+      <!-- Dependant on EARunner to run the tests for this platform -->
+      <dependent name="EARunner" />
+
+      <exec
+          program="${package.EARunner.dir}\bin\Win32\Release\EARunner_PS3.exe"
+          workingdir="${eaconfig-run-programfolder}" >
+        <args>
+          <arg value="-x ${eaconfig-run-console}" unless="@{StrIsEmpty('${eaconfig-run-console}')}" />
+          <arg value="-fdt" />
+          <arg value="-it ${eaconfig-run-console}" unless="@{StrIsEmpty('${eaconfig-run-console}')}" />
+          <arg value="-tr ${eaconfig-run-response-timeout}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+          <arg value="-tu ${eaconfig-run-timeout}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+          <arg value="-hd ${eaconfig-run-homedir}" unless="@{StrIsEmpty('${eaconfig-run-homedir}')}" />
+          <arg value="-fd ${eaconfig-run-workingdir}" unless="@{StrIsEmpty('${eaconfig-run-workingdir}')}"/>
+          <arg value="@{PathToWindows(@{PathCombine('${eaconfig-run-programfolder}', '${eaconfig-run-programname}${eaconfig-run-programextension}')})}" />
+          <arg value="${eaconfig-run-args}"/>
+        </args>
+      </exec>
+
+    </target>
+  </do>
+  
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.iphone')}">
+    <target name="eaconfig-run.iphone" description="Run the current component on iphone (device)" hidden="true">
+      <fail message="IPhoneRunner does not support simulation runs" if="@{PropertyTrue('config.iphone-sim')}"/>
+      <dependent name="IPhoneRunner"/>
+      <dependent name="iphonesdk"/>
+
+      <property name="xcodeprojectname" value="${eaconfig-run-programname}"/>
+      <property name="xcodeprojectext" value=".xcodeproj"/>
+      <property name="xcodeprojectpath" value="${package.builddir}" if="${xcode-projectize} == false"/>
+      <property name="xcodeprojectpath" value="@{PathCombine('${nant.project.buildroot}', '${xcode-ios-project-dir}')}" if="${xcode-projectize} == true"/>
+      <property name="xcodeprojectfullpath" value="@{PathCombine('${xcodeprojectpath}', '${xcodeprojectname}${xcodeprojectext}')}"/>
+
+      <!-- Bypass XCodeGenerator when XcodeProjectizer was used. -->
+      <do unless="${xcode-projectize} == true">
+        <delete dir="${xcodeprojectfullpath}" failonmissing="false" failonerror="false"/>
+        <task name="CallPrebuildStep" group="${eaconfig.build.group}"/>
+        <task name="XCodeProjectGenerateForModule" 
+            Group="${eaconfig.build.group}"
+            Module="${modulename}" 
+            Target="${eaconfig.build.group}-build" 
+            OutputFolder="/${eaconfig.build.group}" 
+            unless="'${eaconfig.build.group}'=='runtime'"/>
+        <task 
+            name="XCodeProjectGenerateForModule" 
+            Group="${eaconfig.build.group}" 
+            Module="${modulename}" 
+            Target="build" 
+            OutputFolder="" 
+            if="'${eaconfig.build.group}'=='runtime'"/>
+      </do>
+      <!-- XCode projects are in fact directories -->
+      <fail unless="@{DirectoryExists('${xcodeprojectfullpath}')}"
+            message="ERROR: '${xcodeprojectfullpath}' does not exist. Make sure to call xcode generation target."/>
+
+      <property name="IPhoneRunner" value="${package.IPhoneRunner.dir}/bin/Debug/IPhoneRunner.exe"/>
+
+      <exec program="chmod" commandline="a+rx ${IPhoneRunner}"/>
+      <exec program="${IPhoneRunner}">
+        <args>
+          <arg value="-p ${xcodeprojectfullpath}"/>
+          <arg value="-d ${eaconfig-run-console}" unless="@{StrIsEmpty('${eaconfig-run-console}')}"/>
+          <arg value="-x ${xcode-projectize}"/>
+          <arg value="-i"/>
+        </args>
+      </exec>
+    </target>
+  </do>
+  
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.unix')}">
+    <target name="eaconfig-run.unix" description="Run the current component on UNIX" hidden="true">
+      <!-- Dependant on EARunner to run the tests for this platform -->
+      <dependent name="EARunner" />
+
+      <property name="local-workingdir" value="@{PathToUnix('${eaconfig-run-workingdir}')}"/>
+      <property name="local-executable" value="@{PathToUnix(@{PathCombine('${eaconfig-run-programfolder}', '${eaconfig-run-programname}${eaconfig-run-programextension}')})}"/>
+
+      <property name="eaconfig.use_valgrind" value="false" unless="@{PropertyExists('eaconfig.use_valgrind')}"/>
+
+      <!-- Valgrind builds are up to 30x slower than normal builds. -->
+      <do if="${eaconfig.use_valgrind}">
+        <property name="eaconfig-run-response-timeout" value="@{MathMul('${eaconfig-run-response-timeout}', '30')}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+        <property name="eaconfig-run-timeout" value="@{MathMul('${eaconfig-run-timeout}', '30')}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+      </do>
+
+      <exec
+         workingdir="${local-workingdir}"
+         program="sh">
+         <args>
+            <arg value="${package.EARunner.dir}/bin/Unix/EARunner_Unix.sh"/>
+            <arg value="-tr ${eaconfig-run-response-timeout}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+            <arg value="-tu ${eaconfig-run-timeout}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+            <arg value="/usr/bin/valgrind -v --leak-check=full --show-reachable=yes --track-origins=yes" if="${eaconfig.use_valgrind}"/>
+            <arg value="${local-executable}"/>
+            <arg value="&quot;${eaconfig-run-args}&quot;"/>
+         </args>
+      </exec>
+    </target>
+  </do>
+  
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="@{TargetExists('eaconfig-run.unix64')}">
+    <target name="eaconfig-run.unix64" description="Run the current component on UNIX (64-bit)" hidden="true">
+      <!-- Dependant on EARunner to run the tests for this platform -->
+      <dependent name="EARunner" />
+
+      <property name="local-workingdir" value="@{PathToUnix('${eaconfig-run-workingdir}')}"/>
+      <property name="local-executable" value="@{PathToUnix(@{PathCombine('${eaconfig-run-programfolder}', '${eaconfig-run-programname}${eaconfig-run-programextension}')})}"/>
+
+      <property name="eaconfig.use_valgrind" value="false" unless="@{PropertyExists('eaconfig.use_valgrind')}"/>
+
+      <!-- Valgrind builds are up to 30x slower than normal builds. -->
+      <do if="${eaconfig.use_valgrind}">
+        <property name="eaconfig-run-response-timeout" value="@{MathMul('${eaconfig-run-response-timeout}', '30')}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+        <property name="eaconfig-run-timeout" value="@{MathMul('${eaconfig-run-timeout}', '30')}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+      </do>
+
+      <exec
+         workingdir="${local-workingdir}"
+         program="sh">
+         <args>
+            <arg value="${package.EARunner.dir}/bin/Unix/EARunner_Unix.sh"/>
+            <arg value="-tr ${eaconfig-run-response-timeout}" unless="@{StrIsEmpty('${eaconfig-run-response-timeout}')}" />
+            <arg value="-tu ${eaconfig-run-timeout}" unless="@{StrIsEmpty('${eaconfig-run-timeout}')}" />
+            <arg value="/usr/bin/valgrind -v --leak-check=full --show-reachable=yes --track-origins=yes" if="${eaconfig.use_valgrind}"/>
+            <arg value="${local-executable}"/>
+            <arg value="${eaconfig-run-args}"/>
+         </args>
+      </exec>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-run" description="Run the current component" hidden="true">
+    <!-- set default values if any properties are undefined -->
+    <property name="eaconfig-run-args"      value="${${groupname}.run.args}"  if="@{PropertyExists('${groupname}.run.args')}" />
+    <property name="eaconfig-run-args"      value=""  unless="@{PropertyExists('${groupname}.run.args')}"/>
+
+    <property name="eaconfig-run-workingdir"  value="${${groupname}.run.workingdir}" if="@{PropertyExists('${groupname}.run.workingdir')}" />
+    <do unless="@{PropertyExists('${groupname}.run.workingdir')}" >
+      <property name="eaconfig-run-workingdir"  value="${package.configbindir}${eaconfig.${eaconfig.build.group}.outputfolder}"/>
+    </do>
+
+    <do if="${config-system}==ps3" >
+      <property name="eaconfig-run-homedir"  value="${${groupname}.run.homedir}" if="@{PropertyExists('${groupname}.run.homedir')}" />
+      <property name="eaconfig-run-homedir"  value="${eaconfig-run-workingdir}"  unless="@{PropertyExists('${groupname}.run.homedir')}" />
+    </do>
+
+    <!-- IN SECONDS-->
+    <property name="eaconfig-run-timeout" value="${${eaconfig.${eaconfig.build.group}.groupname}.run.timeout}" if="@{PropertyExists('${eaconfig.${eaconfig.build.group}.groupname}.run.timeout')}"/>
+    <property name="eaconfig-run-timeout" value="${${groupname}.run.timeout}" if="@{PropertyExists('${groupname}.run.timeout')}" />
+    <property name="eaconfig-run-timeout" value="1200" unless="@{PropertyExists('eaconfig-run-timeout')}"/>
+    <property name="eaconfig-run-response-timeout" value="${${eaconfig.${eaconfig.build.group}.groupname}.run.response.timeout}" if="@{PropertyExists('${eaconfig.${eaconfig.build.group}.groupname}.run.response.timeout')}"/>
+    <property name="eaconfig-run-response-timeout" value="${${groupname}.run.response.timeout}" if="@{PropertyExists('${groupname}.run.response.timeout')}" />
+    <property name="eaconfig-run-response-timeout" value="300" unless="@{PropertyExists('eaconfig-run-response-timeout')}"/>
+    <choose>
+      <do if="@{PropertyExists('package.run.console')}">
+        <property name="eaconfig-run-console" value="${package.run.console}" />
+      </do>
+      <do if="@{PropertyExists('${config-system}target')}">
+        <property name="eaconfig-run-console" value="${${config-system}target}" />
+      </do>
+      <do>
+        <property name="eaconfig-run-console"  value="" />
+      </do>
+    </choose>
+
+    <choose>
+      <do if="@{PropertyExists('package.run.password')}">
+        <property name="eaconfig-run-password" value="${package.run.password}" />
+      </do>
+      <do if="@{PropertyExists('${config-system}password')}">
+        <property name="eaconfig-run-password" value="${${config-system}password}" />
+      </do>
+      <do>
+        <property name="eaconfig-run-password"  value="" />
+      </do>
+    </choose>
+    <!-- start with the folder specified by the build type -->
+    <!-- this property is only being used by xenon as the output path on the console. -->
+    <property name="eaconfig-run-outputfolder" value="${eaconfig.${eaconfig.build.group}.outputfolder}" />
+
+    <!-- remove leading slash or backslash from the path name -->
+    <do if="@{StrStartsWith(${eaconfig-run-outputfolder}, '/')}">
+      <property name="eaconfig-run-outputfolder" value="@{StrRemove(${eaconfig-run-outputfolder}, '0', '1')}" />
+    </do>
+
+    <call target="eaconfig-run.${config-system}" force="true" if="@{TargetExists('eaconfig-run.${config-system}')}" />
+    <fail message="Running tests on platform '${config-system}' is not supported" unless="@{TargetExists('eaconfig-run.${config-system}')}" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-run-caller" hidden="true" >
+    <sysinfo/>
+
+    <property name="eaconfig-run-target-name" value="eaconfig-run" unless="@{PropertyExists('eaconfig-run-target-name')}"/>
+    <do if="@{StrStartsWith('${config-system}', 'pc')} || @{StrStartsWith('${config-system}', 'winrt')}" >
+      <property name="eaconfig-run-PROCESSOR_ARCHITECTURE" value="${sys.env.PROCESSOR_ARCHITECTURE}" readonly="true" />
+    </do>
+
+    <property name="eaconfig-run-default-programfolder" value="${package.configbindir}${eaconfig.${eaconfig.build.group}.outputfolder}"/>
+
+    <do if="@{PropertyExists('${eaconfig.${eaconfig.build.group}.groupname}.buildmodules')}">
+      <property name="eaconfig-run-modules" value="${${eaconfig.${eaconfig.build.group}.groupname}.buildmodules}"/>
+      <property name="eaconfig-run-modules" value="${${eaconfig.${eaconfig.build.group}.groupname}.run.modules}" if="@{PropertyExists('${eaconfig.${eaconfig.build.group}.groupname}.run.modules')}"/>
+    </do>
+
+    <!-- If the package has dependent data files, copy them over to the working directory -->
+    <do if="@{FileSetExists('${eaconfig.${eaconfig.build.group}.groupname}.${package.name}.test-data-fileset')}">
+      <copy todir="${eaconfig-run-default-programfolder}">
+        <fileset fromfileset="${eaconfig.${eaconfig.build.group}.groupname}.${package.name}.test-data-fileset" basedir="@{FileSetGetBaseDir('${eaconfig.${eaconfig.build.group}.groupname}.${package.name}.test-data-fileset')}"/>
+      </copy>
+    </do>
+    <choose>
+      <do if="${config-system}=='ps3'">
+        <property name="eaconfig-run-default-programextension" value="${secured-exe-suffix}"/>
+      </do>
+      <do if="@{PropertyExists('exe-suffix')}">
+        <property name="eaconfig-run-default-programextension" value="${exe-suffix}"/>
+      </do>
+      <do>
+        <property name="eaconfig-run-default-programextension" value=""/>
+      </do>
+    </choose>
+
+    <do if="@{PropertyExists('eaconfig-run-modules')}" >
+      <foreach item="String" in="${eaconfig-run-modules}" delim=" " property="module">
+        <property name="groupname" value="${eaconfig.${eaconfig.build.group}.groupname}.${module}" />
+        <property name="modulename" value="${module}"/>
+        <do if="@{FileSetExists('${groupname}.test-data-fileset')}">
+          <copy todir="${eaconfig-run-default-programfolder}">
+            <fileset fromfileset="${groupname}.test-data-fileset" basedir="@{FileSetGetBaseDir('${groupname}.test-data-fileset')}"/>
+          </copy>
+        </do>
+        <!-- Default build type if not specified is Program -->
+        <property name="${groupname}.buildtype" value="Program" unless="@{PropertyExists('${groupname}.buildtype')}" />
+        <property name="__temp.buildtype" value="${${groupname}.buildtype}" />
+        <do if="'${__temp.buildtype}' == 'Program'" >
+          <property name="__temp.buildtype" value="StdProgram" />
+        </do>
+
+        <task name="GetModuleBaseType" Name="${${groupname}.buildtype}" />
+        <property name="build-base" value="${GetModuleBaseType.RetVal}" />
+        <do if="${build-base} != StdLibrary and ${build-base} != DynamicLibrary and
+                        ${build-base} != ManagedCppAssembly and ${build-base} != CSharpLibrary">
+          <property name="eaconfig-run-programname" value="${module}" />
+          <!-- Some modules have a custom defined output name. -->
+          <do if="@{PropertyExists('${groupname}.outputname')}">
+            <property name="eaconfig-run-programname" value="${${groupname}.outputname}" />
+          </do>
+          <property name="eaconfig-run-programfolder" value="${eaconfig-run-default-programfolder}" />
+          <property name="eaconfig-run-programextension" value="${eaconfig-run-default-programextension}" />
+          <!--
+                     Some game team has custom config and re-defined the link output dir/name/extension here with extra stuff like ${config-type}.
+                     We do the followings to try to conserve the extra info.
+                    -->
+          <property name="temp_linkoutput_rootname" />
+          <property name="temp_linkoutput_dir" />
+          <property name="temp_linkoutput_ext" />
+          <do if="@{OptionSetOptionExists('${__temp.buildtype}', 'linkoutputname')}">
+            <property name="temp_linkoutput_name" value="@{OptionSetGetValue('${__temp.buildtype}', 'linkoutputname')}"/>
+            <do unless="@{StrIsEmpty('${temp_linkoutput_name}')}">
+              <!-- Now strip out the path and extension and then replace the token with the actual filename -->
+              <property name="temp_linkoutput_rootname" value="@{PathGetFileNameWithoutExtension('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_rootname" value="@{StrReplace('${property.value}','%outputname%','${eaconfig-run-programname}')}"/>
+              <property name="temp_linkoutput_dir" value="@{PathGetDirectoryName('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_dir" value="@{StrReplace('${property.value}','%outputdir%','${eaconfig-run-programfolder}')}"/>
+              <property name="temp_linkoutput_ext" value="@{PathGetExtension('${temp_linkoutput_name}')}"/>
+            </do>
+          </do>
+          <do if="'${config-system}'=='xenon'">
+            <do if="@{OptionSetOptionExists('${__temp.buildtype}', 'imgbldoutputname')}">
+              <property name="temp_linkoutput_name" value="@{OptionSetGetValue('${__temp.buildtype}', 'imgbldoutputname')}"/>
+              <!-- Now strip out the path and extension and then replace the token with the actual filename -->
+              <property name="temp_linkoutput_rootname" value="@{PathGetFileNameWithoutExtension('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_rootname" value="@{StrReplace('${property.value}','%outputname%','${eaconfig-run-programname}')}"/>
+              <property name="temp_linkoutput_dir" value="@{PathGetDirectoryName('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_dir" value="@{StrReplace('${property.value}','%outputdir%','${eaconfig-run-programfolder}')}"/>
+              <property name="temp_linkoutput_ext" value="@{PathGetExtension('${temp_linkoutput_name}')}"/>
+            </do>
+          </do>
+          <do if="'${config-system}'=='ps3'">
+            <do if="@{OptionSetOptionExists('${__temp.buildtype}', 'linkoutputnameself')}">
+              <property name="temp_linkoutput_name" value="@{OptionSetGetValue('${__temp.buildtype}', 'linkoutputnameself')}"/>
+              <!-- Now strip out the path and extension and then replace the token with the actual filename -->
+              <property name="temp_linkoutput_rootname" value="@{PathGetFileNameWithoutExtension('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_rootname" value="@{StrReplace('${property.value}','%outputname%','${eaconfig-run-programname}')}"/>
+              <property name="temp_linkoutput_dir" value="@{PathGetDirectoryName('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_dir" value="@{StrReplace('${property.value}','%outputdir%','${eaconfig-run-programfolder}')}"/>
+              <property name="temp_linkoutput_ext" value="@{PathGetExtension('${temp_linkoutput_name}')}"/>
+            </do>
+          </do>
+
+          <property name="eaconfig-run-programname" value="${temp_linkoutput_rootname}" unless="@{StrIsEmpty('${temp_linkoutput_rootname}')}"/>
+          <property name="eaconfig-run-programfolder" value="${temp_linkoutput_dir}" unless="@{StrIsEmpty('${temp_linkoutput_dir}')}"/>
+          <property name="eaconfig-run-programextension" value="${temp_linkoutput_ext}" unless="@{StrIsEmpty('${temp_linkoutput_ext}')}"/>
+
+          <!-- Some modules have a custom defined output dir.  
+                         (This overrides everything even if there are custom modified relative path info in linkoutputname.  This is how the build is setup.) -->
+          <do if="@{PropertyExists('${groupname}.outputdir')}">
+            <property name="eaconfig-run-programfolder" value="${${groupname}.outputdir}" />
+          </do>
+
+          <!-- Now actually do the run -->
+          <call target="${eaconfig-run-target-name}" force="true"/>
+        </do>
+      </foreach>
+    </do>
+    <do unless="@{PropertyExists('eaconfig-run-modules')}" >
+      <property name="groupname" value="${eaconfig.${eaconfig.build.group}.groupname}" />
+      <!-- Default build type if not specified is Program -->
+      <property name="${groupname}.buildtype" value="Program" unless="@{PropertyExists('${groupname}.buildtype')}" />
+      <property name="__temp.buildtype" value="${${groupname}.buildtype}" />
+      <do if="'${__temp.buildtype}' == 'Program'" >
+        <property name="__temp.buildtype" value="StdProgram" />
+      </do>
+
+      <do if="@{PropertyExists('${groupname}.buildtype')}" >
+        <task name="GetModuleBaseType" Name="${${groupname}.buildtype}" />
+        <property name="build-base" value="${GetModuleBaseType.RetVal}" />
+        <do if="${build-base} != StdLibrary and ${build-base} != DynamicLibrary">
+          <property name="eaconfig-run-programname" value="${package.name}" />
+          <!-- Some modules have a custom defined output name. -->
+          <do if="@{PropertyExists('${groupname}.outputname')}">
+            <property name="eaconfig-run-programname" value="${${groupname}.outputname}" />
+          </do>
+          <property name="modulename" value="${eaconfig-run-programname}"/>
+          <property name="eaconfig-run-programfolder" value="${eaconfig-run-default-programfolder}" />
+          <property name="eaconfig-run-programextension" value="${eaconfig-run-default-programextension}" />
+          <!--
+                     Some game team has custom config and re-defined the link output dir/name/extension here with extra stuff like ${config-type}.
+                     We do the followings to try to conserve the extra info.
+                    -->
+          <property name="temp_linkoutput_rootname" />
+          <property name="temp_linkoutput_dir" />
+          <property name="temp_linkoutput_ext" />
+          <do if="@{OptionSetOptionExists('${__temp.buildtype}', 'linkoutputname')}">
+            <property name="temp_linkoutput_name" value="@{OptionSetGetValue('${__temp.buildtype}', 'linkoutputname')}"/>
+            <do unless="@{StrIsEmpty('${temp_linkoutput_name}')}">
+              <property name="temp_linkoutput_rootname" value="@{PathGetFileNameWithoutExtension('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_rootname" value="@{StrReplace('${property.value}','%outputname%','${eaconfig-run-programname}')}"/>
+              <property name="temp_linkoutput_dir" value="@{PathGetDirectoryName('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_dir" value="@{StrReplace('${property.value}','%outputdir%','${eaconfig-run-programfolder}')}"/>
+              <property name="temp_linkoutput_ext" value="@{PathGetExtension('${temp_linkoutput_name}')}"/>
+            </do>
+          </do>
+          <do if="'${config-system}'=='xenon'">
+            <do if="@{OptionSetOptionExists('${__temp.buildtype}', 'imgbldoutputname')}">
+              <property name="temp_linkoutput_name" value="@{OptionSetGetValue('${__temp.buildtype}', 'imgbldoutputname')}"/>
+              <!-- Now strip out the path and extension and then replace the token with the actual filename -->
+              <property name="temp_linkoutput_rootname" value="@{PathGetFileNameWithoutExtension('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_rootname" value="@{StrReplace('${property.value}','%outputname%','${eaconfig-run-programname}')}"/>
+              <property name="temp_linkoutput_dir" value="@{PathGetDirectoryName('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_dir" value="@{StrReplace('${property.value}','%outputdir%','${eaconfig-run-programfolder}')}"/>
+              <property name="temp_linkoutput_ext" value="@{PathGetExtension('${temp_linkoutput_name}')}"/>
+            </do>
+          </do>
+          <do if="'${config-system}'=='ps3'">
+            <do if="@{OptionSetOptionExists('${__temp.buildtype}', 'linkoutputnameself')}">
+              <property name="temp_linkoutput_name" value="@{OptionSetGetValue('${__temp.buildtype}', 'linkoutputnameself')}"/>
+              <!-- Now strip out the path and extension and then replace the token with the actual filename -->
+              <property name="temp_linkoutput_rootname" value="@{PathGetFileNameWithoutExtension('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_rootname" value="@{StrReplace('${property.value}','%outputname%','${eaconfig-run-programname}')}"/>
+              <property name="temp_linkoutput_dir" value="@{PathGetDirectoryName('${temp_linkoutput_name}')}"/>
+              <property name="temp_linkoutput_dir" value="@{StrReplace('${property.value}','%outputdir%','${eaconfig-run-programfolder}')}"/>
+              <property name="temp_linkoutput_ext" value="@{PathGetExtension('${temp_linkoutput_name}')}"/>
+            </do>
+          </do>
+          <property name="eaconfig-run-programname" value="${temp_linkoutput_rootname}" unless="@{StrIsEmpty('${temp_linkoutput_rootname}')}"/>
+          <property name="eaconfig-run-programfolder" value="${temp_linkoutput_dir}" unless="@{StrIsEmpty('${temp_linkoutput_dir}')}"/>
+          <property name="eaconfig-run-programextension" value="${temp_linkoutput_ext}" unless="@{StrIsEmpty('${temp_linkoutput_ext}')}"/>
+
+          <!-- Some modules have a custom defined output dir.  
+                         (This overrides everything even if there are custom modified relative path info in linkoutputname.  This is how the build is setup.) -->
+          <do if="@{PropertyExists('${groupname}.outputdir')}">
+            <property name="eaconfig-run-programfolder" value="${${groupname}.outputdir}" />
+          </do>
+
+          <!-- Now actually do the run -->
+          <call target="${eaconfig-run-target-name}" force="true"/>
+        </do>
+      </do>
+    </do>
+  </target>
+
+</project>
+

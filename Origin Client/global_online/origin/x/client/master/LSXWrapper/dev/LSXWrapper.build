@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+================================================================================
+LSXWrapper.build
+
+(c) 2010-2011 Electronic Arts Inc.
+================================================================================
+-->
+
+<project default="build">
+
+  <!-- ************************* -->
+  <!-- EAConfig target overrides -->
+  <!-- ************************* -->
+  <optionset name="config.targetoverrides" >
+    <option name="clean" value="exclude"/>
+  </optionset>
+
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+  <property name="package.LSXWrapper.dir"  value="@{PathGetFullPath('.')}"/>
+  <property name="package.LSXWrapper.version"  value="@{PathGetFileName('${package.LSXWrapper.dir}')}"/>
+  <package name="LSXWrapper" targetversion="${package.LSXWrapper.version}"/>
+  
+  <!-- ******************** -->
+  <!-- Package dependencies -->
+  <!-- ******************** -->
+  <include file="scripts/initialize.xml" />
+  
+  <dependent name="OriginConfig"/>
+  <dependent name="Qt"/>
+  <dependent name="xsd2cpp"/>
+  
+  <property name="osx-base-sdk-version" value="10.7" />
+  
+  <BuildType name="${package.name}.buildtype" from="OriginLibrary">
+    <option name="buildset.cc.defines">
+      ${option.value}
+      EAT_ASSERT_ENABLED
+      ORIGIN_SDK_EXPORTS
+      RAPIDXML_NO_EXCEPTIONS
+      _WINDOWS
+      UNICODE
+      _UNICODE
+    </option>
+    <option name="buildset.cc.options" if="${config-system} == 'pc'">
+      ${option.value}
+      -wd4275
+      /FI ${package.LSXWrapper.dir}/source/OriginCommon.h
+    </option>
+    <remove>
+      <cc.defines>
+        _USRDLL
+      </cc.defines>
+    </remove>
+    <option name="warningsaserrors" value="off"/>
+  </BuildType>
+  
+  <property name="runtime.LSXWrapper.buildtype" value="${package.name}.buildtype" />
+  
+  <property name="runtime.LSXWrapper.xsd2cpp_generatedfiles.dir" value="${package.LSXWrapper.dir}/source/generated/xsd2cpp"/>
+  <property name="runtime.LSXWrapper.xsd2cpp_js_generatedfiles.dir" value="${package.LSXWrapper.dir}/source/generated/xsd2cpp"/>
+  
+  <property name="runtime.LSXWrapper.rapidxmlfiles" value="${package.LSXWrapper.dir}/src/rapidxml" />
+  <do if="${config-system} == 'pc'">
+    <property name="runtime.LSXWrapper.outputname" value="${package.name}" />
+    <property name="runtime.LSXWrapper.generatedfiles" value="${package.LSXWrapper.dir}/source/generated" />
+  </do>
+    
+  <do if="${config-system} == 'osx'">
+    <property name="runtime.LSXWrapper.generatedfiles" value="${package.LSXWrapper.dir}/source/generated_mac" />
+  </do>
+  <property name="runtime.buildmodules" value="LSXWrapper" />
+    
+  <do if="${config-system} == 'pc'">
+    <dependent name="DotNet" />
+  </do>
+
+  <property name="runtime.LSXWrapper.usedependencies">
+    Qt
+  </property>
+
+  <property name="runtime.LSXWrapper.builddependencies">
+    EABase
+    EAThread
+  </property>
+
+  <property name="runtime.LSXWrapper.osx-frameworks">
+    -framework AppKit
+    -framework Carbon
+    -framework IOKit
+    -framework SystemConfiguration
+    -framework ${package.Qt.libdir}/QtCore
+    -framework ${package.Qt.libdir}/QtGui
+    -framework ${package.Qt.libdir}/QtNetwork
+    -framework ${package.Qt.libdir}/QtOpenGL
+    -framework ${package.Qt.libdir}/QtWebKit
+  -framework ${package.Qt.libdir}/QtWidgets
+    -framework ${package.Qt.libdir}/QtXml
+    -framework ${package.Qt.libdir}/QtXmlPatterns
+    -framework Security
+    -framework ServiceManagement
+    -framework Foundation
+  </property>
+  
+  <property name="runtime.LSXWrapper.includedirs">
+    ${property.value}
+    ${package.dir}/include/
+    ${package.dir}/source/
+    ${runtime.LSXWrapper.xsd2cpp_generatedfiles.dir}
+  </property>
+  
+  <fileset name="runtime.LSXWrapper.headerfiles">
+    <includes name="source/**/*.h"/>
+    <includes name="include/*.h"/>
+    <includes name="source/*.xsd"/>
+  </fileset>
+  
+  <fileset name="runtime.LSXWrapper.sourcefiles" basedir="${package.LSXWrapper.dir}" >
+    <includes name="source/*.cpp" />
+    <includes name="${runtime.LSXWrapper.xsd2cpp_generatedfiles.dir}/zGenerated.cpp" asis="true" />
+  </fileset>
+  
+  <do if="${config-system} == 'pc'">  
+      <fileset name="runtime.LSXWrapper.resourcefiles">
+      </fileset>
+  </do>
+  
+  <fileset name="runtime.LSXWrapper.xsd2cpp_sourcefiles">
+    <includes name="source/LsxProtocolSchema.xsd" />
+    <includes name="source/SrvProtocolSchema.xsd" />
+    <includes name="source/ecommerce2.xsd" />
+    <includes name="source/nonorigingame.xsd" />
+    <includes name="source/customboxart.xsd" />
+  </fileset>
+
+    <fileset name="runtime.LSXWrapper.xsd2cpp_js_sourcefiles">
+    <includes name="source/LsxProtocolSchema.xsd" />
+  </fileset>
+
+  
+  <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+    <do if="${config-system} == 'pc'">
+        <target name="generate-code" depends="compile-xsd" />
+        <target name="generate-codejs" depends="compile-xsdjs" />
+    </do>
+    <do if="${config-system} == 'osx'">
+        <target name="generate-code" depends="compile-xsd" />
+    </do>
+          
+  <property name="runtime.LSXWrapper.prebuildtarget" value="generate-code" />
+  <property name="runtime.LSXWrapper.prebuildtargetjs" value="generate-codejs" />
+  <property name="runtime.LSXWrapper.preprocess" value="generate-code" if="${config-system} == 'osx'" />
+  <property name="runtime.LSXWrapper.prebuildtarget" value="generate-code" if="${config-system} == 'osx'" />
+
+  
+  <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+  <property name="runtime.LSXWrapper.vcproj.pre-build-step">
+    ${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.LSXWrapper.prebuildtarget} ${runtime.LSXWrapper.prebuildtargetjs}
+  </property>
+
+  <target name="compile-xsd" >
+    <foreach property="file" item="FileSet" in="runtime.LSXWrapper.xsd2cpp_sourcefiles">
+      <task name="xsd2cpp.generate_cpp" filename="${file}" output_dir="${runtime.LSXWrapper.xsd2cpp_generatedfiles.dir}" config="client"/>
+    </foreach>
+    <task name="xsd2cpp.zGenerated" output_dir="${runtime.LSXWrapper.xsd2cpp_generatedfiles.dir}"/>
+  </target>
+
+    
+  <target name="compile-xsdjs" >
+    <foreach property="file" item="FileSet" in="runtime.LSXWrapper.xsd2cpp_js_sourcefiles">
+      <task name="xsd2cpp.generate_js" filename="${file}" output_dir="${runtime.LSXWrapper.xsd2cpp_generatedfiles.dir}"/>
+    </foreach>
+  </target>
+
+  <target name="clean-custom" >
+    <delete dir="${runtime.LSXWrapper.xsd2cpp_generatedfiles.dir}" if="${config-system} == 'pc'"/>
+  </target>
+  
+  <target name="dump">
+        <foreach property="file" item="FileSet" in="runtime.LSXWrapper.xsd2cpp_sourcefiles">
+          <echo message="${file}"/>
+          <property name="xsd.file.contents" fromfile="${file}"/>
+          <property name="index" value="@{MathAdd(@{StrIndexOf(${xsd.file.contents},'targetNamespace=&quot;')},17)}"/>
+          <echo message="index: ${index}"/>
+          <property name="xsd.file.contents" value="@{StrRemove(${property.value},0,${index})}"/>
+          <property name="index" value="@{StrIndexOf(${xsd.file.contents},'&quot;')}"/>
+          <echo message="index: ${index}"/>
+          <property name="outputname" value="@{StrSubstring(${xsd.file.contents},0,${index})}"/>
+          <echo message="outputname: ${outputname}"/>
+          <property name="rawfilename" value="@{PathGetFileNameWithoutExtension('${file}')}" />
+        </foreach>
+  </target>
+  
+  </project>

@@ -1,0 +1,104 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.TakeOverPage;
+import com.ea.originx.automation.lib.pageobjects.store.BrowseGamesPage;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.PDPNavBar;
+import com.ea.originx.automation.lib.pageobjects.store.PDPPage;
+import com.ea.originx.automation.lib.pageobjects.store.StoreGameTile;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * @author rmcneil
+ */
+public class OAPDPNavigationPackArt extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12285)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testPDPNavigationPackArt(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+
+
+        logFlowPoint("Log into Origin as " + userAccount.getUsername()); //1
+        logFlowPoint("Navigate to the Browse Games page"); //2
+        logFlowPoint("Click on a game tile and navigate to the PDP page"); //3
+        logFlowPoint("Scroll down to the nav bar and verify the pack art"); //4
+        logFlowPoint("Verify pack art disappears when scrolling back to the top of the page"); //5
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with the user");
+        } else {
+            logFailExit("Could not log into Origin with the user");
+        }
+
+        //2
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        BrowseGamesPage browseGamesPage = navBar.gotoBrowseGamesPage();
+
+        //Sometimes takeover page does exist
+        new TakeOverPage(driver).closeIfOpen();
+
+        if (browseGamesPage.verifyBrowseGamesPageReached()) {
+            logPass("Successfully navigated to the Store page.");
+        } else {
+            logFailExit("Could not navigate to the store page.");
+        }
+
+        //3
+        browseGamesPage.waitForGamesToLoad();
+        StoreGameTile storeGameTile = browseGamesPage.getFirstNonFreeStandardGameTile();
+        String entitlementName = storeGameTile.getTitle();
+        storeGameTile.clickLearnMoreButton();
+        PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+        pdpHeroDescription.waitForPdpHeroToLoad();
+
+        if (Waits.pollingWait(() -> pdpHeroDescription.verifyGameTitle(entitlementName))) {
+            logPass("Clicked on Game tile:" + entitlementName + "and successfully navigated to PDP page");
+        } else {
+            logFailExit("Could not navigate to the Product Description Page");
+        }
+
+        //4
+        PDPPage pdpPage = new PDPPage(driver);
+        pdpPage.scrollToNavBar();
+        PDPNavBar pdpNavBar = new PDPNavBar(driver);
+        boolean navBarPackArtVisible = pdpNavBar.verifyNavBarPackArtVisible();
+        sleep(1000); //Allow refresh time
+        boolean packArtLinksCorrect = pdpPage.verifyPDPPackArtLinks();
+        if (navBarPackArtVisible && packArtLinksCorrect) {
+            logPass("Scrolled to Nav Bar and Pack Art was visible and the link worked");
+        } else {
+            logFailExit("Scrolled to Nav Bar and Pack Art was not visible and/or the link did not work");
+        }
+
+        //5
+        pdpPage.scrollToNavBar();
+        navBarPackArtVisible = pdpNavBar.verifyNavBarPackArtVisible();
+        pdpHeroDescription.scrollToPDPHero();
+        sleep(2000); //Allow refresh time
+        boolean navBarPackArtGone = !pdpNavBar.verifyNavBarPackArtVisible();
+        if (navBarPackArtVisible && navBarPackArtGone) {
+            logPass("Scrolled to Nav Bar and Pack Art was visible and then disappeared when scrolling back to the top");
+        } else {
+            logFailExit("Scrolled to Nav Bar and Pack Art was not visible and/or it did not disappear when scrolling back to the top");
+        }
+
+        softAssertAll();
+    }
+}

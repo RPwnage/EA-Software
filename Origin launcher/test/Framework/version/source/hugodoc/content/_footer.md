@@ -1,1 +1,0 @@
-© Framework - Electronic Arts.

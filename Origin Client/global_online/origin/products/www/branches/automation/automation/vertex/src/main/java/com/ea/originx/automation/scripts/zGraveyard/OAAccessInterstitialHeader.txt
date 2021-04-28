@@ -1,0 +1,101 @@
+package com.ea.originx.automation.scripts.gdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroGDP;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.dialog.SelectOriginAccessPlanDialog;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPActionCTA;
+import com.ea.originx.automation.lib.pageobjects.originaccess.AccessInterstitialPage;
+import com.ea.originx.automation.lib.pageobjects.store.PaymentInformationPage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test to verify the content of the 'Origin Access Interstital' page
+ *
+ * @author cdeaconu
+ */
+public class OAAccessInterstitialHeader extends EAXVxTestTemplate{
+    
+    @TestRail(caseId = 3000751)
+    @Test(groups = {"gdp", "full_regression"})
+    public void testAccessInterstitialHeader(ITestContext context) throws Exception{
+        
+        final OriginClient client = OriginClientFactory.create(context);
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        
+        final EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.MINI_METRO);
+        final String entitlementName = entitlement.getName();
+        
+        logFlowPoint("Log into Origin as newly registered account."); // 1
+        logFlowPoint("Navigate to GDP of a single edition vault entitlement."); // 2
+        logFlowPoint("Click on the primary CTA and verify the 'Origin Access Interstitial' page loads."); // 3
+        logFlowPoint("Verify a background image is showing."); // 4
+        logFlowPoint("Verify the title of the game is showing."); // 5
+        logFlowPoint("Verify some bullet points are showing."); // 6
+        logFlowPoint("Verify 'Join Origin Access' CTA is showing."); // 7
+        logFlowPoint("Verify 'Buy <price>' CTA is showing."); // 8
+        logFlowPoint("Click 'Join Origin Access' CTA and verify the 'Subscription sign up' flow is initiated."); // 9
+        logFlowPoint("Click the 'Buy <price>' CTA and verify the 'Purchase flow' is initiated"); // 10
+        logFlowPoint("Verify a 'Down Arrow' is shown at the bottom of the header"); // 11
+        logFlowPoint("Click the 'Down Arrow' and verify the page scrolls down to the next section automatically"); // 12
+        
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+        
+        // 2
+        logPassFail(MacroGDP.loadGdpPage(driver, entitlement), true);
+        
+        // 3
+        new GDPActionCTA(driver).clickGetTheGameCTA();
+        AccessInterstitialPage accessInterstitialPage =  new AccessInterstitialPage(driver);
+        logPassFail(accessInterstitialPage.verifyOSPInterstitialPageReached(), true);
+        
+        // 4
+        logPassFail(accessInterstitialPage.verifyBackgroundImageIsVisible(), false);
+        
+        // 5
+        logPassFail(accessInterstitialPage.verifyTitleContainsIgnoreCase(entitlementName), false);
+        
+        // 6
+        logPassFail(accessInterstitialPage.verifyOriginAccessPointsAreVisible(), false);
+        
+        // 7
+        logPassFail(accessInterstitialPage.verifyJoinOriginAccessCTAVisible(), true);
+        
+        // 8
+        logPassFail(accessInterstitialPage.verifyBuyGameCTAVisible(), true);
+        
+        // 9
+        accessInterstitialPage.clickJoinOriginAccessCTA();
+        SelectOriginAccessPlanDialog selectOriginAccessPlanDialog = new SelectOriginAccessPlanDialog(driver);
+        logPassFail(selectOriginAccessPlanDialog.waitIsVisible(), true);
+        selectOriginAccessPlanDialog.clickCloseCircle();
+        
+        // 10
+        accessInterstitialPage.clickBuyGameCTA();
+        PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        logPassFail(paymentInformationPage.verifyPaymentInformationReached(), true);
+        paymentInformationPage.clickCloseButton();
+        
+        // 11
+        logPassFail(accessInterstitialPage.verifyHeroDownArrowIsVisible(), true);
+        
+        // 12
+        accessInterstitialPage.clickHeroDownArrow();
+        logPassFail(accessInterstitialPage.verifyStorePdpNavVisible(), true);
+        
+        softAssertAll();
+    }
+}

@@ -1,0 +1,1 @@
+Mockup account for jssdk functional-test, based on 1000147395502/eatest.jssdkmockupdata@eadtest.ea.com

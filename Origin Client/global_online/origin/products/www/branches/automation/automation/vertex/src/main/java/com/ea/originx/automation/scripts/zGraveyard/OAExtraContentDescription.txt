@@ -1,0 +1,120 @@
+package com.ea.originx.automation.scripts.gamelibrary;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.enums.account.AccountTags;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameSlideout;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.SlideoutExtraContent;
+import com.ea.vx.originclient.resources.OAStoreQADeluxeEdition;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the behaviour of descriptions in the Extra Content tab of the Slideout
+ *
+ * @author glivingstone
+ */
+public class OAExtraContentDescription extends EAXVxTestTemplate {
+
+    @Test(groups = {"client", "browser", "gamelibrary"})
+    public void testEULADialogCancel(ITestContext context) throws Exception {
+
+        OAStoreQADeluxeEdition entitlement = new OAStoreQADeluxeEdition();
+        final String entitlementName = entitlement.getName();
+        final String entitlementOfferId = entitlement.getOfferId();
+        final String EXPANSION_004 = entitlement.QA_DELUXE_EXPANSION_004_OFFER_ID;
+        final String DLC_OFFER_ADDON = entitlement.QA_DLC_OFFER_ADDON_OFFER_ID;
+        final String ADDON_001_PUBLISHED = entitlement.QA_DELUXE_ADDON_001_PUBLISHED_OFFER_ID;
+        final String ADDON_005_PUBLISHED = entitlement.QA_DELUXE_ADDON_005_PUBLISHED_OFFER_ID;
+
+        UserAccount user = AccountManagerHelper.getTaggedUserAccount(AccountTags.STORE_DELUXE_OFFER);
+
+        logFlowPoint("Login to Origin as " + user.getUsername()); //1
+        logFlowPoint("Navigate to game library"); //2
+        logFlowPoint("Open the Slideout for " + entitlementName + " and go to the Extra Content Tab"); //3
+        logFlowPoint("Verify the '005' Add-On has Only the Medium Description Visible"); //4
+        logFlowPoint("Verify the '004' Expansion has the Short Description Visible"); //5
+        logFlowPoint("Verify the 'Origin QA DLC Offer' has a Short Description Visible "); //6
+        logFlowPoint("Verify the '001' Add-On has Only Short and Medium Descriptions Visible"); //7
+        logFlowPoint("Verify the '001' Add-On has no Read More Link and the Description is over 6000 Characters Long"); //8
+
+        // 1
+        WebDriver driver = startClientObject(context).getWebDriver();
+        if (MacroLogin.startLogin(driver, user)) {
+            logPass("Successfully logged into Origin with the user.");
+        } else {
+            logFailExit("Could not log into Origin with the user.");
+        }
+
+        // 2
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        GameLibrary gameLibrary = navBar.gotoGameLibrary();
+        if (gameLibrary.verifyGameLibraryPageReached()) {
+            logPass("Navigate to Game Library.");
+        } else {
+            logFailExit("Could not navigate to Game Library.");
+        }
+
+        // 3
+        GameTile entitlementTile = new GameTile(driver, entitlementOfferId);
+        GameSlideout entitlementSlideout = entitlementTile.getGameSlideout();
+        entitlementSlideout.waitForSlideout();
+        entitlementSlideout.clickExtraContentTab();
+        SlideoutExtraContent extraContent = new SlideoutExtraContent(driver);
+        if (extraContent.isExtraContentOpen()) {
+            logPass("Successfully opened the Extra Content tab in the Slideout.");
+        } else {
+            logFailExit("Could not open the Extra Content tab in the Slideout.");
+        }
+
+        // 4
+        boolean medium005Description = extraContent.verifyHasMediumDescription(ADDON_005_PUBLISHED);
+        boolean long005Description = extraContent.verifyHasLongDescription(ADDON_005_PUBLISHED);
+        if (medium005Description && !long005Description) {
+            logPass("Only the medium description is visible on the 005 Add-On.");
+        } else {
+            logFail("Not only the medium descriptions is visible on the 005 Add-On.");
+        }
+        
+        // 5
+        if (extraContent.verifyHasShortDescription(EXPANSION_004)) {
+            logPass("The short description is visible on the 004 Expansion.");
+        } else {
+            logFail("The short description is not visible on the 004 Expansion.");
+        }
+        
+        // 6
+        if (extraContent.verifyHasShortDescription(DLC_OFFER_ADDON)) {
+            logPass("There is a short description visible on the QA DLC Offer.");
+        } else {
+            logFail("There is no short description visible on the QA DLC Offer.");
+        }
+        
+        // 7
+        boolean short001Description = extraContent.verifyHasShortDescription(ADDON_001_PUBLISHED);
+        boolean medium001Description = extraContent.verifyHasMediumDescription(ADDON_001_PUBLISHED);
+        boolean long001Description = extraContent.verifyHasLongDescription(ADDON_001_PUBLISHED);
+        if (short001Description && medium001Description && !long001Description) {
+            logPass("Only the short and medium descriptions are visible on the 001 Add-On.");
+        } else {
+            logFail("Not only the short and medium descriptions are visible on the 001 Add-On.");
+        }
+        
+        // 8
+        boolean something = extraContent.verifyNoReadMoreMedium(ADDON_001_PUBLISHED);
+        boolean extra = extraContent.verifyMediumDescriptionLengthAtLeast(ADDON_001_PUBLISHED, 6000);
+        if (something && extra) {
+            logPass("The 001 Add-On medium description has no read more link, and is over 6000 characters long.");
+        } else {
+            logFail("The 001 Add-On medium description has a read more link, or is under 6000 characters long.");
+        }
+
+        softAssertAll();
+    }
+}

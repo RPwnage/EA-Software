@@ -1,0 +1,25 @@
+var netconndefs_8h =
+[
+    [ "NETCONN_ERROR_ALREADY_STARTED", "d1/db2/netconndefs_8h.html#ga0d529158d184c8fdba172dc0437b6519", null ],
+    [ "NETCONN_ERROR_DIRTYCERT_CREATE", "d1/db2/netconndefs_8h.html#ga87e32c4ccde51b45497ad563177df844", null ],
+    [ "NETCONN_ERROR_INTERNAL", "d1/db2/netconndefs_8h.html#ga55c9fc032ac207a459dba7a3a24d4574", null ],
+    [ "NETCONN_ERROR_ISACTIVE", "d1/db2/netconndefs_8h.html#gab5a684d122a89767ad7bfc0aa9c33706", null ],
+    [ "NETCONN_ERROR_NO_MEMORY", "d1/db2/netconndefs_8h.html#ga18c3995e0fef143aedb0d8d2eb2a79df", null ],
+    [ "NETCONN_ERROR_NOTACTIVE", "d1/db2/netconndefs_8h.html#gad6237a8f5c8858eff87a9459994792fd", null ],
+    [ "NETCONN_ERROR_PLATFORM_SPECIFIC", "d1/db2/netconndefs_8h.html#gac8267f0839287865884c3dc263f9336d", null ],
+    [ "NETCONN_ERROR_PROTOSSL_CREATE", "d1/db2/netconndefs_8h.html#gacf473148c25232ebad7670aae3a61a1b", null ],
+    [ "NETCONN_ERROR_PROTOUPNP_CREATE", "d1/db2/netconndefs_8h.html#ga01c1ceb4e40b8d34e1e04d0edac5a1e7", null ],
+    [ "NETCONN_ERROR_SOCKET_CREATE", "d1/db2/netconndefs_8h.html#gaf238ae3c98456370f0a6055f5027dab6", null ],
+    [ "NETCONN_IFTYPE_CELL", "d1/db2/netconndefs_8h.html#ga66b0a0ddca1ec0ba2871c6fad4992b4d", null ],
+    [ "NETCONN_IFTYPE_ETHER", "d1/db2/netconndefs_8h.html#gaa83a9354aac6c90ea1acd25e1d0e70e5", null ],
+    [ "NETCONN_IFTYPE_MODEM", "d1/db2/netconndefs_8h.html#ga59a1347aa5300ae777f891e20bbd64e5", null ],
+    [ "NETCONN_IFTYPE_NONE", "d1/db2/netconndefs_8h.html#ga44033d2221f5efd16044c920f79cb31d", null ],
+    [ "NETCONN_IFTYPE_PPPOE", "d1/db2/netconndefs_8h.html#gaab83bbc71abb7f82dee83f37637c8f0c", null ],
+    [ "NETCONN_IFTYPE_USB", "d1/db2/netconndefs_8h.html#gae30c984e70798157cba172e2869d5ff5", null ],
+    [ "NETCONN_IFTYPE_WIRELESS", "d1/db2/netconndefs_8h.html#ga281698ba9bae607ff3317d0919567467", null ],
+    [ "NETCONN_PLATENV_CERT", "d1/db2/netconndefs_8h.html#ga8e0d4a97cfe936a5c0e12f042f057e12", null ],
+    [ "NETCONN_PLATENV_DEV", "d1/db2/netconndefs_8h.html#ga339c607fc00e308cb2a8e7ea58ea3a6f", null ],
+    [ "NETCONN_PLATENV_PROD", "d1/db2/netconndefs_8h.html#gadcba2be8963f3d7b339cae2800f2b893", null ],
+    [ "NETCONN_PLATENV_TEST", "d1/db2/netconndefs_8h.html#ga3abe39e65759af35de52eef9dde7317d", null ],
+    [ "NetConfigRecT", "d1/db2/netconndefs_8h.html#ga7977dd840b45bca80b107613ac06179e", null ]
+];

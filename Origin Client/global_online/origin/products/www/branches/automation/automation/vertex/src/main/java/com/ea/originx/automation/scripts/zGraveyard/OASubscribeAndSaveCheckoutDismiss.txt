@@ -1,0 +1,224 @@
+package com.ea.originx.automation.scripts.checkout;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.dialog.SelectOriginAccessPlanDialog;
+import com.ea.originx.automation.lib.pageobjects.login.LoginPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessOrderConfirmationPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessStartMembershipPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageHeader;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageRightHeader;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHero;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.PaymentInformationPage;
+import com.ea.originx.automation.lib.pageobjects.store.StorePage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.vx.originclient.utils.Waits;
+import java.util.ArrayList;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Tests the chain checkout and dismiss flow of the 'Subscribe and Save' page.
+ *
+ * @author mdobre
+ */
+public class OASubscribeAndSaveCheckoutDismiss extends EAXVxTestTemplate {
+
+    public enum TEST_TYPE {
+        NON_SUBSCRIBER,
+        ANONYMOUS_USER
+    }
+
+    public void testSubscribeAndSaveCheckoutDismiss(ITestContext context, OASubscribeAndSaveCheckoutDismiss.TEST_TYPE type) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        // update to a subscribe and save entitlement once the feature is live
+        final EntitlementInfo vaultEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.STAR_WARS_BATTLEFRONT_2);
+        final String vaultEntitlementName = vaultEntitlement.getName();
+
+        if (type == TEST_TYPE.NON_SUBSCRIBER) {
+            logFlowPoint("Log into Origin with a non-subscriber account."); // 1
+        } else {
+            logFlowPoint("Navigate to the store."); // 1
+        }
+        logFlowPoint("Navigate to PDP of a game in pre-order state."); // 2
+        logFlowPoint("Click on 'Learn More' and verify that it navigates to the 'Product Landing' page."); // 3
+        logFlowPoint("Click on the 'Join and Pre-order' CTA in the header and verify the 'Origin Access Plan Selection'"
+                + " dialog appears."); // 4
+        logFlowPoint("Verify there is a 'Next' button and click on it."); // 5
+        if (type == TEST_TYPE.NON_SUBSCRIBER) {
+            logFlowPoint("Verify clicking on the 'Next' button triggers the checkout modal."); // 6
+        } else {
+            logFlowPoint("Verify clicking on the 'Next' button prompts the user to log in."); // 6a
+            logFlowPoint("Log in as a non-subscriber and verify that the checkout modal is displayed."); // 6b
+        }
+        logFlowPoint("Click on the 'Join and Pre-order' CTA in the header and verify the 'Origin Access Plan Selection'"
+                + " dialog appears, as well as the 'Next' button."); // 7
+        logFlowPoint("Enter payment details and verify the 'Next' button exists and is clickable."); // 8
+        logFlowPoint("Click on 'X' to close the 'Payment Info' dialog and verify the user stays on the 'Product Landing' page."); // 9
+        logFlowPoint("Click on the 'Join and Pre-order' CTA in the header and verify Origin Access plan selection"
+                + " dialog appears, as well as the 'Next' button"); // 10
+        logFlowPoint("Click on the 'Start Membership' CTA and verify navigation to the 'Origin Access Confirmation' dialog."); // 11
+        logFlowPoint("Click on 'X' to close the 'Payment Info' dialog and verify the user stays on the 'Product Landing' page and "
+                + "the discount applied text and release date of game are displayed."); // 12
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (type == TEST_TYPE.NON_SUBSCRIBER) {
+            if (MacroLogin.startLogin(driver, userAccount)) {
+                logPass("Successfully logged into Origin with " + userAccount.getUsername() + ".");
+            } else {
+                logFailExit("Could not log into Origin with " + userAccount.getUsername() + ".");
+            }
+        } else {
+            StorePage storePage = new StorePage(driver);
+            storePage.waitForStorePageToLoad();
+            if (storePage.verifyStorePageReached()) {
+                logPass("Successfully navigated to Origin X store as an anonymous user.");
+            } else {
+                logFailExit("Could not navigate to Origin X store as an anonymous user.");
+            }
+        }
+
+        // 2
+        MacroPDP.loadPdpPage(driver, vaultEntitlement);
+        PDPHero pdpHero = new PDPHero(driver);
+        if (pdpHero.verifyPDPHeroReached()) {
+            logPass("Successfully navigated to " + vaultEntitlementName + "'s PDP page.");
+        } else {
+            logFailExit("Failed to navigate to " + vaultEntitlementName + "'s PDP page.");
+        }
+
+        // 3
+        new PDPHeroActionDescriptors(driver).clickOriginAccessLearnMoreLink();
+        ProductLandingPageHeader productLandingPageHeader = new ProductLandingPageHeader(driver);
+        if (productLandingPageHeader.verifyProductLandingPageReached()) {
+            logPass("Successfully navigated to the 'Product Landing' page."); 
+        } else {
+            logFailExit("Failed to navigate to the 'Product Landing' page.");
+        }
+
+        // 4
+        ProductLandingPageRightHeader productLandingPageRightHeader = new ProductLandingPageRightHeader(driver);
+        productLandingPageRightHeader.clickOnCTA();
+        SelectOriginAccessPlanDialog selectOriginAccessPlanDialog = new SelectOriginAccessPlanDialog(driver);
+        if (selectOriginAccessPlanDialog.isDialogVisible()) {
+            logPass("Verified that clicking on the CTA prompts the 'Origin Access Plan Selection' dialog.");
+        } else {
+            logFailExit("Failed to verify that clicking on the CTA prompts the 'Origin Access Plan Selection' dialog.");
+        }
+
+        // 5
+        if (selectOriginAccessPlanDialog.isNextButtonVisible()) {
+            logPass("Verified that the 'Next' button is visible.");
+        } else {
+            logFailExit("Failed to verify that the 'Next' button is visible.");
+        }
+
+        // 6
+        selectOriginAccessPlanDialog.clickNext();
+        if (type == OASubscribeAndSaveCheckoutDismiss.TEST_TYPE.ANONYMOUS_USER) {
+            // 6a
+            ArrayList<String> windows = new ArrayList<>(driver.getWindowHandles());
+            // switch to login window
+            driver.switchTo().window(windows.get(1));
+            final LoginPage loginPage = new LoginPage(driver);
+            loginPage.waitForPageToLoad();
+            if (loginPage.verifyTitleIs("Sign in with your EA Account")) {
+                logPass("Verified that clicking on 'Next' prompts the user to log in.");
+            } else {
+                logFailExit("Failed to verify that clicking on 'Next' prompts the user to log in.");
+            }
+            loginPage.enterInformation(userAccount.getEmail(), userAccount.getPassword());
+            // switch back to parent window
+            driver.switchTo().window(windows.get(0));
+        }
+        PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        paymentInformationPage.clickCloseButton();
+        if (productLandingPageHeader.verifyProductLandingPageReached()) {
+            logPass("Verified that clicking on 'X' closes the 'Payment Info' dialog and the user stays on the 'Product Landing' page.");
+        } else {
+            logFailExit("Failed to verify that clicking on 'X' closes the 'Payment Info' dialog and the user stays on the 'Product Landing' page.");
+        }
+
+        // 7
+        productLandingPageRightHeader.clickOnCTA();
+        boolean isPlanSelectionModalVisible = selectOriginAccessPlanDialog.isDialogVisible();
+        boolean isNextButtonVisible = selectOriginAccessPlanDialog.isNextButtonVisible();
+        selectOriginAccessPlanDialog.clickNext();
+        if (isPlanSelectionModalVisible && isNextButtonVisible) {
+            logPass("Verified that clicking on the CTA prompts the 'Origin Access Plan Selection' dialog and clicked on the 'Next' button");
+        } else {
+            logFailExit("Failed to verify that clicking on the CTA prompts the 'Origin Access Plan Selection' dialog and clicked on the 'Next' button.");
+        }
+
+        // 8 
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        paymentInformationPage.enterCreditCardDetails();
+        sleep(3000); // adding a sleep in order to avoid failing switching to default content
+        driver.switchTo().defaultContent(); // switching to default frame because handlePaymentInfoPage handles the switching to iframe
+        MacroPurchase.handlePaymentInfoPageSubAndSave(driver);
+        paymentInformationPage.clickOnNextButton();
+        OriginAccessStartMembershipPage originAccessStartMembership = new OriginAccessStartMembershipPage(driver);
+        if (Waits.pollingWait(() -> originAccessStartMembership.verifyOriginAccessStartMembershipPageReached())) {
+            logPass("Verified that clicking 'Next' takes the user to the Review Order' page");
+        } else {
+            logFailExit("Failed to verify that clicking 'Next' takes the user to the Review Order' page.");
+        }
+
+        // 9
+        originAccessStartMembership.clickCloseButton();
+        if (productLandingPageHeader.verifyProductLandingPageReached()) {
+            logPass("Verified that clicking on 'X' closes the 'Payment Info' dialog and the user stays on the 'Product Landing' page.");
+        } else {
+            logFailExit("Failed to verify that clicking on 'X' closes the 'Payment Info' dialog and the user stays on the 'Product Landing' page.");
+        }
+
+        //10
+        productLandingPageRightHeader.clickOnCTA();
+        selectOriginAccessPlanDialog.clickNext();
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        paymentInformationPage.enterCreditCardDetails();
+        sleep(3000); // adding a sleep in order to avoid failing swithcing to default content
+        driver.switchTo().defaultContent(); // switching to default frame because handlePaymentInfoPage handles the switching to iframe
+        MacroPurchase.handlePaymentInfoPageSubAndSave(driver);
+        paymentInformationPage.clickOnNextButton();
+        if (Waits.pollingWait(() -> originAccessStartMembership.verifyOriginAccessStartMembershipPageReached())) {
+            logPass("Verified that clicking 'Next' takes the user to the 'Review Order' page.");
+        } else {
+            logFailExit("Failed to verify that clicking 'Next' takes the user to the 'Review Order' page.");
+        }
+
+        //11
+        originAccessStartMembership.waitOriginAccessStartMembershipPagePageToLoad();
+        originAccessStartMembership.clickOnStartMembershipButton();
+        OriginAccessOrderConfirmationPage originAccessOrderConfirmationPage = new OriginAccessOrderConfirmationPage(driver);
+        if (originAccessOrderConfirmationPage.verifyOAOrderConfirmationPageReached()) {
+            logPass("Verified clicking 'Start Membership' navigates to the 'Origin Access Confirmation' dialog.");
+        } else {
+            logFail("Failed to verify clicking 'Start Membership' navigates to the 'Origin Access Confirmation' dialog.");
+        }
+
+        //12
+        originAccessOrderConfirmationPage.closeConfirmationPage();
+        boolean isProductLandingPageReached = productLandingPageHeader.verifyProductLandingPageReached();
+        boolean discountTextApplied = productLandingPageRightHeader.verifyGameDiscountPercentageVisible();
+        if (isProductLandingPageReached && discountTextApplied) {
+            logPass("Verified the user navigated to the PDP page of pre-order game and the discount is visible.");
+        } else {
+            logFail("Failed to verify the user navigated to the PDP page of pre-order game and the discount is visible.");
+        }
+        softAssertAll();
+    }
+}

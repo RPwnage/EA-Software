@@ -1,0 +1,1 @@
+window.originTranslator.localizedStrings = $strings;

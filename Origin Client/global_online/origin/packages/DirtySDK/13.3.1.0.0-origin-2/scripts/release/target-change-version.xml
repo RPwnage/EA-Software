@@ -1,0 +1,249 @@
+<project>
+
+    <target name="dirtysdk-change-version" description="Change the version information in all the required files (look in ScriptMain for filenames)" hidden="true">
+        <script language="C#">
+            <code> <![CDATA[
+                public static void ScriptMain(Project project)
+                {
+                    String driveletter = project.Properties["dirtysdk-driveletter"];
+                    String version     = project.Properties["dirtysdk-version"];
+                    String date        = project.Properties["dirtysdk-date"];
+                    String packagedir  = project.Properties["package.dir"];
+
+                    ChangeBuild  ("../" + version + "/DirtySDK.build",               version);
+                    ChangeBuild  ("../" + version + "/masterconfig.xml",             version);
+                    ChangeBuild  ("../" + version + "/unix-masterconfig.xml",        version);
+                    ChangeBuild  ("../" + version + "/iphone-masterconfig.xml",      version);
+                    ChangeHeader ("../" + version + "/include/DirtySDK/dirtyvers.h", version);
+                    ChangeTargets("../" + version + "/scripts/release-targets.xml",  version, date, driveletter, packagedir);
+                    ChangeVersion("../" + version + "/version.txt",                  version, date);
+                }
+
+                static void ChangeBuild(String filename, String version)
+                {
+                    try
+                    {
+                        if (version == "")
+                        {
+                            return;
+                        }
+
+                        StreamReader SR = new StreamReader(filename);
+                        StreamWriter SW = new StreamWriter(filename + ".new");
+
+                        String line;
+
+                        while ((line = SR.ReadLine()) != null)
+                        {
+                            if (line.IndexOf("package name=\"DirtySDK\"") != -1)
+                            {
+                                int oldVersionQuoteAfter = line.LastIndexOf("\"");
+                                int oldVersionQuoteBefore = line.LastIndexOf("\"", oldVersionQuoteAfter - 1);
+
+                                string oldVersion = line.Substring(oldVersionQuoteBefore + 1, (oldVersionQuoteAfter - oldVersionQuoteBefore) - 1);
+
+                                line = line.Replace(oldVersion, version);
+                            }
+
+                            SW.WriteLine(line);
+                        }
+
+                        SR.Close();
+                        SW.Close();
+
+                        System.IO.File.Delete(filename);
+                        System.IO.File.Move(filename + ".new", filename);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("target-change-version ChangeBuild Error: \"{0}\"", e.Message);
+                    }
+                }
+
+                static void ChangeHeader(String filename, String version)
+                {
+                    try
+                    {
+                        if (version == "")
+                        {
+                            return;
+                        }
+
+                        string year   = version.Split('.')[0];
+                        string season = version.Split('.')[1];
+                        string major  = version.Split('.')[2];
+                        string minor;
+                        string patch;
+
+                        if (major == "0") // Preview release
+                        {
+                            minor = version.Split('.')[3];
+                            patch = version.Split('.')[4];
+                        }
+                        else // Production release
+                        {
+                            minor = "0";
+                            patch = version.Split('.')[3];
+                        }
+
+                        StreamReader SR = new StreamReader(filename);
+                        StreamWriter SW = new StreamWriter(filename + ".new");
+
+                        String line;
+
+                        while ((line = SR.ReadLine()) != null)
+                        {
+                            if (line.IndexOf("#define DIRTYSDK_VERSION_YEAR") != -1)
+                            {
+                                line = "#define DIRTYSDK_VERSION_YEAR   (" + year + ")";
+                            }
+                            else if (line.IndexOf("#define DIRTYSDK_VERSION_SEASON") != -1)
+                            {
+                                line = "#define DIRTYSDK_VERSION_SEASON (" + season + ")";
+                            }
+                            else if (line.IndexOf("#define DIRTYSDK_VERSION_MAJOR") != -1)
+                            {
+                                line = "#define DIRTYSDK_VERSION_MAJOR  (" + major + ")";
+                            }
+                            else if (line.IndexOf("#define DIRTYSDK_VERSION_MINOR") != -1)
+                            {
+                                line = "#define DIRTYSDK_VERSION_MINOR  (" + minor + ")";
+                            }
+                            else if (line.IndexOf("#define DIRTYSDK_VERSION_PATCH") != -1)
+                            {
+                                line = "#define DIRTYSDK_VERSION_PATCH  (" + patch + ")";
+                            }
+
+                            SW.WriteLine(line);
+                        }
+
+                        SR.Close();
+                        SW.Close();
+
+                        System.IO.File.Delete(filename);
+                        System.IO.File.Move(filename + ".new", filename);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("target-change-version ChangeHeader Error: \"{0}\"", e.Message);
+                    }
+                }
+
+                static void ChangeTargets(String filename, String version, String date, String driveletter, String packagedir)
+                {
+                    try
+                    {
+                        if ((version == "") || (date == ""))
+                        {
+                            return;
+                        }
+
+                        StreamReader SR = new StreamReader(filename);
+                        StreamWriter SW = new StreamWriter(filename + ".new");
+
+                        String line;
+
+                        while ((line = SR.ReadLine()) != null)
+                        {
+                            if (line.IndexOf("name=\"dirtysdk-driveletter\"") != -1)
+                            {
+                                SW.WriteLine(line.Replace("C", driveletter));
+                            }
+                            else if (line.IndexOf("name=\"dirtysdk-version\"") != -1)
+                            {
+                                int oldVersionQuoteAfter = line.LastIndexOf("\"");
+                                int oldVersionQuoteBefore = line.LastIndexOf("\"", oldVersionQuoteAfter - 1);
+
+                                string oldVersion = line.Substring(oldVersionQuoteBefore + 1, (oldVersionQuoteAfter - oldVersionQuoteBefore) - 1);
+
+                                SW.WriteLine(line.Replace(oldVersion, version));
+                                SW.WriteLine("    <property name=\"dirtysdk-date\" value=\"" + date + "\" />");
+                                SW.WriteLine("    <property name=\"dirtysdk-package-clientdir\" value=\"" + packagedir + "\" />");
+                            }
+                            else
+                            {
+                                SW.WriteLine(line);
+                            }
+                        }
+
+                        SR.Close();
+                        SW.Close();
+
+                        System.IO.File.Delete(filename);
+                        System.IO.File.Move(filename + ".new", filename);
+                    }
+                    catch(Exception e)
+                    {
+                        Console.WriteLine("target-change-version ChangeTargets Error: \"{0}\"", e.Message);
+                    }
+                }
+
+                static void ChangeVersion(String filename, String version, String date)
+                {
+                    try
+                    {
+                        if ((version == "") || (date == ""))
+                        {
+                            return;
+                        }
+
+                        string year = "20" + version.Split('.')[0].PadLeft(2, '0');
+                        string season;
+
+                        switch (version.Split('.')[1])
+                        {
+                            case "1":
+                                season = "Winter";
+                                break;
+
+                            case "2":
+                                season = "Spring";
+                                break;
+
+                            case "3":
+                                season = "Summer";
+                                break;
+
+                            default:
+                                season = "Fall";
+                                break;
+                        }
+
+                        string major = version.Split('.')[2];
+                        string minor;
+                        string patch;
+
+                        if (major == "0") // Preview release
+                        {
+                            minor = version.Split('.')[3];
+                            patch = version.Split('.')[4];
+
+                            version = year + " " + season + " " + major + "." + minor + "." + patch;
+                        }
+                        else // Production release
+                        {
+                            patch = version.Split('.')[3];
+
+                            version = year + " " + season + " " + major + "." + patch;
+                        }
+
+                        StreamWriter SW = new StreamWriter(filename + ".new");
+
+                        SW.WriteLine("EADP Game Services DirtySDK " + version);
+                        SW.WriteLine(date);
+
+                        SW.Close();
+
+                        System.IO.File.Delete(filename);
+                        System.IO.File.Move(filename + ".new", filename);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("target-change-version ChangeVersion Error: \"{0}\"", e.Message);
+                    }
+                }
+            ]]> </code>
+        </script>
+    </target>
+
+</project>

@@ -1,0 +1,104 @@
+package com.ea.originx.automation.scripts.gdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.CheckoutConfirmation;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPActionCTA;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPHeader;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHousePage;
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHouseTile;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Test add to game library an entitlement that is on the house
+ *
+ * @author cdeaconu
+ */
+public class OAAddOTH extends EAXVxTestTemplate{
+    
+    public enum TEST_TYPE {
+        SUBSCRIBER,
+        NON_SUBSCRIBER,
+        ANONYMOUS_USER
+    }
+    
+    public void testAddOTH(ITestContext context, TEST_TYPE type) throws Exception{
+        
+        final OriginClient client = OriginClientFactory.create(context);
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        
+        if (type != TEST_TYPE.ANONYMOUS_USER) {
+            logFlowPoint("Log into Origin as newly registered account."); // 1
+        }
+        if (type == TEST_TYPE.SUBSCRIBER) {
+            logFlowPoint("Purchase Origin Access."); // 2
+        }
+        logFlowPoint("Navigate to GDP of an entitlement that is on the house."); // 3
+        logFlowPoint("Verify 'Add to Library' primary button is showing and click on it."); // 4
+        if (type == TEST_TYPE.ANONYMOUS_USER) {
+            logFlowPoint("Log in as a newly registered user."); // 5
+        }
+        logFlowPoint("Verify 'Added to library' modal appears."); // 6
+        logFlowPoint("Close the modal and verify the 'Add to Library' primary button changes to 'View in Library'."); // 7
+        logFlowPoint("Verify the 'You have the <edition text> of this game' info block appears."); // 8
+        logFlowPoint("Navigate to 'Game Library' and verify the game is visible."); // 9
+        
+        WebDriver driver = startClientObject(context, client);
+
+        // 1
+        if (type != TEST_TYPE.ANONYMOUS_USER) {
+            logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+        }
+        
+        // 2
+        if (type == TEST_TYPE.SUBSCRIBER) {
+            logPassFail(MacroOriginAccess.purchaseOriginAccess(driver), true);
+        }
+        
+        // 3
+        OnTheHousePage onTheHousePage = new NavigationSidebar(driver).gotoOnHousePage();
+        OnTheHouseTile onTheHouseTile = onTheHousePage.getAllOnTheHouseTiles().get(0);
+        String offerID = onTheHouseTile.getOfferId();
+        onTheHouseTile.clickTitle();
+        logPassFail(new GDPHeader(driver).verifyGDPHeaderReached(), true);
+
+        // 4
+        GDPActionCTA gdpActionCTA = new GDPActionCTA(driver);
+        logPassFail(gdpActionCTA.verifyAddToLibraryOTHCTAVisible(), true);
+        gdpActionCTA.clickAddToLibraryOTHCTA();
+        
+        // 5
+        if (type == TEST_TYPE.ANONYMOUS_USER) {
+            logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+        }
+        
+        // 6
+        CheckoutConfirmation checkoutConfirmation = new CheckoutConfirmation(driver);
+        logPassFail(checkoutConfirmation.waitIsVisible(), true);
+        
+        // 7
+        checkoutConfirmation.closeAndWait();
+        logPassFail(gdpActionCTA.verifyViewInLibraryCTAVisible(), true);
+        
+        // 8
+        GDPHeroActionDescriptors gdpHeroActionDescriptors = new GDPHeroActionDescriptors(driver);
+        boolean isInfoBlockIconVisible = gdpHeroActionDescriptors.verifyFirstInfoBlockIconVisible();
+        boolean isInfoBlockTextVisible = gdpHeroActionDescriptors.verifyFirstInfoBlockTextVisible();
+        logPassFail(isInfoBlockIconVisible & isInfoBlockTextVisible, true);
+        
+        // 9
+        GameLibrary gameLibrary = new NavigationSidebar(driver).gotoGameLibrary();
+        logPassFail(gameLibrary.isGameTileVisibleByOfferID(offerID), true);
+        
+        softAssertAll();
+    }
+}

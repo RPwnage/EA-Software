@@ -1,0 +1,48 @@
+﻿<project default="package">
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+  <property name="package.OriginUtils.dir"  value="@{PathGetFullPath('.')}"/>
+  <property name="package.OriginUtils.version"  value="@{PathGetFileName('${package.OriginUtils.dir}')}"/>
+  <package name="OriginUtils" targetversion="${package.OriginUtils.version}"/>
+  
+  <include file="scripts/initialize.xml"/>
+  
+	<property name="serverAPIdocs.dir" value="\\opqa-online.rws.ad.ea.com\Webserver\test\Origin\serverAPIDocs" />
+	<property name="serverAPIdocs.indexfiles" value="${package.dir}/../../../../ebisu/server/main" />
+	
+	<target name="clean-serverAPIdocs" >
+		<echo message="Cleaning out ${serverAPIdocs.dir}." />
+		<delete dir="${serverAPIdocs.dir}" failonerror="false" />
+	</target>
+	
+    <!-- serverAPIdocs       -->
+    <!-- Grabe docs from server group's Maven repo and extracts them to a network share       -->
+    <!-- Params:       -->
+    <!--    group.name = group id. eg. com.ea.online.ebisu       -->
+    <!--    artifact.name = name of the artifact. eg. cloudsync  -->
+    <target name="serverAPIdocs" >
+        <fail message="group.name property not specified. Use -D:group.name=&lt;group.name&gt;" unless="@{PropertyExists('group.name')}"/>
+        <fail message="artifact.name property not specified. Use -D:group.name=&lt;artifact.name&gt;" unless="@{PropertyExists('artifact.name')}"/>
+        <dependent name="ActivePython"/>
+        <property name="maven.repo" value="http://maven.dm.origin.com/maven" />
+        <exec program="${package.ActivePython.exe}" message="Retrieving ${artifact.name} API docs from ${maven.repo}" >
+            <args>
+                <arg value="${package.OriginUtils.dir}/source/python/get_latest_api_url.py"/>
+                <arg value="-r${maven.repo}"/>
+                <arg value="-g${group.name}"/>
+                <arg value="-a${artifact.name}"/>
+                <arg value="-capiref"/>
+                <arg value="-oserverAPIURL.txt"/>
+                <arg value="-u0"/>
+                <arg value="-d${serverAPIdocs.dir}\${artifact.name}"/>
+            </args>
+        </exec>
+        <echo message="Copying css files to ${serverAPIdocs.dir}." />
+        <copy todir="${serverAPIdocs.dir}">
+            <fileset basedir="${serverAPIdocs.indexfiles}">
+                <includes name="*" />
+            </fileset>
+        </copy>
+    </target>
+</project>

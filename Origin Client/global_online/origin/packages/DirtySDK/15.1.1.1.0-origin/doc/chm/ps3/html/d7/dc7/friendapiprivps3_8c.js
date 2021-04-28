@@ -1,0 +1,28 @@
+var friendapiprivps3_8c =
+[
+    [ "Ps3FriendT", "d1/df1/structPs3FriendT.html", "d1/df1/structPs3FriendT" ],
+    [ "Ps3FriendsListT", "d5/d60/structPs3FriendsListT.html", "d5/d60/structPs3FriendsListT" ],
+    [ "Ps3BlockedUserT", "d3/db7/structPs3BlockedUserT.html", "d3/db7/structPs3BlockedUserT" ],
+    [ "Ps3BlockListT", "dd/dca/structPs3BlockListT.html", "dd/dca/structPs3BlockListT" ],
+    [ "Ps3CallbackCritT", "de/d45/structPs3CallbackCritT.html", "de/d45/structPs3CallbackCritT" ],
+    [ "FriendApiRefT", "d4/d81/structFriendApiRefT.html", "d4/d81/structFriendApiRefT" ],
+    [ "SCE_NP_BASIC_GET_EVENT_MESSAGE_LENGTH", "d7/dc7/friendapiprivps3_8c.html#a3945abcdd79ecf75d5b4a585f171fa6b", null ],
+    [ "Ps3BlockedUserT", "d7/dc7/friendapiprivps3_8c.html#aa82e6f4b9cf9111ff3a74436808ad56f", null ],
+    [ "Ps3BlockListT", "d7/dc7/friendapiprivps3_8c.html#ae1b4599b0be342c1394768dd75e6303c", null ],
+    [ "Ps3CallbackCritT", "d7/dc7/friendapiprivps3_8c.html#af4f6cf690d9af2131d583b5bb0674c1c", null ],
+    [ "Ps3FriendsListT", "d7/dc7/friendapiprivps3_8c.html#a3039e7b50b5b5778d745d65a25762d22", null ],
+    [ "Ps3FriendT", "d7/dc7/friendapiprivps3_8c.html#ad93a96ad5f0251dd0a89e55674233d06", null ],
+    [ "FriendApiPrivBlockUser", "d7/dc7/friendapiprivps3_8c.html#a844709fc596afe20c18bfb983d9006f3", null ],
+    [ "FriendApiPrivControl", "d7/dc7/friendapiprivps3_8c.html#ac956a018b135f65f9346b4d8287bfb55", null ],
+    [ "FriendApiPrivCreate", "d7/dc7/friendapiprivps3_8c.html#a8b4ef9970d8eb2d6ac9fe880f105b1ef", null ],
+    [ "FriendApiPrivDestroy", "d7/dc7/friendapiprivps3_8c.html#ab21a32181796b39a82c174cf55c6c1bd", null ],
+    [ "FriendApiPrivGetBlockList", "d7/dc7/friendapiprivps3_8c.html#ac3a19140261ba8e4c3ce5ff54c686096", null ],
+    [ "FriendApiPrivGetBlockListVersion", "d7/dc7/friendapiprivps3_8c.html#a4cb66b27dc6e21164d60d43b14a33e65", null ],
+    [ "FriendApiPrivGetFriendsList", "d7/dc7/friendapiprivps3_8c.html#a5cb4071e731fb53428831c22f6a932a6", null ],
+    [ "FriendApiPrivIsUserBlocked", "d7/dc7/friendapiprivps3_8c.html#af584617c6ff088041edb090bd8821526", null ],
+    [ "FriendApiPrivIsUserFriend", "d7/dc7/friendapiprivps3_8c.html#a960426936a7ad54d6ecf86e0b5dba07d", null ],
+    [ "FriendApiPrivIsUserRealFriend", "d7/dc7/friendapiprivps3_8c.html#ad9161535e786c0114451662cc5fc0458", null ],
+    [ "FriendApiPrivStatus", "d7/dc7/friendapiprivps3_8c.html#a7bc5a7d3196b17740ba90f3dd61f1a64", null ],
+    [ "FriendApiPrivUnblockUser", "d7/dc7/friendapiprivps3_8c.html#a12354c79cb83fe47f8c3f38ada3f1d27", null ],
+    [ "FriendApiPrivUpdate", "d7/dc7/friendapiprivps3_8c.html#a04a54cafc39290eb0c89686a908fd440", null ]
+];

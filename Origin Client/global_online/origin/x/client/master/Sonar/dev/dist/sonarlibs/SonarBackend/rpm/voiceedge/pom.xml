@@ -1,0 +1,193 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>sonar-voiceedge-rpm</artifactId>
+    <name>ESN Sonar VoiceEdge RPM</name>
+    <packaging>pom</packaging>
+
+    <parent>
+        <groupId>com.esn.sonar</groupId>
+        <artifactId>sonar-rpm</artifactId>
+        <version>0.10.0-SNAPSHOT</version>
+    </parent>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.esn.sonar</groupId>
+            <artifactId>sonar-allinone</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>2.2</version>
+                <executions>
+                    <execution>
+                        <id>copy_dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+
+
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.esn.sonar</groupId>
+                                    <artifactId>sonar-allinone</artifactId>
+                                    <version>${project.version}</version>
+                                    <type>jar</type>
+                                    <overWrite>false</overWrite>
+                                    <outputDirectory>${project.build.directory}/dist</outputDirectory>
+                                    <destFileName>sonar-allinone-voiceedge.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>rpm-maven-plugin</artifactId>
+                <version>2.0.1</version>
+                <executions>
+                    <execution>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>rpm</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <name>sonar-voiceedge</name>
+                    <release>${releaseNumber}</release>
+                    <copyright>ESN AB</copyright>
+                    <distribution>ESN</distribution>
+                    <group>Application/Net</group>
+                    <packager>ESN</packager>
+                    <prefix>/usr/local</prefix>
+                    <requires>
+                        <require>java-sun &gt;= 1.6</require>
+                    </requires>
+                    <preinstall>
+                        adduser sonar -d /var/sonar/home &amp;&gt;/dev/null || true
+                    </preinstall>
+                    <postinstall>
+                        ARG=$1
+                        if [ "$ARG" = "1" ]; then
+                        /sbin/chkconfig --add sonarvoiceedge
+                        /sbin/chkconfig sonarvoiceedge on
+                        fi;
+
+                        true
+                    </postinstall>
+
+                    <defineStatements>
+                        <defineStatement>_unpackaged_files_terminate_build 0</defineStatement>
+                    </defineStatements>
+                    <mappings>
+
+                        <mapping>
+                            <directory>/etc/rc.d/init.d</directory>
+                            <filemode>755</filemode>
+                            <username>root</username>
+                            <groupname>root</groupname>
+                            <sources>
+                                <source>
+                                    <location>init</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>/etc</directory>
+                            <configuration>noreplace</configuration>
+                            <directoryIncluded>false</directoryIncluded>
+                            <sources>
+                                <source>
+                                    <location>../../voiceedge/src/main/resources/sonar-voiceedge.conf</location>
+                                </source>
+                            </sources>
+                            <username>root</username>
+                            <groupname>root</groupname>
+                        </mapping>
+                        <mapping>
+                            <directory>/var/sonar/home</directory>
+                            <username>sonar</username>
+                            <groupname>sonar</groupname>
+                        </mapping>
+                        <mapping>
+                            <directory>/var/log/sonar</directory>
+                            <filemode>755</filemode>
+                            <username>sonar</username>
+                            <groupname>sonar</groupname>
+                        </mapping>
+
+                        <mapping>
+                            <directory>/usr/local/sonar/bin</directory>
+                            <filemode>755</filemode>
+                            <username>root</username>
+                            <groupname>root</groupname>
+                            <sources>
+                                <source>
+                                    <location>target/dist</location>
+                                    <includes>
+                                        <include>sonar-allinone-voiceedge.jar</include>
+                                    </includes>
+                                </source>
+                            </sources>
+                        </mapping>
+
+                    </mappings>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>rhnpush</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <tasks>
+                                <path id="rpmfile.id">
+                                    <fileset dir="${project.build.directory}/rpm/sonar-voiceedge/RPMS/noarch">
+                                        <include name="*.noarch.rpm"/>
+                                    </fileset>
+                                </path>
+                                <property name="rpmfile" refid="rpmfile.id"/>
+                                <exec executable="${basedir}/rpmsign.sh">
+                                    <arg value="${rpmfile}"/>
+                                </exec>
+                            </tasks>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>ant</groupId>
+                        <artifactId>ant-optional</artifactId>
+                        <version>1.5.3-1</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.ant</groupId>
+                        <artifactId>ant-jsch</artifactId>
+                        <version>1.7.0</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

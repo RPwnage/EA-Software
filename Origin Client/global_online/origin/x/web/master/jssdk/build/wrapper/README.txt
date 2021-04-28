@@ -1,0 +1,1 @@
+Nothing else should be in this folder beside the intro.js and outro.js files. The gruntfile places these files at the beginning and end respectively during concatenation phase.

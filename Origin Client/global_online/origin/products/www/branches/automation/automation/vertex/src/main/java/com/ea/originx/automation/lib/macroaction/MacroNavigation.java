@@ -1,0 +1,712 @@
+package com.ea.originx.automation.lib.macroaction;
+
+import com.ea.originx.automation.lib.pageobjects.common.GlobalSearchResults;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.discover.DiscoverPage;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameSlideout;
+import com.ea.originx.automation.lib.pageobjects.originaccess.PlayFirstTrialsPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.VaultPage;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileHeader;
+import com.ea.originx.automation.lib.pageobjects.settings.AppSettings;
+import com.ea.originx.automation.lib.pageobjects.settings.DiagSettings;
+import com.ea.originx.automation.lib.pageobjects.settings.InstallSaveSettings;
+import com.ea.originx.automation.lib.pageobjects.settings.NotificationsSettings;
+import com.ea.originx.automation.lib.pageobjects.settings.OIGSettings;
+import com.ea.originx.automation.lib.pageobjects.settings.VoiceSettings;
+import com.ea.originx.automation.lib.pageobjects.store.AboutStorePage;
+import com.ea.originx.automation.lib.pageobjects.store.BrowseGamesPage;
+import com.ea.originx.automation.lib.pageobjects.store.DealsPage;
+import com.ea.originx.automation.lib.pageobjects.store.DownloadOriginPage;
+import com.ea.originx.automation.lib.pageobjects.store.OriginAccessFaqPage;
+import com.ea.originx.automation.lib.pageobjects.store.StoreFacet;
+import com.ea.originx.automation.lib.pageobjects.store.StorePage;
+import com.ea.originx.automation.lib.pageobjects.template.EAXVxSiteTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+
+/**
+ * Navigating to different pages using url.
+ * These are shortcuts to specific page
+ *
+ * @author rocky
+ */
+public class MacroNavigation extends EAXVxSiteTemplate {
+    
+    private static final String MOST_POPULAR = "Most Popular";
+    private static final String PRICE = "Price";
+    private static final String SORT = "Sort";
+    /**
+     * Constructor
+     *
+     * @param driver Selenium WebDriver
+     */
+    public MacroNavigation(WebDriver driver){
+        super(driver);
+    }
+
+    /**
+     * Top uri enum
+     */
+    protected enum TopUri {
+        MY_HOME ("my-home"),
+        STORE ("store"),
+        MY_GAME_LIBRARY ("game-library"),
+        PROFILE ("profile"),
+        SETTINGS("settings"),
+        GLOBAL_SEARCH("search?searchString=%s");
+
+        /**
+         * Store page sub menu uri enum
+         */
+        protected enum StoreSubUri {
+            BROWSE_GAMES (STORE.toString()+"/browse"),
+            DEALS (STORE.toString()+"/deals"),
+            FREE_GAMES (STORE.toString()+"/free-games"),
+            ORIGIN_ACCESS (STORE.toString()+"/origin-access"),
+            ABOUT (STORE.toString()+"/about"),
+            DOWNLOAD (STORE.toString()+"/download");
+
+            /**
+             * Deals page sub menu uri enum
+             */
+            protected enum DealsSubUri {
+                ON_SALE(STORE.toString()+"/browse?fq=price:on-sale&sort=rank%20desc"),
+                UNDER_5(STORE.toString()+"/browse?fq=price:pricebargains"),
+                UNDER(STORE.toString()+"/browse?fq=price:PriceTier1");
+
+                private final String dealsSubMenuUri;
+
+                /**
+                 * Constructor for Deals page sub menu uri enum
+                 *
+                 * @param uri uri
+                 */
+                DealsSubUri(final String uri) {
+                    dealsSubMenuUri = uri;
+                }
+
+                /**
+                 * This returns String value for each enum item.
+                 *
+                 * @return value for Deals page sub menu uri enum
+                 */
+                @Override
+                public String toString() {
+                    return dealsSubMenuUri;
+                }
+            }
+
+            /**
+             * Origin Access page sub menu uri enum
+             */
+            protected enum OriginAccessSubUri {
+                VAULT_GAMES(ORIGIN_ACCESS.toString()+"/vault-games?fq=subscriptionGroup:vault-games&sort=releaseDate%20desc"),
+                PLAY_FIRST_TRIALS(ORIGIN_ACCESS.toString()+"/trials"),
+                ORIGIN_ACCESS_FAQ(ORIGIN_ACCESS.toString()+"/faq");
+
+                private final String originAccessSubMenuUri;
+
+                /**
+                 * Constructor for Origin Access page sub menu uri enum
+                 *
+                 * @param uri uri
+                 */
+                OriginAccessSubUri(final String uri) {
+                    originAccessSubMenuUri = uri;
+                }
+
+                /**
+                 * This returns String value for each enum item.
+                 *
+                 * @return value for Origin Access page sub menu uri enum.
+                 */
+                @Override
+                public String toString() {
+                    return originAccessSubMenuUri;
+                }
+            }
+
+            private final String storeSubMenuUri;
+
+            /**
+             * Constructor for Store page sub menu uri enum
+             *
+             * @param uri uri
+             */
+            StoreSubUri(final String uri) {
+                storeSubMenuUri = uri;
+            }
+
+            /**
+             * This returns String value for each enum item.
+             *
+             * @return value for Store page sub menu uri enum.
+             */
+            @Override
+            public String toString() {
+                return storeSubMenuUri;
+            }
+        }
+
+        /**
+         * Origin Game Detail page uri enum
+         */
+        protected enum OriginGameDetailPageUri {
+            FRIENDS_WHO_PLAY(TopUri.MY_GAME_LIBRARY.toString()+"/ogd/%s/friends-who-play"),
+            ACHIEVEMENTS(TopUri.MY_GAME_LIBRARY.toString()+"/ogd/%s/achievements"),
+            EXTRA_CONTENT(TopUri.MY_GAME_LIBRARY.toString()+"/ogd/%s/expansions");
+
+            private final String originGameDetailPageUri;
+
+            /**
+             * Constructor for Origin Game Detail page uri enum
+             *
+             * @param uri uri
+             */
+            OriginGameDetailPageUri(final String uri) {
+                originGameDetailPageUri = uri;
+            }
+
+            /**
+             * This returns String value for each enum item.
+             *
+             * @return value for Origin Game Detail page uri enum
+             */
+            @Override
+            public String toString() {
+                return originGameDetailPageUri;
+            }
+        }
+
+        /**
+         * User Profile page sub menu uri enum
+         */
+        protected enum ProfileSubUri {
+            ACHIEVEMENTS(PROFILE.toString()+"/achievements"),
+            FRIENDS(PROFILE.toString()+"/friends"),
+            GAMES(PROFILE.toString()+"/games"),
+            WISHLIST(PROFILE.toString()+"/wishlist");
+
+            private final String profileSubMenuUri;
+
+            /**
+             * Constructor for User Profile page sub menu uri enum
+             *
+             * @param uri uri
+             */
+            ProfileSubUri(final String uri) {
+                profileSubMenuUri = uri;
+            }
+
+            /**
+             * This returns String value for each enum item.
+             *
+             * @return value for User Profile page sub menu uri enum
+             */
+            @Override
+            public String toString() {
+                return profileSubMenuUri;
+            }
+        }
+
+        private final String topUri;
+
+        /**
+         * Constructor for top uri enum
+         *
+         * @param uri uri
+         */
+        TopUri(final String uri) {
+            topUri = uri;
+        }
+
+        /**
+         * This returns String value for each enum item.
+         *
+         * @return value for top uri enum
+         */
+        @Override
+        public String toString() {
+            return topUri;
+        }
+
+        /**
+         * Settings page menu uri enum
+         */
+        protected enum SettingsMenuUri {
+            APPLICATION(SETTINGS+"/application"),
+            DIAGNOSTICS(SETTINGS+"/diagnostics"),
+            INSTALLSAVES(SETTINGS+"/installs"),
+            NOTIFICATIONS(SETTINGS+"/notifications"),
+            ORIGIN_IN_GAME(SETTINGS+"/oig"),
+            VOICE(SETTINGS+"/voice");
+
+            private final String settingUri;
+
+            /**
+             * Constructor for Settings page menu uri enum
+             *
+             * @param uri uri
+             */
+            SettingsMenuUri(final String uri) {
+                settingUri = uri;
+            }
+
+            /**
+             * This returns String value for each enum item.
+             *
+             * @return value for Settings page menu uri enum
+             */
+            @Override
+            public String toString() {
+                return settingUri;
+            }
+        }
+    }
+
+    /**
+     * Returns full url using uri from enum above.
+     * Basically this will remove all query string from url
+     *
+     * @param uri string from enum above
+     * @return full url for navigation.
+     */
+    private String returnUrlForNavigation(String uri) {
+
+        // Regular expression if url contains country and locale like '/can/en_us/'.
+        final String countryLocaleMatch = "(.*)[/]\\D{3}[/]\\D{2}[-]\\D{2}[/](.*)";
+        // Regular expression to remove query string 'fq...&' from url.
+        final String fqQueryStringMatch = "fq\\S+?&";
+        // Regular expression to remove query string 'sort...&' from url.
+        final String sortQueryStringMatch = "sort\\S+?&";
+        // Regular expression to remove search string 'searchString=..' from url.
+        final String searchStringMatch = "searchString=(\\S+?&|\\S+)";
+        final String[] queryStringsMatch = {fqQueryStringMatch, sortQueryStringMatch, searchStringMatch};
+
+        final String currentUrl = driver.getCurrentUrl();
+
+        // Remove unnecessary query string from current url
+        String tempUrl = currentUrl;
+        for(String match : queryStringsMatch) {
+            tempUrl = tempUrl.replaceAll(match, "");
+        }
+
+        // divide url into domain+uri and parameters.
+        final String url[] = tempUrl.split("\\?");
+
+        // Divide domain+uri into segments.
+        final String partialUrl[] = url[0].split("/");
+        String parameters;
+
+        // There should be only one '?' in url.
+        // if uri has '?' due to query string, put '&' before parameters.
+        if (uri.contains("?")) {
+            parameters = "&" + url[1];
+        }
+        // if uri does not have '?' then put '?' before parameters.
+        else {
+            parameters = "?" + url[1];
+        }
+
+        // http or https protocol
+        final String httpProtocol = partialUrl[0];
+        // Domain info for example 'alpha.qa.www.origin.com'.
+        final String domain = partialUrl[2];
+        String finalFullUrl;
+
+        // If current url from driver contains country and locale info like '/can/en_us/'
+        // then we need to keep country and locale info to the url.
+        if (currentUrl.matches(countryLocaleMatch)) {
+            // Country code for example 'can'
+            String countryCode = partialUrl[3];
+            // locale info for example 'en_us'
+            String localeCode = partialUrl[4];
+            finalFullUrl = httpProtocol + "//" + domain + "/" + countryCode + "/" + localeCode + "/" + uri + parameters;
+        } else {
+            finalFullUrl = httpProtocol + "//" + domain + "/" + uri + parameters;
+        }
+        return finalFullUrl;
+    }
+
+    /**
+     * Navigating to My Home page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toMyHomePage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.MY_HOME.toString());
+        driver.get(navigationUrl);
+        return new DiscoverPage(driver).verifyDiscoverPageReached();
+    }
+
+    /**
+     * Navigating to Store page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toStorePage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.STORE.toString());
+        driver.get(navigationUrl);
+        return new StorePage(driver).verifyStorePageReached();
+    }
+
+    /**
+     * Navigating to Browse Games page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toBrowseGamesPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.BROWSE_GAMES.toString());
+        driver.get(navigationUrl);
+        return new BrowseGamesPage(driver).verifyBrowseGamesPageReached();
+    }
+
+    /**
+     * Navigating to Deals page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toDealsPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.DEALS.toString());
+        driver.get(navigationUrl);
+        return new DealsPage(driver).verifyDealsPageReached();
+    }
+
+    /**
+     * Navigating to Origin Access page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toOriginAccessPage() {
+        return toVaultGamesPage();
+    }
+
+    /**
+     * Navigating to About page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toAboutStorePage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.ABOUT.toString());
+        driver.get(navigationUrl);
+        return new AboutStorePage(driver).verifyAboutStorePageReached();
+    }
+
+    /**
+     * Navigating to Download Origin page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toDwnloadOriginPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.DOWNLOAD.toString());
+        driver.get(navigationUrl);
+        return new DownloadOriginPage(driver).verifyDownloadOriginTileVisible();
+    }
+
+    /**
+     * Navigating to Store - Deals - On Sale page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toOnSalePage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.DealsSubUri.ON_SALE.toString());
+        driver.get(navigationUrl);
+        boolean isMostPopularChecked = Waits.pollingWait(()-> new StoreFacet(driver).isOptionChecked(SORT, MOST_POPULAR), 30000, 1000, 0);
+        boolean isOnSaleChecked = Waits.pollingWait(()-> new StoreFacet(driver).isOptionChecked(PRICE, "On Sale"), 30000, 1000, 0);
+        return isOnSaleChecked && isMostPopularChecked;
+    }
+
+    /**
+     * Navigating to Store - Deals - Under $5 page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toUnder5Page() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.DealsSubUri.UNDER_5.toString());
+        driver.get(navigationUrl);
+        boolean isMostPopularChecked = Waits.pollingWait(()-> new StoreFacet(driver).isOptionChecked(SORT, MOST_POPULAR), 30000, 1000, 0);
+        boolean isOnSaleChecked = Waits.pollingWait(()-> new StoreFacet(driver).isOptionChecked(PRICE, "Under $5"), 30000, 1000, 0);
+        return isOnSaleChecked && isMostPopularChecked;
+    }
+
+    /**
+     * Navigating to Store - Deals - Under page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toUnder10Page() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.DealsSubUri.UNDER.toString());
+        driver.get(navigationUrl);
+        boolean isMostPopularChecked = Waits.pollingWait(()-> new StoreFacet(driver).isOptionChecked(SORT, MOST_POPULAR), 30000, 1000, 0);
+        boolean isOnSaleChecked = Waits.pollingWait(()-> new StoreFacet(driver).isOptionChecked(PRICE, "Under $10"), 30000, 1000, 0);
+        return isOnSaleChecked && isMostPopularChecked;
+    }
+
+    /**
+     * Navigating to Store - Free Games - On The House page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toVaultGamesPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.OriginAccessSubUri.VAULT_GAMES.toString());
+        driver.get(navigationUrl);
+        return new VaultPage(driver).verifyPageReached();
+    }
+
+    /**
+     * Navigating to Store - Origin Access - Play First Trials page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toPlayFirstTrials() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.OriginAccessSubUri.PLAY_FIRST_TRIALS.toString());
+        driver.get(navigationUrl);
+        return new PlayFirstTrialsPage(driver).verifyPlayFirstTrialPageReached();
+    }
+
+    /**
+     * Navigating to Store - Origin Access - Origin Access FAQ page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toOriginAccessFAQ() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.StoreSubUri.OriginAccessSubUri.ORIGIN_ACCESS_FAQ.toString());
+        driver.get(navigationUrl);
+        return new OriginAccessFaqPage(driver).verifyFaqTitleMessage();
+    }
+
+    /**
+     * Navigating to My Game Library page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toMyGameLibraryPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.MY_GAME_LIBRARY.toString());
+        driver.get(navigationUrl);
+        return new GameLibrary(driver).verifyGameLibraryPageReached();
+    }
+
+    /**
+     * Navigating to Friends Who Play tab in Origin Game Details page using url.
+     *
+     * @param offerID Entitlement offer Id
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toOGDFriendsWhoPlayTab(String offerID) {
+        final String navigationUrl = returnUrlForNavigation(String.format(TopUri.OriginGameDetailPageUri.FRIENDS_WHO_PLAY.toString(), offerID));
+        driver.get(navigationUrl);
+        return new GameSlideout(driver).verifyFriendsWhoPlayNavLinkActive();
+    }
+
+    /**
+     * Navigating to Achievements tab in Origin Game Details page using url.
+     *
+     * @param offerID Entitlement offer Id
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toOGDAchievementsTab(String offerID) {
+        final String navigationUrl = returnUrlForNavigation(String.format(TopUri.OriginGameDetailPageUri.ACHIEVEMENTS.toString(), offerID));
+        driver.get(navigationUrl);
+        return new GameSlideout(driver).verifyAchievementsNavLinkActive();
+    }
+
+    /**
+     * Navigating to Extra Content tab in Origin Game Details page using url.
+     *
+     * @param offerID Entitlement offer Id
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toOGDExtraContentTab(String offerID) {
+        final String navigationUrl = returnUrlForNavigation(String.format(TopUri.OriginGameDetailPageUri.EXTRA_CONTENT.toString(), offerID));
+        driver.get(navigationUrl);
+        return new GameSlideout(driver).verifyExtraContentNavLinkActive();
+    }
+
+    /**
+     * Navigating to Achievements tab in User Profile page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toProfileAchievementsTab() throws Exception {
+        final String navigationUrl = returnUrlForNavigation(TopUri.ProfileSubUri.ACHIEVEMENTS.toString());
+        driver.get(navigationUrl);
+        boolean isElementVisible = maximizeWindowIfElementNotVisible();
+        MainMenu mainMenu = new MainMenu(driver);
+        if (new ProfileHeader(driver).verifyAchievementsTabActive()){
+            if (!isElementVisible) mainMenu.clickRestoreButton();
+            return true;
+        } else {
+            if (!isElementVisible) mainMenu.clickRestoreButton();
+            return false;
+        }
+    }
+
+    /**
+     * Navigating to Achievements tab with Anonymous User Profile page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toAnonymousProfileAchievementsTab() throws Exception {
+        final String navigationUrl = returnUrlForNavigation(TopUri.ProfileSubUri.ACHIEVEMENTS.toString());
+        driver.get(navigationUrl);
+        if (Waits.pollingWait(() -> new ProfileHeader(driver).verifyOnSignInPage(), 30000, 1000, 0)){
+            return true;
+        } else {
+            _log.error("Unable to load/navigate to Achievement tab with anonymous user profile page using url: " + navigationUrl);
+            return false;
+        }
+    }
+    
+    /**
+     * Navigating to Friends tab in User Profile page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toProfileFriendsTab() throws Exception {
+        final String navigationUrl = returnUrlForNavigation(TopUri.ProfileSubUri.FRIENDS.toString());
+        driver.get(navigationUrl);
+        boolean isElementVisible = maximizeWindowIfElementNotVisible();
+        MainMenu mainMenu = new MainMenu(driver);
+        if (new ProfileHeader(driver).verifyFriendsTabActive()){
+            if (!isElementVisible) mainMenu.clickRestoreButton();
+            return true;
+        } else {
+            if (!isElementVisible) mainMenu.clickRestoreButton();
+            return false;
+        }
+    }
+
+    /**
+     * Navigating to Games tab in User Profile page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toProfileGamesTab() throws Exception {
+        final String navigationUrl = returnUrlForNavigation(TopUri.ProfileSubUri.GAMES.toString());
+        driver.get(navigationUrl);
+        boolean isElementVisible = maximizeWindowIfElementNotVisible();
+        MainMenu mainMenu = new MainMenu(driver);
+        if (new ProfileHeader(driver).verifyGamesTabActive()){
+            if (!isElementVisible) mainMenu.clickRestoreButton();
+            return true;
+        } else {
+            if (!isElementVisible) mainMenu.clickRestoreButton();
+            return false;
+        }
+    }
+
+    /**
+     * Navigating to Wishlist tab in User Profile page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toProfileWishlistTab() throws Exception {
+        final String navigationUrl = returnUrlForNavigation(TopUri.ProfileSubUri.WISHLIST.toString());
+        driver.get(navigationUrl);
+        boolean isElementVisible = maximizeWindowIfElementNotVisible();
+        MainMenu mainMenu = new MainMenu(driver);
+        if (new ProfileHeader(driver).verifyWishlistActive()){
+            if (!isElementVisible) mainMenu.clickRestoreButton();
+            return true;
+        } else {
+            if (!isElementVisible) mainMenu.clickRestoreButton();
+            return false;
+        }
+    }
+
+    /**
+     * Navigating to Application settings page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toApplicationSettingsPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.SettingsMenuUri.APPLICATION.toString());
+        driver.get(navigationUrl);
+        return new AppSettings(driver).verifyAppSettingsReached();
+    }
+
+    /**
+     * Navigating to Diagnostics settings pag using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toDiagnosticsSettingsPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.SettingsMenuUri.DIAGNOSTICS.toString());
+        driver.get(navigationUrl);
+        return new DiagSettings(driver).verifyDiagSettingsReached();
+    }
+
+    /**
+     * Navigating to Install And Saves settings page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toInstallAndSavesSettingsPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.SettingsMenuUri.INSTALLSAVES.toString());
+        driver.get(navigationUrl);
+        return new InstallSaveSettings(driver).verifyInstallSaveSettingsReached();
+    }
+
+    /**
+     * Navigating to Notifications settings page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toNotificationsSettingsPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.SettingsMenuUri.NOTIFICATIONS.toString());
+        driver.get(navigationUrl);
+        return new NotificationsSettings(driver).verifyNotificationsSettingsReached();
+    }
+
+    /**
+     * Navigating to Origin In Game settings page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toOriginInGameSettingsPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.SettingsMenuUri.ORIGIN_IN_GAME.toString());
+        driver.get(navigationUrl);
+        return new OIGSettings(driver).verifyOIGSettingsReached();
+    }
+
+    /**
+     * Navigating to Voice settings page using url.
+     *
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toVoiceSettingsPage() {
+        final String navigationUrl = returnUrlForNavigation(TopUri.SettingsMenuUri.VOICE.toString());
+        driver.get(navigationUrl);
+        return new VoiceSettings(driver).verifyVoiceSettingsReached();
+    }
+
+    /**
+     * Navigating to Global Search Results page using url.
+     * @param keyword keywords to enter
+     * @return return true if the page load is successful. False otherwise.
+     */
+    public boolean toGlobalSearchResultsPage(String keyword) {
+        final String navigationUrl = returnUrlForNavigation(String.format(TopUri.GLOBAL_SEARCH.toString(), keyword));
+        driver.get(navigationUrl);
+        GlobalSearchResults globalSearchResults = new GlobalSearchResults(driver);
+        globalSearchResults.waitForResults();
+        return globalSearchResults.verifySearchDisplayed();
+    }
+
+    /**
+     * If element in profile page is not visible, maximize window.
+     * This is added due to temp fix for ORPS-6729.
+     * This will be removed once issue is fixed.
+     *
+     * @return return true if element in profile page is visible, false otherwise
+     */
+    private boolean maximizeWindowIfElementNotVisible() throws Exception {
+        if (new ProfileHeader(driver).verifyNavigationSection()){
+            return true;
+        } else {
+            new MainMenu(driver).clickMaximizeButton();
+            return false;
+        }
+    }
+}

@@ -1,0 +1,84 @@
+diff -r -u a/include/EACallstack/Apple/EACallstackApple.h b/include/EACallstack/Apple/EACallstackApple.h
+--- a/include/EACallstack/Apple/EACallstackApple.h	2014-02-18 13:34:56.000000000 -0500
++++ b/include/EACallstack/Apple/EACallstackApple.h	2014-02-18 13:37:03.000000000 -0500
+@@ -26,6 +26,7 @@
+     {
+         char mType[32];             // The type field (e.g. __TEXT) from the vmmap output.
+         char mPermissions[16];      // The permissions "r--/rwx" kind of string from the vmmap output.
++        char mUuid[40];             // The module's UUID, if any
+     };
+     
+     typedef eastl::fixed_vector<ModuleInfoApple, 128, true> ModuleInfoAppleArray;
+diff -r -u a/source/Apple/GetModuleInfoApple.cpp b/source/Apple/GetModuleInfoApple.cpp
+--- a/source/Apple/GetModuleInfoApple.cpp	2014-02-18 13:34:56.000000000 -0500
++++ b/source/Apple/GetModuleInfoApple.cpp	2014-02-18 13:39:04.000000000 -0500
+@@ -45,7 +45,60 @@
+ {
+ namespace Callstack
+ {
++// This function determines the UUID of a given module and
++void GetModuleUuid(eastl::string& modulePath, eastl::string& moduleUuid)
++{
++    moduleUuid.clear();
++    
++    char command[PATH_MAX];
++    sprintf(command, "otool -l %s | grep uuid", modulePath.data());
++    FILE*  pFile = popen(command, "r");
++    if (pFile)
++    {
++        char line[512];
++        
++        while(fgets(line, EAArrayCount(line), pFile))
++        {
++            char cmd[16];
++            char uuid[64];
++            int fieldCount = EA::StdC::Sscanf(line, "%16s %64s", cmd, uuid);
++            if (fieldCount == 2 && strcmp(cmd, "uuid") == 0)
++            {
++                moduleUuid.assign(uuid);
++            }
++        }
++        
++        pclose(pFile);
++    }
++}
+ 
++void GetAllModuleInfoAppleUUIDs(ModuleInfoAppleArray& moduleInfos)
++{
++    typedef eastl::map<eastl::string, eastl::string> UuidMap;
++    UuidMap uuids;
++    
++    ModuleInfoAppleArray::iterator end(moduleInfos.end());
++    for(ModuleInfoAppleArray::iterator i(moduleInfos.begin()); i != end; ++i)
++    {
++        eastl::string path(&(i->mPath[0]));
++        UuidMap::iterator where = uuids.find(path);
++        if (where != uuids.end())
++        {
++            strncpy(i->mUuid, where->second.c_str(), sizeof(i->mUuid));
++        }
++        else
++        {
++            eastl::string uuid;
++            GetModuleUuid(path, uuid);
++            if (!uuid.empty())
++            {
++                uuids[path] = uuid;
++                strncpy(i->mUuid, uuid.c_str(), sizeof(i->mUuid));
++            }
++        }
++    }
++}
++    
+ // This fills a moduleInfoApple object with the information from all of the segments listed in the given mach_header's segments, starting at the given currentSegmentPos. It also puts the pModulePath info the moduleInfoApple object, which is then push_back on the given array.
+ //
+ // moduleInfoAppleArray is an in/out param that is push_back using information derived from other parameters
+@@ -172,6 +225,8 @@
+         
+         // Use this to compare results
+         // printf("vmmap -w %lld", (int64_t)pid);
++        
++        GetAllModuleInfoAppleUUIDs(moduleInfoAppleArray);
+     }
+     return (size_t)moduleInfoAppleArray.size();
+ }

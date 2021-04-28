@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="ed0d2418-859f-4e9c-8e09-f85e861e2e3d" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <!--
+    <summary>
+      <para>Optional summary abstract</para>
+    </summary>
+    -->
+
+    <introduction>
+      <para>
+        <newTerm>Initialize.xml</newTerm> file represents a package's public data.
+        Usually the Initialize.xml file contains a package's include directories, a list of libraries, assemblies, etc.
+      </para>
+    </introduction>
+
+    <!-- Add one or more top-level section elements.  These are collapsible.
+         If using <autoOutline />, add an address attribute to identify it
+         and specify a title so that it can be jumped to with a hyperlink. -->
+    <section address="InitializeXmlFile_Overview">
+      <title>Overview</title>
+      <content>
+        <para>
+          When a package has a dependency on another package the Initialize.xml file of the dependent package is loaded into the parent package's project.
+          Framework targets can use any list of known properties and filesets defined in the Initialize.xml file to find include directories, 
+          libraries and other public data of dependent package.
+        </para>
+        <para>
+          Initialize.xml file is loaded by the <newTerm>&lt;dependent&gt;</newTerm> task.
+          When a package declares a dependency on another package the <newTerm>&lt;dependent&gt;</newTerm> task is executed by Framework targets.
+          When the <newTerm>&lt;dependent&gt;</newTerm> task is invoked in the *.build script, the Initialize.xml file is loaded as well and all data defined in this
+          file become available in the script.
+        </para>
+        <para>
+          Before loading the Initialize.xml file the <newTerm>&lt;dependent&gt;</newTerm> task sets several properies:
+        </para>
+        <table>
+          <tableHeader>
+            <row>
+              <entry>
+                <para>property name</para>
+              </entry>
+              <entry>
+                <para>Description</para>
+              </entry>
+            </row>
+          </tableHeader>
+          <row>
+            <entry>
+              <para>
+                package.<legacyItalic>[Dependent Package Name]</legacyItalic>.dir
+              </para>
+            </entry>
+            <entry>
+              <para>
+                Directory where package <legacyItalic>[Dependent Package Name]</legacyItalic> is located
+              </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>
+                package.<legacyItalic>[Dependent Package Name]</legacyItalic>.version
+              </para>
+            </entry>
+            <entry>
+              <para>Version of the package</para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>
+                package.<legacyItalic>[Dependent Package Name]</legacyItalic>.builddir
+              </para>
+            </entry>
+            <entry>
+              <para>Build directory of the package</para>
+            </entry>
+          </row>
+        </table>
+
+        <para></para>
+      </content>
+    </section>
+    <section address="InitializeXmlFile_Data">
+      <title>Package public data</title>
+      <content>
+        <para>
+          Arbitrary nant scripts can be present in the Initialize.xml file, but there is a number of
+          properties and filesets known to Framework that can be used to expose data needed for the build,
+          this data describes include directories, libraries, assemblies, etc.
+        </para>
+        <para>
+          Public data can be described on the package level and on the per-module level.
+          There is also convenient syntax to describe data for different platforms.
+        </para>
+      </content>
+      <sections>
+        <section address="InitializeXmlFile_Data_Package_Level">
+          <title>Package level definitions</title>
+          <content>
+            <para>
+              Package level definitions use following syntax for property or fileset names:
+            </para>
+            <table>
+              <tableHeader>
+                <row>
+                  <entry>
+                    <para>name</para>
+                  </entry>
+                  <entry>
+                    <para>Description</para>
+                  </entry>
+                </row>
+              </tableHeader>
+              <row>
+                <entry>
+                  <para>
+                    <legacyBold>package.<legacyItalic>PackageName</legacyItalic>.xxxxx</legacyBold>
+                  </para>
+                </entry>
+                <entry>
+                  <para>
+                    <legacyItalic>PackageName</legacyItalic> is the name of dependent package, and xxxxx stands for the type of property or fileset: "includedirs", "libs", etc.
+                  </para>
+                </entry>
+              </row>
+            </table>
+            <para>
+              Traditionally public data in Initialize.xml were defined on a per-package basis because older versions of Framework did not support modules.
+              Thus, public data can be defined all together even when a package has multiple modules, include directories and libraries.
+            </para>
+            <para>
+              The problem with package level definitions is that a dependency on a single module will take libraries from all modules.
+              Framework 3 has code that tries to autodetect which libraries belong to which module, but this is unreliable.
+              For this reason, it is much better is to define data on a per-module basis.
+            </para>
+            <alert class="important">
+              <para>For packages with multiple modules always define data at the module level</para>
+            </alert>
+          </content>
+        </section>
+        <section address="InitializeXmlFile_Data_Module_Level">
+          <title>Module level definitions</title>
+          <content>
+            <para>
+              The same set of properties and filesets can be defined on a per-module basis.
+              Because information from a dependent package's build file may not be available when the Initialize.xml is loaded, an additional property
+              containing a list of modules in dependent packages is required.
+            </para>
+            <table>
+              <tableHeader>
+                <row>
+                  <entry>
+                    <para>name</para>
+                  </entry>
+                  <entry>
+                    <para>Description</para>
+                  </entry>
+                </row>
+              </tableHeader>
+              <row>
+                <entry>
+                  <para>
+                    <legacyBold>package.<legacyItalic>PackageName</legacyItalic>.buildmodules</legacyBold>
+                  </para>
+                </entry>
+                <entry>
+                  <para>
+                    List of module name in the package.
+                  </para>
+                  <alert class="note">
+                    <para>
+                      List of modules here can contain a subset of all modules in the package.
+                      Modules that do not have any public data do not need to be listed.
+                    </para>
+                  </alert>
+                </entry>
+              </row>
+              <row>
+                <entry>
+                  <para>
+                    <legacyBold>package.<legacyItalic>PackageName</legacyItalic>.<legacyItalic>ModuleName</legacyItalic>.xxxxx</legacyBold>
+                  </para>
+                </entry>
+                <entry>
+                  <para>
+                    <legacyItalic>PackageName</legacyItalic> is the name of the dependent package,
+                    <legacyItalic>ModuleName</legacyItalic> is the name of <token>modulename</token> in dependent package,
+                    and xxxxx stands for the type of property or fileset: "includedirs", "libs", etc.
+                  </para>
+                </entry>
+              </row>
+            </table>
+            <alert class="note">
+              <para>If a module level definition for a property or fileset is not found, a package level definition for that property or fileset will be used.</para>
+              <para>If no module or package level definition for a property or fileset is found then public data will be empty.</para>
+              <para>Framework automatically adds libraries and assemblies that are built by each module to the public data for this module</para>
+            </alert>
+          </content>
+        </section>
+
+        <section address="InitializeXmlFile_Data_KnownFrameworkNames">
+          <title>Framework properties and filesets</title>
+          <content>
+            <para>
+              <legacyBold>Properties</legacyBold>
+            </para>
+            <list class="bullet">
+              <listItem>
+                <para>
+                  <link xlink:href="9a55858f-2e01-44d7-884d-e7ff3c3d68c2">---.defines</link>
+                  - preprocessor definitions exported by the package/module.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  <link xlink:href="5c94c170-d339-4b95-bebc-2cf43c413718">---.includedirs</link>
+                  - include directories exported by the package/module
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  <link xlink:href="46b39c39-7e6b-4000-8926-d373e7e5015b">---.usingdirs</link>
+                  - using directories exported by the package/module
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  <link xlink:href="1726d18e-e685-4a19-b982-a81a4d5f49c2">---.libdirs</link>
+                  - library directories exported by the package/module
+                </para>
+              </listItem>
+            </list>
+            <alert class="note">
+              <para>Add every item like define or directory on a separate line</para>
+            </alert>
+
+            <para>
+                <legacyBold>Filesets</legacyBold>
+              </para>
+            
+            <list class="bullet">
+                <listItem>
+                  <para>
+                    <link xlink:href="1410adf7-7a64-4990-811f-c4b77966be31">---.libs (libs.external, libs.spu)</link>
+                  </para>
+                </listItem>
+
+                <listItem>
+                  <para>
+                    <link xlink:href="0547a610-d12a-4654-a1fc-02003e4e61ea">---.dlls (dlls.external, dlls.spu)</link>
+                  </para>
+                </listItem>
+                <listItem>
+                  <para>
+                    <link xlink:href="c1ddacc7-67c4-48bf-b439-3f5376197e06">---.assemblies (assemblies.external)</link>
+                  </para>
+                </listItem>
+              </list>
+
+            <para>There are three variants for each fileset name.</para>
+            <list class="bullet">
+              <listItem>
+                <para>
+                  <legacyBold>.xxx</legacyBold> - libraries, assemblies, dlls, etc.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  <legacyBold>.xxx.external</legacyBold>
+                  - this variant was introduced in Framework 2 to get around Visual Studio Solution generation behavior where
+                  all filesets <legacyItalic>'.xxx'</legacyItalic> were discarded, and build was relying on Visual Studio to pull in dependent libraries, assemblies, etc.
+                  In case when additional (prebuilt) libraries or assemblies had to be added <legacyItalic>'.xxx.external'</legacyItalic> variant could be used.
+                </para>
+                <alert class="important">
+                  <para>
+                    Discarding of the <legacyItalic>'.xxx'</legacyItalic> filesets in Framework 2 was creating inconsistency between nant builds and
+                    Visual Studio builds. In case of Visual Studio builds build output was effectively used, while in nant builds it could be skipped in the Initialized.xml.
+                  </para>
+                  <para>Framework 3 automatically adds libraies built by a module to the module public data eliminating diference between Visual Studio and nant builds.</para>
+                  <para>To control whethe module libraries need to be linked use corresponding dependency types.</para>
+                  <para>Dll import libraries are NOT automatically added.</para>
+                </alert>
+                <alert class="note">
+                  <para>
+                    In Framework 3 there is no need to use <legacyItalic>'.xxx.external'</legacyItalic> variant. All data can be specified in <legacyItalic>'.xxx'</legacyItalic>.
+                    Framework 3 will autodetect files that correspond to the build output of the module and use them accordingly in different types of a build or generation.
+                  </para>
+                </alert>
+              </listItem>
+              <listItem>
+                <para>
+                  <legacyBold>.xxx.spu</legacyBold> - Data for PS3 SPU type modules should be defined through <legacyItalic>'.spu'</legacyItalic> postfix.
+                </para>
+                <para>
+                  More precisely, framework uses the <newTerm>subsystem</newTerm> property: <legacyItalic>'.xxx${subsystem}'</legacyItalic>.
+                  But the only subsystem type currently used in Framework is <legacyItalic>'.spu'</legacyItalic>. This may change in future.
+                </para>
+              </listItem>
+            </list>
+
+            <para> <legacyBold>Android specific</legacyBold></para>
+            
+            <list class="bullet">
+              <listItem>
+                <para>
+                  <legacyBold>package.DependentPackageName.java.classes</legacyBold> - classes exported by dependent package. These classes are copied in 'classes' 
+                  build folder of parent package and can be referenced in java code of the parent package.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  <legacyBold>package.DependentPackageName.java.archives</legacyBold> - classes exported by dependent package. These archives are extracted into 'classes'
+                  build folder of parent package and can be referenced in java code of the parent package.
+                </para>
+              </listItem>
+
+              <listItem>
+                <para>
+                  <legacyBold>package.DependentPackageName.assetfiles-set.${config-system}</legacyBold> or
+                  <legacyBold>package.DependentPackageName.assetfiles-set</legacyBold>
+                  - list of assetfilesets defined in this intialize.xml file.
+                </para>
+                <alert class="note">
+                  <para>
+                    When <legacyItalic>assetfiles-set</legacyItalic> property is defined, the second definition for single assetfileset given below is ignored.
+                  </para>
+                </alert>
+                <alert class="note">
+                  <para>
+                    Since FileSet class in Framework 3 supports multiple Base Directories the need to have many assetfilesets does not exist anymore..
+                  </para>
+                </alert>
+              </listItem>
+
+              <listItem>
+                <para>
+                  <legacyBold>package.DependentPackageName.assetfiles.${config-system}</legacyBold> or
+                  <legacyBold>package.DependentPackageName.assetfiles</legacyBold>
+                  - when there is single assetfileset, it can have one of the above names. In this case <legacyItalic>assetfiles-set</legacyItalic> property is not required.
+                </para>
+              </listItem>
+            </list>
+
+          </content>
+        </section>
+      </sections>
+    </section>
+    <section address="InitializeXmlFile_ScriptInit_Task">
+      <title>Task ScriptInit</title>
+      <content>
+        <para>ScriptInit was created to simplify the setting of public data in the Initialize.xml file</para>
+        <para>This task sets includedirs, libdirs and libs on the package level. It does not do any additional initialization or actions.</para>
+        <para>When called without parameters this task will add a library with a name equivalent to the package name</para>
+        
+        <code language="xml" title="" source="ExampleFiles\Packages\InitializeXmlFile\InitialieScriptTask_Example1.xml" />
+
+        <alert class="caution">
+          <para>Do not invoke ScriptInit without parameters when</para>
+          <list class="bullet">
+            <listItem>
+              <para>packages don't produce a library, like Utility</para>
+            </listItem>
+            <listItem>
+              <para>Library name differs from the package name</para>
+            </listItem>
+          </list>
+        </alert>
+
+        <para>Using parameters in the ScriptInit task allows for more flexibility</para>
+        
+        <code language="xml" title="" source="ExampleFiles\Packages\InitializeXmlFile\InitialieScriptTask_Example2.xml" />
+
+        <alert class="tip">
+          <para>
+            Do not use ScriptInit task for packages with multiple modules. It would be much better to use
+            <link xlink:href="ed0d2418-859f-4e9c-8e09-f85e861e2e3d#InitializeXmlFile_Data_Module_Level">module level definitions</link>.</para>
+        </alert>
+
+      </content>
+    </section>
+
+    <section>
+      <title>Examples</title>
+      <content>
+        <code language="xml" title="Package level definitions" source="ExampleFiles\Packages\InitializeXmlFile\PackageLevelDefinitions.xml" />
+        <para></para>
+        <code language="xml" title="Module level definitions" source="ExampleFiles\Packages\InitializeXmlFile\ModuleLevelDefinitions.xml" />
+      </content>
+    </section>
+
+    <relatedTopics>
+      <!-- One or more of the following:
+           - A local link
+           - An external link
+           - A code entity reference
+
+      <link xlink:href="Other Topic's ID"/>
+      <link xlink:href="Other Topic's ID">Link inner text</link>
+
+      <externalLink>
+          <linkText>Link text</linkText>
+          <linkAlternateText>Optional alternate link text</linkAlternateText>
+          <linkUri>URI</linkUri>
+      </externalLink>
+
+      <codeEntityReference>API member ID</codeEntityReference>
+
+      Examples:
+
+      <link xlink:href="00e97994-e9e6-46e0-b420-5be86b2f8270" />
+      <link xlink:href="00e97994-e9e6-46e0-b420-5be86b2f8278">Some other topic</link>
+
+      <externalLink>
+          <linkText>SHFB on CodePlex</linkText>
+          <linkAlternateText>Go to CodePlex</linkAlternateText>
+          <linkUri>http://shfb.codeplex.com</linkUri>
+      </externalLink>
+
+      <codeEntityReference>T:TestDoc.TestClass</codeEntityReference>
+      <codeEntityReference>P:TestDoc.TestClass.SomeProperty</codeEntityReference>
+      <codeEntityReference>M:TestDoc.TestClass.#ctor</codeEntityReference>
+      <codeEntityReference>M:TestDoc.TestClass.#ctor(System.String,System.Int32)</codeEntityReference>
+      <codeEntityReference>M:TestDoc.TestClass.ToString</codeEntityReference>
+      <codeEntityReference>M:TestDoc.TestClass.FirstMethod</codeEntityReference>
+      <codeEntityReference>M:TestDoc.TestClass.SecondMethod(System.Int32,System.String)</codeEntityReference>
+      -->
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

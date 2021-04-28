@@ -1,0 +1,69 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+     
+===============================================================================
+target-build-custom.xml
+
+Allows custom build like tasks to be integrated easily into the build.  Tools
+like PcLint, CodeWizard, etc. can make use of this generic interface to maintain
+separate targets rather than creating custom targets within eaconfig.
+===============================================================================
+-->
+
+<project>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="build-custom" description="Custom build the specific configuration" hidden="true">
+    <property name="eaconfig.build.target" value="eaconfig-custom-build" />
+    <property name="eaconfig.build.group" value="runtime" />
+    <call target="eaconfig-build-caller" force="true" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-custom-build" hidden="true" >
+
+    <!-- make sure the build name has been defined beforehand -->
+    <fail unless="@{PropertyExists('custom-build.name')}" />
+    <fail unless="@{PropertyExists('custom-build.includefile')}" />
+    <fail unless="@{PropertyExists('custom-build.target')}" />
+
+    <fail message="Target eaconfig-custom-build is not supported in Framework 3. Contact 'EATech CM Support' if you need implementation of this target."/>
+
+    <call target="__private_initialize"/>
+
+    <property name="custom-build.usedependencies" value="${build.usedependencies}" />
+    <property name="custom-build.builddependencies" value="${build.builddependencies.all}" />
+
+    <property name="custom-build.buildname" value="${build.outputname}" />
+    <property name="custom-build.buildtype" value="CustomProgram" if="${build.buildtype.base} == 'StdProgram'" />
+    <property name="custom-build.buildtype" value="CustomLibrary" if="${build.buildtype.base} == 'StdLibrary'" />
+
+    <property name="custom-build.modulename" value="${build.module}"/>
+    <property name="custom-build.outputdir" value="${package.builddir}/${config}/${custom-build.name}/${build.module}" />
+
+    <fileset name="custom-build.asmsourcefiles" fromfileset="build.asmsourcefiles.all" />
+    <fileset name="custom-build.sourcefiles" fromfileset="build.sourcefiles.all" />
+
+    <property name="custom-build.asdefines" value="@{OptionSetGetValue('${build.buildtype}', 'as.defines')} ${build.defines.all}"/>
+    <property name="custom-build.ccdefines" value="@{OptionSetGetValue('${build.buildtype}', 'cc.defines')} ${build.defines.all}"/>
+
+    <property name="custom-build.asoptions" value="@{OptionSetGetValue('${build.buildtype}', 'as.options')}"/>
+    <property name="custom-build.ccoptions" value="@{OptionSetGetValue('${build.buildtype}', 'cc.options')}"/>
+    <property name="custom-build.liboptions" value="@{OptionSetGetValue('${build.buildtype}', 'lib.options')}"/>
+    <property name="custom-build.linkoptions" value="@{OptionSetGetValue('${build.buildtype}', 'link.options')}"/>
+
+    <property name="custom-build.asincludedirs" value="@{OptionSetGetValue('${build.buildtype}', 'as.includedirs')} ${build.includedirs.all}"/>
+    <property name="custom-build.ccincludedirs" value="@{OptionSetGetValue('${build.buildtype}', 'cc.includedirs')} ${build.includedirs.all}"/>
+
+    <include file="${custom-build.includefile}" />
+    <call target="${custom-build.target}" force="true"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="build-custom-all" description="Custom build all the configurations" hidden="true">
+    <property name="eaconfig.buildall.target" value="build-custom" />
+    <property name="eaconfig.build.group" value="runtime" />
+    <call target="eaconfig-buildall-caller" force="true" />
+  </target>
+
+</project>

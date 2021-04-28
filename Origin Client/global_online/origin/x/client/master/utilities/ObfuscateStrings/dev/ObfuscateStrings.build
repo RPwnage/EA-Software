@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="ObfuscateStrings" default="build">
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.ObfuscateStrings.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.ObfuscateStrings.version"  value="dev"/>
+    <package name="ObfuscateStrings" targetversion="${package.ObfuscateStrings.version}"/>
+    
+    <property name="eaconfig.rtti" value="on" />
+    <property name="dirtysdk-samples" value="false" />
+    
+    <!-- ******************* -->
+    <!-- Package dependencies -->
+    <!-- ******************* -->
+    <dependent name="OriginConfig" />
+    
+    <!-- ******************* -->
+    <!-- Build Configuration -->
+    <!-- ******************* -->
+    
+    <BuildType name="ObfuscateStrings.buildtype" from="WindowsProgram" if="${config-system} == 'pc'">
+        <option name="warningsaserrors" value="off" />
+        <option name="pcconsole" value="on" />
+    </BuildType>
+    
+    <BuildType name="ObfuscateStrings.buildtype" from="OriginProgram" if="${config-system} == 'osx'">
+        <option name="warningsaserrors" value="off" />
+	<option name="language" value="on" />
+	<option name="buildset.cc.options">
+	    ${option.value}
+	    -std=c++11
+	    -stdlib=libc++
+	</option>
+    </BuildType>
+    
+    <property name="runtime.ObfuscateStrings.buildtype" value="${package.name}.buildtype"/>
+    <property name="runtime.buildmodules" value="ObfuscateStrings" />
+    <property name="runtime.ObfuscateStrings.outputname" value="ObfuscateStrings"/>
+    <property name="runtime.ObfuscateStrings.outputdir" value="${package.ObfuscateStrings.dir}/Debug"/>
+    <property name="runtime.ObfuscateStrings.outputdir" value="${package.ObfuscateStrings.dir}/Release" if="${config-type} == 'opt'"/>
+    <property name="runtime.ObfuscateStrings.osx-extra-link-options" value="-stdlib=libc++"/>
+    <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+    <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+    
+    <property name="runtime.ObfuscateStrings.builddependencies">
+        coreallocator
+        EABase
+        EAIO
+        EAStdC
+        EASTL
+    </property>
+    
+    <fileset name="runtime.ObfuscateStrings.libs">
+    </fileset>
+    
+    <fileset name="runtime.ObfuscateStrings.sourcefiles">
+        <includes name="${package.ObfuscateStrings.dir}/*.cpp" />
+    </fileset> 
+    
+    <fileset name="runtime.ObfuscateStrings.headerfiles">
+        <includes name="${package.ObfuscateStrings.dir}/*.h" />
+    </fileset>
+
+    <property name="runtime.ObfuscateStrings.includedirs">
+        ${package.ObfuscateStrings.dir}
+    </property>
+
+    <fileset name="runtime.ObfuscateStrings.resourcefiles">
+    </fileset>
+    
+    <property name="runtime.ObfuscateStrings.defines">
+        ${property.value}
+        UNICODE
+        _UNICODE
+    </property>
+    
+    <!-- ************************** -->
+    <!-- postbuild property targets -->
+    <!-- ************************** -->
+    
+    <property name="postbuild.target.list">
+        copy-to-runtime
+    </property>
+    
+    <target name="post-build-tasks">
+        <foreach property="runtarget" item="String" in="${postbuild.target.list}">
+            <echo message="Post Build Task: ${runtarget}" />
+            <call target="${runtarget}" />
+        </foreach>
+    </target>
+    
+    <!-- NANT postbuild target. Will execute this after compiling happens. -->
+    <property name="runtime.ObfuscateStrings.postbuildtarget" value="post-build-tasks" />
+    
+    <!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+    <property name="runtime.ObfuscateStrings.vcproj.post-build-step">
+        ${nant.location}/nant.exe -buildfile:${nant.project.buildfile} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.ObfuscateStrings.postbuildtarget}
+    </property>
+
+    <target name="copy-to-runtime">
+        <do if="${config-system} == 'osx'">
+            <copy file="${package.ObfuscateStrings.dir}/build/XCodeOSX/build/${config-xcode-type}/ObfuscateStrings.app/Contents/MacOS/ObfuscateStrings" tofile="${package.ObfuscateStrings.dir}/${config-xcode-type}/ObfuscateStrings" />
+        </do>
+    </target>
+</project>

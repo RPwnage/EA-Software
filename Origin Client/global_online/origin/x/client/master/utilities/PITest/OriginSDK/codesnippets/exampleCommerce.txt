@@ -1,0 +1,64 @@
+// Example urls. These are the URLs for the online purchase site and for purchase success and failure.
+const OriginCharT * LOCKBOX_URL	= "https://159.153.216.103/lockbox-ui/checkout";
+const OriginCharT * SUCCESS_URL	= "http://www.google.com";
+const OriginCharT * FAILED_URL	= "http://www.cnn.com";
+void exampleCommerce()
+{
+	// Select the store. This example uses the example store and catalog IDs.
+	uint64_t storeId = 10757;
+	uint64_t catalogId = 12099;
+
+	OriginErrorT err = OriginSelectStore(storeId, catalogId, LOCKBOX_URL, SUCCESS_URL, FAILED_URL);
+
+	if (err == ORIGIN_SUCCESS)
+	{
+		// Get the categories.
+		uint32_t categoriesTotal;
+		OriginHandleT categoryHandle;
+
+		OriginErrorT err = OriginQueryCategoriesSync(OriginGetDefaultUser(), NULL, 0, &categoriesTotal, 10000, &categoryHandle);
+
+		if (err == ORIGIN_SUCCESS)
+		{
+			uint32_t categoriesRead = 0;
+			OriginCategoryT *pCategories = new OriginCategoryT[categoriesTotal];
+
+			err = OriginReadEnumerationSync(categoryHandle, pCategories, categoriesTotal*sizeof(OriginCategoryT), 0, categoriesTotal, &categoriesRead);
+
+			if (err == ORIGIN_SUCCESS && categoriesRead>0)
+			{
+				// Select a category.
+				const char *pCategory = pCategories[0].CategoryId;
+
+				uint32_t offersTotal;
+				OriginHandleT offersHandle;
+
+				// Find product offers for this category.
+				OriginErrorT err = OriginQueryOffersSync(OriginGetDefaultUser(), &pCategory, 1, NULL, 0, &offersTotal, 10000, &offersHandle);
+			
+				if(err == ORIGIN_SUCCESS)
+				{
+					OriginOfferT *pOffers = new OriginOfferT[offersTotal];
+					uint32_t offersRead = 0;
+
+					err = OriginReadEnumerationSync(offersHandle, pOffers, sizeof(OriginOfferT) * offersTotal, 0, offersTotal, &offersRead);
+
+					if(err == ORIGIN_SUCCESS && offersRead>0)
+					{
+						// Select a product.
+						const char *pProductId = pOffers[0].OfferId;
+
+						// Purchase the selected product via the web UI.
+						// Once the product is purchased the user can consume their entitlements.
+						// See exampleCommerceConsumeEntitlements below.
+						OriginShowCheckoutUI(OriginGetDefaultUser(), &pProductId, 1);
+					}
+					delete[] pOffers;
+				}
+				OriginDestroyHandle(offersHandle);
+			}
+			delete[] pCategories;
+		}
+		OriginDestroyHandle(categoryHandle);
+	}
+}

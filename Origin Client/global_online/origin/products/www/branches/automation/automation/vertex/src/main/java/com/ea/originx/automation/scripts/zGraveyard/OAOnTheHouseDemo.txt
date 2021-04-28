@@ -1,0 +1,82 @@
+package com.ea.originx.automation.scripts.freegames;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.InfoBubble;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.CheckoutConfirmation;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.store.DemosAndBetasPage;
+import com.ea.originx.automation.lib.pageobjects.store.DemoTile;
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHousePage;
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHouseTile;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test adding 'OTH' and 'Demo' entitlements to the 'Game Library'.
+ *
+ * @author nvarthakavi
+ */
+public class OAOnTheHouseDemo extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 1016689)
+    @Test(groups = {"freegames", "release_smoke"})
+    public void testOnTheHouseDemo(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        logFlowPoint("Login as a newly registered user."); // 1
+        logFlowPoint("Navigate to the 'OTH' page and hover over a game tile's 'Get It Now' CTA and verify the info bubble appears and click the CTA."); // 2
+        logFlowPoint("Navigate to the 'Demos and Beta' page and hover over a game tile's 'Get It Now' CTA and verify the info bubble appears and click the CTA."); // 3
+        logFlowPoint("Navigate to the 'Game Library' and verify the 'OTH', and 'Demos & Beta' tiles are in 'Game Library'."); // 4
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+
+        // 2
+        OnTheHousePage onTheHousePage = new NavigationSidebar(driver).gotoOnHousePage();
+        OnTheHouseTile onTheHouseTile = onTheHousePage.getAllOnTheHouseTiles().get(0); // get the first tile in the list
+        String othOfferId = onTheHouseTile.getOfferId(); // to verify the game is in the game library
+        Waits.pollingWait(onTheHouseTile::verifyGetItNowCTAVisible);
+        onTheHouseTile.hoverOnGetItNowButton();
+        InfoBubble infoBubble = new InfoBubble(driver);
+        boolean isInfoBubbleVisibleOTH = Waits.pollingWait(infoBubble::isInfoBubbleVisible);
+        onTheHouseTile.clickGetItNowButton();
+        CheckoutConfirmation checkoutConfirmationOTH = new CheckoutConfirmation(driver);
+        checkoutConfirmationOTH.waitForVisible();
+        checkoutConfirmationOTH.clickCloseCircle();
+        logPassFail(isInfoBubbleVisibleOTH, false);
+
+        // 3
+        DemosAndBetasPage demosAndBetasPage = new NavigationSidebar(driver).gotoDemosBetasPage();
+        demosAndBetasPage.waitForDemoTilesToLoad(); // The Demo Tiles take time to load
+        DemoTile demoTile = demosAndBetasPage.getAllDemoAndBetaTiles().get(0); //get the first tile in the list
+        String demoOfferId = demoTile.getOfferId(); // to verify the game is in the game library
+        demoTile.hoverOnGetItNowButton();
+        boolean isInfoBubbleVisibleDemo = Waits.pollingWait(infoBubble::isInfoBubbleVisible);
+        demoTile.clickGetItNowButton();
+        CheckoutConfirmation checkoutConfirmationDemo = new CheckoutConfirmation(driver);
+        checkoutConfirmationDemo.waitForVisible();
+        checkoutConfirmationDemo.clickCloseCircle();
+        logPassFail(isInfoBubbleVisibleDemo, false);
+
+        // 4
+        new NavigationSidebar(driver).gotoGameLibrary();
+        GameLibrary gameLibrary = new GameLibrary(driver);
+        boolean isAllInGameLibrary = gameLibrary.verifyGameLibraryHasExpectedGames(othOfferId, demoOfferId);
+        logPassFail(isAllInGameLibrary, true);
+
+        softAssertAll();
+    }
+}

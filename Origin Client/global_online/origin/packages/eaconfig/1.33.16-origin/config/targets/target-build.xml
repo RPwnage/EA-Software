@@ -1,0 +1,1178 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <property name="eaconfig.runtime.groupname" value="runtime" />
+  <property name="eaconfig.runtime.outputfolder" value="" />
+  <property name="eaconfig.runtime.sourcedir" value="source" />
+  <property name="eaconfig.runtime.usepackagelibs" value="false" />
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    Target which pulls all the module-specific settings into build.____
+    style properties.
+    
+    TODO:  Work out whether we really need this or not.
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="__private_set_up_variables" hidden="true" >
+
+    <PrivateSetupVariables groupname="${groupname}" buildmodule="${build.module}"/>
+
+  </target>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-build-caller" hidden="true" >
+
+    <EaconfigBuildCaller build-target-name="${eaconfig.build.target}"/>
+
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-buildall-caller" hidden="true" >
+
+    <call target="eaconfig-construct-persistent-properties"/>
+
+    <foreach item="String" in="${package.configs}" property="build-config-name">
+      <nant buildfile="${package.dir}/${package.name}.build" target="${eaconfig.buildall.target}" optionset="package-eaconfig-persistent-properties">
+        <property name="config" value="${build-config-name}"/>
+        <property name="package.configs" value="${package.configs}"/>
+      </nant>
+    </foreach>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build')}' == 'exclude'">
+    <target name="build" description="Build the specific configuration">
+      <property name="eaconfig.build.target" value="eaconfig-build" />
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="eaconfig-build-caller" force="true" />
+    </target>
+  </do>
+  
+  <target name="eaconfig-buildcsc" hidden="true" >
+    <do if="@{FileSetCount('build.sourcefiles.all')} > 0" >
+      <property name="cscTarget" value="@{OptionSetGetValue('${build.buildtype}', 'csc.target')}"/>
+      <property name="build.suffix" value="${exe-suffix}"/>
+      <property name="build.suffix" value=".dll" if="${cscTarget} == library"/>
+      <property name="build.debug" value="false"/>
+      <property name="build.debug" value="true" if="@{OptionSetGetValue('${build.buildtype}', 'debugflags')} == on"/>
+      <property name="build.debug" value="true" if="@{OptionSetGetValue('${build.buildtype}', 'debugflags')} == custom"/>
+      <property name="build.optimize" value="false"/>
+      <property name="build.optimize" value="true" if="@{OptionSetGetValue('${build.buildtype}', 'optimization')} == on"/>
+      <property name="build.optimize" value="true" if="@{OptionSetGetValue('${build.buildtype}', 'optimization')} == custom"/>
+
+
+      <!-- <csc> expects defines separated by semi-columns, but ${build.defines.all} provides ones with newlines and tabs -->
+      <property name="cscDefinesAll"/>
+      <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+        <property name="cscDefinesAll" value="EA_DOTNET2"/>
+      </do>
+
+      <foreach item="String" in="${build.defines.all}" property="cscDefine">
+        <property name="cscDefinesAll" value="${cscDefine} ${property.value}"/>
+      </foreach>
+      <property name="cscDefinesAll" value="@{StrReplace(@{StrTrim(${property.value})}, ' ', ';')}"/>
+
+      <property name="__private_output_filename" value="${package.configbindir}${eaconfig.${eaconfig.build.group}.outputfolder}\${build.outputname}${build.suffix}"/>
+
+      <do if="@{OptionSetOptionExists('${build.buildtype}', 'linkoutputname')}">
+        <property name="__private_output_filename" value="@{OptionSetGetValue('${build.buildtype}', 'linkoutputname')}"/>
+        <property name="__private_output_filename" value="@{StrReplace('${__private_output_filename}', '%outputdir%', '${package.configbindir}${eaconfig.${eaconfig.build.group}.outputfolder}')}"/>
+        <property name="__private_output_filename" value="@{StrReplace('${__private_output_filename}', '%outputname%', '${build.outputname}')}"/>
+      </do>
+
+      <do if="@{PropertyExists('${groupname}.outputdir')}">
+        <property name="__private_output_filename" value="${${groupname}.outputdir}\${build.outputname}${build.suffix}"/>
+      </do>
+
+      <mkdir dir="@{PathGetDirectoryName('${__private_output_filename}')}" />
+
+      <!-- Store the assembly for this module, so we know the filename if another module has a module-dep on this one later. -->
+      <fileset name="__private_${eaconfig.build.group}.${build.module}.assembly">
+        <includes name="${__private_output_filename}"/>
+      </fileset>
+
+      <!-- Copy over the external assemblies if specified. -->
+      <do if="'${${groupname}.copylocal}' == 'true'">
+        <do if="@{FileSetExists('${groupname}.assemblies')}">
+          <foreach item="FileSet" in="${groupname}.assemblies" property="filename">
+            <do if="@{FileExists('${filename}')}">
+              <property name="__private_outputfolder" value="@{PathGetDirectoryName('${__private_output_filename}')}"/>
+              <property name="__private_file_name_only" value="@{PathGetFileName('${filename}')}"/>
+              <copy file="${filename}" tofile="${__private_outputfolder}\${__private_file_name_only}"/>
+            </do>
+          </foreach>
+        </do>
+      </do>
+
+      <choose>
+        <!-- If there is a list of warnings, we'll need to supply a different commmandline -->
+        <do if="@{PropertyExists('${groupname}.warningsaserrors.list')}" >
+          <!-- Make sure its not empty -->
+          <do unless="@{StrIsEmpty('${${groupname}.warningsaserrors.list}')}" >
+            <!-- We also need to make sure that we have a comma separated list of warnings -->
+            <task name="CommaSeparateList" MixedList="${${groupname}.warningsaserrors.list}" Result="__private_warnaserrors.list" />
+            <!-- need to remove the leading comma -->
+            <property name="build.args" value="${property.value} /warnaserror+:${__private_warnaserrors.list}" />
+          </do>
+        </do>
+        <!-- If the list is not defined, we need to see if warningsaserrors is defined -->
+        <do>
+          <do if="@{PropertyExists('${groupname}.warningsaserrors')}" >
+            <property name="build.args" value="${property.value} /warnaserror" if="${${groupname}.warningsaserrors}" />
+          </do>
+        </do>
+      </choose>
+
+      <do if="@{PropertyExists('${groupname}.suppresswarnings')}" >
+        <do unless="@{StrIsEmpty('${${groupname}.suppresswarnings}')}" >
+          <task name="CommaSeparateList" MixedList="${${groupname}.suppresswarnings}" Result="__private_nowarn.list" />
+          <property name="build.args" value="${property.value} /nowarn:${__private_nowarn.list}" />
+        </do>
+      </do>
+
+      <do if="@{PropertyExists('package.eaconfig.isusingvc9')}">
+        <!-- Supress Assembly generation - Referenced assembly 'System.Data.dll' targets a different processor -->
+        <property name="build.args" value="${property.value} /nowarn:1607" />
+      </do>
+
+      <do if="@{PropertyExists('${groupname}.allowunsafe')}">
+        <property name="build.args" value="${property.value} /unsafe" if="${${groupname}.allowunsafe}"/>
+      </do>
+
+      <do if="@{PropertyExists('${groupname}.keyfile')}">
+        <property name="keyfilename" value="@{StrTrim('${${groupname}.keyfile}')}"/>
+        <property name="build.args" value="${property.value} /keyfile:${keyfilename}" unless="@{StrIsEmpty('${keyfilename}')}"/>
+      </do>
+
+      <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+        <property name="cscPlatform" value="anycpu"/>
+        <do if="'${cscTarget}'=='exe' or '${cscTarget}'=='winexe'">
+          <choose>
+            <do if="@{PropertyExists('${groupname}.platform')}">
+              <property name="cscPlatform" value="${${groupname}.platform}"/>
+            </do>
+            <do if="'${config-system}'=='pc64'">
+              <property name="cscPlatform" value="x64"/>
+            </do>
+            <do if="'${config-system}'=='pc'">
+              <property name="cscPlatform" value="x86"/>
+            </do>
+          </choose>
+        </do>
+        <property name="build.args" value="${property.value} /platform:${cscPlatform}" unless="@{StrIsEmpty('${cscPlatform}')}"/>
+      </do>
+
+      <property name="build.args" value="${property.value} /optimize" if="${build.debug} and ${build.optimize}"/>
+
+      <!-- Dot Net frameworks version 3.0 and higher have executables in a different directory-->
+      <property name="__dotnet_bin_folder" value="${package.DotNet.appdir}"/>
+      <property name="__dotnet_bin_folder" value="${package.DotNet.bindir}" if="@{PropertyExists('package.DotNet.bindir')}" />
+
+      <fileset name="__private_build_assemblies_all" fromfileset="build.assemblies.all"/>
+      <do if="@{PropertyExists('${groupname}.copylocal')}">
+        <!-- The external assemblies has been removed from the build.assemblies.all fileset if copylocal is slim! 
+               So we need to add this back in to a private list and do a nant build from this private list.
+          -->
+        <do if="'${${groupname}.copylocal}' == 'slim'">
+          <fileset name="__private_build_assemblies_all" append="true" fromfileset="build.assemblies" if="@{FileSetExists('build.assemblies')}"/>
+        </do>
+      </do>
+      <choose>
+        <do if="@{PropertyExists('${groupname}.csc-doc')}">
+          <!-- Make sure the build.doc direcotry exists-->
+          <mkdir dir="@{PathGetDirectoryName('${build.doc}')}" />
+
+          <csc
+            doc="${build.doc}"
+            output="${__private_output_filename}"
+            target="${cscTarget}"
+            debug="${build.debug}"
+            define="${cscDefinesAll}"
+            win32icon="${build.win32icon}"
+            compiler="${__dotnet_bin_folder}\csc.exe"
+            resgen="${package.DotNetSDK.appdir}\bin\resgen.exe"
+            >
+            <references>
+              <includes fromfileset="__private_build_assemblies_all"/>
+            </references>
+            <!-- Because this file is in eaconfig's folder, resources.basedir will be set to path to that folder.
+            So we need to set it to correct value, or embedded resources will have full path instead of relative one.
+            This is also because fileset doesn't expose its basedir as a property.
+            -->
+            <resources prefix="${build.resourcefiles.prefix}" basedir="${build.resourcefiles.basedir}">
+              <includes fromfileset="build.resourcefiles.all"/>
+            </resources>
+            <modules>
+              <includes fromfileset="build.modules.all"/>
+            </modules>
+            <sources basedir="@{FileSetGetBaseDir('build.sourcefiles.all')}">
+              <includes fromfileset="build.sourcefiles.all"/>
+            </sources>
+            <arg value="${build.args}"/>
+          </csc>
+        </do>
+        <do>
+          <csc
+            output="${__private_output_filename}"
+            target="${cscTarget}"
+            debug="${build.debug}"
+            define="${cscDefinesAll}"
+            win32icon="${build.win32icon}"
+            compiler="${__dotnet_bin_folder}\csc.exe"
+            resgen="${package.DotNetSDK.appdir}\bin\resgen.exe"
+            >
+            <references>
+              <includes fromfileset="__private_build_assemblies_all"/>
+            </references>
+            <!-- Because this file is in eaconfig's folder, resources.basedir will be set to path to that folder.
+            So we need to set it to correct value, or embedded resources will have full path instead of relative one.
+            This is also because fileset doesn't expose its basedir as a property.
+            -->
+            <resources prefix="${build.resourcefiles.prefix}" basedir="${build.resourcefiles.basedir}">
+              <includes fromfileset="build.resourcefiles.all"/>
+            </resources>
+            <modules>
+              <includes fromfileset="build.modules.all"/>
+            </modules>
+            <sources basedir="@{FileSetGetBaseDir('build.sourcefiles.all')}">
+              <includes fromfileset="build.sourcefiles.all"/>
+            </sources>
+            <arg value="${build.args}"/>
+          </csc>
+        </do>
+      </choose>
+    </do>
+  </target>
+
+    <target name="eaconfig-buildfsc" hidden="true" >
+
+        <do if="@{FileSetCount('build.sourcefiles.all')} > 0" >
+            <property name="fscTarget" value="@{OptionSetGetValue('${build.buildtype}', 'fsc.target')}"/>
+            <property name="build.suffix" value="${exe-suffix}"/>
+            <property name="build.suffix" value=".dll" if="${fscTarget} == library"/>
+            <property name="build.debug" value="false"/>
+            <property name="build.debug" value="true" if="@{OptionSetGetValue('${build.buildtype}', 'debugflags')} == on"/>
+            <property name="build.debug" value="true" if="@{OptionSetGetValue('${build.buildtype}', 'debugflags')} == custom"/>
+            <property name="build.optimize" value="false"/>
+            <property name="build.optimize" value="true" if="@{OptionSetGetValue('${build.buildtype}', 'optimization')} == on"/>
+            <property name="build.optimize" value="true" if="@{OptionSetGetValue('${build.buildtype}', 'optimization')} == custom"/>
+
+            <!-- <fsc> expects defines separated by semi-columns, but ${build.defines.all} provides ones with newlines and tabs -->
+            <property name="fscDefinesAll"/>
+            <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+                <property name="fscDefinesAll" value="EA_DOTNET2"/>
+            </do>
+
+            <foreach item="String" in="${build.defines.all}" property="fscDefine">
+                <property name="fscDefinesAll" value="${fscDefine} ${property.value}"/>
+            </foreach>
+            <property name="fscDefinesAll" value="@{StrReplace(@{StrTrim(${property.value})}, ' ', ';')}"/>
+
+            <property name="__private_output_filename" value="${package.configbindir}${eaconfig.${eaconfig.build.group}.outputfolder}\${build.outputname}${build.suffix}"/>
+
+            <do if="@{OptionSetOptionExists('${build.buildtype}', 'linkoutputname')}">
+                <property name="__private_output_filename" value="@{OptionSetGetValue('${build.buildtype}', 'linkoutputname')}"/>
+                <property name="__private_output_filename" value="@{StrReplace('${__private_output_filename}', '%outputdir%', '${package.configbindir}${eaconfig.${eaconfig.build.group}.outputfolder}')}"/>
+                <property name="__private_output_filename" value="@{StrReplace('${__private_output_filename}', '%outputname%', '${build.outputname}')}"/>
+            </do>
+
+            <do if="@{PropertyExists('${groupname}.outputdir')}">
+                <property name="__private_output_filename" value="${${groupname}.outputdir}\${build.outputname}${build.suffix}"/>
+            </do>
+
+            <mkdir dir="@{PathGetDirectoryName('${__private_output_filename}')}" />
+
+            <!-- Store the assembly for this module, so we know the filename if another module has a module-dep on this one later. -->
+            <fileset name="__private_${eaconfig.build.group}.${build.module}.assembly">
+                <includes name="${__private_output_filename}"/>
+            </fileset>
+
+            <do if="'${${groupname}.copylocal}' == 'true'">
+                <do if="@{FileSetExists('${groupname}.assemblies')}">
+                    <foreach item="FileSet" in="${groupname}.assemblies" property="filename">
+                        <do if="@{FileExists('${filename}')}">
+                            <property name="__private_outputfolder" value="@{PathGetDirectoryName('${__private_output_filename}')}"/>
+                            <property name="__private_file_name_only" value="@{PathGetFileName('${filename}')}"/>
+                            <copy file="${filename}" tofile="${__private_outputfolder}\${__private_file_name_only}"/>
+                        </do>
+                    </foreach>
+                </do>
+            </do>
+
+            <choose>
+                <!-- If there is a list of warnings, we'll need to supply a different commmandline -->
+                <do if="@{PropertyExists('${groupname}.warningsaserrors.list')}" >
+                    <!-- Make sure its not empty -->
+                    <do unless="@{StrIsEmpty('${${groupname}.warningsaserrors.list}')}" >
+                        <!-- We also need to make sure that we have a comma separated list of warnings -->
+                        <task name="CommaSeparateList" MixedList="${${groupname}.warningsaserrors.list}" Result="__private_warnaserrors.list" />
+                        <!-- need to remove the leading comma -->
+                        <property name="build.args" value="${property.value} /warnaserror+:${__private_warnaserrors.list}" />
+                    </do>
+                </do>
+                <!-- If the list is not defined, we need to see if warningsaserrors is defined -->
+                <do>
+                    <do if="@{PropertyExists('${groupname}.warningsaserrors')}" >
+                        <property name="build.args" value="${property.value} /warnaserror" if="${${groupname}.warningsaserrors}" />
+                    </do>
+                </do>
+            </choose>
+
+            <do if="@{PropertyExists('${groupname}.suppresswarnings')}" >
+                <do unless="@{StrIsEmpty('${${groupname}.suppresswarnings}')}" >
+                    <task name="CommaSeparateList" MixedList="${${groupname}.suppresswarnings}" Result="__private_nowarn.list" />
+                    <property name="build.args" value="${property.value} /nowarn:${__private_nowarn.list}" />
+                </do>
+            </do>
+
+            <do if="@{PropertyExists('${groupname}.allowunsafe')}">
+                <property name="build.args" value="${property.value} /unsafe" if="${${groupname}.allowunsafe}"/>
+            </do>
+
+            <do if="@{PropertyExists('${groupname}.keyfile')}">
+                <property name="keyfilename" value="@{StrTrim('${${groupname}.keyfile}')}"/>
+                <property name="build.args" value="${property.value} /keyfile:${keyfilename}" unless="@{StrIsEmpty('${keyfilename}')}"/>
+            </do>
+
+            <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+                <property name="fscPlatform" value="anycpu"/>
+                <do if="'${fscTarget}'=='exe' or '${fscTarget}'=='winexe'">
+                    <choose>
+                        <do if="@{PropertyExists('${groupname}.platform')}">
+                            <property name="fscPlatform" value="${${groupname}.platform}"/>
+                        </do>
+                        <do if="'${config-system}'=='pc64'">
+                            <property name="fscPlatform" value="x64"/>
+                        </do>
+                        <do if="'${config-system}'=='pc'">
+                            <property name="fscPlatform" value="x86"/>
+                        </do>
+                    </choose>
+                </do>
+                <property name="build.args" value="${property.value} /platform:${fscPlatform}" unless="@{StrIsEmpty('${fscPlatform}')}"/>
+            </do>
+
+            <property name="build.args" value="${property.value} /optimize" if="${build.debug} and ${build.optimize}"/>
+
+            <!-- Dot Net frameworks version 3.0 and higher have executables in a different directory-->
+            <property name="__dotnet_bin_folder" value="${package.DotNet.appdir}"/>
+            <property name="__dotnet_bin_folder" value="${package.DotNet.bindir}" if="@{PropertyExists('package.DotNet.bindir')}" />
+            <property name="__fsharp_bin_folder" value="${package.FSharp.appdir}"/>
+
+            <choose>
+                <do if="@{PropertyExists('${groupname}.fsc-doc')}">
+                    <!-- Make sure the build.doc direcotry exists-->
+                    <mkdir dir="@{PathGetDirectoryName('${build.doc}')}" />
+
+                    <fsc
+                                  doc="${build.doc}"
+                                  output="${__private_output_filename}"
+                                  target="${fscTarget}"
+                                  debug="${build.debug}"
+                                  define="${fscDefinesAll}"
+                                  win32icon="${build.win32icon}"
+                                  compiler="${__fsharp_bin_folder}\fsc.exe"
+                                  resgen="${package.DotNetSDK.appdir}\bin\resgen.exe"
+						>
+                        <references>
+                            <includes fromfileset="build.assemblies.all"/>
+                        </references>
+                        <!-- Because this file is in eaconfig's folder, resources.basedir will be set to path to that folder.
+						So we need to set it to correct value, or embedded resources will have full path instead of relative one.
+						This is also because fileset doesn't expose its basedir as a property.
+						-->
+                        <resources prefix="${build.resourcefiles.prefix}" basedir="${build.resourcefiles.basedir}">
+                            <includes fromfileset="build.resourcefiles.all"/>
+                        </resources>
+                        <modules>
+                            <includes fromfileset="build.modules.all"/>
+                        </modules>
+                        <sources basedir="@{FileSetGetBaseDir('build.sourcefiles.all')}">
+                            <includes fromfileset="build.sourcefiles.all"/>
+                        </sources>
+                        <arg value="${build.args}"/>
+                    </fsc>
+                </do>
+                <do>
+                    <fsc
+                                  output="${__private_output_filename}"
+                                  target="${fscTarget}"
+                                  debug="${build.debug}"
+                                  define="${fscDefinesAll}"
+                                  win32icon="${build.win32icon}"
+                                  compiler="${__fsharp_bin_folder}\fsc.exe"
+                                  resgen="${package.DotNetSDK.appdir}\bin\resgen.exe"
+						>
+                        <references>
+                            <includes fromfileset="build.assemblies.all"/>
+                        </references>
+                        <!-- Because this file is in eaconfig's folder, resources.basedir will be set to path to that folder.
+						So we need to set it to correct value, or embedded resources will have full path instead of relative one.
+						This is also because fileset doesn't expose its basedir as a property.
+						-->
+                        <resources prefix="${build.resourcefiles.prefix}" basedir="${build.resourcefiles.basedir}">
+                            <includes fromfileset="build.resourcefiles.all"/>
+                        </resources>
+                        <modules>
+                            <includes fromfileset="build.modules.all"/>
+                        </modules>
+                        <sources basedir="@{FileSetGetBaseDir('build.sourcefiles.all')}">
+                            <includes fromfileset="build.sourcefiles.all"/>
+                        </sources>
+                        <arg value="${build.args}"/>
+                    </fsc>
+                </do>
+            </choose>
+        </do>
+    </target>  
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'eaconfig-build')}' == 'exclude'">
+  <target name="eaconfig-build" hidden="true" >
+
+    <do if="@{FileSetExists('${groupname}.resourcefiles')}">
+      <property name="build-res-done" value="false"/>
+    </do>
+
+    <EaconfigBuild groupname="${groupname}" buildmodule="${build.module}" />
+  </target>
+  </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <target name="eaconfig-buildmakestyle" hidden="true">
+        <!-- This target just execute the batch command listed in the property -->
+        <do if="@{PropertyExists('${groupname}.MakeBuildCommand')}">
+            <property name="temp-batch" value="@{PathGetTempFileName()}.bat" />
+            <mkdir dir="${package.builddir}" unless="@{DirectoryExists('${package.builddir}')}"/>
+            <choose>
+                <do if="@{PlatformIsWindows()}">
+                    <echo file="${temp-batch}" append="false" >
+                        @echo off
+                        ${${groupname}.MakeBuildCommand}
+                    </echo>
+                    <exec program="${temp-batch}" workingdir="${package.builddir}" message="Executing MakeStyle build command"/>
+                    <!-- Didn't bother to delete the temp file because sometimes, Windows seems to hold onto the file make causes build error during the delete!" -->
+                </do>
+                <do>
+                    <property name="UnixMakeBuildCommand" value="@{StrReplace('${${groupname}.MakeBuildCommand}', '\r\n', '\n')}"/>
+                    
+                    <!-- 
+                    Don't try combining these into one echo statement with newlines.
+                    The resulting shell file will have invalid newlines which will catch it to fail
+                    -->
+                    <echo file="${temp-batch}" append="false" message="#!/bin/bash" />
+                    <echo file="${temp-batch}" append="true" message="${UnixMakeBuildCommand}" />
+
+                    <exec program="chmod" message="Modifying permissions">
+                        <args>
+                            <arg value="777"/>
+                            <arg value="${temp-batch}"/>
+                        </args>
+                    </exec>
+                    <exec program="bash" workingdir="${package.builddir}" message="Executing MakeStyle build command">
+                        <args>
+                            <arg value="${temp-batch}"/>
+                        </args>
+                    </exec>
+                </do>
+            </choose>
+        </do>
+        <do unless="@{PropertyExists('${groupname}.MakeBuildCommand')}">
+            <echo message="WARNING: Property ${groupname}.MakeBuildCommand was not defined.  Unable to execute this MakeStyle module."/>
+        </do>
+    </target>
+
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-buildcpp" hidden="true">
+    <do if="@{FileSetExists('${groupname}.resourcefiles')}">
+      <do unless="${build-res-done}">
+        <!--For unmanaged modules, build the resource files using rc.exe-->
+        <do if="@{StrIndexOf(${build.buildtype.base}, 'Managed')} == -1 and @{StrIndexOf(${build.buildtype.base}, 'CSharp')} == -1">
+          <do if="@{FileSetCount('build.resourcefiles.all')} > 0">
+            <call target="__private_build_unmanaged_resources"/>
+          </do>
+          <fileset name="build.resourcefiles.all" />
+          <!-- empty the resourcefiles fileset because it will be not used-->
+        </do>
+        <eval code="@{PropertyUndefine('build-res-done')}" type='Function'/>
+      </do>
+
+      <!--For managed modules, compile the .resX files to .resources files-->
+      <do if="@{StrIndexOf('${build.buildtype.base}', 'Managed')} != -1">
+        <do if="@{FileSetCount('build.resourcefiles')} > 0">
+          <property name="is-building-managed-resource" value="true"/>
+          <call target="__private_build_unmanaged_resources"/>
+          <eval code="@{PropertyUndefine('is-building-managed-resource')}" type='Function'/>
+          <eval code="@{PropertyUndefine('build-res-done')}" type='Function'/>
+          <call target="__private_build_managed_resources"/>
+        </do>
+      </do>
+    </do>
+
+    <!-- Add in all the builddependencies libs.  -->
+    <do if="${build.buildtype.base} != 'StdLibrary'">
+      <foreach property="dependent" item="String" in="${build.builddependencies.all}">
+        
+        <choose>
+          <!-- Respect moduleconstraints when retrieving dependent libraties -->
+          <do if="@{PropertyExists('${groupname}.${dependent}.${eaconfig.build.group}.buildmodules')}">
+            <!-- Check if package exports libraries on a per-module basis, otherwise switch to package libs -->
+            <property name="__${dependent}_per_module_libs" value="false"/>
+            <foreach item="String" in="${${groupname}.${dependent}.${eaconfig.build.group}.buildmodules}" property="__dependent_module">
+              <do if="@{FileSetExists('package.${dependent}.${__dependent_module}.libs${subsystem}')}">
+                <fileset name="build.libs.all" append="true" fromfileset="package.${dependent}.${__dependent_module}.libs${subsystem}"/>
+                <property name="__${dependent}_per_module_libs" value="true"/>
+              </do>
+            </foreach>
+            <!-- If dependent package does not export per-module libs, add package libs -->
+            <do unless="${__${dependent}_per_module_libs}">
+              <do if="@{FileSetExists('package.${dependent}.libs${subsystem}')}">
+                <fileset name="build.libs.all" append="true" fromfileset="package.${dependent}.libs${subsystem}"/>
+              </do>
+            </do>
+            <!-- done with libs -->
+            <!-- Check if package exports dlls on a per-module basis, otherwise switch to package dlls -->
+            <property name="__${dependent}_per_module_libs" value="false"/>
+            <foreach item="String" in="${${groupname}.${dependent}.${eaconfig.build.group}.buildmodules}" property="__dependent_module">
+              <do if="@{FileSetExists('package.${dependent}.${__dependent_module}.dlls${subsystem}')}">
+                <fileset name="build.dlls.all" append="true" fromfileset="package.${dependent}.${__dependent_module}.dlls${subsystem}"/>
+                <property name="__${dependent}_per_module_libs" value="true"/>
+              </do>
+            </foreach>
+            <!-- If dependent package does not export per-module libs, add package libs -->
+            <do unless="${__${dependent}_per_module_libs}">
+              <do if="@{FileSetExists('package.${dependent}.dlls${subsystem}')}">
+                <fileset name="build.dlls.all" append="true" fromfileset="package.${dependent}.dlls${subsystem}"/>
+              </do>
+            </do>
+            <!-- done with dlls -->
+            <eval code="@{PropertyUndefine('__${dependent}_per_module_libs')}" type="Function"/>
+          </do>
+          <do>
+            <do if="@{FileSetExists('package.${dependent}.libs${subsystem}')}">
+              <fileset name="build.libs.all" append="true" fromfileset="package.${dependent}.libs${subsystem}"/>
+            </do>
+            <do if="@{FileSetExists('package.${dependent}.dlls${subsystem}')}">
+              <fileset name="build.dlls.all" append="true" fromfileset="package.${dependent}.dlls${subsystem}"/>
+            </do>
+          </do>
+        </choose>
+
+        <do if="@{FileSetExists('package.${dependent}.libs${subsystem}.external')}">
+          <fileset name="build.libs.all" append="true" fromfileset="package.${dependent}.libs${subsystem}.external"/>
+        </do>
+      </foreach>
+    </do>
+
+    <!-- Store the LIB for this module, so we know the filename if another module has a module-dep on this one later. -->
+    <do if="${build.buildtype.base} == 'StdLibrary' or ${build.buildtype.base} == 'DynamicLibrary'">
+      <choose>
+        <do if="@{PropertyExists('${groupname}.outputdir')}">
+          <choose>
+            <do if="${config-system} == 'ps3' and ${build.buildtype.base} == 'DynamicLibrary'">
+              <fileset name="__private_${eaconfig.build.group}.${build.module}.lib">
+                <includes name="${${groupname}.outputdir}\${build.outputname}_stub${lib-suffix}"/>
+              </fileset>
+            </do>
+            <do if="${config-system} == 'rev' and ${build.buildtype.base} == 'DynamicLibrary'">
+              <fileset name="__private_${eaconfig.build.group}.${build.module}.dll">
+                <includes name="${${groupname}.outputdir}\${build.outputname}.rso"/>
+              </fileset>
+            </do>
+
+            <do>
+              <fileset name="__private_${eaconfig.build.group}.${build.module}.lib">
+                <includes name="${${groupname}.outputdir}\${lib-prefix}${build.outputname}${lib-suffix}"/>
+              </fileset>
+            </do>
+          </choose>
+        </do>
+        <do>
+          <choose>
+            <do if="${config-system} == 'ps3' and ${build.buildtype.base} == 'DynamicLibrary'">
+              <fileset name="__private_${eaconfig.build.group}.${build.module}.lib">
+                <includes name="${package.configlibdir}\${eaconfig.${eaconfig.build.group}.outputfolder}\${build.outputname}_stub${lib-suffix}"/>
+              </fileset>
+            </do>
+            <do if="${config-system} == 'rev' and ${build.buildtype.base} == 'DynamicLibrary'">
+              <fileset name="__private_${eaconfig.build.group}.${build.module}.dll">
+                <includes name="${package.configbindir}\${eaconfig.${eaconfig.build.group}.outputfolder}\${build.outputname}.rso"/>
+              </fileset>
+            </do>
+            <do>
+              <fileset name="__private_${eaconfig.build.group}.${build.module}.lib">
+                <includes name="${package.configlibdir}\${eaconfig.${eaconfig.build.group}.outputfolder}\${lib-prefix}${build.outputname}${lib-suffix}"/>
+              </fileset>
+            </do>
+          </choose>
+        </do>
+      </choose>
+    </do>
+
+    <!-- Store the assembly for this module, so we know the filename if another module has a module-dep on this one later. -->
+    <do if="@{StrStartsWith('${build.buildtype.base}', 'ManagedCpp')}">
+      <property name="build.suffix" value="${exe-suffix}"/>
+      <property name="build.suffix" value=".dll" if="${build.buildtype.base} == 'ManagedCppAssembly'"/>
+      <choose>
+        <do if="@{PropertyExists('${groupname}.outputdir')}">
+          <fileset name="__private_${eaconfig.build.group}.${build.module}.assembly">
+            <includes name="${${groupname}.outputdir}\${build.outputname}${build.suffix}"/>
+          </fileset>
+        </do>
+        <do>
+          <fileset name="__private_${eaconfig.build.group}.${build.module}.assembly">
+            <includes name="${package.configbindir}\${eaconfig.${eaconfig.build.group}.outputfolder}\${build.outputname}${build.suffix}"/>
+          </fileset>
+        </do>
+      </choose>
+    </do>
+
+    <!-- Copy over the external assemblies if specified. -->
+    <do if="'${${groupname}.copylocal}' == 'true'">
+      <do if="@{FileSetExists('${groupname}.assemblies')}">
+        <foreach item="FileSet" in="${groupname}.assemblies" property="filename">
+          <do if="@{FileExists('${filename}')}">
+            <property name="__private_outputfolder" value="@{PathGetDirectoryName('${__private_output_filename}')}"/>
+            <property name="__private_file_name_only" value="@{PathGetFileName('${filename}')}"/>
+            <copy file="${filename}" tofile="${__private_outputfolder}\${__private_file_name_only}"/>
+          </do>
+        </foreach>
+      </do>
+    </do>
+
+    <!-- For MC++ modules, prefix ${filename} with -FU -->
+    <property name="fuAssemblies"/>
+    <do if="@{StrIndexOf(${build.buildtype.base}, 'Managed')} != -1">
+      <do if="@{FileSetExists('build.assemblies.all')}">
+        <fileset name="__private_build_assemblies_all" fromfileset="build.assemblies.all"/>
+        <do if="@{PropertyExists('${groupname}.copylocal')}">
+          <!-- The external assemblies has been removed from the build.assemblies.all fileset if copylocal is slim! 
+                 So we need to add this back in to a private list and do a nant build from this private list.
+            -->
+          <do if="'${${groupname}.copylocal}' == 'slim'">
+            <fileset name="__private_build_assemblies_all" append="true" fromfileset="build.assemblies" if="@{FileSetExists('build.assemblies')}"/>
+          </do>
+        </do>
+      </do>
+      <foreach if="@{FileSetExists('__private_build_assemblies_all')}" item="FileSet" in="__private_build_assemblies_all" property="filename">
+        <property name="fuAssemblies">
+          ${property.value}
+          -FU "${filename}"
+        </property>
+
+        <choose>
+          <do if="@{FileExists('${filename}')}">
+            <fileset name="build.filedependencies.all" append="true">
+              <includes name="${filename}"/>
+            </fileset>
+          </do>
+          <do>
+            <do unless="@{PathIsPathRooted('${filename}')}">
+              <foreach item="String" in="@{OptionSetGetValue('${build.buildtype}', 'cc.usingdirs')}" property="dir">
+                <property name="fullPath" value="${dir}\${filename}"/>
+                <do if="@{FileExists('${fullPath}')}">
+                  <fileset name="build.filedependencies.all" append="true">
+                    <includes name="${fullPath}"/>
+                  </fileset>
+                </do>
+              </foreach>
+            </do>
+          </do>
+        </choose>
+
+      </foreach>
+    </do>
+
+    <!-- If there is a user-defined groupname.outputdir, then replace the existing output location with it
+                and update the optionset '__private_build.buildtype.nativenant' with the new location. We do not mess up with the real 
+                build.buildtype optionset since it might be used by other modules in the same build-->
+
+    <!-- Store 'link.postlink.program' and 'link.postlink.commandline', because they might be overwritten below. -->
+    <do if="@{PropertyExists('link.postlink.program')}">
+      <property name="__private_link.postlink.program" value="${link.postlink.program}"/>
+    </do>
+    <do if="@{PropertyExists('link.postlink.commandline')}">
+      <property name="__private_link.postlink.commandline" value="${link.postlink.commandline}"/>
+    </do>
+
+    <!--we need to respect groupname.outputdir for library types as well-->
+    <do if="@{PropertyExists('${groupname}.outputdir')}">
+      <do if="${build.buildtype.base} == StdLibrary">
+        <mkdir dir="${${groupname}.outputdir}" unless="@{DirectoryExists('${${groupname}.outputdir}')}"/>
+      </do>
+    </do>
+
+    <!--
+      Platform-specific overrides for compiler/linker settings, dependent on the build type.
+      -->
+
+    <choose>
+
+      <!-- Correct the output file names for the VS2005 post-link step, so they work even if the end-user
+                    has done overrides for the 'linkoutputname'. -->
+      <do if="${config-system}==pc or ${config-system}==pc64">
+        <do if="@{PropertyExists('package.eaconfig.isusingvc8')}">
+          <property name="__private_linkoutputname" value="@{OptionSetGetValue('__private_build.buildtype.nativenant', 'linkoutputname')}"/>
+          <property name="link.postlink.commandline" value="@{StrReplace('${link.postlink.commandline}', '%outputdir%\%outputname%.exe.manifest', '${__private_linkoutputname}.manifest')}"/>
+          <choose>
+            <!-- Fix up the Side-by-Side Assembly Manifest embedding for DLLs, which need different MT.EXE settings. -->
+            <do if="${build.buildtype.base}=='DynamicLibrary' or ${build.buildtype.base}=='ManagedCppAssembly'">
+              <property name="link.postlink.commandline" value="@{StrReplace('${link.postlink.commandline}', '%outputdir%\%outputname%.exe;1', '${__private_linkoutputname};2')}"/>
+            </do>
+            <do>
+              <property name="link.postlink.commandline" value="@{StrReplace('${link.postlink.commandline}', '%outputdir%\%outputname%.exe;1', '${__private_linkoutputname};1')}"/>
+            </do>
+          </choose>
+          <eval code="@{PropertyUndefine('__private_linkoutputname')}" type='Function'/>
+        </do>
+      </do>
+
+      <do if="${config-system}==ps3">
+
+        <!-- Convert PS3 system include paths into -isystem options -->
+        <task name="ApplyConvertSystemIncludesToCCOptions" BuildTypeName="__private_build.buildtype.nativenant" FileSetName="build.sourcefiles.all"/>
+
+        <!--For PS3 PPU program type, overwrite the .elf and .self name(full path) in the default postlink makeself command-->
+        <do if="'@{OptionSetGetValue('__private_build.buildtype.nativenant', 'cc')}' != '@{OptionSetGetValue('ps3spu', 'cc')}'">
+          <property name="tempLinkOption" value="@{OptionSetGetValue('__private_build.buildtype.nativenant', 'link.options')}"/>
+          
+          <do unless="@{StrIndexOf('${tempLinkOption}', '-oformat=fself')} != -1 or @{StrIndexOf('${tempLinkOption}', '-oformat=fsprx')} != -1">
+            <do if="${build.buildtype.base}=='StdProgram'">
+              <property name="link.postlink.commandline">
+                @{OptionSetGetValue('__private_build.buildtype.nativenant', 'linkoutputname')}
+                @{OptionSetGetValue('__private_build.buildtype.nativenant', 'linkoutputnameself')}
+              </property>
+            </do>
+            <do if="${build.buildtype.base}=='DynamicLibrary'">
+              <property name="link.postlink.commandline">
+                @{OptionSetGetValue('__private_build.buildtype.nativenant', 'linkoutputname')}
+                @{OptionSetGetValue('__private_build.buildtype.nativenant', 'linkoutputnamesprx')}
+              </property>
+            </do>
+          </do>
+          <do if="@{StrIndexOf('${tempLinkOption}', '-oformat=fself')} != -1 or @{StrIndexOf('${tempLinkOption}', '-oformat=fsprx')} != -1">
+            <eval code="@{PropertyUndefine('link.postlink.program')}" type='Function' />
+          </do>
+        </do>
+
+        <!-- PS3 SPU has to use relative paths due to the limit of SPUNAME name (32 chars)
+                        It also doesn't need to generate SELF files, so we omit the post-link step.
+                        NB:  We're not currently restoring the 'link.userelativepaths' setting, plus this
+                        override doesn't seem to fix all the path length problems anyway. -->
+        <do if="'@{OptionSetGetValue('__private_build.buildtype.nativenant', 'cc')}' == '@{OptionSetGetValue('ps3spu', 'cc')}'">
+          <property name="link.userelativepaths" value="true"/>
+          <eval code="@{PropertyUndefine('link.postlink.program')}" type='Function' />
+        </do>
+
+      </do>
+
+      <!--For Xenon VS2005 Program type, overwrite the .exe and .xex file names in the default postlink imagexex command-->
+      <do if="'${config-system}'=='xenon'">
+        <property name="link.postlink.commandline" value="${build.imgbldoptions}" />
+      </do>
+
+    </choose>
+
+    <property name="outputpath" value="${package.configbuilddir}${eaconfig.${eaconfig.build.group}.outputfolder}/${build.module}"/>
+
+    <!-- If the end-user has supplied a custom link property like 'linkoutputname, linkoutputpdbname', then ensure that the output directory exists. -->
+    <property name="__private_linkProperties" value="linkoutputname linkoutputpdbname linkoutputmapname imgbldoutputname linkoutputnameself linkoutputnamesprx"/>
+    <foreach item="String" in="${__private_linkProperties}" delim=" " property="__private_linkProperty">
+      <do if="@{OptionSetOptionExists('__private_build.buildtype.nativenant', '$__private_linkProperty}')}">
+          <property name="__private_linkOutput" value="@{OptionSetGetValue('__private_build.buildtype.nativenant', '$__private_linkProperty}')}"/>
+          <property name="__private_linkOutput" value="@{StrReplace('${__private_linkOutput}', '%outputdir%', '${package.configbuilddir}${eaconfig.${eaconfig.build.group}.outputfolder}\${build.module}')}"/>
+          <property name="__private_linkOutput" value="@{StrReplace('${__private_linkOutput}', '%outputname%', '${build.outputname}')}"/>
+          <mkdir dir="@{PathGetDirectoryName('${__private_linkOutput}')}"/>
+      </do>
+    </foreach>
+      
+    <!-- Omit -Xlinker option for ps3-sn ppu modules (we still keep -Xlinker for ps3-sn spu modules til SNC replaces GCC completely)-->
+    <do if="${config-platform}=='ps3-sn'">
+      <property name="link.template.commandline" unless="@{OptionSetOptionExists('__private_build.buildtype.nativenant', 'ps3-spu')}">
+        %options%
+        %objectfiles%
+        %librarydirs%
+        %libraryfiles%
+      </property>
+    </do>
+
+    <!--keyfile is for .Net Assemblies, not for native C++ modules-->
+    <do if="@{StrIndexOf(${build.buildtype.base}, 'Managed')} != -1">
+      <property name="keyfilename" value=""/>
+      <property name="keyfilename" value="@{StrTrim('${${groupname}.keyfile}')}" if="@{PropertyExists('${groupname}.keyfile')}"/>
+      <do unless="@{StrIsEmpty('${keyfilename}')}">
+        <property name="__private_link_options" value="@{OptionSetGetValue('__private_build.buildtype.nativenant', 'link.options')}"/>
+        <optionset name="__private_build.buildtype.nativenant">
+          <option name="link.options" value="${__private_link_options} -KEYFILE:&quot;${keyfilename}&quot;"/>
+        </optionset>
+      </do>
+    </do>
+
+    <build name="${build.outputname}" type="__private_build.buildtype.nativenant" outputdir="${outputpath}">
+      <sources basedir="@{FileSetGetBaseDir('build.sourcefiles.all')}">
+        <includes fromfileset="build.sourcefiles.all"/>
+      </sources>
+      <asmsources>
+        <includes fromfileset="build.asmsourcefiles.all"/>
+      </asmsources>
+      <defines>
+        ${build.defines.all}
+      </defines>
+      <ccoptions>
+        ${build.warningsuppression.all}
+        ${fuAssemblies}
+        ${__private_sdata_option}
+      </ccoptions>
+      <includedirs>
+        ${build.includedirs.all}
+      </includedirs>
+      <objects>
+        <includes fromfileset="build.objects.all"/>
+      </objects>
+      <libraries>
+        <includes fromfileset="build.libs.all"/>
+      </libraries>
+      <dependencies>
+        <!-- Since we pass Assemblies with -FU and not use #using, there's no
+            way Framework will know about the assemblies dependencies, so 
+            we have to pass it in manually.  This feature requires FW 2.08.00
+            or later. -->
+        <includes fromfileset="build.filedependencies.all"/>
+      </dependencies>
+    </build>
+
+    <do if="${config-system}==ps3">
+      <!-- A (hopefully) temporary solution to move any PRX stub libraries and their
+                    associated TXT files to the configlibdir.  We can't find any command-line
+                    method of controlling the output location.  They just seem to get dumped
+                    in the current directory.  There doesn't seem to any need to support
+                    controlling the stub LIB filenames via options, because there the PRX
+                    system defines a standard naming convention for them itself.  We still
+                    don't really know what the TXT file is for. -->
+      <copy todir="${package.configlibdir}">
+        <fileset basedir="@{PathGetDirectoryName('${link}')}">
+          <includes name="*_stub.a"/>
+          <includes name="*.txt"/>
+        </fileset>
+      </copy>
+      <delete>
+        <fileset basedir="@{PathGetDirectoryName('${link}')}">
+          <includes name="*_stub.a"/>
+          <includes name="*.txt"/>
+        </fileset>
+      </delete>
+    </do>
+
+    <!-- Restore the original 'link.postlink.program' and 'link.postlink.commandline' settings. -->
+    <do if="@{PropertyExists('__private_link.postlink.program')}">
+      <property name="link.postlink.program" value="${__private_link.postlink.program}"/>
+      <eval code="@{PropertyUndefine('__private_link.postlink.program')}" type='Function'/>
+    </do>
+    <do if="@{PropertyExists('__private_link.postlink.commandline')}">
+      <property name="link.postlink.commandline" value="${__private_link.postlink.commandline}"/>
+      <eval code="@{PropertyUndefine('__private_link.postlink.commandline')}" type='Function'/>
+    </do>
+    <eval code="@{OptionSetUndefine('__private_build.buildtype.nativenant')}" type="Function" />
+    <eval code="@{PropertyUndefine('build.outputdir.override')}" type='Function'/>
+    <!-- restore the original value of link.template.commandline -->
+    <do if="${config-platform}=='ps3-sn'">
+      <property name="link.template.commandline" unless="@{OptionSetOptionExists('__private_build.buildtype.nativenant', 'ps3-spu')}">
+        %options%
+        %objectfiles%
+        %librarydirs%
+        -Xlinker --start-group
+        %libraryfiles%
+        -Xlinker --end-group
+      </property>
+    </do>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-copy')}' == 'exclude'">
+    <target name="build-copy" hidden="true" >
+      <choose>
+        <!-- Call user-defined target if it exists -->
+        <do if="@{TargetExists('build-copy-${build.buildtype}')}">
+          <!-- Just for backward compatibility -->
+          <call target="build-copy-${build.buildtype}" force="true"/>
+        </do>
+        <do>
+          <!-- Try to determine which target to call based on the buildtype, or library as default. -->
+          <choose>
+            <do if="${build.buildtype.base} == 'Program'" >
+              <property name="__private_buildtype_group" value="program" />
+            </do>
+            <do if="${build.buildtype.base} == 'StdProgram'" >
+              <property name="__private_buildtype_group" value="program" />
+            </do>
+            <do if="${build.buildtype.base} == 'WindowsProgram'" >
+              <property name="__private_buildtype_group" value="program" />
+            </do>
+            <do if="${build.buildtype.base} == 'DynamicLibrary'" >
+              <property name="__private_buildtype_group" value="dynamiclibrary" />
+            </do>
+            <do if="${build.buildtype.base} == 'ManagedCppProgram'" >
+              <property name="__private_buildtype_group" value="program" />
+            </do>
+            <do if="${build.buildtype.base} == 'ManagedCppAssembly'" >
+              <property name="__private_buildtype_group" value="dynamiclibrary" />
+            </do>
+            <!-- This is for standard CSharp modules, not custom one -->
+            <do if="@{StrStartsWith(${build.buildtype.base}, 'CSharp')}" >
+              <property name="__private_buildtype_group" value="${build.buildtype.base}" />
+            </do>
+            <do>
+              <property name="__private_buildtype_group" value="library" />
+            </do>
+          </choose>
+          <call target="build-copy-${__private_buildtype_group}"/>
+          <eval code="@{PropertyUndefine('__private_buildtype_group')}" type="Function"/>
+        </do>
+      </choose>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-copy-library')}' == 'exclude'">
+    <target name="build-copy-library" hidden="true" >
+      <copy todir="${package.configlibdir}${eaconfig.${eaconfig.build.group}.outputfolder}">
+        <fileset basedir="${package.configbuilddir}${eaconfig.${eaconfig.build.group}.outputfolder}/${build.module}">
+          <includes name="*${lib-suffix}"/>
+          <includes name="*.pdb"/>
+        </fileset>
+      </copy>
+      <!-- Execute platform specific target -->
+      <do if ="@{PropertyExists('config-platform-load-name')}">
+        <do if ="@{TargetExists('build-copy-library-${config-platform-load-name}')}">
+          <call target="build-copy-library-${config-platform-load-name}" force="true"/>
+        </do>
+      </do>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-copy-dynamiclibrary')}' == 'exclude'">
+    <target name="build-copy-dynamiclibrary" hidden="true" >
+      <call target="build-copy-library" force="true"/>
+      <call target="build-copy-program" force="true"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-copy-program')}' == 'exclude'">
+    <target name="build-copy-program" hidden="true" >
+      <copy todir="${package.configbindir}${eaconfig.${eaconfig.build.group}.outputfolder}">
+        <fileset basedir="${package.configbuilddir}${eaconfig.${eaconfig.build.group}.outputfolder}/${build.module}">
+          <includes name="*${exe-suffix}"/>
+          <group if="'${config-system}' == 'ps3'">
+            <includes name="*${secured-exe-suffix}"/>
+            <includes name="*${secured-dll-suffix}"/>
+          </group>
+          <group if="'${config-system}' == 'xenon'">
+            <includes name="*${temp-dll-suffix}"/>
+          </group>
+          <group if="@{PropertyExists('dll-suffix')}">
+            <includes name="*${dll-suffix}"/>
+          </group>
+          <includes name="*.dll"/>
+          <includes name="*.map"/>
+          <includes name="*.pdb"/>
+          <includes name="*.xbe"/>
+          <includes name="*.rso"/>
+          <includes name="*.sel"/>
+          <includes name="*.xdb"/>
+        </fileset>
+      </copy>
+      <!-- Execute platform specific target -->
+      <do if ="@{PropertyExists('config-platform-load-name')}">
+        <do if ="@{TargetExists('build-copy-program-${config-platform-load-name}')}">
+          <call target="build-copy-program-${config-platform-load-name}" force="true"/>
+        </do>
+      </do>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-copy-WindowsProgram')}' == 'exclude'">
+    <target name="build-copy-WindowsProgram" hidden="true" >
+      <call target="build-copy-program"/>
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-copy-CSharpLibrary')}' == 'exclude'">
+    <target name="build-copy-CSharpLibrary" hidden="true" >
+      <!-- Do nothing.-->
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-copy-CSharpProgram')}' == 'exclude'">
+    <target name="build-copy-CSharpProgram" hidden="true" >
+      <!-- Do nothing.-->
+    </target>
+  </do>
+
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-copy-CSharpWindowsProgram')}' == 'exclude'">
+    <target name="build-copy-CSharpWindowsProgram" hidden="true" >
+      <!-- Do nothing.-->
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'buildall')}' == 'exclude'">
+    <target name="buildall" description="Build all the configurations">
+      <property name="eaconfig.buildall.target" value="build" />
+      <call target="eaconfig-buildall-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'build-common-createbuilddependencies')}' == 'exclude'">
+    <target name="build-common-createbuilddependencies" hidden="true" >
+      <!-- Create empty build dependencies list, if client specified list not present -->
+      <property name="build.builddependencies.all" unless="@{PropertyExists('build.builddependencies')}">
+      </property>
+
+      <!-- Copy the client specified build dependencies, if present -->
+      <property name="build.builddependencies.all" if="@{PropertyExists('build.builddependencies')}">
+        ${build.builddependencies}
+      </property>
+
+      <!-- Append the config specific builddependencies, if specified -->
+      <property name="build.builddependencies.all" if="@{PropertyExists('build.builddependencies.${config-system}')}">
+        ${property.value}
+        ${build.builddependencies.${config-system}}
+      </property>
+    </target>
+  </do>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  Another target which sets up build.___ variables.
+  
+  TODO:  Does this _need_ to be different to the other target, or could
+  they be rolled together.
+  
+  TODO:  Do we need to do any of this at all?
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="__private_set_up_variables_2" hidden="true" >
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="__private_initialize">
+    <call target="__private_call_prebuild_target"/>
+    <call target="__private_set_up_variables"/>/>
+    <call target="__private_set_up_variables_2"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="__private_call_prebuild_target">
+
+    <!--    
+        If "comassemblies" fileset exists tlbimp.exe is used to generate the 
+            corresponding managed wrappers, which are added to the "assemblies" fileset for the module.
+      -->
+
+    <do if="@{FileSetExists('${groupname}.comassemblies')}">
+      <task name="task-generatemoduleinteropassemblies" module="${build.module}" group="${eaconfig.build.group}"/>
+    </do>
+    <!--
+        If "webreferences" fileset exists wsdl.exe is used to generate the corresponding managed wrappers.
+      -->
+    <do if="@{OptionSetExists('${groupname}.webreferences')}">
+      <task name="task-generatemodulewebreferences" module="${build.module}" />
+    </do>
+
+    <choose>
+      <do if="@{PropertyExists('${groupname}.prebuildtarget')}">
+        <property name="__private_prebuildtarget" value="${${groupname}.prebuildtarget}" if="@{TargetExists('${${groupname}.prebuildtarget}')}" />
+      </do>
+      <do>
+        <property name="__private_prebuildtarget" value="${groupname}.prebuildtarget" if="@{TargetExists('${groupname}.prebuildtarget')}" />
+      </do>
+    </choose>
+
+    <!-- Hook to allow users to add arbitrary extra build overrides. -->
+    <do if="@{PropertyExists('__private_prebuildtarget')}">
+      <call target="${__private_prebuildtarget}"/>
+      <eval code="@{PropertyUndefine('__private_prebuildtarget')}" type="Function"/>
+    </do>
+
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <!-- This target will build unmanaged resource files e.g. *.rc *.ico *.bmp etc.
+       per module to a .res file. -->
+  <target name="__private_build_unmanaged_resources">
+    <property name="groupdir" value="/${eaconfig.${eaconfig.build.group}.groupname}" />
+    <property name="groupdir" value="" if="${eaconfig.${eaconfig.build.group}.groupname} == runtime"/>
+
+    <property name="res.name" value="${build.module}.res"/>
+    <property name="res.name" value="${${groupname}.res.name}" if="@{PropertyExists('${groupname}.res.name')}"/>
+    <property name="res.outputdir" value="${package.configbuilddir}${groupdir}/${build.module}"/>
+    <property name="res.outputdir" value="${${groupname}.res.outputdir}" if="@{PropertyExists('${groupname}.res.outputdir')}"/>
+    <fileset name="res.sourcefiles" fromfileset="build.resourcefiles.all"/>
+    <property name="res.resourcefile" value=""/>
+    <foreach item="FileSet" in="res.sourcefiles" property="resourcefilename">
+      <property name="__resourecefile_extension" value="@{PathGetExtension('${resourcefilename}')}"/>
+      <do if="'@{StrToLower('${__resourecefile_extension}')}' == '.rc'">
+        <property name="res.resourcefile" value="${resourcefilename}" unless="'${resourcefilename}' == ''"/>
+      </do>
+    </foreach>
+    <do unless="@{PropertyExists('is-building-managed-resource')}">
+      <fail message="
+        
+            ERROR[${package.name}-${package.version}]: missing .rc file for module '${build.module}'!
+            
+            "
+          if="'${res.resourcefile}' == ''"/>
+    </do>
+    <call target="build-res" force="true" unless="'${res.resourcefile}' == ''"/>
+
+    <do unless="'${res.resourcefile}' == ''">
+      <fileset name="build.objects.all" append="true">
+        <includes name="${res.outputdir}/${res.name}" asis="true"/>
+      </fileset>
+    </do>
+  </target>
+
+  <!-- This target builds managed resource .resX files to .resources files. -->
+  <target name="__private_build_managed_resources">
+    <property name="_resgen_commandline" value=""/>
+    <property name="_assembly_resouce_options" value=""/>
+    <property name="rootnamespace" value="${build.module}"/>
+    <do if="@{PropertyExists('${groupname}.rootnamespace')}">
+      <property name="rootnamespace" value="${${groupname}.rootnamespace}"/>
+    </do>
+    <property name="_resourcesfile_folder" value="${package.configbuilddir}${eaconfig.${eaconfig.build.group}.outputfolder}/${build.module}/vcproj/forms"/>
+    <foreach item="FileSet" in="build.resourcefiles.all" property="filename">
+      <property name="_file_extension" value="@{PathGetExtension('${filename}')}"/>
+      <do if="'@{StrToLower('${_file_extension}')}' == '.resx'">
+        <property name="_resXfile_name" value="@{PathGetFileNameWithoutExtension('${filename}')}"/>
+        <property name="_resgen_commandline" value="${property.value} &quot;${filename}&quot;,&quot;${_resourcesfile_folder}/${rootnamespace}.${_resXfile_name}.resources&quot;"/>
+        <property name="_assembly_resouce_options">
+          ${property.value}
+          /ASSEMBLYRESOURCE:"${_resourcesfile_folder}/${rootnamespace}.${_resXfile_name}.resources"
+        </property>
+      </do>
+    </foreach>
+    <do unless="@{StrIsEmpty('${_resgen_commandline}')}">
+      <mkdir dir="${_resourcesfile_folder}" unless="@{DirectoryExists('${_resourcesfile_folder}')}" />
+      <exec program="${package.DotNetSDK.appdir}\bin\resgen.exe">
+        <args>
+          <arg value='/useSourcePath' />
+          <arg value='/compile' />
+          <arg value='${_resgen_commandline}' />
+        </args>
+      </exec>
+      <optionset name="__private_build.buildtype.nativenant">
+        <option name="link.options">
+          @{OptionSetGetValue('__private_build.buildtype.nativenant', 'link.options')}
+          ${_assembly_resouce_options}
+        </option>
+      </optionset>
+    </do>
+  </target>
+</project>

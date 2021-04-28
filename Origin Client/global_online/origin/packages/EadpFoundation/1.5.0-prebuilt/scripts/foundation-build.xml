@@ -1,0 +1,122 @@
+<project>
+    <runtime>
+        <property name="buildtype" local="true" value="Library"/>
+        <property name="buildtype" local="true" value="DynamicLibrary" if="${Dll??false}"/>
+        <property name="buildtype" local="true" value="WinRTCppLibrary" if="${config-system} == capilano"/>
+
+        <Library name="EadpFoundation" buildtype="${buildtype}">
+            <includedirs>
+                ${package.dir}/include
+                ${package.dir}/source/foundation
+                ${package.dir}/source/director/include
+            </includedirs>
+            <headerfiles basedir="${package.dir}">
+                <includes name="include/**.h"/>
+                <includes name="source/**.h"/>
+                <excludes name="include/eadp/foundation/internal/xbox/**.h" unless="${config-system} == 'capilano'"/>
+                <excludes name="source/foundation/xbox/**.h" unless="${config-system} == 'capilano'"/>
+                <excludes name="include/eadp/foundation/internal/ps/**.h" unless="${config-system} == 'kettle'"/>
+                <excludes name="source/foundation/ps/**.h" unless="${config-system} == 'kettle'"/>
+                <excludes name="include/eadp/foundation/internal/nx/**.h" unless="${config-system} == 'nx'"/>
+                <excludes name="source/foundation/nx/**.h" unless="${config-system} == 'nx'"/>
+                <excludes name="include/eadp/foundation/internal/ios/**.h" unless="${config-system} == 'iphone'"/>
+                <excludes name="source/foundation/ios/**.h" unless="${config-system} == 'iphone'"/>
+                <excludes name="include/eadp/foundation/internal/android/**.h" unless="${config-system} == 'android'"/>
+                <excludes name="source/foundation/android/**.h" unless="${config-system} == 'android'"/>
+                <excludes name="include/eadp/foundation/internal/win/**.h" unless="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+                <excludes name="source/foundation/win/**.h" unless="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+                <excludes name="include/eadp/foundation/internal/unix/**.h" unless="${config-system} == 'unix' or ${config-system} == 'unix64'"/>
+                <excludes name="source/foundation/unix/**.h" unless="${config-system} == 'unix' or ${config-system} == 'unix64'"/>
+                <excludes name="include/eadp/foundation/internal/macos/**.h" unless="${config-system} == 'osx' or ${config-system} == 'osx64'"/>
+                <excludes name="source/foundation/macos/**.h" unless="${config-system} == 'osx' or ${config-system} == 'osx64'"/>
+            </headerfiles>      
+            <sourcefiles basedir="${package.dir}/source/">
+                <includes name="**/*.cpp"/>
+                <excludes name="foundation/xbox/**.cpp" unless="${config-system} == 'capilano'"/>
+                <excludes name="foundation/ps/**.cpp" unless="${config-system} == 'kettle'"/>
+                <excludes name="foundation/nx/**.cpp" unless="${config-system} == 'nx'"/>
+                <excludes name="foundation/ios/**.cpp" unless="${config-system} == 'iphone'" />
+                <includes name="foundation/ios/**.m" if="${config-system} == 'iphone'" optionset="ObjectiveCPPLibraryWithARC"/>
+                <includes name="foundation/ios/**.mm" if="${config-system} == 'iphone'" optionset="ObjectiveCPPLibraryWithARC"/>
+                <excludes name="foundation/android/**.cpp" unless="${config-system} == 'android'"/>
+                <excludes name="foundation/win/**.cpp" unless="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+                <excludes name="foundation/unix/**.cpp" unless="${config-system} == 'unix' or ${config-system} == 'unix64'"/>
+                <excludes name="foundation/macos/**.cpp" unless="${config-system} == 'osx' or ${config-system} == 'osx64'"/>
+            </sourcefiles>
+            <do if="${config-system} == 'android'">
+                <java>
+                    <sourcefiles basedir="${package.dir}/source/">
+                        <includes name="java/**.java"/>
+                    </sourcefiles>
+                </java>
+            </do>
+            <dependencies>
+                <build>
+                    EAIO
+                </build>
+                <auto>
+                    coreallocator
+                    EABase
+                    EAAssert
+                    EAStdC
+                    DirtySDK
+                    EAThread
+                    EAJson
+                    <do unless="${package.EadpFoundation.use_std_stl??false}">
+                        EASTL
+                        IEAUser
+                    </do>
+                    <do if="${package.EadpFoundation.init_semd??false} and ${config-system} == 'kettle'">
+                        EASystemEventMessageDispatcher
+                        IEASystemEventMessageDispatcher
+                        EAMessage
+                    </do>
+                </auto>
+            </dependencies>
+
+            <sdkreferences if="${config-system} == 'capilano'">
+                Xbox Services API, Version=8.0
+            </sdkreferences>
+
+            <config>
+                <defines>
+                    ${package.EadpFoundation.sharedDefines}
+                    EADP_FOUNDATION_VERSION="${package.targetversion}"
+                    EADPSDK_PACKAGE_NAME="EadpFoundation"
+                    <do if="${eadpsdk_init_dirtysdk??false}">
+                        EADPSDK_INIT_DIRTYSDK=1
+                    </do>
+                    <do if="${package.EadpFoundation.init_semd??false}">
+                        EADPSDK_INIT_SEMD=1
+                    </do>
+                    <do if="${dirtysdk_debug_enable??false}">
+                        DIRTYCODE_LOGGING=1
+                    </do>
+                    <do if="${dirtysdk_debug_disable??false}">
+                        DIRTYCODE_LOGGING=0
+                    </do>
+                    <do if="${Dll??false} and ${config-compiler} == 'vc'">
+                        EADPSDK_API=__declspec(dllexport)
+                        EADPGENERATED_API=
+                    </do>
+                </defines>
+
+                <warningsuppression>
+                    <do if="${Dll??false} and ${config-compiler} == 'vc'">
+                        -wd4251 <!-- 'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2' -->
+                    </do>
+                </warningsuppression>
+            </config>
+
+            <!-- This also works for XCode. "excludedbuildfiles" defines a list of files that are excluded from the build but are added to the visual studio project as non-buildable files. -->
+            <visualstudio>
+                <excludedbuildfiles>
+                    <includes name="Initialize.xml" basedir="${package.dir}/scripts" if="${EadpFoundation.ShowBuildScripts??false}"/>
+                    <includes name="proto/**/*.proto" basedir="${package.dir}" if="${EadpFoundation.ShowProtoFiles??false}"/>
+                </excludedbuildfiles>
+            </visualstudio>
+
+            <bulkbuild enable="true" />
+        </Library>
+    </runtime>
+</project>

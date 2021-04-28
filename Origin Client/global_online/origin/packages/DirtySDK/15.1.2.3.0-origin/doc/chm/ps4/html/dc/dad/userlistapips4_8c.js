@@ -1,0 +1,38 @@
+var userlistapips4_8c =
+[
+    [ "UserListRequestT", "d7/db2/structUserListRequestT.html", "d7/db2/structUserListRequestT" ],
+    [ "UserListApiNotificationT", "d9/d89/structUserListApiNotificationT.html", "d9/d89/structUserListApiNotificationT" ],
+    [ "UserListApiNotifyEventT", "da/dc3/structUserListApiNotifyEventT.html", "da/dc3/structUserListApiNotifyEventT" ],
+    [ "UserListApiRefT", "df/dca/structUserListApiRefT.html", "df/dca/structUserListApiRefT" ],
+    [ "USERLISTAPI_API_GROUP", "dc/dad/userlistapips4_8c.html#ad48605668469104b0f2581d4c225178f", null ],
+    [ "USERLISTAPI_DEFAULT_READ_BUFFER_SIZE", "dc/dad/userlistapips4_8c.html#a9152b7ed35f070d99a66b3c1b3e7a625", null ],
+    [ "USERLISTAPI_FRIEND_TYPE_FRIEND", "dc/dad/userlistapips4_8c.html#a7c4b52958fd29d92c830781bae2b7f41", null ],
+    [ "USERLISTAPI_MAX_QUEUED_NOTIFICATIONS", "dc/dad/userlistapips4_8c.html#accdcbdbabcd565aeba60ac5efc37534d", null ],
+    [ "USERLISTAPI_ONE_FRIEND_BUFFER_SIZE", "dc/dad/userlistapips4_8c.html#a960ae8595db949b5b7455f3d24f1d67a", null ],
+    [ "USERLISTAPI_PATH_BASE", "dc/dad/userlistapips4_8c.html#ac13c8fcf4426975c5aa2ec88f1120b47", null ],
+    [ "USERLISTAPI_PATH_BLOCKED", "dc/dad/userlistapips4_8c.html#a17efd356e986090fe7cfb12b23fc07e5", null ],
+    [ "USERLISTAPI_PATH_FRIENDS", "dc/dad/userlistapips4_8c.html#aa3bf6957d76c99eb8e9a57ec05685ebc", null ],
+    [ "USERLISTAPI_USER_NOT_FOUND_ERROR_CODE", "dc/dad/userlistapips4_8c.html#aa07a6bb31c37665fc51bf8fd7184f472", null ],
+    [ "UserListApiNotificationT", "dc/dad/userlistapips4_8c.html#a83dc59a08230b9d1954642783763e101", null ],
+    [ "UserListApiNotifyEventT", "dc/dad/userlistapips4_8c.html#a754824eb538974d8fad19c4a46dfe7c7", null ],
+    [ "UserListApiRequestTypeE", "dc/dad/userlistapips4_8c.html#a2697f2d55ae6b98a5c9397977329d4e4", null ],
+    [ "UserListRequestT", "dc/dad/userlistapips4_8c.html#acd165321158cb97d3329fed2184cb135", null ],
+    [ "UserListApiRequestTypeE", "dc/dad/userlistapips4_8c.html#ad6c1067175287e9424e6b3dcfd2c6457", [
+      [ "USERLISTAPI_REQUEST_TYPE_FRIENDS", "dc/dad/userlistapips4_8c.html#ad6c1067175287e9424e6b3dcfd2c6457ac901336b1945bcedf9947791bcc704b6", null ],
+      [ "USERLISTAPI_REQUEST_TYPE_BLOCKED", "dc/dad/userlistapips4_8c.html#ad6c1067175287e9424e6b3dcfd2c6457a73bb7148a3f561f03d98b874a12d486c", null ],
+      [ "USERLISTAPI_REQUEST_TYPE_FRIENDS_OF_FRIEND", "dc/dad/userlistapips4_8c.html#ad6c1067175287e9424e6b3dcfd2c6457ab60351f597d7f47ae614236dd4dfec23", null ],
+      [ "USERLISTAPI_REQUEST_TYPE_MUTED", "dc/dad/userlistapips4_8c.html#ad6c1067175287e9424e6b3dcfd2c6457a838f43e561f6a980be827eadc9922c29", null ],
+      [ "USERLISTAPI_REQUEST_TYPE_ISFRIENDS", "dc/dad/userlistapips4_8c.html#ad6c1067175287e9424e6b3dcfd2c6457a68fd8c236464a816c62eab6d3672d987", null ],
+      [ "USERLISTAPI_REQUEST_TYPE_ISBLOCKED", "dc/dad/userlistapips4_8c.html#ad6c1067175287e9424e6b3dcfd2c6457a8852c38283bfda6d6057c869d77ae9e8", null ]
+    ] ],
+    [ "UserListApiCancelAll", "dc/dad/userlistapips4_8c.html#ga19d7ff27361bea271ed933b8475df3dd", null ],
+    [ "UserListApiControl", "dc/dad/userlistapips4_8c.html#gabe31a52e387ebea09af0e9fa6da0314a", null ],
+    [ "UserListApiCreate", "dc/dad/userlistapips4_8c.html#ga8447cd7190c828067abc29680942f702", null ],
+    [ "UserListApiDestroy", "dc/dad/userlistapips4_8c.html#ga85297f539a3cecfca6f0bcbf78856be7", null ],
+    [ "UserListApiGetListAsync", "dc/dad/userlistapips4_8c.html#ga5a7b512cb0621920c0694d9142f6c023", null ],
+    [ "UserListApiIsBlockedAsync", "dc/dad/userlistapips4_8c.html#ga6d9e152afd48b5e2fc4fb6580a9bc05c", null ],
+    [ "UserListApiIsFriendAsync", "dc/dad/userlistapips4_8c.html#ga7b11661597fc81dca5ff345ea2e1c2a3", null ],
+    [ "UserListApiRegisterUpdateEvent", "dc/dad/userlistapips4_8c.html#ga43c28200c2b1daeaf470fbf43d1322f4", null ],
+    [ "UserListApiStatus", "dc/dad/userlistapips4_8c.html#ga8387a54f2bdf7cbff73fb1b085f44541", null ],
+    [ "UserListApiUpdate", "dc/dad/userlistapips4_8c.html#ga199acc4db1433e569dbd393986badd28", null ]
+];

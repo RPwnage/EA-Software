@@ -1,0 +1,1175 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'dobby-reports')}' == 'exclude'">
+        <target name="dobby-reports" style="build">
+
+            <call target="__private_initialize"/>
+
+            <dependent name="Dobby"/>
+
+            <property name="defines">
+                ${cc.gccdefines}
+                ${cc.defines}
+            </property>
+
+            <property name="outdir"   value="${package.configbuilddir}/Dobby"/>
+            <property name="database" value="${outdir}/${package.name}.udc"/>
+
+            <property name="includes">
+                ${package.includedirs.all}
+            </property>
+
+            <fileset name="source-files">
+                <includes fromfileset="package.sourcefiles.all"/>
+            </fileset>
+
+            <include file="${package.Dobby.dir}/source/Core/Source/NAnt/DobbyTargets.xml"/>
+            <call target="package-dobby-reports" force="true"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'distributed-build')}' == 'exclude'">
+        <target name="distributed-build">
+            <choose>
+                <do if="${config-system}==ps2 or ${config-system}==ps3 or ${config-system}==psp">
+                    <choose>
+                        <do if="${ps3.useincredibuild}">
+                            <call target="incredibuild" />
+                        </do>
+                        <do>
+                            <call target="sndbs"/>
+                        </do>
+                    </choose>
+                </do>
+                <do>
+                    <call target="incredibuild"/>
+                </do>
+            </choose>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <target name="__private_vs_to_makefile" description="Generate makefiles from Visual Studio SLN file">
+        <choose>
+            <do if="'${config-system}'=='ps3'">
+                <dependent name="${PlayStation3Package}"/>
+            </do>
+            <do if="'${config-system}'=='rev'">
+                <dependent name="RevolutionCodeWarrior"/>
+            </do>
+        </choose>
+
+        <sysinfo/>
+        <dependent name="vstomaketools"/>
+
+        <property name="__use_xge_pc" value="${incredibuild.usexge}" />
+
+        <property name="__vstomake_numjobs" value ="32"/>
+        <property name="__vstomake_numjobs" value ="${xge.numjobs}" if="@{PropertyExists('xge.numjobs')}"/>
+
+        <property name="__vstomake_use_vsimake_wrapper" value="true"/>
+        <do if="@{PropertyExists('xge.use_vsimake_wrapper')}">
+            <property name="__vstomake_use_vsimake_wrapper" value="${xge.use_vsimake_wrapper}"/>
+        </do>
+
+        <property name="__vstomake_buildtool_use_wrappers" value="true"/>
+        <do if="@{PropertyExists('xge.buildtool_use_wrappers')}">
+            <property name="__vstomake_buildtool_use_wrappers" value="${xge.buildtool_use_wrappers}"/>
+        </do>
+
+        <property name="__vstomake_vsimake_wrapper_numattempts" value="2"/>
+        <do if="@{PropertyExists('xge.vsimake_wrapper_numattempts')}">
+            <property name="__vstomake_vsimake_wrapper_numattempts" value="${xge.vsimake_wrapper_numattempts}"/>
+        </do>
+
+        <property name="__vstomake_vsimake_wrapper_errpatterns" value=""/>
+        <do if="@{PropertyExists('package.vstomaketools.vsimakewrapper.errpatterns.txt')}">
+            <property name="__vstomake_vsimake_wrapper_errpatterns" value="/vsimake-wrapper-errpatterns:${package.vstomaketools.vsimakewrapper.errpatterns.txt}"/>
+        </do>
+        <do if="@{PropertyExists('xge.vsimake_wrapper_errpatterns')}">
+            <property name="__vstomake_vsimake_wrapper_errpatterns" value="/vsimake-wrapper-errpatterns:${xge.vsimake_wrapper_errpatterns}"/>
+        </do>
+
+        <property name="__vstomake_quiet_arg" value="true"/>
+        <property name="__vstomake_buildtool_wrapper_verbose" value="false"/>
+        <property name="__vstomake_vsimake_wrapper_verbose" value="false"/>
+        <do if="@{PropertyExists('incredibuild.verbose')}">
+            <property name="__vstomake_quiet_arg" value="false"  if="'${incredibuild.verbose}'=='true'" />
+            <property name="__vstomake_buildtool_wrapper_verbose" value="true" if="'${incredibuild.verbose}'=='true'"/>
+            <property name="__vstomake_vsimake_wrapper_verbose" value="true" if="'${incredibuild.verbose}'=='true'"/>
+        </do>
+
+        <property name="__vstomake_tibsqlpp_arg" value=""/>
+        <do if="@{PropertyExists('vstomake.tibsqlpp')}">
+            <do unless="@{StrIsEmpty('${vstomake.tibsqlpp}')}">
+                <property name="__vstomake_tibsqlpp_arg" value="/tibsqlpp:${vstomake.tibsqlpp}"/>
+            </do>
+        </do>
+
+        <property name="__vstomake_skip_create_lib" value="false"/>
+        <do if="@{PropertyExists('vstomake.skip-create-lib')}">
+            <do unless="@{StrIsEmpty('${vstomake.skip-create-lib}')}">
+                <property name="__vstomake_skip_create_lib" value="${vstomake.skip-create-lib}"/>
+            </do>
+        </do>
+
+        <property name="__vstomake_pdb_to_lib" value="false"/>
+        <do if="@{PropertyExists('vstomake.pdb-to-lib')}">
+            <do unless="@{StrIsEmpty('${vstomake.pdb-to-lib}')}">
+                <property name="__vstomake_pdb_to_lib" value="${vstomake.pdb-to-lib}"/>
+            </do>
+        </do>
+
+        <do if="@{PropertyExists('vstomake.additional-args')}">
+            <do unless="@{StrIsEmpty('${vstomake.additional-args}')}">
+                <property name="__vstomake_additional-args" value="${vstomake.additional-args}"/>
+            </do>
+        </do>
+        <do if="@{PropertyExists('vstomake.additional-args.${config-system}')}">
+            <do unless="@{StrIsEmpty('${vstomake.additional-args.${config-system}}')}">
+                <property name="__vstomake_additional-args" value="${vstomake.additional-args.${config-system}}"/>
+            </do>
+        </do>
+
+        <choose>
+            <do if="${config-system}==ps3">
+                <exec program="${package.vstomaketools.vstomakefile.exe}" message="Generating project makefiles..." failonerror="true">
+                    <args>
+                        <arg value='/solution:"${sln-file}"'/>
+                        <arg value='/config:"${config}|${platform.name.${config-system}}"'/>
+                        <arg value='/numjobs:${__vstomake_numjobs}'/>
+                        <arg value='/quiet:${__vstomake_quiet_arg}'/>
+                        <arg value='${__vstomake_tibsqlpp_arg}'/>
+                        <arg value='/use-vsimake-wrapper:${__vstomake_use_vsimake_wrapper}'/>
+                        <arg value='/buildtool-use-wrappers:${__vstomake_buildtool_use_wrappers}'/>
+                        <arg value='/buildtool-wrapper-verbose:${__vstomake_buildtool_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-verbose:${__vstomake_vsimake_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-numattempts:${__vstomake_vsimake_wrapper_numattempts}'/>
+                        <arg value='${__vstomake_vsimake_wrapper_errpatterns}'/>
+                        <arg value='${__vstomake_additional-args}' if="@{PropertyExists('__vstomake_additional-args')}"/>
+                    </args>
+                    <env>
+                        <option name="SCE_PS3_ROOT" value="${package.${PlayStation3Package}.appdir}"/>
+                    </env>
+                </exec>
+            </do>
+            <do if="'${__use_xge_pc}' == 'true' and (${config-system}==pc or ${config-system}==pc64 or ${config-system}==xenon)">
+                <property name="__IncrediPath" value="${package.xenonsdk.appdir}\bin\win32" if="${config-system}==xenon"/>
+                <property name="__IncrediPath" value="${build.env.PATH}" unless="${config-system}==xenon"/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <property name="tool-prefix" value="vc"/>
+                <property name="tool-prefix" value="xenon" if="${config-system}==xenon"/>
+
+                <exec program="${package.vstomaketools.vstomakefile.exe}" message="Generating project makefiles..." failonerror="true">
+                    <args>
+                        <arg value='/solution:"${sln-file}"'/>
+                        <arg value='/config:"${config}|${platform.name.${config-system}}"'/>
+                        <arg value='/numjobs:${__vstomake_numjobs}'/>
+                        <arg value='/${tool-prefix}-compiler:"${cc}"'/>
+                        <arg value='/${tool-prefix}-linker:"${link}"'/>
+                        <arg value='/${tool-prefix}-asm:"${as}"'/>
+                        <arg value='/${tool-prefix}-librarian:"${lib}"'/>
+                        <arg value='/quiet:${__vstomake_quiet_arg}'/>
+                        <arg value='${__vstomake_tibsqlpp_arg}'/>
+                        <arg value='/skip-create-lib:${__vstomake_skip_create_lib}'/>
+                        <arg value='/pdb-to-lib:${__vstomake_pdb_to_lib}'/>
+                        <arg value='/use-vsimake-wrapper:${__vstomake_use_vsimake_wrapper}'/>
+                        <arg value='/buildtool-use-wrappers:${__vstomake_buildtool_use_wrappers}'/>
+                        <arg value='/buildtool-wrapper-verbose:${__vstomake_buildtool_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-verbose:${__vstomake_vsimake_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-numattempts:${__vstomake_vsimake_wrapper_numattempts}'/>
+                        <arg value='${__vstomake_vsimake_wrapper_errpatterns}'/>
+                        <arg value='${__vstomake_additional-args}' if="@{PropertyExists('__vstomake_additional-args')}"/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__IncrediPath}"/>
+                    </env>
+                </exec>
+            </do>
+            <do if="${config-compiler}==ghs">
+                <property name="__IncrediPath" value =""/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <property name="tool-prefix" value="ghs"/>
+
+                <exec program="${package.vstomaketools.vstomakefile.exe}" message="Generating project makefiles..." failonerror="true">
+                    <args>
+                        <arg value='/solution:"${sln-file}"'/>
+                        <arg value='/config:"${config}|${platform.name.${config-system}}"'/>
+                        <arg value='/numjobs:${__vstomake_numjobs}'/>
+                        <arg value='/${tool-prefix}-compiler:"${cc}"'/>
+                        <arg value='/${tool-prefix}-linker:"${link}"'/>
+                        <arg value='/${tool-prefix}-asm:"${as}"'/>
+                        <arg value='/${tool-prefix}-librarian:"${lib}"'/>
+                        <arg value='/quiet:no'/>
+                        <arg value='/fail-on-error:no'/>
+                        <arg value='${__vstomake_tibsqlpp_arg}'/>
+                        <arg value='/use-vsimake-wrapper:${__vstomake_use_vsimake_wrapper}'/>
+                        <arg value='/buildtool-use-wrappers:${__vstomake_buildtool_use_wrappers}'/>
+                        <arg value='/buildtool-wrapper-verbose:${__vstomake_buildtool_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-verbose:${__vstomake_vsimake_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-numattempts:${__vstomake_vsimake_wrapper_numattempts}'/>
+                        <arg value='${__vstomake_vsimake_wrapper_errpatterns}'/>
+                        <arg value='${__vstomake_additional-args}' if="@{PropertyExists('__vstomake_additional-args')}"/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__IncrediPath}"/>
+                    </env>
+                </exec>
+            </do>
+            <do if="${config-system}==rev">
+                <property name="__IncrediPath" value =""/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <property name="tool-prefix" value="rev"/>
+
+                <exec program="${package.vstomaketools.vstomakefile.exe}" message="Generating project makefiles..." failonerror="true">
+                    <args>
+                        <arg value='/solution:"${sln-file}"'/>
+                        <arg value='/config:"${config}|${platform.name.${config-system}}"'/>
+                        <arg value='/numjobs:${__vstomake_numjobs}'/>
+                        <arg value='/${tool-prefix}-compiler:"${cc}"'/>
+                        <arg value='/${tool-prefix}-linker:"${link}"'/>
+                        <arg value='/${tool-prefix}-asm:"${as}"'/>
+                        <arg value='/${tool-prefix}-librarian:"${lib}"'/>
+                        <arg value='/quiet:no'/>
+                        <arg value='/fail-on-error:no'/>
+                        <arg value='${__vstomake_tibsqlpp_arg}'/>
+                        <arg value='/use-vsimake-wrapper:${__vstomake_use_vsimake_wrapper}'/>
+                        <arg value='/buildtool-use-wrappers:${__vstomake_buildtool_use_wrappers}'/>
+                        <arg value='/buildtool-wrapper-verbose:${__vstomake_buildtool_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-verbose:${__vstomake_vsimake_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-numattempts:${__vstomake_vsimake_wrapper_numattempts}'/>
+                        <arg value='${__vstomake_vsimake_wrapper_errpatterns}'/>
+                        <arg value='${__vstomake_additional-args}' if="@{PropertyExists('__vstomake_additional-args')}"/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__IncrediPath}"/>
+                    </env>
+                </exec>
+            </do>
+            <do if="${config-system}==android">
+
+                <property name="__IncrediPath" value =""/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <property name="tool-prefix" value="gcc"/>
+
+                <exec program="${package.vstomaketools.vstomakefile.exe}" message="Generating project makefiles..." failonerror="true">
+                    <args>
+                        <arg value='/solution:"${sln-file}"'/>
+                        <arg value='/config:"${config}|${platform.name.${config-system}}"'/>
+                        <arg value='/numjobs:${__vstomake_numjobs}'/>
+                        <arg value='/${tool-prefix}-compiler:"${cc}"'/>
+                        <arg value='/${tool-prefix}-linker:"${link}"'/>
+                        <arg value='/${tool-prefix}-asm:"${as}"'/>
+                        <arg value='/${tool-prefix}-librarian:"${lib}"'/>
+                        <arg value='/quiet:no'/>
+                        <arg value='/fail-on-error:no'/>
+                        <arg value='${__vstomake_tibsqlpp_arg}'/>
+                        <arg value='/use-vsimake-wrapper:${__vstomake_use_vsimake_wrapper}'/>
+                        <arg value='/buildtool-use-wrappers:${__vstomake_buildtool_use_wrappers}'/>
+                        <arg value='/buildtool-wrapper-verbose:${__vstomake_buildtool_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-verbose:${__vstomake_vsimake_wrapper_verbose}'/>
+                        <arg value='/vsimake-wrapper-numattempts:${__vstomake_vsimake_wrapper_numattempts}'/>
+                        <arg value='${__vstomake_vsimake_wrapper_errpatterns}'/>
+                        <arg value='${__vstomake_additional-args}' if="@{PropertyExists('__vstomake_additional-args')}"/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__IncrediPath}"/>
+                    </env>
+                </exec>
+            </do>
+            <do if="${config-system}==psp2">
+              <property name="__IncrediPath" value =""/>
+              <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+              <property name="tool-prefix" value="psp2"/>
+
+              <exec program="${package.vstomaketools.vstomakefile.exe}" message="Generating project makefiles..." failonerror="true">
+                <args>
+                  <arg value='/solution:"${sln-file}"'/>
+                  <arg value='/config:"${config}|${platform.name.${config-system}}"'/>
+                  <arg value='/numjobs:${__vstomake_numjobs}'/>
+                  <arg value='/${tool-prefix}-compiler:"${cc}"'/>
+                  <arg value='/${tool-prefix}-linker:"${link}"'/>
+                  <arg value='/${tool-prefix}-asm:"${as}"'/>
+                  <arg value='/${tool-prefix}-librarian:"${lib}"'/>
+                  <arg value='/quiet:no'/>
+                  <arg value='/fail-on-error:no'/>
+                  <arg value='${__vstomake_tibsqlpp_arg}'/>
+                  <arg value='/use-vsimake-wrapper:${__vstomake_use_vsimake_wrapper}'/>
+                  <arg value='/buildtool-use-wrappers:${__vstomake_buildtool_use_wrappers}'/>
+                  <arg value='/buildtool-wrapper-verbose:${__vstomake_buildtool_wrapper_verbose}'/>
+                  <arg value='/vsimake-wrapper-verbose:${__vstomake_vsimake_wrapper_verbose}'/>
+                  <arg value='/vsimake-wrapper-numattempts:${__vstomake_vsimake_wrapper_numattempts}'/>
+                  <arg value='${__vstomake_vsimake_wrapper_errpatterns}'/>
+                  <arg value='${__vstomake_additional-args}' if="@{PropertyExists('__vstomake_additional-args')}"/>
+                </args>
+                <env>
+                  <option name="PATH" value="${__IncrediPath}"/>
+                </env>
+              </exec>
+            </do>
+            <do>
+                <fail message="ERROR: vstomakefile implemented only for PS3, Wii, android, PC, PC64, GHS and Xenon platforms. Can't create makefile for '${config-system}'."/>
+            </do>
+        </choose>
+    </target>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <target name="__private_xgMake" description="Use makefile with IncrediBuild">
+        <do if="${config-system}==ps3">
+            <dependent name="${PlayStation3Package}"/>
+        </do>
+        <dependent name="IncrediBuild"/>
+        <dependent name="vstomaketools"/>
+
+        <property name="make" value="Makefile" unless="@{PropertyExists('make')}"/>
+
+        <property name="__xge_profile" value="${package.vstomaketools.profile.xml}"/>
+        <property name="__xge_profile" value="${xge.profile}" if="@{PropertyExists('xge.profile')}"/>
+
+        <property name="__xge_numjobs" value ="32"/>
+        <property name="__xge_numjobs" value ="${xge.numjobs}" if="@{PropertyExists('xge.numjobs')}"/>
+        <property name="__xge_stop" value ="--stop"/>
+
+        <do if="@{PropertyExists('incredibuild.keep_going')}">
+            <property name="__xge_stop" value ="--keep-going" if="'${incredibuild.keep_going}'=='true'"/>
+        </do>
+
+        <property name="__use_xge_pc" value ="${incredibuild.usexge}" />
+        <property name="__xge_output_level" value="--no-print-directory"/>
+
+        <property name="__xge_vsimake" value="${package.vstomaketools.vsimake.exe}"/>
+        <do if="@{PropertyExists('xge.use_external_vsimake')}">
+            <property name="__xge_vsimake" value="${package.vstomaketools.external.vsimake.exe}" if="'${xge.use_external_vsimake}'=='true'"/>
+        </do>
+
+        <property name="__xge_use_vsimake_wrapper" value="true"/>
+        <do if="@{PropertyExists('xge.use_vsimake_wrapper')}">
+            <property name="__xge_use_vsimake_wrapper" value="${xge.use_vsimake_wrapper}"/>
+        </do>
+
+        <property name="__xge_vsimake_wrapper_numattempts" value="/numattempts:2"/>
+        <do if="@{PropertyExists('xge.vsimake_wrapper_numattempts')}">
+            <property name="__xge_vsimake_wrapper_numattempts" value="/numattempts:${xge.vsimake_wrapper_numattempts}"/>
+        </do>
+
+        <property name="__xge_vsimake_wrapper_errpatterns" value=""/>
+        <do if="@{PropertyExists('package.vstomaketools.vsimakewrapper.errpatterns.txt')}">
+            <property name="__xge_vsimake_wrapper_errpatterns" value="/errpatterns:${package.vstomaketools.vsimakewrapper.errpatterns.txt}"/>
+        </do>
+        <do if="@{PropertyExists('xge.vsimake_wrapper_errpatterns')}">
+            <property name="__xge_vsimake_wrapper_errpatterns" value="/errpatterns:${xge.vsimake_wrapper_errpatterns}"/>
+        </do>
+
+        <property name="__xge_avoid_local" value=""/>
+        <do if="@{PropertyExists('incredibuild.avoid_local')}">
+            <property name="__xge_avoid_local" value="/AvoidLocal=On" if="'${incredibuild.avoid_local}'=='true'"/>
+            <property name="__xge_avoid_local" value="/AvoidLocal=Off" if="'${incredibuild.avoid_local}'=='false'"/>
+        </do>
+
+        <property name="__xge_reset_cache" value="false"/>
+        <do if="@{PropertyExists('xge.reset_cache')}">
+            <property name="__xge_reset_cache" value="${xge.reset_cache}"/>
+        </do>
+
+        <property name="__xge_user_makeoptions" value=""/>
+        <do if="@{PropertyExists('incredibuild.xgConsole.custom_makeoptions')}">
+            <property name="__xge_user_makeoptions" value="${incredibuild.xgConsole.custom_makeoptions}"/>
+        </do>
+
+        <property name="__xge_user_options" value=""/>
+        <do if="@{PropertyExists('incredibuild.xgConsole.custom_options')}">
+            <property name="__xge_user_options" value="${incredibuild.xgConsole.custom_options}"/>
+            <!-- do error checks.  In case user specified incredibuild.avoid_local and specified /AvoidLocal in here. -->
+            <property name="__xge_user_options_upper" value="@{StrToUpper('${__xge_user_options}')}"/>
+            <do if="@{StrIndexOf('${__xge_user_options_upper}','/AVOIDLOCAL=')} != -1 and @{PropertyExists('incredibuild.avoid_local')}">
+                <warn message="Warning: /AvoidLocal is already specified in property incredibuild.xgConsole.custom_options.  The property incredibuild.avoid_local will be ignored!"/>
+                <property name="__xge_avoid_local" value=""/>
+            </do>
+        </do>
+
+        <do if="@{PropertyExists('incredibuild.verbose')}">
+            <property name="__xge_output_level" value=""  if="'${incredibuild.verbose}'=='true'" />
+        </do>
+
+        <!-- 
+        Some targets generate solution in different than ${package.buildir} directories. Use sln-file path since makefile is always generated in sln directory     
+        -->
+        <property name="__makefileDir" value="@{PathGetDirectoryName('${sln-file}')}"/>
+
+        <!-- Define TMP environment variable to pass to incredibuild -->
+        <property name="IncrediTempPath" value="${__makefileDir}\IncrediTemp"/>
+        <mkdir dir="${IncrediTempPath}" unless="@{DirectoryExists('${IncrediTempPath}')}"/>
+
+        <!--Certain cmdline executables are found here (used for batch file based post build events) -->
+        <property name="WindowsPaths" value="${sys.os.folder.system}"/>
+
+        <property name="make_build_target" value=""/>
+        <property name="make_build_target" value="${eaconfig.build-one-module}" if="@{PropertyExists('eaconfig.build-one-module')}"/>
+
+        <eval type="Expression" property="__private_fw213_usexge" code="${config-system}==pc or ${config-system}==pc64 or ${config-system}==xenon" />
+
+        <property name="__vsimake_path" value="@{PathGetDirectoryName('${__xge_vsimake}')}"/>
+        <property name="__vsimake_exe" value="@{PathGetFileName('${__xge_vsimake}')}"/>
+
+        <property name="__vsimake_full" value="${__vsimake_exe}"/>
+        <do if="${__xge_use_vsimake_wrapper} AND @{PropertyExists('package.vstomaketools.vsimakewrapper.exe')}">
+          <property name="__vsimake_full" value='"${package.vstomaketools.vsimakewrapper.exe}" ${__xge_vsimake_wrapper_numattempts} "${__xge_vsimake_wrapper_errpatterns}" "${__vsimake_exe}"'/>
+          <!-- HACK ALERT: version-found property is set by Incredibuild package in its Initialize.xml -->
+          <do if="'${version-found}' gte '3.60 (build 1208)'">
+            <echo message="INFO: Incredibuild 3.60+ currently cannot handle commandlines with nested quotes. Paths with spaces will result in failures."/>
+            <property name="__vsimake_full" value='${package.vstomaketools.vsimakewrapper.exe} ${__xge_vsimake_wrapper_numattempts} "${__xge_vsimake_wrapper_errpatterns}" "${__vsimake_exe}"'/>
+          </do>
+        </do>
+
+        <!-- Must be run independent of builds -->
+        <do if="${__xge_reset_cache}">
+            <exec program='${package.IncrediBuild.xgConsole.exe}' message="Resetting agent cache..." failonerror="false">
+                <args>
+                    <arg value='/Reset'/>
+                </args>
+            </exec>
+        </do>
+
+        <property name="___xge_repeatpattern" value="Timed out waiting for Build System process to initialize."/>
+        <property name="___xge_repeatpattern" value="${incredibuild.xge.repeatpattern}" if="@{PropertyExists('incredibuild.xge.repeatpattern')}"/>
+
+        <choose>
+            <do if="@{PropertyExists('incredibuild.xge.commandfile')}">
+                <echo message="${__vsimake_full} ${__xge_output_level} ${__xge_stop} --no-builtin-rules --jobs=${__xge_numjobs} ${__xge_user_makeoptions} -C${__makefileDir} -f${make} ${make_build_target}" file="${incredibuild.xge.commandfile}"/>
+                <property name="___xge_makecommand" value="${incredibuild.xge.commandfile}"/>
+            </do>
+            <do>
+                <property name="___xge_makecommand" value="${__vsimake_full} ${__xge_output_level} ${__xge_stop} --no-builtin-rules --jobs=${__xge_numjobs} ${__xge_user_makeoptions} -C${__makefileDir} -f${make} ${make_build_target}"/>
+            </do>
+        </choose>
+
+        <choose>
+            <do if="${config-system}==ps3">
+                <property name="__IncrediPath" value=""/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <repeatexecif program='${package.IncrediBuild.xgConsole.exe}' message="Building ${package.name}..." failonerror="true"
+                              repeatpattern="${___xge_repeatpattern}" maxlinestoscan="50">
+                    <args>
+                        <arg value='/command="${___xge_makecommand}"'/>
+                        <arg value='/profile="${__xge_profile}"'/>
+                        <arg value='${__xge_avoid_local}'/>
+                        <arg value='${__xge_user_options}'/>
+                    </args>
+                    <env>
+                        <option name="SCE_PS3_ROOT" value="${package.${PlayStation3Package}.appdir}" />
+                        <option name="PATH" value="${__vsimake_path};${__IncrediPath};${WindowsPaths}" />
+                        <option name="TMP" value="${IncrediTempPath}"/>
+                        <option name="TEMP" value="${IncrediTempPath}"/>
+                    </env>
+                </repeatexecif>
+            </do>
+            <do if="${config-compiler}==ghs">
+                <property name="__IncrediPath" value=""/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <repeatexecif program='${package.IncrediBuild.xgConsole.exe}' message="Building ${package.name}..." failonerror="true"
+                                repeatpattern="${___xge_repeatpattern}" maxlinestoscan="50">
+                    <args>
+                        <arg value='/command="${___xge_makecommand}"'/>
+                        <arg value='/profile="${__xge_profile}"'/>
+                        <arg value='${__xge_avoid_local}'/>
+                        <arg value='${__xge_user_options}'/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__vsimake_path};${__IncrediPath};${WindowsPaths}" />
+                        <option name="TMP" value="${IncrediTempPath}"/>
+                        <option name="TEMP" value="${IncrediTempPath}"/>
+                    </env>
+                </repeatexecif>
+            </do>
+            <do if="${config-system}==rev">
+                <property name="__IncrediPath" value=""/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <repeatexecif program='${package.IncrediBuild.xgConsole.exe}' message="Building ${package.name}..." failonerror="true"
+                                repeatpattern="${___xge_repeatpattern}" maxlinestoscan="50">
+                    <args>
+                        <arg value='/command="${___xge_makecommand}"'/>
+                        <arg value='/profile="${__xge_profile}"'/>
+                        <arg value='${__xge_avoid_local}'/>
+                        <arg value='${__xge_user_options}'/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__vsimake_path};${__IncrediPath};${WindowsPaths}" />
+                        <option name="TMP" value="${IncrediTempPath}"/>
+                        <option name="TEMP" value="${IncrediTempPath}"/>
+                    </env>
+                </repeatexecif>
+            </do>
+            <do if="${config-system}==android">
+                <property name="__IncrediPath" value=""/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <repeatexecif program='${package.IncrediBuild.xgConsole.exe}' message="Building ${package.name}..." failonerror="true"
+                              repeatpattern="${___xge_repeatpattern}" maxlinestoscan="50">
+                    <args>
+                        <arg value='/command="${___xge_makecommand}"'/>
+                        <arg value='/profile="${__xge_profile}"'/>
+                        <arg value='${__xge_avoid_local}'/>
+                        <arg value='${__xge_user_options}'/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__vsimake_path};${__IncrediPath};${WindowsPaths}" />
+                        <option name="TMP" value="${IncrediTempPath}"/>
+                        <option name="TEMP" value="${IncrediTempPath}"/>
+                    </env>
+                </repeatexecif>
+            </do>
+            <do if="${config-system}==psp2">
+                <property name="__IncrediPath" value=""/>
+                <property name="__IncrediPath" value="${property.value};${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+
+                <repeatexecif program='${package.IncrediBuild.xgConsole.exe}' message="Building ${package.name}..." failonerror="true"
+                              repeatpattern="${___xge_repeatpattern}" maxlinestoscan="50">
+                    <args>
+                        <arg value='/command="${___xge_makecommand}"'/>
+                        <arg value='/profile="${__xge_profile}"'/>
+                        <arg value='${__xge_avoid_local}'/>
+                        <arg value='${__xge_user_options}'/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__vsimake_path};${__IncrediPath};${WindowsPaths}" />
+                        <option name="TMP" value="${IncrediTempPath}"/>
+                        <option name="TEMP" value="${IncrediTempPath}"/>
+                    </env>
+                </repeatexecif>
+            </do>
+            <do if="${__use_xge_pc} and ${__private_fw213_usexge}" >
+                <property name="__IncrediPath" value="${package.xenonsdk.appdir}\bin\win32" if="${config-system}==xenon"/>
+                <property name="__IncrediPath" value="${build.env.PATH}" unless="${config-system}==xenon"/>
+                <property name="__IncrediPath" value="${property.value}; ${incredibuild.user.path}" if="@{PropertyExists('incredibuild.user.path')}" />
+                <repeatexecif program='${package.IncrediBuild.xgConsole.exe}' message="Building ${package.name}..." failonerror="true"
+                              repeatpattern="${___xge_repeatpattern}" maxlinestoscan="50">
+                    <args>
+                        <arg value='/command="${___xge_makecommand}"'/>
+                        <arg value='/profile="${__xge_profile}"'/>
+                        <arg value='${__xge_avoid_local}'/>
+                        <arg value='${__xge_user_options}'/>
+                    </args>
+                    <env>
+                        <option name="PATH" value="${__vsimake_path};${__IncrediPath};${WindowsPaths}"/>
+                        <option name="TMP" value="${IncrediTempPath}"/>
+                        <option name="TEMP" value="${IncrediTempPath}"/>
+                    </env>
+                </repeatexecif>
+            </do>
+            <do>
+                <fail message="ERROR: Incredibuild XGE implemented only for PS3, Wii, android, PC, PC64, and Xenon platforms. Can't build using XGE for '${config-system}'."/>
+            </do>
+        </choose>
+
+    </target>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'incredibuildall')}' == 'exclude'">
+        <target name="incredibuildall" description="Build all the configurations using incredibuild">
+            <property name="eaconfig.buildall.target" value="incredibuild" />
+            <call target="eaconfig-buildall-caller" force="true" />
+        </target>
+    </do>
+
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'incredibuild-example-all')}' == 'exclude'">
+        <target name="incredibuild-example-all" description="Build all the configurations using incredibuild-example">
+            <property name="eaconfig.buildall.target" value="incredibuild-example" />
+            <property name="eaconfig.build.group" value="example" />
+            <call target="eaconfig-buildall-caller" force="true" />
+        </target>
+    </do>
+
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'incredibuild-tool-all')}' == 'exclude'">
+        <target name="incredibuild-tool-all" description="Build all the configurations using incredibuild-tool">
+            <property name="eaconfig.buildall.target" value="incredibuild-tool" />
+            <property name="eaconfig.build.group" value="tool" />
+            <call target="eaconfig-buildall-caller" force="true" />
+        </target>
+    </do>
+
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'incredibuild-test-all')}' == 'exclude'">
+        <target name="incredibuild-test-all" description="Build all the configurations using incredibuild-test">
+            <property name="eaconfig.buildall.target" value="incredibuild-test" />
+            <property name="eaconfig.build.group" value="test" />
+            <call target="eaconfig-buildall-caller" force="true" />
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+	<do unless="'@{OptionSetGetValue('eaconfig.targets', 'incredibuild')}' == 'exclude'">
+		<target name="incredibuild" description="Build the library using IncrediBuild">
+			<property name="incredibuild.usexge" value="false" unless="@{PropertyExists('incredibuild.usexge')}" />
+			<dependent name="IncrediBuild"/>
+
+			<property name="vcproj_ext" local="true" value="vcproj"/>
+			<property name="vcproj_ext" local="true" value="vcxproj" if="'${config-vs-version}'=='10.0'" />
+
+			<property name="vcproj-file" value="${package.builddir}/${package.name}/${package.name}.{vcproj_ext}"/>
+			<property name="slnmode" value="" unless="@{PropertyExists('slnmode')}"/>
+			<property name="incredibuild.xgemakefile" value="true" unless="@{PropertyExists('incredibuild.xgemakefile')}"/>
+			<property name="incredibuild.xgemake" value="true" unless="@{PropertyExists('incredibuild.xgemake')}"/>
+			<property name="slnprefix" value=""/>
+			<property name="slnprefix" value="${config}/" if="@{PropertyExists('generate-single-config')}"/>
+			<property name="sln-file" value="${package.builddir}/${slnprefix}${package.name}${slnmode}.sln"/>
+			<property name="sln-file" value="${package.builddir}/${package.name}/${package.name}.sln" unless="@{FileExists('${sln-file}')}"/>
+			<!-- eaconfig don't really save the sln file in this location.  Requested by game team to also check the sln file here. -->
+			<property name="sln-file" value="${package.builddir}/${config}/${package.name}.sln" unless="@{FileExists('${sln-file}')}"/>
+
+			<property name="platform.name.pc"       value="Win32"/>
+			<property name="platform.name.pc64"     value="x64"/>
+			<property name="platform.name.xbox"     value="Xbox"/>
+			<property name="platform.name.xenon"    value="Xbox 360"/>
+			<property name="platform.name.ps3"      value="Win32"/>
+			<property name="platform.name.rev"      value="Win32"/>
+			<property name="platform.name.android"  value="Win32"/>
+      <property name="platform.name.psp2"     value="Win32"/>
+
+			<property name="platform.name.${config-system}"  value="Win32" if="${config-compiler}==ghs"/>
+
+			<fail message="ERROR: IncrediBuild doesn't support ${config-system} builds.  Please use 'visualstudio' target instead."
+				  unless="@{PropertyExists('platform.name.${config-system}')}"/>
+
+			<property name="incredibuild.enablecmdlinesupport" value="false"/>
+			<property name="incredibuild.enablecmdlinesupport" value="${package.xenonsdk.incredibuild.support}" if="@{PropertyExists('package.xenonsdk.incredibuild.support')}"/>
+
+			<property name="incredibuild.keep_going" value="false" unless="@{PropertyExists('incredibuild.keep_going')}"/>
+			<property name="incredibuild.show_agent" value="false" unless="@{PropertyExists('incredibuild.show_agent')}"/>
+			<property name="incredibuild.show_time" value="false" unless="@{PropertyExists('incredibuild.show_time')}"/>
+			<property name="incredibuild.show_logo" value="true" unless="@{PropertyExists('incredibuild.show_logo')}"/>
+			<property name="incredibuild.custom_options" value="" unless="@{PropertyExists('incredibuild.custom_options')}"/>
+
+			<property name="__use_xge_pc" value ="${incredibuild.usexge}" />
+
+			<property name="arg.build-one-module" value=""/>
+			<property name="arg.build-one-module" value='"/Prj=${eaconfig.build-one-module}"' if="@{PropertyExists('eaconfig.build-one-module')}"/>
+
+			<choose>
+			<do if="@{FileExists('${sln-file}')}">
+				<GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+				<eval verbose="true" type="Expression" property="__private_fw213_usexge" code="${config-system}==pc or ${config-system}==pc64 or ${config-system}==xenon" />
+				<eval verbose="true" type="Expression" property="__private_fw213_usexge" code="${config-system}==ps3 or ${config-system}==rev or ${config-system}==android or ${config-system}==psp2 or ${config-compiler}==ghs or (${__use_xge_pc} and ${__private_fw213_usexge})" />
+
+				<!-- Define TMP environment variable to pass to incredibuild -->
+				<property name="IncrediTempPath" value="@{PathGetDirectoryName('${sln-file}')}\IncrediTemp"/>
+				<mkdir dir="${IncrediTempPath}" unless="@{DirectoryExists('${IncrediTempPath}')}"/>
+
+				<property name="___console_repeatpattern" value="Timed out waiting for Build System process to initialize."/>
+				<property name="___console_repeatpattern" value="${incredibuild.xgConsole.repeatpattern}" if="@{PropertyExists('incredibuild.xgConsole.repeatpattern')}"/>
+
+				<choose>
+					<do if="${__private_fw213_usexge}" >
+						<call target="__private_vs_to_makefile" if="${incredibuild.xgemakefile}"/>
+						<call target="incredibuild.make.postprocess" if="@{TargetExists('incredibuild.make.postprocess')}" />
+						<call target="__private_xgMake" if="${incredibuild.xgemake}"/>
+					</do>
+						<do if="${incredibuild.enablecmdlinesupport}">
+							<repeatexecif program="${package.IncrediBuild.BuildConsole.exe}"
+										  repeatpattern="${___console_repeatpattern}" maxlinestoscan="50">
+								<args>
+									<arg value='"${sln-file}"'/>
+									<arg value='/CFG="${config}|${platform.name.${config-system}}"'/>
+									<arg value='/All' if="${incredibuild.keep_going}"/>
+									<arg value='/ShowAgent' if="${incredibuild.show_agent}"/>
+									<arg value='/ShowTime' if="${incredibuild.show_time}"/>
+									<arg value='/NoLogo' ifnot="${incredibuild.show_logo}"/>
+									<arg value='${incredibuild.custom_options}' if="@{StrLen('${incredibuild.custom_options}')} > 0"/>
+									<arg value='${arg.build-one-module}'/>
+								</args>
+								<env>
+									<option name="IB_XDKInstalledVersion" value="${package.xenonsdk.IB_XDKInstalledVersion}"/>
+									<option name="IB_XDKInstallPath" value="${package.xenonsdk.IB_XDKInstallPath}"/>
+									<option name="IB_XDKProjectDefaultsDir" value="${package.xenonsdk.IB_XDKProjectDefaultsDir}"/>
+									<option name="TMP" value="${IncrediTempPath}"/>
+									<option name="TEMP" value="${IncrediTempPath}"/>
+								</env>
+							</repeatexecif>
+						</do>
+						<do unless="${incredibuild.enablecmdlinesupport}">
+							<repeatexecif program="${package.IncrediBuild.BuildConsole.exe}"
+										  repeatpattern="${___console_repeatpattern}" maxlinestoscan="50">
+								<args>
+									<arg value='"${sln-file}"'/>
+									<arg value='/CFG="${config}|${platform.name.${config-system}}"'/>
+									<arg value='/All' if="${incredibuild.keep_going}"/>
+									<arg value='/ShowAgent' if="${incredibuild.show_agent}"/>
+									<arg value='/ShowTime' if="${incredibuild.show_time}"/>
+									<arg value='/NoLogo' ifnot="${incredibuild.show_logo}"/>
+									<arg value='${incredibuild.custom_options}' if="@{StrLen('${incredibuild.custom_options}')} > 0"/>
+									<arg value='${arg.build-one-module}'/>
+								</args>
+								<env>
+									<option name="TMP" value="${IncrediTempPath}"/>
+									<option name="TEMP" value="${IncrediTempPath}"/>
+								</env>
+							</repeatexecif>
+						</do>
+				</choose>
+			</do>
+			<do if="@{FileExists('${vcproj-file}')}">
+				<!-- Define TMP environment variable to pass to incredibuild -->
+				<property name="IncrediTempPath" value="@{PathGetDirectoryName('${vcproj-file}')}\IncrediTemp"/>
+				<mkdir dir="${IncrediTempPath}" unless="@{DirectoryExists('${IncrediTempPath}')}"/>
+
+				<do if="${incredibuild.enablecmdlinesupport}">
+					<repeatexecif program="${package.IncrediBuild.BuildConsole.exe}"
+								  repeatpattern="${___console_repeatpattern}" maxlinestoscan="50">
+						<args>
+							<arg value='"${vcproj-file}"'/>
+							<arg value='/CFG="${config}|${platform.name.${config-system}}"'/>
+							<arg value='/All' if="${incredibuild.keep_going}"/>
+							<arg value='/ShowAgent' if="${incredibuild.show_agent}"/>
+							<arg value='/ShowTime' if="${incredibuild.show_time}"/>
+							<arg value='/NoLogo' ifnot="${incredibuild.show_logo}"/>
+							<arg value='${incredibuild.custom_options}' if="@{StrLen('${incredibuild.custom_options}')} > 0"/>
+							<arg value='${arg.build-one-module}'/>
+						</args>
+						<env>
+							<option name="IB_XDKInstalledVersion" value="${package.xenonsdk.IB_XDKInstalledVersion}"/>
+							<option name="IB_XDKInstallPath" value="${package.xenonsdk.IB_XDKInstallPath}"/>
+							<option name="IB_XDKProjectDefaultsDir" value="${package.xenonsdk.IB_XDKProjectDefaultsDir}"/>
+							<option name="TMP" value="${IncrediTempPath}"/>
+							<option name="TEMP" value="${IncrediTempPath}"/>
+						</env>
+					</repeatexecif>
+				</do>
+				<do unless="${incredibuild.enablecmdlinesupport}">
+					<repeatexecif program="${package.IncrediBuild.BuildConsole.exe}"
+						  repeatpattern="${___console_repeatpattern}" maxlinestoscan="50">
+						<args>
+							<arg value='"${vcproj-file}"'/>
+							<arg value='/CFG="${config}|${platform.name.${config-system}}"'/>
+							<arg value='/All' if="${incredibuild.keep_going}"/>
+							<arg value='/ShowAgent' if="${incredibuild.show_agent}"/>
+							<arg value='/ShowTime' if="${incredibuild.show_time}"/>
+							<arg value='/NoLogo' ifnot="${incredibuild.show_logo}"/>
+							<arg value='${incredibuild.custom_options}' if="@{StrLen('${incredibuild.custom_options}')} > 0"/>
+							<arg value='${arg.build-one-module}'/>
+						</args>
+						<env>
+							<option name="TMP" value="${IncrediTempPath}"/>
+							<option name="TEMP" value="${IncrediTempPath}"/>
+						</env>
+					</repeatexecif>
+				</do>
+			</do>
+			<do>
+				<fail message="Need to generate VCPROJ or SLN file for ${package.name} package.  Couldn't find ${vcproj-file}"/>
+			</do>
+			</choose>
+		</target>
+	</do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio')}' == 'exclude'">
+        <target name="visualstudio" description="Build the library using visualstudio">
+            <do if="${config-compiler}=='sn' or ${config-system}=='ps3'">
+                <dependent name="snvsi"/>
+            </do>
+            <do if="${config-system}=='ps3' and @{PropertyExists('config-vs-version')}">
+                <!-- Detect if Visual Studio parallel build is turned on.  If it is, give user a warning.  It is not reliable to be used together with ps3 build. -->
+                <property name="__private_vs_concurrent_build_regkey" value="SOFTWARE\Microsoft\VisualStudio\${config-vs-version}\General"/>
+                <property name="__private_vs_concurrent_build_regvalue" value="MaxConcurrentBuilds"/>
+                <do if="@{RegistryKeyExists('CurrentUser','${__private_vs_concurrent_build_regkey}')}">
+                    <do if="@{RegistryValueExists('CurrentUser','${__private_vs_concurrent_build_regkey}','${__private_vs_concurrent_build_regvalue}')}">
+                        <!-- Only spit warning message if we found the registry key and value. -->
+                        <property name="__private_vs_concurrent_build_setting" value="@{RegistryGetValue('CurrentUser','${__private_vs_concurrent_build_regkey}','${__private_vs_concurrent_build_regvalue}')}"/>
+                        <do if="${__private_vs_concurrent_build_setting} gt 1">
+                            <echo message="CAUTION: Your current Visual Studio's maximum number of parallel project builds is set to ${__private_vs_concurrent_build_setting}.  Visual Studio parallel build setting is known to cause build issue.  You may need to reset this to 1."/>
+                        </do>
+                    </do>
+                </do>
+            </do>
+			<property name="vsi-use-dbs" value="0"/>
+			<choose>
+				<!-- for winrt programs, we need to call deploy.  this will do a build if necessary -->
+				<do if="${config-system} == 'winrt'">
+					<call target="visualstudio-internal-deploy" />
+				</do>
+				<do>
+					<call target="visualstudio-internal"/>
+				</do>
+			</choose>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-example')}' == 'exclude'">
+        <target name="visualstudio-example">
+            <property name="slnmode" value="-example"/>
+            <call target="visualstudio"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-test')}' == 'exclude'">
+        <target name="visualstudio-test">
+            <property name="slnmode" value="-test"/>
+            <call target="visualstudio"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-tool')}' == 'exclude'">
+        <target name="visualstudio-tool">
+            <property name="slnmode" value="-tool"/>
+            <call target="visualstudio"/>
+        </target>
+    </do>
+
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-clean')}' == 'exclude'">
+        <target name="visualstudio-clean" description="Clean the library using visualstudio">
+            <call target="visualstudio-internal-clean"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-example-clean')}' == 'exclude'">
+        <target name="visualstudio-example-clean">
+            <property name="slnmode" value="-example"/>
+            <call target="visualstudio-clean"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-test-clean')}' == 'exclude'">
+        <target name="visualstudio-test-clean">
+            <property name="slnmode" value="-test"/>
+            <call target="visualstudio-clean"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-tool-clean')}' == 'exclude'">
+        <target name="visualstudio-tool-clean">
+            <property name="slnmode" value="-tool"/>
+            <call target="visualstudio-clean"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-deploy')}' == 'exclude'">
+        <target name="visualstudio-deploy" description="Clean the library using visualstudio">
+            <call target="visualstudio-internal-deploy"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-example-deploy')}' == 'exclude'">
+        <target name="visualstudio-example-deploy">
+            <property name="slnmode" value="-example"/>
+            <call target="visualstudio-deploy"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-test-deploy')}' == 'exclude'">
+        <target name="visualstudio-test-deploy">
+            <property name="slnmode" value="-test"/>
+            <call target="visualstudio-deploy"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'visualstudio-tool-deploy')}' == 'exclude'">
+        <target name="visualstudio-tool-deploy">
+            <property name="slnmode" value="-tool"/>
+            <call target="visualstudio-deploy"/>
+        </target>
+    </do>
+
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'sndbs')}' == 'exclude'">
+        <target name="sndbs" description="Build the library using visualstudio (SN-DBS enabled)">
+            <dependent name="sndbs"/>
+            <dependent name="snvsi"/>
+            <property name="vsi-use-dbs" value="1"/>
+            <property name="is-sndbs2" value="false"/>
+            <property name="is-sndbs2" value="true" if="@{StrCompareVersions('${package.sndbs.version}', '2.0.0')} gte 0"/>
+            <call target="visualstudio-internal"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'distributed-build-example')}' == 'exclude'">
+        <target name="distributed-build-example">
+            <property name="slnmode" value="-example"/>
+            <call target="distributed-build"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'distributed-build-test')}' == 'exclude'">
+        <target name="distributed-build-test">
+            <property name="slnmode" value="-test"/>
+            <call target="distributed-build"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'distributed-build-tool')}' == 'exclude'">
+        <target name="distributed-build-tool">
+            <property name="slnmode" value="-tool"/>
+            <call target="distributed-build"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'incredibuild-example')}' == 'exclude'">
+        <target name="incredibuild-example">
+            <property name="slnmode" value="-example"/>
+            <call target="incredibuild"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'incredibuild-test')}' == 'exclude'">
+        <target name="incredibuild-test">
+            <property name="slnmode" value="-test"/>
+            <call target="incredibuild"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'incredibuild-tool')}' == 'exclude'">
+        <target name="incredibuild-tool">
+            <property name="slnmode" value="-tool"/>
+            <call target="incredibuild"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'sndbs-example')}' == 'exclude'">
+        <target name="sndbs-example">
+            <property name="slnmode" value="-example"/>
+            <call target="sndbs"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'sndbs-test')}' == 'exclude'">
+        <target name="sndbs-test">
+            <property name="slnmode" value="-test"/>
+            <call target="sndbs"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <do unless="'@{OptionSetGetValue('eaconfig.targets', 'sndbs-tool')}' == 'exclude'">
+        <target name="sndbs-tool">
+            <property name="slnmode" value="-tool"/>
+            <call target="sndbs"/>
+        </target>
+    </do>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <target name="visualstudio-internal" hidden="true">
+        <call target="get-visualstudio-installdir"/>
+        <property name="vcproj-file" value="${package.builddir}/${package.name}/${package.name}.vcproj"/>
+        <property name="vcproj-file" value="${package.builddir}/${package.name}/${package.name}.vcxproj" if="@{PropertyExists('package.eaconfig.isusingvc10')}"/>
+
+        <property name="slnmode" value="" unless="@{PropertyExists('slnmode')}"/>
+        <property name="slnprefix" value=""/>
+        <property name="slnprefix" value="${config}/" if="@{PropertyExists('generate-single-config')}"/>
+        <property name="sln-file" value="${package.builddir}/${slnprefix}${package.name}${slnmode}.sln"/>
+        <property name="sln-file" value="${package.builddir}/${package.name}/${package.name}.sln" unless="@{FileExists('${sln-file}')}"/>
+
+        <property name="platform.name.pc"    value="Win32"/>
+        <property name="platform.name.pc64"  value="x64"/>
+        <property name="platform.name.ps2"   value="Win32"/>
+        <property name="platform.name.ps3"   value="Win32"/>
+        <property name="platform.name.xbox"  value="Xbox"/>
+        <property name="platform.name.xenon" value="Xbox 360"/>
+        <property name="platform.name.winrt" value="x64" if="${config-processor} == 'x64'" />
+        <property name="platform.name.winrt" value="x86" if="${config-processor} == 'x86'" />
+        <property name="platform.name.winrt" value="ARM" if="${config-processor} == 'arm'" />
+
+        <fail message="ERROR: Visual Studio doesn't support ${config-system} builds."
+              unless="@{PropertyExists('platform.name.${config-system}')}"/>
+
+        <!-- Don't assume that the global SCE_PS3_ROOT environment variable references the same
+             version of the PlayStation3 SDK as we have specified in our masterconfig.xml file. -->
+        <do if="${config-system} == ps3">
+            <property name="exec.env.SCE_PS3_ROOT" value="${package.${PlayStation3Package}.appdir}"/>
+        </do>
+
+        <property name="is-sndbs2" value="false" unless="@{PropertyExists('is-sndbs2')}"/>
+
+        <property name="arg.build-one-module" value=""/>
+        <property name="arg.build-one-module" value="/project ${eaconfig.build-one-module}" if="@{PropertyExists('eaconfig.build-one-module')}"/>
+
+
+        <choose>
+            <do if="@{FileExists('${sln-file}')}">
+                <GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+                <choose>
+                    <do if="'${is-sndbs2}'=='true'">
+                        <exec program="vsibuild.exe">
+                            <arg value="${sln-file}"/>
+                            <arg value='"${config}|${platform.name.${config-system}}"'/>
+                            <arg value="/sn-dbs"/>
+                        </exec>
+                    </do>
+                    <do>
+                        <exec program="${eaconfig.visualstudio.installdir}\Common7\IDE\devenv.com">
+                            <arg value="/build"/>
+                            <arg value='"${config}|${platform.name.${config-system}}"'/>
+                            <arg value='"${sln-file}"'/>
+                            <arg value="${arg.build-one-module}"/>
+                            <env>
+                                <option name="VSI_USE_DBS" value="${vsi-use-dbs}"/>
+                            </env>
+                        </exec>
+                    </do>
+                </choose>
+            </do>
+            <do if="@{FileExists('${vcproj-file}')}">
+                <exec program="${eaconfig.visualstudio.installdir}\Common7\IDE\devenv.com">
+                    <arg value='"${vcproj-file}"'/>
+                    <arg value="/build"/>
+                    <arg value='"${config}|${platform.name.${config-system}}"'/>
+                    <env>
+                        <option name="VSI_USE_DBS" value="${vsi-use-dbs}"/>
+                    </env>
+                </exec>
+            </do>
+            <do>
+                <fail message="Need to generate VCPROJ or SLN file for ${package.name} package.  Couldn't find ${vcproj-file}"/>
+            </do>
+        </choose>
+    </target>
+
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <target name="visualstudio-internal-clean" hidden="true">
+        <call target="get-visualstudio-installdir"/>
+
+        <property name="vcproj_ext" local="true" value="vcproj"/>
+        <property name="vcproj_ext" local="true" value="vcxproj" if="'${config-vs-version}'=='10.0'" />
+
+        <property name="vcproj-file" value="${package.builddir}/${package.name}/${package.name}.${vcproj_ext}"/>
+        <property name="slnmode" value="" unless="@{PropertyExists('slnmode')}"/>
+        <property name="slnprefix" value=""/>
+        <property name="slnprefix" value="${config}/" if="@{PropertyExists('generate-single-config')}"/>
+        <property name="sln-file" value="${package.builddir}/${slnprefix}${package.name}${slnmode}.sln"/>
+        <property name="sln-file" value="${package.builddir}/${package.name}/${package.name}.sln" unless="@{FileExists('${sln-file}')}"/>
+
+        <property name="platform.name.pc"    value="Win32"/>
+        <property name="platform.name.pc64"  value="x64"/>
+        <property name="platform.name.ps2"   value="Win32"/>
+        <property name="platform.name.ps3"   value="Win32"/>
+        <property name="platform.name.xbox"  value="Xbox"/>
+        <property name="platform.name.xenon" value="Xbox 360"/>
+        <property name="platform.name.winrt" value="x64" if="${config-processor} == 'x64'" />
+        <property name="platform.name.winrt" value="x86" if="${config-processor} == 'x86'" />
+        <property name="platform.name.winrt" value="ARM" if="${config-processor} == 'arm'" />
+
+        <fail message="ERROR: Visual Studio doesn't support ${config-system} builds."
+            unless="@{PropertyExists('platform.name.${config-system}')}"/>
+
+        <property name="arg.build-one-module" value=""/>
+        <property name="arg.build-one-module" value="/project ${eaconfig.build-one-module}" if="@{PropertyExists('eaconfig.build-one-module')}"/>
+
+        <choose>
+            <do if="@{FileExists('${sln-file}')}">
+                <GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+                <exec program="${eaconfig.visualstudio.installdir}\Common7\IDE\devenv.com">
+                    <arg value="/clean"/>
+                    <arg value='"${config}|${platform.name.${config-system}}"'/>
+                    <arg value="${sln-file}"/>
+                    <arg value="${arg.build-one-module}"/>
+                </exec>
+            </do>
+            <do if="@{FileExists('${vcproj-file}')}">
+                <exec program="${eaconfig.visualstudio.installdir}\Common7\IDE\devenv.com">
+                    <arg value="${vcproj-file}"/>
+                    <arg value="/clean"/>
+                    <arg value='"${config}|${platform.name.${config-system}}"'/>
+                    <env>
+                        <option name="VSI_USE_DBS" value="${vsi-use-dbs}"/>
+                    </env>
+                </exec>
+            </do>
+        </choose>
+    </target>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+    <target name="visualstudio-internal-deploy" hidden="true">
+        <call target="get-visualstudio-installdir"/>
+
+        <property name="vcproj_ext" local="true" value="vcproj"/>
+        <property name="vcproj_ext" local="true" value="vcxproj" if="'${config-vs-version}'=='10.0'" />
+
+        <property name="vcproj-file" value="${package.builddir}/${package.name}/${package.name}.${vcproj_ext}"/>
+        <property name="slnmode" value="" unless="@{PropertyExists('slnmode')}"/>
+        <property name="slnprefix" value=""/>
+        <property name="slnprefix" value="${config}/" if="@{PropertyExists('generate-single-config')}"/>
+        <property name="sln-file" value="${package.builddir}/${slnprefix}${package.name}${slnmode}.sln"/>
+        <property name="sln-file" value="${package.builddir}/${package.name}/${package.name}.sln" unless="@{FileExists('${sln-file}')}"/>
+
+        <property name="platform.name.pc"    value="Win32"/>
+        <property name="platform.name.pc64"  value="x64"/>
+        <property name="platform.name.ps2"   value="Win32"/>
+        <property name="platform.name.ps3"   value="Win32"/>
+        <property name="platform.name.xbox"  value="Xbox"/>
+        <property name="platform.name.xenon" value="Xbox 360"/>
+        <property name="platform.name.winrt" value="x64" if="${config-processor} == 'x64'" />
+        <property name="platform.name.winrt" value="x86" if="${config-processor} == 'x86'" />
+        <property name="platform.name.winrt" value="ARM" if="${config-processor} == 'arm'" />
+
+        <fail message="ERROR: Visual Studio doesn't support ${config-system} builds."
+            unless="@{PropertyExists('platform.name.${config-system}')}"/>
+
+        <property name="arg.build-one-module" value=""/>
+        <property name="arg.build-one-module" value="/project ${eaconfig.build-one-module}" if="@{PropertyExists('eaconfig.build-one-module')}"/>
+
+        <choose>
+            <do if="@{FileExists('${sln-file}')}">
+                <GetConfigPlatform configname="config" platformname="platform.name.${config-system}" file="${sln-file}" />
+                <exec program="${eaconfig.visualstudio.installdir}\Common7\IDE\devenv.com">
+                    <arg value="/deploy"/>
+                    <arg value='"${config}|${platform.name.${config-system}}"'/>
+                    <arg value="${sln-file}"/>
+                    <arg value="${arg.build-one-module}"/>
+                </exec>
+            </do>
+            <do if="@{FileExists('${vcproj-file}')}">
+                <exec program="${eaconfig.visualstudio.installdir}\Common7\IDE\devenv.com">
+                    <arg value="${vcproj-file}"/>
+                    <arg value="/deploy"/>
+                    <arg value='"${config}|${platform.name.${config-system}}"'/>
+                    <env>
+                        <option name="VSI_USE_DBS" value="${vsi-use-dbs}"/>
+                    </env>
+                </exec>
+            </do>
+        </choose>
+    </target>
+
+
+    <!-- Locate the Visual Studio install directory. -->
+    <target name="get-visualstudio-installdir">
+        <property name="eaconfig.VisualStudio.registrykey" value="SOFTWARE\Microsoft\VisualStudio\SxS\VS7"/>
+        <fail
+          unless="@{RegistryValueExists('LocalMachine', '${eaconfig.VisualStudio.registrykey}', '${config-vs-version}')}"
+          message="Visual Studio ${config-vs-version} is not installed on this system."
+    />
+        <property name="eaconfig.visualstudio.installdir" value="@{RegistryGetValue('LocalMachine', '${eaconfig.VisualStudio.registrykey}', '${config-vs-version}')}"/>
+    </target>
+
+</project>

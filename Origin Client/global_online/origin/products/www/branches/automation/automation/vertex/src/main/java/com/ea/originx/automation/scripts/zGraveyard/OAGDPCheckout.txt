@@ -1,0 +1,115 @@
+package com.ea.originx.automation.scripts.checkout;
+
+import com.ea.originx.automation.lib.macroaction.MacroGDP;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.Waits;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.gdp.GDPActionCTA;
+import com.ea.originx.automation.lib.pageobjects.gdp.OfferSelectionPage;
+import com.ea.originx.automation.lib.pageobjects.login.LoginPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.AccessInterstitialPage;
+import com.ea.originx.automation.lib.pageobjects.store.*;
+import com.ea.originx.automation.lib.resources.OriginClientData;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+import java.util.ArrayList;
+
+/**
+ * Test GDP checkout on client and browser
+ *
+ * @author mdobre
+ */
+public class OAGDPCheckout extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 1016688)
+    @Test(groups = {"checkout", "release_smoke", "int_only"})
+    public void testGDPCheckout(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_STANDARD);
+        boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        if (isClient) {
+            logFlowPoint("Launch Origin and register as a new user on client."); // 1
+        }
+        logFlowPoint("Navigate to GDP page and click 'Buy' button."); // 2
+        if (!isClient) {
+            logFlowPoint("Verify login page appears on browser."); // 3
+        }
+        if (!isClient) {
+            logFlowPoint("Create new user account from login page and verify user is able to login on browser."); // 4
+        }
+        logFlowPoint("Proceed purchasing entitlement and verify packart on 'Review Order' Page."); // 5
+        logFlowPoint("Verify total price on 'Review Order' Page.");// 6
+        logFlowPoint("Click 'Complete Order' button and verify navigating to 'Thank You' Page."); // 7
+        if (!isClient) {
+            logFlowPoint("Verify there is an origin download link on 'Thank You' Page on browser."); // 8
+        }
+        logFlowPoint("Verify there is an order history link on 'Thank You' Page."); // 9
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (isClient) {
+            logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+        }
+
+        //2
+        logPassFail(MacroGDP.loadGdpPage(driver, entitlement), true);
+        new GDPActionCTA(driver).clickGetTheGameCTA();
+        new AccessInterstitialPage(driver).clickBuyGameOSPCTA();
+        new OfferSelectionPage(driver).clickPrimaryButton(entitlement.getOcdPath());
+
+        //3
+        if (!isClient) {
+            final LoginPage loginPage = new LoginPage(driver);
+            loginPage.waitForPageToLoad();
+            ArrayList<String> tabs = new ArrayList<>(driver.getWindowHandles());
+            driver.switchTo().window(tabs.get(1));
+            logPassFail(Waits.pollingWait(loginPage::isOnLoginPage), true);
+
+            //4
+            driver.switchTo().window(tabs.get(0));
+            loginPage.clickRegistrationLink();
+            MacroLogin.quickRegister(userAccount, driver);
+            logPassFail(Waits.waitIsPageThatMatchesOpen(driver, OriginClientData.MAIN_SPA_PAGE_URL, 15), true);
+        }
+
+        //5
+        MacroPurchase.handlePaymentInfoPage(driver);
+        ReviewOrderPage reviewOrder = new ReviewOrderPage(driver);
+        reviewOrder.waitForPageToLoad();
+        logPassFail(Waits.pollingWait(() -> reviewOrder.verifyPackArtExists()), false);
+
+        //6
+        logPassFail(reviewOrder.verifyTotalCost(), false);
+
+        //7
+        reviewOrder.clickCompleteOrderButton();
+        ThankYouPage thankYouPage = new ThankYouPage(driver);
+        thankYouPage.waitForThankYouPageToLoad();
+        logPassFail(Waits.pollingWait(thankYouPage::verifyThankYouPageReached), true);
+
+        //8
+        if (!isClient) {
+            logPassFail(thankYouPage.verifyOriginDownloadLink(), false);
+        }
+
+        //9
+        logPassFail(thankYouPage.verifyViewOrderHistoryLink(), false);
+
+        softAssertAll();
+    }
+}

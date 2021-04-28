@@ -1,0 +1,151 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'clean')}' == 'exclude'">
+    <target name="clean" description="Clean the specific configuration">
+      <call target="clean-default"/>
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="eaconfig-clean" hidden="true" >
+    <echo message="WARNING: The 'eaconfig-clean' target is deprecated.  Please use 'clean-default' instead."/>
+    <call target="clean-default"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'clean-default')}' == 'exclude'">
+    <target name="clean-default" description="Default implementation of 'clean' target.">
+      <property name="eaconfig.build.target" value="__private_clean_default_implementation" />
+      <property name="eaconfig.build.group" value="runtime" />
+      <call target="eaconfig-build-caller" force="true" />
+    </target>
+  </do>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <target name="__private_clean_default_implementation" hidden="true" >
+
+    <!-- 
+    Clean up which module groups? For top package, runtime plus included tool, example,
+    and test; for dependents, only runtime.
+    -->
+    <property name="eaconfig.clean.groups" value="runtime"/>
+    <do unless="@{PropertyExists('package.${package.name}.parent')}">
+      <property name="eaconfig.clean.groups" value="${property.value} tool"
+        if="@{TargetExists('tool-build')}"/>
+      <property name="eaconfig.clean.groups" value="${property.value} example"
+        if="@{TargetExists('example-build')}"/>
+      <property name="eaconfig.clean.groups" value="${property.value} test"
+        if="@{TargetExists('test-build')}"/>
+    </do>
+
+    <foreach item="String" in="${eaconfig.clean.groups}" delim=" " property="group">
+      <property name="eaconfig.clean.group" value="${group}" />
+
+      <choose>
+        <do if="@{PropertyExists('${eaconfig.${eaconfig.clean.group}.groupname}.buildmodules')}">
+          <!-- Get dependents of all modules -->
+          <property name="build.builddependencies.all"/>
+          <foreach item="String" in="${${eaconfig.${eaconfig.clean.group}.groupname}.buildmodules}" delim=" " property="module">
+            <do if="@{PropertyExists('${eaconfig.${eaconfig.clean.group}.groupname}.${module}.builddependencies')}">
+              <property name="build.builddependencies.all">
+                ${property.value}
+                ${${eaconfig.${eaconfig.clean.group}.groupname}.${module}.builddependencies}
+              </property>
+            </do>
+            <do if="@{PropertyExists('${eaconfig.${eaconfig.clean.group}.groupname}.${module}.builddependencies.${config-system}')}">
+              <property name="build.builddependencies.all">
+                ${property.value}
+                ${${eaconfig.${eaconfig.clean.group}.groupname}.${module}.builddependencies.${config-system}}
+              </property>
+            </do>
+          </foreach>
+          <!-- Remove redundant dependents -->
+          <property name="build.builddependencies.tmp"/>
+          <foreach item="String" in="${build.builddependencies.all}" property="dependent">
+            <property name = "unique" value="true"/>
+            <foreach item="String" in="${build.builddependencies.tmp}" property="unique.dependent">
+              <do if="@{StrCompare('${unique.dependent}', '${dependent}')} == 0" >
+                <property name = "unique" value="false"/>
+              </do>
+            </foreach>
+            <do if="${unique}==true">
+              <property name="build.builddependencies.tmp">
+                ${property.value}
+                ${dependent}
+              </property>
+            </do>
+          </foreach>
+          <property name="build.builddependencies.all" value="${build.builddependencies.tmp}"/>
+          <eval code="@{PropertyUndefine('build.builddependencies.tmp')}" type='Function' />
+        </do>
+        <do>
+          <property name="build.builddependencies" value="${${eaconfig.${eaconfig.clean.group}.groupname}.builddependencies}" if="@{PropertyExists('${eaconfig.${eaconfig.clean.group}.groupname}.builddependencies')}" />
+          <property name="build.builddependencies.${config-system}" value="${${eaconfig.${eaconfig.clean.group}.groupname}.builddependencies.${config-system}}" if="@{PropertyExists('${eaconfig.${eaconfig.clean.group}.groupname}.builddependencies.${config-system}')}" />
+          <call target="build-common-createbuilddependencies" force="true" />
+        </do>
+      </choose>
+      <foreach property="dependent" item="String" in="${build.builddependencies.all}">
+        <dependent name="${dependent}"/>
+      </foreach>
+    </foreach>
+
+    <!-- Check make style modules -->
+    <do if="@{PropertyExists('${groupname}.MakeCleanCommand')}">
+      <property name="temp-batch" value="@{PathGetTempFileName()}.bat" />
+      <choose>
+        <do if="@{PlatformIsWindows()}">
+          <echo file="${temp-batch}" append="false" >
+            @echo off
+            ${${groupname}.MakeCleanCommand}
+          </echo>
+          <exec program="${temp-batch}" message="Executing MakeStyle clean command"/>
+          <!-- Didn't bother to delete the temp file because sometimes, Windows seems to hold onto the file make causes build error during the delete!" -->
+        </do>
+        <do>
+          <property name="UnixMakeCleanCommand" value="@{StrReplace('${${groupname}.MakeCleanCommand}', '\r\n', '\n')}"/>
+
+          <!-- 
+                    Don't try combining these into one echo statement with newlines.
+                    The resulting shell file will have invalid newlines which will catch it to fail
+                    -->
+          <echo file="${temp-batch}" append="false" message="#!/bin/bash" />
+          <echo file="${temp-batch}" append="true" message="${${groupname}.MakeCleanCommand}" />
+
+          <exec program="chmod" message="Modifying permissions">
+            <args>
+              <arg value="777"/>
+              <arg value="${temp-batch}"/>
+            </args>
+          </exec>
+          <exec program="bash" workingdir="${package.builddir}" message="Executing MakeStyle clean command">
+            <args>
+              <arg value="${temp-batch}"/>
+            </args>
+          </exec>
+        </do>
+      </choose>
+    </do>
+
+    <delete dir="${package.builddir}/${config}" if="@{DirectoryExists('${package.builddir}/${config}')}"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <do unless="'@{OptionSetGetValue('eaconfig.targets', 'cleanall')}' == 'exclude'">
+    <target name="cleanall" description="Clean all configurations" >
+      <foreach item="String" in="${package.configs}" property="clean-config-name">
+        <nant buildfile="${package.dir}/${package.name}.build" target="clean">
+          <property name="config" value="${clean-config-name}"/>
+        </nant>
+      </foreach>
+      <!-- Not safe to do this.  Default builddir is the package directory and clients could
+        specify any directory as the build root and it would be deleted
+      <delete dir="${package.builddir}"/>
+      -->
+    </target>
+  </do>
+
+</project>

@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><project>
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.ea.core</groupId>
+	<artifactId>buildLauncher</artifactId>
+	<name>buildLauncher</name>
+	<version>${version.name}</version>
+	<packaging>pom</packaging>
+	
+  <!-- Source Control Management -->
+	<!--
+		http://maven.apache.org/ref/current/maven-model/maven.html#class_scm
+	-->
+	<!--
+		NOTE: This block must exist independently in each child project!
+	-->
+
+  <!-- versionPackage packages up the last CL synced.  -->
+  <modules>
+    <module>version\versionPackage</module>
+  </modules>
+
+  <distributionManagement>
+		<!-- Fusion Snapshots -->
+		<snapshotRepository>
+			<id>snapshots</id>
+			<url>http://ebisu-build03:8088/nexus/content/repositories/snapshots</url>
+			<uniqueVersion>true</uniqueVersion>
+		</snapshotRepository>
+	</distributionManagement>
+
+	<properties>
+		<branch.name>8.6</branch.name>
+		<version.name>8.6.0-SNAPSHOT</version.name>
+    <p4.server>eac-p4proxy:4487</p4.server>
+  </properties>
+
+	<scm>
+		<connection>
+            scm:perforce:p4serv1.online.ea.com:4487://ebisu/client/$(branch.name)/${artifactId}
+        </connection>
+		<developerConnection>${scm.connection}</developerConnection>
+		<url>http://docs.online.ea.com:4487/ebisu/client/$(branch.name)/${artifactId}</url>
+	</scm>
+	
+	
+	
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-clean-plugin</artifactId>
+				<version>2.4</version>
+				<configuration>
+					<filesets>
+						<fileset>
+							<directory>${basedir}/${build.configuration}</directory>
+						</fileset>
+					</filesets>
+				</configuration>
+			</plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-getLastBuildNumber</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.ea.core</groupId>
+                  <artifactId>getLastBuildNumber</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/dependency</outputDirectory>
+                  <type>zip</type>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-UpdateVersion</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.ea.core</groupId>
+                  <artifactId>UpdateVersion</artifactId>
+                  <version>1.4.0-SNAPSHOT</version>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/dependency</outputDirectory>
+                  <type>zip</type>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>getLastInstallerBuild</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>python.exe</executable>
+              <workingDirectory>target/dependency</workingDirectory>
+              <arguments>
+                <argument>getLastBuildNumber.py</argument>
+                <argument>-rhttp://ebisu-build01:8080/hudson</argument>
+                <argument>-j"OriginInstaller-8.6"</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>properties-maven-plugin</artifactId>
+        <version>1.0-alpha-2</version>
+        <executions>
+          <execution>
+            <phase>compile</phase>
+            <goals>
+              <goal>read-project-properties</goal>
+            </goals>
+            <configuration>
+              <files>
+                <file>target/dependency/number.properties</file>
+              </files>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>properties-maven-plugin</artifactId>
+        <version>1.0-alpha-2</version>
+        <executions>
+          <execution>
+            <phase>compile</phase>
+            <goals>
+              <goal>read-project-properties</goal>
+            </goals>
+            <configuration>
+              <files>
+                <file>target/dependency/number.properties</file>
+              </files>
+            </configuration>
+          </execution>
+        </executions>
+        </plugin>
+        <plugin>
+          <artifactId>maven-antrun-plugin</artifactId>
+          <executions>
+            <execution>
+              <phase>install</phase>
+              <configuration>
+                <tasks>
+                  <taskdef resource="net/sf/antcontrib/antcontrib.properties" classpathref="maven.plugin.classpath"/>
+                  <math result="new.build.num" operand1="${upstream.build.num}" operation="+" operand2="1" datatype="int"/>
+                  <echo>NEW BUILD REVISION NUMBER IS ${new.build.num}</echo>
+
+                  <exec executable="python.exe" dir="target/dependency">
+                    <arg value="update-version.py"/>
+                    <arg value="-o../../version/"/>
+                    <arg value="-v${branch.name}.version"/>
+                    <arg value="-i${new.build.num}"/>
+                    <arg value="-c00000"/>
+                    <arg value="-s${p4.server}"/>
+                    <arg value="-w${p4.clientspec}"/>
+                    <arg value="-uhudson.online"/>
+                    <arg value="-kCrMbLmTXe"/>
+                  </exec>
+                </tasks>
+
+              </configuration>
+              <goals>
+                <goal>run</goal>
+              </goals>
+            </execution>
+          </executions>
+          <dependencies>
+            <dependency>
+              <groupId>ant-contrib</groupId>
+              <artifactId>ant-contrib</artifactId>
+              <version>1.0b3</version>
+              <exclusions>
+                <exclusion>
+                  <groupId>ant</groupId>
+                  <artifactId>ant</artifactId>
+                </exclusion>
+              </exclusions>
+            </dependency>
+            <dependency>
+              <groupId>ant</groupId>
+              <artifactId>ant-nodeps</artifactId>
+              <version>1.6.5</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>2.5</version>
+          <configuration>
+            <skip>true</skip>
+          </configuration>
+        </plugin>
+      </plugins>
+  </build>
+	<dependencies>
+    <dependency>
+      <groupId>com.ea.core</groupId>
+      <artifactId>getLastBuildNumber</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+      <type>zip</type>
+    </dependency>  
+    <dependency>
+      <groupId>com.ea.core</groupId>
+      <artifactId>UpdateVersion</artifactId>
+      <version>1.4.0-SNAPSHOT</version>
+      <type>zip</type>
+    </dependency>
+  </dependencies>
+</project>

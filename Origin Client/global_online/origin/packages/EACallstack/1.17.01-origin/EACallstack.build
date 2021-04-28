@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="EACallstack" default="build">
+
+    <property name="Dll" value="false" unless="@{PropertyExists('Dll')}" />
+
+    <optionset name="config.targetoverrides">
+        <option name="test-build" value="include" />
+        <option name="test-buildall" value="include" />
+        <option name="test-run" value="include" />
+        <option name="test-runall" value="include" />
+    </optionset>
+
+    <!-- Package declaration -->
+    <!-- Get the version number from current directory -->
+    <property name="currDir" value="@{PathGetFullPath('.')}" />
+    <property name="currVer" value="@{PathGetFileName('${currDir}')}" />
+    <package name="EACallstack" targetversion="${currVer}" />
+
+
+    <!-- Options -->
+    <!-- To enable options put (e.g.) <globalproperties>EACallstack.EACALLSTACK_DEFAULT_ALLOCATOR_ENABLED=1</globalproperties> -->
+    <!-- in your masterconfig file or use -D:EACallstack.EACALLSTACK_DEFAULT_ALLOCATOR_ENABLED=1 on the nant command line.     -->
+    <!-- The EACallstack.EACALLSTACK_XXX values here directly correspond to EACallstack config #defines.                       --> 
+    <property name="EATECH_WARNINGSASERRORS" value="0" unless="@{PropertyExists('EATECH_WARNINGSASERRORS')}" />
+
+    <property name="EACallstack.configDefineTypes">
+        EACALLSTACK_MS_PDB_READER_ENABLED
+        EACALLSTACK_DEFAULT_ALLOCATOR_ENABLED
+        EACALLSTACK_ENABLE_ELF_SPAWN
+        EACALLSTACK_MSVC_DEMANGLE_ENABLED
+        EACALLSTACK_GCC_DEMANGLE_ENABLED
+        EACALLSTACK_CODEWARRIOR_DEMANGLE_ENABLED
+        EACALLSTACK_MSVC_MAPFILE_ENABLED
+        EACALLSTACK_GCC_MAPFILE_ENABLED
+        EACALLSTACK_SN_MAPFILE_ENABLED
+        EACALLSTACK_CODEWARRIOR_MAPFILE_ENABLED
+        EACALLSTACK_GREENHILLS_MAPFILE_ENABLED 
+        EACALLSTACK_GREENHILLS_GHSFILE_ENABLED
+        EACALLSTACK_PDBFILE_ENABLED
+        EACALLSTACK_DWARFFILE_ENABLED
+        EACALLSTACK_DASM_POWERPC_ENABLED
+        EACALLSTACK_DASM_X86_ENABLED
+        EACALLSTACK_DASM_ARM_ENABLED
+        EACALLSTACK_DEBUG_DETAIL_ENABLED
+    </property>
+
+    <property name="EACallstack.configDefines" />
+    <foreach item="String" in="${EACallstack.configDefineTypes}" property="configDefineType">
+        <property name="EACallstack.configDefines" if="@{PropertyExists('EACallstack.${configDefineType}')}">
+            ${property.value}
+            ${configDefineType}=${EACallstack.${configDefineType}}
+        </property>
+    </foreach>
+
+    <property name="EACallstack.configDefines" if="@{PropertyExists('EA_XBDM_ENABLED')}">
+        ${property.value}
+        EA_XBDM_ENABLED=${EA_XBDM_ENABLED}
+    </property>
+
+
+
+    <!-- Create extra build types which simply add some additional compiler arguments -->
+    <optionset name="config-options-library-extra" fromoptionset="config-options-library">
+        <option name="buildset.name" value="LibraryExtra" />
+        <option name="warningsaserrors" value="off" if="${EATECH_WARNINGSASERRORS} == 0" />
+        <option name="warningsaserrors" value="on" if="${EATECH_WARNINGSASERRORS} == 1" />
+    </optionset>
+    <task name="GenerateBuildOptionset" configsetname="config-options-library-extra" />
+    <optionset name="LibraryExtra">
+        <option name="cc.options" if="${config-compiler} == 'gcc'">          
+            @{StrReplace(${option.value}, '-fno-strict-aliasing', '-fstrict-aliasing')}
+        </option>
+
+        <option name="cc.options" if="${config-compiler} == 'gcc' and @{StrStartsWith('${config-system}', 'unix')} "> <!-- What we really want to test for is GCC on x86. -->
+            @{StrReplace(${option.value}, '-fomit-frame-pointer', '')} <!-- Don't just StrReplace with -fno-omit-frame-pointer, because GCC4.6+ omits frame pointers by default, and this won't cover that in case eaconfig some day stops using -fomit-frame-pointer. -->
+            -fno-omit-frame-pointer
+        </option>
+
+        <option name="cc.options" if="${config-compiler} == 'mw'">
+            @{StrReplace(@{StrReplace(${option.value}, '-w nofilecaps', '-w filecaps')}, '-w nosysfilecaps', '-w sysfilecaps')}
+        </option>
+
+        <option name="cc.options" if="${EATECH_WARNINGSASERRORS} == 1 and ${config-compiler} == 'sn' and ${config-system} == 'ps3'">
+            ${option.value}
+            -Xdiag=2             <!-- Enable compiler remarks in addition to errors and warnings. -->
+            -Xquit=2             <!-- Set it so that even remarks are considered errors. -->
+
+            --diag_error=68      <!-- turn on 'change of sign' (68) warning.  -->
+            --diag_suppress=178  <!-- variable was declared but never referenced -->
+            --diag_suppress=341  <!-- value copied to temporary, reference to temporary used. -->
+            --diag_suppress=403  <!-- destructor for base class is not virtual. -->
+            --diag_suppress=481  <!-- function redeclared "inline" after being called -->
+            --diag_suppress=833  <!-- support for placement delete is disabled. -->
+            --diag_suppress=1236 <!-- invalid error number -->
+            --diag_suppress=1772 <!-- argument of type "X" is implicitly converted to parameter of type "Y" -->
+            --diag_suppress=1779 <!-- identifier (with leading underscore) is non-standard. [SN mistakenly flags this even when compiling compiler headers.] -->
+            --diag_suppress=1783 <!-- cast from "X" to "Y" increases required alignment from 1 to 4 -->
+            --diag_suppress=1785 <!-- pointer cast from "X" to "Y" violates strict-aliasing rules -->
+            --diag_suppress=1788 <!-- inserted X bytes of padding at offset Y to align class "Z" -->
+        </option>
+
+        <option name="cc.options" if="${EATECH_WARNINGSASERRORS} == 1 and ${config-compiler} == 'sn' and ${config-system} == 'ps3'">
+            @{StrReplace(${option.value}, '-Xdiag=1', '')} <!-- Remove any -Xdiag=1 present, as we already have -Xdiag=2 -->
+        </option>
+        <option name="cc.options" if="${EATECH_WARNINGSASERRORS} == 1 and ${config-compiler} == 'sn' and ${config-system} == 'ps3'">
+            @{StrReplace(${option.value}, '-Xquit=1', '')} <!-- Remove any -Xquit=1 present, as we already have -Xquit=2 -->
+        </option>
+    </optionset>
+
+    <!-- ********************* -->
+    <!-- Runtime configuration -->
+    <!-- ********************* -->
+
+    <property name="runtime.buildmodules" value="${property.value} EACallstack" />
+
+    <property name="runtime.EACallstack.buildtype" value="LibraryExtra" />
+    <property name="runtime.EACallstack.buildtype" value="DynamicLibrary" if="${Dll}" />
+
+    <property name="runtime.EACallstack.usedependencies">
+        EABase
+        coreallocator
+    </property>
+
+    <property name="runtime.EACallstack.usedependencies" unless="${Dll}">
+        ${property.value}
+        EAAssert
+        EASTL
+        EAStdC
+        EAThread
+        PPMalloc
+        EAIO
+    </property>
+
+    <property name="runtime.EACallstack.builddependencies" if="${Dll}">
+        ${property.value}
+        EAAssert
+        EASTL
+        EAStdC
+        EAThread
+        PPMalloc
+        EAIO
+    </property>
+
+    <property name="runtime.EACallstack.defines">
+        ${property.value}
+        ${EACallstack.configDefines}
+        UTF_USE_EAASSERT=1
+    </property>
+
+    <property name="runtime.EACallstack.defines" if="${Dll} and ${config-compiler} == 'vc'">
+        ${property.value}
+        EACALLSTACK_API=__declspec(dllexport)
+    </property>
+
+    <fileset name="runtime.EACallstack.sourcefiles">
+        <includes name="${package.dir}/source/*.cpp" />
+        <includes name="${package.dir}/source/internal/EACallstackChoose.cpp" />
+        <excludes name="${package.dir}/source/PS3DumpFile.cpp" if="${config-system} != pc and ${config-system} != pc64" />   <!-- Only a PC would want to use this -->
+        <includes name="${package.dir}/source/internal/Win32Runner.cpp" if="${config-system} == pc or  ${config-system} == pc64" />
+        <includes name="${package.dir}/source/internal/CabReader.cpp" if="${config-system} == pc or  ${config-system} == pc64" />
+        <includes name="${package.dir}/source/internal/DLLSupport.cpp" if="${Dll}" />
+        <includes name="${package.dir}/source/internal/DemangleGCC.cpp" />
+        <includes name="${package.dir}/source/internal/DemangleCodeWarrior.cpp" />
+        <includes name="${package.dir}/source/internal/Minidump.cpp" />
+        <includes name="${package.dir}/source/internal/PthreadInfo.cpp" />
+        <includes name="${package.dir}/source/internal/cxa_demangle.cpp" />
+    </fileset>
+
+    <fileset name="runtime.EACallstack.bulkbuild.sourcefiles" fromfileset="runtime.EACallstack.sourcefiles" />
+
+    <property name="runtime.EACallstack.warningsuppression" if="${config-compiler} == 'vc'">
+        -wd4217        <!-- disable warning: "member template functions cannot be used for copy-assignment or copy-construction" -->
+        -wd4350        <!-- disable warning: "behavior change: '_Wrap_alloc(const std::_Wrap_alloc<_Alloc> &)' called instead of '_Wrap_alloc<std::_Wrap_alloc<_Alloc> >(_Other &)' -->
+        -wd4530        <!-- disable warning: "C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc" -->
+        -wd4548        <!-- disable warning: "expression before comma has no effect; expected expression with side-effect" -->
+        -wd4619        <!-- disable warning: "#pragma warning : there is no warning number 'xxxx'"  MS being silly here -->
+        -wd4738        <!-- disable warning: "storing 32-bit float result in memory, possible loss of performance" -->
+    </property>
+
+    <property name="runtime.EACallstack.warningsuppression" if="${config-compiler} == 'mw'">
+        -w off        <!-- disable all warnings. We do this only because CodeWarrior doesn't document how to disable some individual warnings -->
+    </property>
+
+    <property name="runtime.EACallstack.warningsuppression" if="${config-compiler} == 'gcc'">
+        -Wstrict-aliasing=3
+        -Wextra
+    </property>
+
+    <!-- SPU version of the lib -->
+    <do if="${config-system} == 'ps3'">
+        <dependent name="EAThread"/>
+        <do if="@{StrCompareVersions(${package.EAThread.version}, '1.17.02')} lte 0">
+            <property name="runtime.buildmodules" value="${property.value} EACallstackSPU" />
+            <property name="runtime.EACallstackSPU.buildtype" value="SPULibrary" />
+            <property name="runtime.EACallstackSPU.usedependencies" value="${runtime.EACallstack.usedependencies}" />
+            <fileset name="runtime.EACallstackSPU.sourcefiles">           <includes name="${package.dir}/source/ps3/EACallstack_PS3_SPU.cpp" /> </fileset>
+            <fileset name="runtime.EACallstackSPU.bulkbuild.sourcefiles"> <includes name="${package.dir}/source/ps3/EACallstack_PS3_SPU.cpp" /> </fileset>
+            <property name="runtime.EACallstackSPU.defines" value="${runtime.EACallstack.defines}" if="@{PropertyExists('runtime.EACallstack.defines')}" />
+            <property name="runtime.EACallstackSPU.warningsuppression" value="${runtime.EACallstack.warningsuppression}" if="@{PropertyExists('runtime.EACallstack.warningsuppression')}" />
+        </do>
+    </do>
+
+
+
+
+    <!-- ********************* -->
+    <!-- Test configuration    -->
+    <!-- ********************* -->
+
+    <property name="test.buildmodules" value="EACallstackTest" />
+    <optionset name="config-options-eacallstack-test-program" fromoptionset="config-options-program">
+        <option name="buildset.name" value="EACallstackTestProgram" />
+        <option name="warningsaserrors" value="off" if="${EATECH_WARNINGSASERRORS} == 0" />
+        <option name="warningsaserrors" value="on" if="${EATECH_WARNINGSASERRORS} == 1" />
+    </optionset>
+    <task name="GenerateBuildOptionset" configsetname="config-options-eacallstack-test-program" />
+    <optionset name="EACallstackTestProgram">
+        <option name="cc.options" if="${config-compiler} == 'gcc' and @{StrStartsWith('${config-system}', 'unix')} "> <!-- What we really want to test for is GCC on x86. -->
+            @{StrReplace(${option.value}, '-fomit-frame-pointer', '')} <!-- Don't just StrReplace with -fno-omit-frame-pointer, because GCC4.6+ omits frame pointers by default, and this won't cover that in case eaconfig some day stops using -fomit-frame-pointer. -->
+            -fno-omit-frame-pointer
+        </option>
+    </optionset>
+
+    <property name="test.EACallstackTest.buildtype" value="EACallstackTestProgram" />
+    <!--Make sure runtime DLLs are available in the tests local folder-->
+    <property name="test.EACallstackTest.copylocal" value="true" />
+
+
+    <!-- Test data -->
+	<fileset name="test.EACallstackTest.deploy-contents-fileset" basedir="${package.configbindir}/test">
+        <includes name="**" />
+    </fileset>
+    <fileset name="test.EACallstackTest.test-data-fileset" basedir="${package.dir}/test/data/">
+		<includes name="**" />
+	</fileset>
+    <do if="${config-system} == iphone">
+        <property name="test.EACallstackTest.xcodeproj.paths-to-include-contents-in-bundle">
+            ${package.dir}/test/data/
+        </property>
+    </do>
+
+    <property name="test.EACallstackTest.usedependencies">
+        EABase
+        coreallocator
+    </property>
+
+    <property name="test.EACallstackTest.builddependencies">
+        EAAssert
+        EASTL
+        EAStdC
+        EAThread
+        PPMalloc
+        EAIO
+        MemoryMan
+        EATest
+    </property>
+
+    <property name="test.EACallstackTest.runtime.moduledependencies">
+        EACallstack
+    </property>
+
+    <property name="test.EACallstackTest.defines">
+        ${property.value}
+        ${EACallstack.configDefines}
+        UTF_USE_EAASSERT=1
+        EA_MEMORY_LEAK_TRACE_ENABLED=1
+    </property>
+
+    <property name="test.EACallstackTest.warningsuppression" if="${config-compiler} == 'vc'">
+        -wd4217        <!-- disable warning: "member template functions cannot be used for copy-assignment or copy-construction" -->
+        -wd4530        <!-- disable warning: "C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc" -->
+        -wd4619        <!-- disable warning: "#pragma warning : there is no warning number 'xxxx'"  MS being silly here -->
+        -wd4548        <!-- disable warning: "expression before comma has no effect; expected expression with side-effect" -->
+        -wd4738        <!-- disable warning: "storing 32-bit float result in memory, possible loss of performance" -->
+    </property>
+
+    <property name="test.EACallstackTest.warningsuppression" if="${config-compiler} == 'mw'">
+        -w off        <!-- disable all warnings. We do this only because CodeWarrior doesn't document how to disable some individual warnings -->
+    </property>
+
+    <property name="test.EACallstackTest.includedirs">
+        ${package.dir}/include
+        ${package.dir}/test/include
+    </property>
+
+    
+    <fileset name="test.EACallstackTest.sourcefiles">    
+        <includes name="${package.dir}/test/source/*.cpp" />
+    </fileset>
+    
+    <fileset name="test.EACallstackTest.libs">
+        <includes name="${package.configlibdir}/${lib-prefix}${package.name}${lib-suffix}" />
+
+        <group if="${config-system} == ps3 and @{PropertyExists('package.PlayStation3GCC.appdir')}">
+            <includes name="${package.PlayStation3GCC.appdir}/target/ppu/lib/liblv2dbg_stub.a" />
+        </group>
+
+        <group if="${config-system} == ps3 and @{PropertyExists('package.ps3sdk.appdir')}">
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/liblv2dbg_stub.a" />
+        </group>
+
+        <group if="${config-system} == unix or ${config-system} == unix64 or ${config-system} == palm or ${config-system} == android">
+            <includes name="-ldl" asis="true" /> <!-- Link libdl.a, which implements dlopen, dlclose, etc. -->
+        </group>
+    </fileset>
+
+    <do if="${config-system}=='ps3'">
+      <fileset name="test.EACallstackTest.libs" append="true">
+        <includes name="${package.ps3sdk.appdir}/target/ppu/lib/libsn.a" />
+      </fileset>
+    </do>
+
+    <do if="${config-system} == 'android'">
+      <fileset name="test.EACallstackTest.java.sourcefiles" basedir="${package.dir}/test/android/java_source">
+        <includes name="**.java" />
+      </fileset>
+      <fileset name="test.EACallstackTest.assetfiles" basedir="${package.dir}/test/">
+        <includes name="data/**" />
+      </fileset>
+      <fileset name="test.EACallstackTest.manifestfile.android">
+        <includes name="${package.dir}/test/android/AndroidManifest.xml" />
+      </fileset>
+    </do>
+
+     <!-- If we are running fw3 then the copylocal property set earlier in this file handles copying the DLLs
+          to the test folder but for fw2 we need to do that manually. This introduces a (harmless) circular
+          dependency that fw3 detects (and fails on) but fw2 doesn't so we conditionally exclude it for fw3 
+          which should also avoid a double copy of the DLLs.. -->
+    <do unless="${nant.framework3??false} == true">
+        <property name="test.EACallstackTest.vcproj.post-build-step">
+            ${property.value}
+            @{PathToWindows('${nant.location}')}\nant.exe -D:config=${config} -buildfile:@{PathToWindows('${package.dir}')}\${package.name}.build -buildroot:@{PathToWindows('${nant.project.buildroot}')} -masterconfigfile:@{PathToWindows('${nant.project.masterconfigfile}')} test.EACallstackTest.postbuildtarget
+        </property>
+
+        <target name="test.EACallstackTest.postbuildtarget">
+            <do if="${Dll}">
+                <dependent name="EAAssert" />
+                <dependent name="EAThread" />
+                <dependent name="EATest" />
+                <dependent name="EAStdC" />
+                <dependent name="EASTL" />
+                <dependent name="EAIO" />
+                <dependent name="MemoryMan" />
+                <dependent name="PPMalloc" />
+                <copy todir="${package.configbindir}\test" overwrite="true" clobber="true" flatten="true">
+                    <fileset>
+                        <includes name="${package.EAAssert.builddir}\${config}\bin\EAAssert.dll" />
+                        <includes name="${package.EAThread.builddir}\${config}\bin\EAThread.dll" />
+                        <includes name="${package.EAStdC.builddir}\${config}\bin\EAStdC.dll" />
+                        <includes name="${package.builddir}\${config}\bin\EACallstack.dll" />
+                        <includes name="${package.EASTL.builddir}\${config}\bin\EASTL.dll" />
+                        <includes name="${package.EATest.builddir}\${config}\bin\EATest.dll" />
+                        <includes name="${package.EAIO.builddir}\${config}\bin\EAIO.dll" />
+                        <includes name="${package.MemoryMan.builddir}\${config}\bin\MemoryMan.dll" />
+                        <includes name="${package.PPMalloc.builddir}\${config}\bin\PPMalloc.dll" />
+                    </fileset>
+                </copy>
+            </do>
+        </target>
+    </do>
+</project>
+
+
+
+

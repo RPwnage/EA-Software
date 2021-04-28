@@ -1,0 +1,80 @@
+<button id='login' onclick="login()" type="button" class="btn btn-primary">Login</button>
+<button id='logout' onclick="logout()" type="button" class="btn btn-primary">Logout</button>
+<button id='loggingin' type="button" class="btn btn-primary" disabled="disabled">Logging In ....</button>
+<script>
+    var oauth = 'https://accounts.int.ea.com/connect/auth?response_type=token&scope=basic.identity+basic.persona+signin+offline&client_id=ORIGIN_PC&locale=en_US';
+    var loc = window.location.origin + window.location.pathname;
+    var dir = loc.substring(0, loc.lastIndexOf('/'));
+    var loginBtn = document.getElementById("login");
+    var logoutBtn = document.getElementById("logout");
+    var loggingInBtn = document.getElementById("loggingin");
+
+    function showLogoutBtn() {
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = '';
+        loggingInBtn.style.display = 'none';
+    }
+
+    function showLoginBtn() {
+        logoutBtn.style.display = 'none';
+        loginBtn.style.display = '';
+        loggingInBtn.style.display = 'none';
+    }
+
+    function showLoggingInBtn() {
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = 'none';
+        loggingInBtn.style.display = '';
+    }
+
+    function login() {
+        oauth += '&redirect_uri=';
+        oauth += dir + '/login.html';
+        window.open(oauth, 'myWindow', 'width=200, height=100');
+    }
+
+    function logout() {
+        var oauth = 'https://accounts.int.ea.com/connect/logout?client_id=ORIGIN_PC';
+        var loc = window.location.origin + window.location.pathname;
+        var dir = loc.substring(0, loc.lastIndexOf('/'));
+        oauth += '&redirect_uri=';
+        oauth += dir + '/logout.html';
+        window.open(oauth, 'myWindow', 'width=200, height=100');
+    }
+    window.logoutCompleteCallback = function() {
+        logoutBtn.style.display = 'none';
+        loginBtn.style.display = '';
+        window.parent.logoutCompleteCallback();
+    }
+
+    window.loginCompleteCallback = function() {
+        showLoggingInBtn();
+
+        Origin.auth.login();
+        Origin.events.on(Origin.events.AUTH_SUCCESSRETRY, function() {
+            Origin.client.games.requestStatus();
+            Origin.xmpp.connect();
+        })
+    }
+
+
+    Origin.init({
+        env: 'qa',
+        overrideUrls: {
+            feedStories: 'https://dev-proxy.x.origin.com:1415/feeds/{feedType}/' + locale + '/{index}'
+        }
+    }).then(function() {
+        Origin.events.on(Origin.events.XMPP_CONNECTED, function() {
+            Origin.xmpp.updatePresence();
+            showLogoutBtn()
+        })
+
+        if (Origin.auth.isLoggedIn()) {
+            showLogoutBtn();
+
+        } else {
+            showLoginBtn();
+        }
+
+    });
+</script>

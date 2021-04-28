@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<example>
+<para>Shows how to setup basic dependency checking for any task.  
+Notice the use of the <see cref="TouchTask"/> to create a persistent file.  
+This is useful if you are doing recursive builds.  
+Remember to create the -start file at the start of your build using 
+another <see cref="TouchTask"/> instance.  
+Note that if the depends task was not used, the core-build target would keep 
+getting called because of the recursive nature of the build.</para>
+<code file="fruit.build">
+<![CDATA[
+<project default="build">
+    <touch file="start"/>
+
+    <target name="build" depends="apple banana">
+        <fail unless="@{FileExists('apple')}"/>
+        <fail unless="@{FileExists('banana')}"/>
+    </target>
+
+    <target name="apple">
+        <nant buildfile="core.xml" target="apple-build"/>
+    </target>
+
+    <target name="banana">
+        <nant buildfile="core.xml" target="banana-build"/>
+    </target>
+</project>
+]]>
+</code>
+<para>Where <c>core.xml</c> contains:</para>
+<code file="core.xml">
+<![CDATA[
+<project>
+    <target name="core">
+        <depends property="needs-building">
+            <inputs>
+                <includes name="start"/>
+            </inputs>
+            <outputs>
+                <includes name="core-built"/>
+            </outputs>
+        </depends>
+        <nant 
+            if="${needs-building}" 
+            buildfile="core.xml" target="core-build"
+            />
+        <touch file="core-built"/>
+    </target>
+
+    <target name="apple-build" depends="core">
+        <echo message="Building apple"/>
+        <touch file="apple"/>
+    </target>
+
+    <target name="banana-build" depends="core">
+        <echo message="Building banana"/>
+        <touch file="banana"/>
+    </target>
+
+    <target name="core-build">
+        <echo message="Building core"/>
+        <touch file="core"/>
+    </target>
+</project>
+]]>
+</code>
+</example>

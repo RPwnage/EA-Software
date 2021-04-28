@@ -1,0 +1,128 @@
+<project default="build" xmlns="schemas/ea/framework3.xsd">
+  <!-- Note: all eaconfig default overrides must be set before our package element! -->
+  <optionset name="config.targetoverrides">
+    <option name="package" value="exclude"/>
+    <option name="test-run" value="include" />
+  </optionset>
+
+  <package name="blazeserver"/>
+
+  <do if="${config-system} == 'unix64'">
+    <!-- we only build with containers on linux -->
+    <fail unless="@{FileExists('/.dockerenv')}" message="building on linux must happen within a container"/>
+  </do>
+
+  <!-- For release builds only: the folder in blaze-latest to which generated docs are published --> 
+  <property name="blazeserver.publishdocs.dir" value="${blazeserver.publishdocs.dir??DEV}"/>
+
+  <!-- Framework 3 fix for dependency issue in code generation step -->
+  <property name="package.preprocess" value="prebuild"/>
+
+  <!-- allow loose and bulk build files -->
+  <property name="package.enablepartialbulkbuild" value="true"/>
+
+  <!-- Default external libraries / modules that are slightly different on PC and Linux -->
+  <choose>
+    <do if="${config-system} == pc64">
+      <property name="ptmalloc3" value="${ptmalloc3??false}"/>
+      <property name="google-coredumper" value="${google-coredumper??false}"/>
+    </do>
+    <do>
+      <property name="ptmalloc3" value="${ptmalloc3??true}"/>
+      <property name="google-coredumper" value="${google-coredumper??true}"/>
+    </do>
+  </choose>
+
+  <!-- Leave google perftools off by default -->
+  <property name="google-tcmalloc" value="${google-tcmalloc??false} or ${google-profile??false}"/>
+  <property name="google-profile" value="${google-profile??false}"/>
+
+  <!-- custom build types -->
+  <include file="scripts/build_types.xml"/>
+  <!-- custom package targets-->
+  <include file="scripts/package_overrides.xml"/>
+  <!-- custom component, dependencies and custom library overrides -->
+  <include file="scripts/custom/override.xml" ignoremissing="true"/>
+  <!-- define core modules -->
+  <include file="scripts/core.xml"/>
+  <!-- generatecode target-->
+  <include file="scripts/code_gen.xml"/>
+  <!-- vs organization-->
+  <include file="scripts/vs.xml"/>
+
+  <!-- fifa custom task target-->
+  <include file="scripts/fifa_custom_task.xml"/>
+
+  <!-- Java Blaze library -->
+  <property name="blazejava" value="${blazejava??false}"/>
+  <property name="blazejava" value="false" if="@{StrIndexOf('${exclude.modules.tokenized}','blazejava;')} >= 0"/>
+  <include file="scripts/blazejava.xml"/>
+
+  <!-- Define tool modules -->
+  <property name="stress" value="${stress??true}"/> 
+  <property name="stress" value="false" if="@{StrIndexOf('${exclude.modules.tokenized}','stress;')} >= 0"/>
+  <include file="scripts/tools/stress.xml" if="${stress} == true"/>
+  
+  <property name="depchecker" value="${depchecker??true}"/>
+  <property name="depchecker" value="false" if="@{StrIndexOf('${exclude.modules.tokenized}','depchecker;')} >= 0"/>
+  <include file="scripts/tools/depchecker.xml" if="${depchecker} == true"/>
+  
+  <property name="gdbtools" value="${gdbtools??true}"/>
+  <property name="gdbtools" value="false" if="@{StrIndexOf('${exclude.modules.tokenized}','gdbtools;')} >= 0"/>
+  <include file="bin/gdbtools/gdbtools.xml" if="${gdbtools} == true"/>
+
+  <include file="scripts/tools/blazeredis.xml" if="${config-system} == pc64"/>
+
+  <!-- Include ILT target -->
+  <include file="scripts/tools/ilt.xml"/>
+
+  <!-- Pre-build target -->
+  <target name="prebuild">
+    <!-- For framework3, ensure task runs at most once to avoid parallel builds stepping on the same files -->
+    <do.once key="prebuildToolsDoOnceKey" blocking="true">
+      <task name="package.blazeserver.prebuild.task"/>
+    </do.once>
+  </target>
+
+  <!-- helper -->
+  <createtask name="package.blazeserver.prebuild.task">
+    <parameters/>
+    <code>
+      <call target="fifa_custom_pretasks"/>
+      <call target="generatecode"/>
+      <call target="buildjava" if="${blazejava} == true" />      
+      <call target="mkvers" if="${config-system} == unix64" />
+      <call target="mkvcproj" if="${config-system} == pc64" />
+      <call target="mkvcprojredis" if="${config-system} == pc64" />
+    </code>
+  </createtask>
+  
+  <property name="buildgraph.global.postprocess">
+    ${property.value}
+    addglobalinclude
+  </property>
+
+  <foreach item="String" in="${runtime.buildmodules}" property="module">
+    <property name="runtime.${module}.visualstudio-extension">
+      fixupvcxproj
+    </property>
+  </foreach>
+
+  <taskdef assembly=" ">
+    <sources>
+      <includes name="scripts/addglobalinclude.cs"/>
+      <includes name="scripts/fixupvcxproj.cs"/>
+    </sources>
+  </taskdef>
+
+
+  <do if="${config-system} == 'pc64'">
+    <property name="backend.VisualStudio.postgenerate">
+      ${property.value}
+      vssetstartupprojects
+    </property>
+  </do>
+
+  <property name="package.sln.startupproject" value="blazeserver"/>
+  
+</project>

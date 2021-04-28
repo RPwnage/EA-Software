@@ -1,0 +1,156 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+
+<project>
+  
+  <!-- UnixClang needs to know config-system first -->
+  <dependent name="UnixClang" />
+
+  <taskdef assembly="${nant.project.temproot}/eaconfig/unix-clang-options.dll">
+    <sources>
+      <includes name="options/unix-clang-options.cs"/>
+    </sources>
+  </taskdef>
+
+  <property name="default-lib-prefix"     value="lib" />
+  <property name="default-lib-suffix"     value=".a" />
+  <property name="default-dll-suffix"     value=".so"/>
+  <property name="default-exe-suffix"     value=""/>
+
+  <property name="exe-suffix"     value="${exe-suffix.${config-system}??${exe-suffix??${default-exe-suffix}}}"/>
+  <property name="lib-prefix"     value="${lib-prefix.${config-system}??${lib-prefix??${default-lib-prefix}}}"/>
+  <property name="lib-suffix"     value="${lib-suffix.${config-system}??${lib-suffix??${default-lib-suffix}}}"/>
+  <property name="dll-suffix"     value="${dll-suffix.${config-system}??${dll-suffix??${default-dll-suffix}}}"/>
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle"      value="Unix"/>
+  <!-- Compile in parallel on multiple CPUs         -->
+  <property name="cc.parallelcompiler"    value="true"/>
+  <property name="as.parallelcompiler"    value="true"/>
+
+  <fail unless="@{PropertyExists('cc.includedirs')}" message="Property cc.includedirs is required by this release of eaconfig. Please use a release of UnixClang that defines this property."/>
+
+  <!-- Swapped options and includedirs so that -nostdinc can be specified in cc.options in general.xml -->
+  <property name="cc.template.commandline">
+    %defines%
+    %options%
+    %includedirs%
+    -o "%objectfile%"           <!-- object file -->
+    -c "%sourcefile%"           <!-- source file -->
+  </property>
+
+  <property name="cc.template.includedir"    value='-I "%includedir%"'/>
+  <property name="cc.template.define"        value='-D %define%'/>
+
+  <property name='link.template.librarydir'  value='-L "%librarydir%"'/>
+  <property name='link.template.libraryfile' value='"%libraryfile%"'/>
+  <property name='link.template.objectfile'  value='"%objectfile%"'/>
+
+  <property name="link.template.commandline">
+    %options%
+    %objectfiles%
+    %librarydirs%
+    -Xlinker --start-group
+    %libraryfiles%
+    -Xlinker --end-group
+  </property>
+
+  <property name="link.template.commandline" if="@{PlatformIsOSX()}">
+    %options%
+    %objectfiles%
+    %librarydirs%
+    %libraryfiles%
+  </property>
+
+  <property name="eaconfig.use_valgrind" value="${eaconfig.use_valgrind??false}"/>
+  <property name="valgrind-define" value=""/>
+  <property name="valgrind-define" value="EA_VALGRIND_ENABLED" if="${eaconfig.use_valgrind}"/>
+  <optionset name="config-options-common">
+    <option name="cc" value="${cc}"/>
+    <option name="as" value="${as}"/>
+    <option name="link" value="${link}"/>
+    <option name="lib" value="${lib}"/>
+    <option name="preprocess"/>
+    <option name="postprocess" value="" /> <!-- all-platforms-postprocess"/> -->
+    <option name="buildset.cc.options">
+      ${option.value}
+      ${cc.options??}
+    </option>
+      <option name="buildset.cc.includedirs">
+      ${option.value}
+      ${cc.includedirs}
+    </option>
+    <option name="buildset.cc.defines">
+      ${option.value}
+      ${valgrind-define}
+      ${cc.defines??}
+    </option>
+    <option name="buildset.cc.clangdefines">
+      ${option.value}
+      ${cc.clangdefines??}
+    </option>
+    <option name="buildset.lib.options">
+      ${option.value}
+      ${lib.options??}
+    </option>
+    <option name="buildset.link.options">
+      ${option.value}
+      ${link.options??}
+    </option>
+    <option name="buildset.link.librarydirs">
+      ${option.value}
+      ${link.librarydirs}
+    </option>
+  </optionset>
+
+  <!-- Clear properties that are already appended to the optionset-->
+  <property name="cc.options" />
+  <property name="cc.defines" />
+  <property name="cc.clangdefines" />
+  <property name="cc.includedirs"/>
+  <property name="link.options"/>
+  <property name="link.libraries"/>
+  <property name="link.librarydirs"/>
+  <property name="lib.options"/>
+
+  <optionset name="config-options-library">
+    <option name="liboutputname" value="%outputdir%/${lib-prefix}%outputname%${lib-suffix}" />
+    <option name="buildset.lib.options">
+      -rs "%liboutputname%"
+    </option>
+  </optionset>
+
+  <optionset name="config-options-program">
+    <option name="linkoutputname" value="%outputdir%/%outputname%${exe-suffix}" />
+  </optionset>
+
+  <optionset name="config-options-dynamiclibrary" >
+    <option name="generatedll"              value="on" />
+    <option name="buildset.name"                        value="DynamicLibrary" />
+    <option name="buildset.tasks"                       value="asm cc link" />
+    <option name="buildset.cc.defines"                  value="EA_DLL ${valgrind-define}" />
+    <option name="linkoutputname"           value="%outputdir%/%outputname%${dll-suffix}" />
+    <!-- name of import library -->
+    <option name="impliboutputname"         value="%outputlibdir%/${lib-prefix}%outputname%${lib-suffix}"/>
+  </optionset>
+
+
+
+  <!-- 
+    Set version specific libraries
+  If you need to use the dpm libs of TypeB/TypeC, do these if you're using FW2/eaconfig:
+  1. Derive your build type (optionset) from appropriate optionset, says config-options-library.
+  2. Set standardsdklibs to custom in your optionset
+  3. In its standardsdklibs.custom.link option, include those dpm libs
+  -->
+  <fail unless="@{PropertyExists('package.UnixClang.regularlib')}"
+    message="Property package.UnixClang.regularlib is required by this release of eaconfig. Please use a release of UnixClang that defines this property."/>
+  <property name="platform.sdklibs.regular">
+    ${package.UnixClang.regularlib}
+  </property>
+  <property name="platform.sdklibs.debug">
+    ${package.UnixClang.debuglib}
+  </property>
+
+</project>

@@ -1,0 +1,209 @@
+This document is intended to aid the process of transitioning user code built against the DirtySDK V8 series
+to the DirtySDK V13.1 series of SDKs.  If there are items that should be in this document but are not,
+please write the "GOS dirtysock support" mailing list so those items can be added to future revisions of this
+document.
+
+Supported Platforms
+
+    WII (Revolution) is no longer a supported platform.
+
+
+API renaming or behavioral changes
+
+    DirtySDK (All)
+        DirtySDK public header files are now namespaced. Public header files used to be located in the 
+        <DirtySDK root>/core/include directory. They are now located in <DirtySDK root>/include/DirtySDK/<module>.
+        All source files including DirtySDK header files need to be updated to prefix the header file with the
+        matching relative module path. For instance: 
+            #include "dirtysock.h"  --->   #include "DirtySDK/dirtysock.h"
+            #include "dirtylib.h"   --->   #include "DirtySDK/dirtysock/dirtylib.h"
+            #include "xmlparse.h"   --->   #include "DirtySDK/xml/xmlparse.h"
+
+        The following modules are removed, they no longer exist in this version of DirtySDK:
+            BuddyTickerGlue
+            CryptSSC2
+            DigObjApi
+            LockerApi
+            NetGameDistStream (Use NetGameLink streams instead)
+            ProtoFilter
+            PortTestApi
+            TelemetryApi (Use TelemetrySdk package instead)
+            Ticker
+            XmlList
+
+        ConnApi
+            The public API of ConnApi was significantly modified to support MLU (Multi Local Users).
+            A ConnApi client still represents a machine (or console) as it used to. But instead of implicitly
+            assuming a single user per client, ConnApi now supports multiple users per such client:
+                ConnApiClientT used to have a UserInfo field of type ConnApiUserInfoT containing both
+                machine and user data. It now rather has a ClientInfo field of type ConnApiClientInfoT (new type),
+                which contains:
+                    * several machine-specific data fields
+                    * an array of ConnApiUserInfoT entries for all users on that machine (ConnApiUserInfoT was trimmed
+                      down to user-specific only fields)
+
+            Initiating game connectivity between the different players in the game is still done with a call to
+            ConnApiConnect() which now takes a list of clients of type ConnApiClientInfoT instead of a list of entries
+            of type ConnApiUserInfoT. Each ConnapiClientInfoT contains an array of multiple valid ConnApiUserInfoT if the
+            corresponding machine has several active users.
+
+            After a call to ConnApiConnect(), clients can still be dynamically added/removed with ConnApiAddClient() and
+            ConnApiRemoveClient(). In addition, for a given client, users can now be added/removed with calls to the
+            following new functions: ConnApiAddUser() and ConnApiRemoveUser().
+
+            ConnApiFindClient() and ConnApiFindClientById() now return a ConnApiClientInfoT instead of a ConnApiUserInfoT.
+
+            Replaced ConnApiAddClient() with ConnApiAddClient2(). When adding a new client, you shall now specify its
+            index in the client list.
+
+        DirtyLib
+            Prototype of NetLibCreate was made consistent across all platforms. NetLibCreate() now takes 3 parmameters.
+                iThreadPriority: priority to start the _NetLibThread with
+                iThreadStackSize: stack size to start the _NetLibThread with (in bytes)
+                iThreadCpuAffinity: cpu affinity to start the _NetLibThread with
+
+                Modify your code accordingly, and pass zero to parameters where a default value fits your need.
+
+            Replaced NetLibDestroy() with NetLibDestroy2(). NetLibDestroy() now has parameter uShutdownFlags.
+
+        DirtyNet
+            Prototype of SocketCreate was made consistent across all platforms. NetLibCreate() now takes 3 parmameters
+                iThreadPrio: priority to start threads with
+                iThreadStackSize: stack size to start threads with (in bytes)
+                iThreadCpuAffinity: cpu affinity to start threads with
+
+                Modify your code accordingly, and pass zero to parameters where a default value fits your need.
+
+        FriendApi
+            FRIENDAPI_EVENT_INIT_COMPLETE was added. This event will be signaled once after a callback is registered
+            with FriendApiAddCallback(). It means that the friend api module is finished with generating
+            an initial set of  FRIENDAPI_EVENT_FRIEND_UPDATED and FRIENDAPI_EVENT_BLOCKLIST_UPDATED
+            events describing the current state of the friendslist and blocklist. This is a new helper 
+            feature, and using it is optional.
+
+            FRIENDAPI_EVENT_BLOCKEDLIST_UPDATED was renamed to FRIENDAPI_EVENT_BLOCKLIST_UPDATED.
+
+            FRIENDAPI_EVENT_MSG_ATTACH_RCVED and FRIENDAPI_EVENT_MSG_ATTACH_RESULT were deprecated. For platforms
+            supporting such events (ps3!), they will now be signaled with FRIENDAPI_EVENT_UNKNOWN and the 
+            pRawData1 can be inspected to find out the exact 1st party event value.
+
+            FRIENDAPA_EVENT_MAX was renamed to FRIENDAPI_EVENT_MAX.
+
+            FriendEventDataT now contains a union of event-specific data. Your event handler needs to be modified
+            accordingly.
+
+            FriendApiNotifyCbT no longer has a pFriendData. This info is now part of the FriendEventDataT. Your
+            event handler needs to be modified accordingly.
+
+            FriendApiControl no longer supports identifiers 'strt' and 'stop', and the corresponding functionality was moved 
+            to FriendApiCreate and FriendApiDestroy, and is performed transparently for you.
+
+            FriendApiGetFriendslistVersion() no longer returns the version in the return code, but it now fills
+            a user-provided buffer (new parameter) with the version value. Please adapt your code accordingly.
+
+            FriendApiGetBlockListVersion() no longer returns the version in the return code, but it now fills
+            a user-provided buffer (new parameter) with the version value. Please adapt your code accordingly.
+
+        NetGameDist
+            Deprecated 'meta', 'metm' and 'metv' selector in NetGameDistControl(). Equivalent functionality is
+            now availabe in NetGameDistMetaSetup().
+
+        NetGameLink
+            Deprecated packet type GAME_PACKET_DEAD.
+
+        ProtoHttp
+            The signature of many functions had the type of parameter uDataLen changed from uint32_t to uint64_t
+            or of parameter iDataLen changed from int32_t to int64_t to allow support to bigger file transfers
+
+        ProtoHttpManager
+            The signature of many functions had the type of parameter uDataLen changed from uint32_t to uint64_t
+            or of parameter iDataLen changed from int32_t to int64_t to allow support to bigger file transfers
+
+        Utilities
+            The "Lobby" prefix was removed in the name of the following DirtySDK header files:
+                LobbyBase64.h       -->     Base64.h
+                LobbyDispList.h     -->     DispList.h
+                LobbyLang.h         -->     DirtyLang.h
+                LobbyHasher.h       -->     Hasher.h
+                LobbySort.h         -->     Sort.h
+                LobbyTagField.h     -->     TagField.h
+                LobbyUtf8.h         -->     Utf8.h
+            Function names in the respective APIs were also changed accordingly.
+            All source files including these header files shall be updated accordingly.
+
+        Voip/VoipGroup
+            Implementation of the voip channel feature was moved from the VoipGroup module
+            to the Voip module. Modify your code to adapt to the following api changes:
+                VoipGroupSelectChannel()   -->   VoipSelectChannel()
+                VoipGroupResetChannels()   -->   VoipResetChannels()
+                VoipGroupChanModeE         -->   VoipChanModeE()
+
+            Also, the following modifications were made but should have no impact on your code because
+            these construts were intended for intenal use only (eventhough existing in the public header):
+                VOIPGROUP_CBTYPE_CHANEVENT was deprecated
+                VOIPGROUP_CBTYPE_USEREVENT was deprecated
+
+            MLU (Multi Local Users) support was added to the voip channel feature:
+            VoipSelectChannel() and VoipResetChannels() both have a new iUserIndex parameter now.
+            Make sure you fill that parameter with the proper local user index.
+
+            VoipConnect() no longer takes a pUserId parameter. Please modify your code accordingly.
+
+            Replaced VoipDestroy() with VoipDestroy2(). VoipDestroy() now has parameter uShutdownFlags.
+
+        XmlParse
+            Changed XmlParse functions to take char * parameters instead of unsigned char * parameters,
+            removing the need for ugly typecasting by the caller. Adapt your code accordingly.
+
+    DirtySDK (PSP2)
+        NetConn
+            NetConnConnectSub() now has 3 new parameters.
+                uSlot: Used to specify which sub-user logical slot [1,3] to bring the sub-user signin dialog for.
+                The uSlot parameter cannot be 0 (0 implicitly means primary user).
+
+                pCallback: Callback that is going to be called with sub-sign in result when the 1st party sub-signin dialog is closed
+
+                pUserData: User data to be passed to the callback
+
+    DirtySDK (PS3)
+        FriendApiPrivPS3
+            Deprecated 'cbfp' and 'cbup' selectors. For visibility on NP Basic events, game code now
+            needs to registers a callback with FriendApiAddCallback().
+
+        NetConn
+            NetConnConnectSub() now has 3 new parameters.
+                uSlot: Used to specify which sub-user logical slot [1,3] to bring the sub-user signin dialog for.
+                The uSlot parameter cannot be 0 (0 implicitly means primary user).
+
+                pCallback: Callback that is going to be called with sub-sign in result when the 1st party sub-signin dialog is closed
+
+                pUserData: User data to be passed to the callback
+
+        VoipHeadsetPS3
+            Changed default codec from dvi to celp, and default sampling rate from 8kHZ to 16kHz. DirtySDK now
+            internally loads/unloads, on a need basis, the PRX required by the active codec selection. To avoid
+            contention, game teams are no longer allowed to load/unload the libcelpenc/libcelp8enc PRXs explicitly.
+            This step is now owned by DirtySDK. The CELP encoder and decoder use the 'shared' SPU and it is not
+            uncommon that a game's SPU setup by default is not compatible with CELP. To get CELP working, some
+            priority changes may be required. For game teams that want to go back to the former default configuration,
+            they will have to:
+                1. Explicitly change the default codec from celp to dvi with a call to
+                   VoipControl(VoipGetRef(), 'cdec', 'dvid', NULL);
+                2. Explicitly change the default sampling rate from 16 kHz to 8kHz with a call to
+                   VoipControl(VoipGetRef(), 'mrat', 8000, NULL);
+
+    DirtySDK (Xenon)
+        ConnApiXenon
+            ConnApiCbRankT, used upon CONNAPI_CBTYPE_RANKEVENT, has member uValid renamed to uReportValid, for clarity.
+            This field indicates whether the report has been filled by the game team. If set to false, rank report
+            is discarded. If set to true, rank reports will be submitted.
+            Furthermore, a new field, uPartialTableValid, has been added. By default, this field is set to false. This
+            means "submit rank for everybody". If the field is set to true, the game team must fill uScoreValid[]. This
+            allows the game team to specify for which of the clients the rank report is submitted. (partial rank report)
+
+            The iData parameter of NetConnConnect() is no longer used to pass a mask of game-selected local users.
+            All local users signed-in with XBL are considered as "active" by NetConnXenon. From now on, just
+            fill that parameter with 0.
+
+        NetConnXenon
+            NetConnConnect now by default hides the guest option on the signin dialog. This options can be changed with "-guest=..."

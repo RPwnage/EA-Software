@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="35560473-93dd-4104-aa95-0ccc222c4fdf" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>Sections in this topic describe how to define processing steps.</para>
+    </introduction>
+    
+    <section address="PrePostProcessStepsDefinitions">
+      <title>Pre/Post Process Steps Definitions</title>
+      <content>
+        <para>
+          Pre or post process steps in Framework 3 can be targets or
+          <link xlink:href="35560473-93dd-4104-aa95-0ccc222c4fdf#ProcessingStepASNAntTask">C# NAnt tasks</link>.
+        </para>
+        <para>
+          NAnt properties can be used to specify target or task names for pre/post steps. Module level steps 
+          (<link xlink:href="e4fc0861-466a-46e2-abf6-0ae47b1d94cb">steps (2) and (3) in the execution order graph</link>)
+          can also be set using option on buildoptionset or a property in the build script, or both.
+          Processing steps defined in optionsets are executed first, and then steps defined in property(ies) are executed.
+        </para>
+        <para>
+          For each kind of steps different NAnt properties are used, but the value format for these properties is the same- 
+          put target or task name in the property. Multiple Targets or tasks can be defined, each on a separate line.
+        </para>
+        <para>
+          Example of defining global postprocess step
+          (<link xlink:href="e4fc0861-466a-46e2-abf6-0ae47b1d94cb">step (6) in the execution order graph</link>):
+        </para>
+        <code language="xml" title=" ">
+          
+.          &lt;!-- Make sure we collect all code generation into one step before generating VS Solution or building--&gt;
+.          &lt;property name="buildgraph.global.postprocess"&gt;
+.            ${property.value}
+.            collectadf
+.          &lt;/property&gt;
+
+.          &lt;property name="buildgraph.global.postprocess" if="${config-system}==ps3"&gt;
+.              ${property.value}
+.              audio-spu-jobs-to-make
+.          &lt;/property&gt;
+
+        </code>
+        <para>
+          To spefify pre or post process steps through <token>buildtype</token> optionset put target or task names in options
+          <codeInline>preprocess</codeInline> or <codeInline>postprocess</codeInline>. These steps are used a lot in eaconfig:
+        </para>
+        <code language="xml" title=" ">
+          
+.          &lt;optionset name="config-options-common"&gt;
+.            &lt;option name="preprocess"/&gt;
+.            &lt;option name="postprocess"&gt;
+.              pc-vc-postprocess
+.              all-platforms-postprocess
+.            &lt;/option&gt;
+.            &lt;option name="buildset.link.options"&gt;
+.              
+.              . . . . . . .
+.              
+.          &lt;/optionset>
+
+        </code>
+      </content>
+
+      <sections>
+
+        <section address="ProcessingStepASNAntTask">
+          <title>Using NAnt Task as pre/post process step.</title>
+          <content>
+            <para>To use a Nant task as as a processin</para>
+          </content>
+          
+        </section>
+
+      </sections>
+    </section>
+    <section address="ProcessingStepASNAntTask">
+      <title>Using NAnt Task as pre/post process step.</title>
+      <content>
+        <para>To use a Nant task as as a processing step write a task and then load it using 
+        <link xlink:href="f9f8dce9-4768-7794-2a82-e0affa1821ef">&lt;taskdef&gt;</link>
+      </para>
+      </content>
+      <sections>
+        <section address="ProcessingStepASNAntTask_Global">
+          <title>Global Processing NAnt Tasks</title>
+          <content>
+            <para>
+              Global processing tasks can be derived from NAnt <codeInline>Task</codeInline> class. You can access GuldGraph through task
+              <codeInline>Project</codeInline> object.
+            </para>
+            <para>
+              Following example shows how to
+
+              collect all SPU job modules from <codeInline>EAAudioCore</codeInline> package,
+              convert them to a single MakeStyle module, add t
+            </para>
+            <list class="bullet">
+              <listItem>
+                <para>Access BuildGraph() object</para>
+              </listItem>
+              <listItem>
+                <para>
+                  Collect all SPU job modules from <codeInline>EAAudioCore</codeInline> package
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Convert collected SPU modules to a single <link xlink:href="016c357f-86f5-4958-bea3-4bb85cff9031">MakeStyle</link> module,
+                  and insert it into build graph.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Set dependencies between other packages and new module.
+                </para>
+              </listItem>
+              <listItem>
+                <para>
+                  Mark all originaly collected SPU jobs as non buildable.
+                </para>
+              </listItem>
+            </list>
+            <code language="c#" title=" " source="ExampleFiles\Packages\PrePostProcessSteps\AudioSpuJobsToMake.cs"/>
+
+            <alert class="note">
+              <para>
+                Task must be loaded into Framework before it can be used. 
+                Use <link xlink:href="f9f8dce9-4768-7794-2a82-e0affa1821ef">&lt;taskdef&gt;</link> 
+                to both compile task and load it.
+              </para>
+            </alert>
+            <para>
+              Example of building tasks and loading them using <codeInline>&lt;taskdef&gt;</codeInline>
+            </para>
+            <code language="xml" title="">
+              .              &lt;taskdef assembly="${nant.project.temproot}/MyTasls.dll"&gt;
+              .                &lt;sources&gt;
+              .                  &lt;includes name="..\tasks\*.cs"/&gt;
+              .                &lt;/sources&gt;
+              .                &lt;references&gt;
+              .                  &lt;includes name="System.Xml.Linq.dll" asis="true"/&gt;
+              .                  &lt;includes name="Microsoft.CSharp.dll" asis="true"/&gt;
+              .                &lt;/references&gt;
+              .              &lt;/taskdef&gt;
+            </code>
+          </content>
+        </section>
+        <section address="ProcessingStepASNAntTask_Module">
+          <title>Module Level Processing NAnt Tasks</title>
+          <content>
+            <para>
+              Nant Tasks for module level processing must be derived from
+              <link xlink:href="35560473-93dd-4104-aa95-0ccc222c4fdf#AbstractModuleProcessorTaskCode">AbstractModuleProcessorTask</link>
+              class
+            </para>
+            <code language="c#" title=" ">
+.              namespace EA.Eaconfig.Core
+.              {
+.                public abstract class AbstractModuleProcessorTask : Task, IBuildModuleTask, IModuleProcessor
+            </code>
+            <para>
+              This class contains property <codeInline>Module</codeInline> that provides access to the Module object, and a nummber 
+              of convenience methods that can be overwritten to perform various operations on the Module object and tools included in the module.
+              Below are few examples of using Module level postprocess task in eaconfig:
+            </para>
+            <code language="xml" title="" source="ExampleFiles\Packages\PrePostProcessSteps\vc-common-postprocess.cs"/>
+          </content>
+        </section>
+        <section address="AbstractModuleProcessorTaskCode">
+          <title>AbstractModuleProcessorTask Task</title>
+          <content>
+            <code language="c#" title=" " source=".\..\EA.Tasks\EA.Config\Core\AbstractModuleProcessorTask.cs"/>
+          </content>
+        </section>
+
+      </sections>
+
+    </section>
+
+    <relatedTopics>
+
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

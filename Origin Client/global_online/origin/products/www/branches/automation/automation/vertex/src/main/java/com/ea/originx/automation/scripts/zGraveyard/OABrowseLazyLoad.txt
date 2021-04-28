@@ -1,0 +1,125 @@
+package com.ea.originx.automation.scripts.browsegames;
+
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.store.BrowseGamesPage;
+import com.ea.originx.automation.lib.pageobjects.store.StoreFacet;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import java.util.List;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests that the Browse Games page loads more game tiles after scrolling to the
+ * bottom of the page
+ *
+ * @author lscholte, cvanichsarn
+ */
+public class OABrowseLazyLoad extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 11747)
+    @Test(groups = {"browsegames", "full_regression"})
+    public void testBrowseLazyLoad(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final String facetUnderMinimum = "Mass Effect";
+        final String facetOverMinimum = "FIFA";
+        final String facet = "Franchise";
+        final int maxGameTilesPerLoad = 30;
+
+        UserAccount user = AccountManager.getRandomAccount();
+
+        logFlowPoint("Log into Origin"); //1
+        logFlowPoint("Navigate to Browse Games Page"); //2
+        logFlowPoint("Verify that when there are more than 30 games to display, only 30 tiles are loaded at first"); //3
+        logFlowPoint("Verify that scrolling to the bottom of the page loads 30 more game tiles after a loading spinner icon appears"); //4
+        logFlowPoint("Filter the results down to less than 30"); //5
+        logFlowPoint("Verify that less than the default number of results are loaded"); //6
+        logFlowPoint("Change the filter to result in more than 30 results, and scroll to the very bottom repeatedly until no more products load"); //7
+        logFlowPoint("Verify that once all products are loaded the loading icon no longer appears and no more products are loaded"); //8
+
+        //1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, user)) {
+            logPass("Successfully logged into Origin with user " + user.getUsername());
+        } else {
+            logFailExit("Failed to log into Origin with user" + user.getUsername());
+        }
+
+        //2
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        BrowseGamesPage browseGamesPage = navBar.gotoBrowseGamesPage();
+        if (browseGamesPage.verifyBrowseGamesPageReached()) {
+            logPass("Successfully navigated to the Browse Games Page");
+        } else {
+            logFailExit("Failed to navigate to the Browse Games Page");
+        }
+
+        //3
+        int defaultNumberOfGames = browseGamesPage.getNumberOfGameTilesLoaded();
+        if (defaultNumberOfGames == maxGameTilesPerLoad) {
+            logPass(defaultNumberOfGames + " were loaded on the Browse Games page");
+        } else {
+            logFailExit("No game tiles were loaded on the Browse Games page");
+        }
+
+        //4
+        browseGamesPage.scrollToBottom();
+        boolean wasSpinnerPresent = browseGamesPage.verifyLoadingSpinnerPresent();
+        browseGamesPage.waitForGamesToLoad();
+        //sleep for a bit to give the game tiles a chance to appear after the
+        //loading indicator has gone away
+        sleep(1000);
+        int numberOfGamesAfterScrolling = browseGamesPage.getNumberOfGameTilesLoaded();
+        if (numberOfGamesAfterScrolling == (defaultNumberOfGames+maxGameTilesPerLoad) && wasSpinnerPresent) {
+            logPass("Scrolling to the bottom of the page displays a spinner icon and loads 30 more game tiles");
+        } else {
+            logFail("Scrolling to the bottom of the page did not display a spinner icon or load 30 more game tiles");
+        }
+
+        //5
+        StoreFacet storeFacet = new StoreFacet(driver);
+        storeFacet.clickOption(facet, facetUnderMinimum);
+        if (storeFacet.isOptionChecked(facet, facetUnderMinimum)) {
+            logPass(String.format("Successfully set the '%s' facet to '%s'", facet, facetUnderMinimum));
+        } else {
+            logFailExit(String.format("Failed to set the '%s' facet to '%s'", facet, facetUnderMinimum));
+        }
+
+        //6
+        int numberOfGamesAfterApplyingFilter = browseGamesPage.getNumberOfGameTilesLoaded();
+        if (numberOfGamesAfterApplyingFilter < maxGameTilesPerLoad) {
+            logPass(String.format("Selecting the '%s' option under the '%s' facet reduced the number of game tiles loaded", facetUnderMinimum, facet));
+        } else {
+            logFail(String.format("Selecting the '%s' option under the '%s' facet did not reduce the number of game tiles loaded", facetUnderMinimum, facet));
+        }
+        
+        //7
+        storeFacet.clickClearAllLink();
+        storeFacet.clickOption(facet, facetOverMinimum);
+        List<String> allGameOfferIds = browseGamesPage.getAllStoreGameOfferIds();
+        if(allGameOfferIds.size() > maxGameTilesPerLoad) {
+            logPass("Successfully reached the end of the products and no more products are loading");
+        }
+        else {
+            logFailExit("Failed to reach the end of the products or there were 30 or less products to load");
+        }
+        
+        //8
+        if(!browseGamesPage.verifyLoadingSpinnerPresent()) {
+            logPass("Verified that the spinner icon is no longer present once all products have been loaded");
+        }
+        else {
+            logFailExit("Failed to verify that the spinner icon is no longer present once all the products have been loaded");
+        }
+
+        softAssertAll();
+    }
+}

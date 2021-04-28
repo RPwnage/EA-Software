@@ -1,0 +1,147 @@
+package com.ea.originx.automation.scripts.zGraveyard.oig;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.helpers.EACoreHelper;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.macroaction.MacroSettings;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.Notification;
+import com.ea.originx.automation.lib.pageobjects.dialog.GamePropertiesDialog;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests that the OIG notification are visible at the correct time.
+ *
+ * @author caleung
+ */
+public class OAOigNotificationOff extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 2720690)
+    @Test(groups = {"oig", "client_only", "full_regression"})
+    public void testOAOigNotificationOff(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EACoreHelper.extendNotificationExpiryTime(client.getEACore());
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.DA_2);
+        final String entitlementName = entitlement.getName();
+        final String entitlementOfferId = entitlement.getOfferId();
+        final String entitlementProcessName = entitlement.getProcessName();
+
+        UserAccount user = AccountManagerHelper.registerNewThrowAwayAccountThroughREST("Canada");
+
+        logFlowPoint("Log into Origin and entitle a game that has OIG notifications."); // 1
+        logFlowPoint("Navigate to the 'OIG Settings' page and set the 'Enable OIG' setting to 'Off'."); // 2
+        logFlowPoint("Navigate to the 'Game Library' and download the game."); // 3
+        logFlowPoint("Launch the game and verify OIG notification does not appear."); // 4
+        logFlowPoint("Close the game."); // 5
+        logFlowPoint("Navigate to 'OIG settings' and set the 'Enable OIG' setting to 'On'."); // 6
+        logFlowPoint("Navigate to the 'Game Library'."); // 7
+        logFlowPoint("Open the 'Game Properties' dialog for the game and disable OIG for the game."); // 8
+        logFlowPoint("Launch the game and verify the OIG notification toast does not appear."); // 9
+
+        // 1
+        final WebDriver driver = startClientObject(context, client);
+        MacroLogin.startLogin(driver, user);
+        boolean isPurchaseSuccessful = MacroPurchase.purchaseEntitlement(driver, entitlement);
+        if (isPurchaseSuccessful) {
+            logPass("Successfully logged into Origin and entitled " + entitlementName);
+        } else {
+            logFailExit("Could not log into Origin or could not entitle " + entitlementName);
+        }
+
+        // 2
+        if (MacroSettings.setOIGNotification(driver, false)) {
+            logPass("Successfully set 'Enable OIG' to 'Off'.");
+        } else {
+            logFailExit("Failed to set 'Enable OIG' to 'Off'.");
+        }
+
+        // 3
+        MacroSettings.changeCloudSaveSettings(driver, false); // turn off cloud save to disable alerts
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        GameLibrary gameLibrary = navBar.gotoGameLibrary();
+        boolean downloaded = MacroGameLibrary.downloadFullEntitlement(driver, entitlementOfferId);
+        if (downloaded) {
+            logPass("Successfully downloaded " + entitlementName);
+        } else {
+            logFailExit("Failed to download " + entitlementName);
+        }
+
+        // 4
+        GameTile gameTile = new GameTile(driver, entitlementOfferId);
+        entitlement.addActivationFile(client);
+        gameTile.play();
+        Waits.pollingWaitEx(() -> entitlement.isLaunched(client));
+        Notification notification = new Notification(driver);
+        if (!notification.isOigNotificationWindowPresent()) {
+            logPass("The OIG notification toast did not appear.");
+        } else {
+            logFail("The OIG notification toast appeared.");
+        }
+
+        // 5
+        ProcessUtil.killProcess(client, entitlementProcessName);
+        if (!ProcessUtil.isProcessRunning(client, entitlementProcessName)) {
+            logPass("Successfully closed " + entitlementName);
+        } else {
+            logFailExit("Failed to close " + entitlementName);
+        }
+
+        // 6
+        if (MacroSettings.setOIGNotification(driver, true)) {
+            logPass("Successfully set 'Enable OIG' to 'On'.");
+        } else {
+            logFailExit("Failed to set 'Enable OIG' to 'On'.");
+        }
+
+        // 7
+        navBar.gotoGameLibrary();
+        if (gameLibrary.verifyGameLibraryPageReached()) {
+            logPass("Successfully navigated to the 'Game Library'.");
+        } else {
+            logFailExit("Failed to navigate to the 'Game Library'.");
+        }
+
+        // 8
+        gameTile.openGameProperties();
+        GamePropertiesDialog gameProperties = new GamePropertiesDialog(driver);
+        gameProperties.waitForVisible();
+        gameProperties.setEnableOIG(false);
+        boolean oigDisabled = !gameProperties.verifyOIGEnabled();
+        gameProperties.save();
+        if (oigDisabled) {
+            logPass("Successfully disabled OIG for " + entitlementName);
+        } else {
+            logFailExit("Failed to disable OIG for " + entitlementName);
+        }
+
+        // 9
+        gameTile.play();
+        Waits.pollingWaitEx(() -> entitlement.isLaunched(client));
+        if (!notification.isOigNotificationWindowPresent()) {
+            logPass("The OIG notification toast did not appear.");
+        } else {
+            logFail("The OIG notification toast appeared.");
+        }
+        ProcessUtil.killProcess(client, entitlementProcessName);
+
+        softAssertAll();
+    }
+}

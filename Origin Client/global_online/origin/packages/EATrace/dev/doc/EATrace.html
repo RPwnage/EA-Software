@@ -1,0 +1,395 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<title>EATrace</title>
+<meta name="author" content="Paul Pedriana">
+<link type="text/css" rel="stylesheet" href="UTFDoc.css">
+<style type="text/css">
+<!--
+.style1 {color: #FF0000}
+.style2 {color: #7B97E0}
+-->
+</style>
+</head><body bgcolor="#ffffff">
+<h1>EATrace</h1>
+<h2>Summary</h2>
+<p>The UTF  Trace and Log facilities provide a unified runtime trace, assert, and logging system. EATrace 
+  provides conventional and extended debug output and assertion functionality, 
+  while EALog builds upon EATrace to provide dynamically definable channels 
+  and output streams for tracing information. Both of these systems are intrinsically 
+  powerful but also allow you to override and add to their behavior via plug-in 
+  functionality, yet they are almost trivially easy to use, as you merely need 
+  to write code such as this:</p>
+<pre class="code-example">EA_TRACE("Hello world.");
+ 
+EA_ASSERT(pData != NULL);
+ 
+EA_ASSERT_FORMATTED(gravity &gt; 3.0, (&quot;Gravity (%f) is too low&quot;, gravity));
+ 
+EA_LOG(&quot;Simulator&quot;, kLevelInfo, &quot;Simulator started with 32 agents.&quot;);</pre>
+  <p>While the macros involved in implementing tracing, asserting, and logging may 
+  seem a little complicated, the actual runtime behavior is fairly fast and doesn't 
+  normally allocate memory as it runs. Runtime memory usage and performance shouldn't 
+  normally be an issue.</p>
+  <h2>Example minimal app </h2>
+  <p> You currently need to call EA::Trace::SetTracer before using it. The reason why it doesn't do so automatically on startup is that doing so could result in (a small amount of) memory being allocated, and allocating memory before main is not allowed. </p>
+  <pre class="code-example">#include &lt;EATrace/EATrace.h&gt;
+
+ 
+int main( int, char**)
+{
+    EA::Trace::Tracer tracer;
+    EA::Trace::SetTracer(&amp;tracer);<br>
+    EA_TRACE( &quot;Hello world&quot;);
+
+    . . .<br>}</pre>
+  <h2>Layering</h2>
+  <p>EATrace is a layered system, with basic functionality at the bottom and higher level functionality sitting above. Here we have a diagram showing EATraceBase at the bottom and EATrace sitting above it, and EALog sitting above that, and finally the trace and log macros above all. </p>
+  <table width="300"  border="0" cellpadding="0" cellspacing="0">
+    <tr>
+      <td width="6%">&nbsp;</td>
+      <td width="88%"><table width="100%"  border="1" cellspacing="0">
+          <tr>
+            <td><div align="center">EATrace / EALog Macros</div></td>
+          </tr>
+        </table>
+          <br>
+          <table width="100%"  border="1" cellspacing="0">
+            <tr>
+              <td width="70%"><div align="center"> EALog </div></td>
+            </tr>
+          </table>
+          <br>
+          <table width="100%"  border="1" cellspacing="0">
+            <tr>
+              <td><div align="center">EATrace</div></td>
+            </tr>
+          </table>
+          <br>
+          <table width="100%"  border="1" cellspacing="0">
+            <tr>
+              <td width="100%"><div align="center">EATraceBase</div></td>
+            </tr>
+        </table></td>
+      <td width="6%">&nbsp;</td>
+    </tr>
+  </table>
+  <h2>EATraceBase</h2>
+  <p>EATraceBase provides fundamental utilities used by EATrace and which can be used independently of EATrace. We won't spend much time on it, but it provides the following:</p>
+  <blockquote>
+    <table border="1">
+      <tr>
+        <td><strong>Utility</strong></td>
+        <td><strong>Purpose</strong></td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_TRACE_TRUE<br>EA_TRACE_FALSE</td>
+        <td valign="top">Expression that evaluates to true or false, but the compiler can't see so.</td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_PREPROCESSOR_JOIN</td>
+        <td valign="top">Joins two preprocessor defines; useful for building other macros. </td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_PREPROCESSOR_STRINGIFY</td>
+        <td valign="top">Takes a unquoted preprocessor term and makes a string consant from it.</td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_PREPROCESSOR_LOCATION</td>
+        <td valign="top">Creates a single string that includes the file and line number of the location of the macro's usage.</td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_UNUSED</td>
+        <td valign="top">Defines away an unused variable, including function arguments. </td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_UNIQUELY_NAMED_VARIABLE</td>
+        <td valign="top">Creates a dynamically defined local variable.</td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_CURRENT_FUNCTION</td>
+        <td valign="top">Provides a consistent way to get the current function name as a macro like the __FILE__ and __LINE__ macros work.</td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_CURRENT_FUNCTION_PARAMS</td>
+        <td valign="top">Similar to EA_CURRENT_FUNCTION, but also includes parameters.</td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_SWALLOW_ARGS</td>
+        <td valign="top">Makes unused vararg function arguments go away in release builds.</td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_NOOP</td>
+        <td valign="top">Implements a no-op (no operation). This is useful for having intentionallyempty statements without the compiler warning about them.</td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_DEBUG_TEXT</td>
+        <td valign="top">Makes text go away in a non-debug build. </td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_DEBUG_BREAK</td>
+        <td valign="top">Triggers a debugger breakpoint. </td>
+      </tr>
+      <tr>
+        <td valign="top" class="code-example-span">EA_CT_ASSERT<br>EA_CT_ASSERT_NAMED</td>
+        <td valign="top">Implements a compile-time assert, as opposed to a runtime assert.</td>
+      </tr>
+    </table>
+</blockquote>
+  <h2>EATrace Design</h2>
+  <p>With EATrace, tracing, asserting, and logging all goes through the same interface. This interface allows for user-supplied plugin output back-ends. Thus you can register one or more callbacks which receive EATrace output. The difference between asserting and logging is that assertions go through an expression check first and if the expression fails then the assertion failure is logged via the 'assert' channel of the standard logging system. The user can provide back-ends that filter specifically for this 'assert' channel if desired. This process can be described by the following pseudocode:</p>
+  <pre class="code-example"><span class="code-example-comment">// This statement:
+</span>EA_ASSERT_MESSAGE(1 + 1 == 3, &quot;Math failure&quot;);
+
+<span class="code-example-comment">// Translates into essentially this:
+</span>if(!(1 + 1 == 3))
+{
+    if(should not ignore this assert)
+    {
+        TraceSystem-&gt;Trace(kTraceTypeError, &quot;Math failure&quot;, __FILE__, __LINE__);
+            { For each registered back-end, give it this trace }
+        TriggerDebugBreak();
+    }
+}
+</pre>
+  <h2>EATrace Functionality </h2>
+<p>EATrace primarily provides the following:</p>
+<table style="text-align: left; width: 85%; margin-left: 40px;" border="1" cellpadding="2" cellspacing="2">
+  <tbody>
+    <tr>
+      <td style="vertical-align: top; font-weight: bold;">Identifier<br>
+      </td>
+      
+    <td style="vertical-align: top; font-weight: bold;">Purpose </td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top; ">EA_DEBUG_BREAK</td>
+      
+    <td style="vertical-align: top;">Forced runtime stop. Actually this is part of EATraceBase. </td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top; ">EA_TRACE<br>EA_TRACE_FORMATTED</td>
+      
+    <td style="vertical-align: top;">Text debug output.</td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top;"><span style="font-family: monospace;"></span>EA_WARN<br>EA_WARN_FORMATTED</td>
+      
+    <td style="vertical-align: top;">Conditional text debug output.</td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top;"><span style="font-family: monospace;"></span>EA_NOTIFY<br>EA_NOTIFY_FORMATTED</td>
+      
+    <td style="vertical-align: top;">Always evaluated conditional text debug output.</td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top; ">EA_CT_ASSERT</td>
+      <td style="vertical-align: top;">Compile-time assertions. Actually this is part of EATraceBase.</td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top;">EA_ASSERT<br>EA_ASSERT_MESSAGE<br>EA_ASSERT_FORMATTED<br>
+      </td>
+      
+    <td style="vertical-align: top;">Conditional alert.</td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top; ">EA_VERIFY<br>EA_VERIFY_MESSAGE<br>EA_VERIFY_FORMATTED<br>
+      </td>
+      
+    <td style="vertical-align: top;">Always evaluated conditional alert.</td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top; ">EA_FAIL_MESSAGE<br>EA_FAIL_FORMATTED<br>
+      </td>
+      
+    <td style="vertical-align: top;">Unconditional alert.</td>
+    </tr>
+    <tr>
+      <td class="code-example-span" style="vertical-align: top;">class ITracer<br>
+      </td>
+      
+    <td style="vertical-align: top;">Class that implements tracing functionality.</td>
+    </tr>
+  </tbody>
+</table>
+<p> The above tracing and assertion functionality comes in multiple useful variations. 
+  For example, there are variations that let you specify text via printf-style 
+  formatting and there are optional output group and level specifications. Another 
+  useful feature is that assertions provide functionality for ignorability (via 
+  a dialog box) at runtime if the user chooses. Central to EA::Trace is ITracer 
+  which is an overridable C++ interface class that handles the tracing and assertion 
+  notifications. The default implementation of ITracer can both used as-is, can 
+  be subclassed, or can be replaced altogether. Example basic usage of&nbsp;EA::Trace 
+  assertion might be:</p>
+<pre class="code-example"> EA_ASSERT(result, "Hello world");</pre>
+  <p>EATrace can be enabled or disabled via the EA_TRACE_ENABLED #define, which is enabled by default in debug builds (EA_DEBUG). </p>
+  <h2>What to Assert</h2>Asserts should be used to detect failures that are programming errors. Not all failures are programming errors. The inability of the C fopen function to open a file is not a programming error. A function failure is an error if and only if it violates one of the functions preconditions, prevents the function from meeting any of its callers' preconditions, prevents the function from meeting any of its own postconditions, or reestablishing any invariant that the function shares responsibility (with the caller and other functions) of maintaining. <br>
+<br>
+Let's make bullet points out of this. There are three kinds of programming errors that should be detected via assertions:
+<ul>
+  <li><span style="font-style: italic;">Violation of, or failure to achieve, a precondition</span>: The function detects a violation of one of its own preconditions (e.g. a parameter or state restriction), or encounters a condition that prevents it from meeting a precondition of another essential function that must be called.</li>
+  <li><span style="font-style: italic;">Failure to achieve a postcondition</span>: The function encounters a condition that prevents it from establishing one of its own postconditions. If the function has a return value, producing a valid return value is a postcondition.</li>
+  <li><span style="font-style: italic;">Failure to reestablish an invariant</span>: The function encounters a condition that prevents it from reestablishing (maintaining) an invariant that it is responsible for maintaining. This is a special kind of postcondition that applies particularly to member fucntions; an essential postcondition of every nonprivate member function is that it must reestablish its class's invariants.</li>
+</ul>
+<p>See the book "C++ Coding Standards", item #70 for a good description of what we say here. The above descriptions and policty is largely taken from that book.</p>
+<p>You can control the presentation of assertion failure dialog boxes via the following functions:</p>
+<pre class="code-example">tAlertResult DisplayTraceDialog(const char* pTitle, const char* pText);
+bool         GetTraceDialogEnabled();
+void         SetTraceDialogEnabled(bool bEnabled);</pre>
+<h2>EALog</h2>
+<p>EALog extends EATrace to provide a server (Trace::IServer) which 
+  maintains a dynamic set of tracing back-ends (Trace::ILogReporter) and 
+  user-definable filtering of output to those back-ends. One or more back-ends 
+  can be put in place by the user which work as per the user's needs. <span class="563174301-17012004"><font>The 
+  default implementation is both re-entrant and thread-safe and has been tested 
+  under fairly extreme usage conditions. </font></span>The Server itself is also 
+  overridable and replaceable. Example basic usage of EA::Log  is:</p>
+  <pre class="code-example"> EA_LOG_LEVEL("GUI", kLevelInfo, "Hello world"); <span class="code-example-comment">// Write to the &quot;GUI&quot; channel the string &quot;Hello world&quot;</span></pre>
+  <p>It is important to note that since EALog is built upon EATrace, all 
+  trace statements can route through the Log system if desired. To do this, 
+  the user need only set the default Tace::ITracer to be an instance of Trace::IServer.</p>
+  <p>EALog provides the following:</p>
+  <table style="text-align: left; width: 85%; margin-left: 40px;" border="1" cellpadding="2" cellspacing="2">
+    <tbody>
+      <tr>
+        <td style="vertical-align: top; font-weight: bold;">Identifier<br>
+        </td>
+        <td style="vertical-align: top; font-weight: bold;">Purpose </td>
+      </tr>
+      <tr>
+        <td class="code-example-span" style="vertical-align: top; ">EA_LOG<br>EA_LOG_MESSAGE<br>EA_LOG_FORMATTED</td>
+        <td style="vertical-align: top;">Log statements. These are very similar to EA_TRACE statements except that they have a log 'group' or 'channel' name as well. </td>
+      </tr>
+      <tr>
+        <td class="code-example-span" style="vertical-align: top;">class IServer<br>
+        </td>
+        <td style="vertical-align: top;">Class that implements logging functionality.</td>
+      </tr>
+    </tbody>
+  </table>
+<p>EALog can be enabled or disabled via the EA_LOG_ENABLED #define, which is enabled by default in debug builds (EA_DEBUG). </p>
+<h2>EA_LOG Macro Limitations </h2>
+<p>A limitation of the log macro system is that the group (a.k.a. channel) and level must be constant. The values passed to an individual EA_LOG cannot change at runtime. The result of having variable values is that all log calls will work as if they were using the first-seen group and level values. This limitation is present because it allows the log system to be very fast at filtering. </p>
+<p>The following will not work as expected:</p>
+<pre class="code-example">EA_LOG(<span class="style1">stringArray[index]</span>, "Dialog box displayed");
+<br>EA_LOG_LEVEL("GUI", <span class="style1">levelArray[index]</span>, "Dialog box displayed");
+</pre>
+<p>The solution is to do this:</p>
+<pre class="code-example">void DoLog(int index, const char* pText)<br>{<br>    switch (index)<br>    {
+        case GUI: EA_LOGI(stringArray[index], (pText)); break;
+        case AI:  EA_LOGI(stringArray[index], (pText)); break;
+        etc.
+    }
+}</pre>
+<p>or this: </p>
+<pre class="code-example">template&lt;int index&gt;
+void EALogIChannel(const char* pText)
+{
+    EA_LOGI(stringArray[index], (pText));
+}
+
+void DoLog(int index, const char* pText)
+{
+    typedef void (*LogFunction)(const char*); <span class="code-example-comment">// Possibly create and initialize this table elsewhere.</span>
+    static LogFunction functionTable[COUNT] = { EALogIChannel&lt;GUI&gt;, EALogIChannel&lt;AI&gt;, etc. };
+
+    functionTable[index](pText);
+}</pre>
+<p>or possibly this dynamic TraceHelper for elaborate usage:</p>
+<pre class="code-example">EA::Trace::TempTraceHelperMap gTraceHelperMap;
+
+
+void MessageFunction(const char* pChannelName, const char* pFile, 
+                     uint32_t nLine, const char* pFormat, va_list args)
+{<br>    using namespace EA::Trace;
+
+    TraceHelper* const pHelper = gTraceHelperMap.ReserveHelper(kTraceTypeLog, pChannelName, kLevelDebug, 
+                                        ReportingLocation(pFile, nLine, EA_CURRENT_FUNCTION));
+
+    if(pHelper &amp;&amp; pHelper-&gt;IsTracing())
+    {
+        const tAlertResult result = GetTracer()-&gt;TraceVaList(*pHelper, pFormat, args);
+
+        if(result &amp; kAlertResultDisable)
+            pHelper-&gt;SetEnabled(false);
+
+        if(result &amp; kAlertResultBreak)
+            EA_DEBUG_BREAK();
+    }
+}</pre>
+<p> </p>
+<h2>EATrace Examples </h2>
+<p>Most of the time, code will need to use only a few of the trace/assertion statements. 
+  Below are some examples of the most common such statements in use. EATrace 
+  also provides group- and level-based tracing, but for simplicity we don't present 
+  it here. Note that each of the trace and assertion statements exists in an abbreviated 
+  form which we don't show here but is useful for quick compact coding.</p>
+<pre class="code-example">EA_CT_ASSERT(sizeof(int) &gt;= 4);<br>EA_CT_ASSERT_MESSAGE(sizeof(int) &gt;= 4, "Expect 32 bit or greater int")<br>EA_DEBUG_BREAK();<br><br>EA_TRACE("Hello world");<br>EA_TRACE_FORMATTED(("%s", "Hello world"));
+<br>EA_WARN(result, "result is false");<br>EA_WARN_FORMATTED(result, ("result (%d) is false", result));
+<br>EA_NOTIFY(result, "result is false");<br>EA_NOTIFY_FORMATTED(result, ("result (%d) is false", result));<br><br>EA_ASSERT(result);<br>EA_ASSERT_MESSAGE(result, "Hello world");<br>EA_ASSERT_FORMATTED(result, ("%s", "Hello world"));
+<br>EA_VERIFY(LoadTexture(id));<br>EA_VERIFY_MESSAGE(LoadTexture(id), "LoadTexture failed");<br>EA_VERIFY_FORMATTED(LoadTexture(id), ("LoadTexture(%d) failed", id));
+<br>EA_FAIL_MESSAGE("Unilateral failure occurred.");<br>EA_FAIL_FORMATTED(("Unilateral failure occurred for id = %d.", id));</pre>
+<blockquote></blockquote>
+<h2> EALog Examples </h2>
+<p>EALog uses much the same style as EATrace, though it is entirely about 
+  tracing and not about asserting. However, assertion functionality is still available 
+  through EALog if desired. Note that as with EATrace, each of the statements 
+  exists in an abbreviated form which we don't show here but is useful for quick 
+  compact coding.</p>
+<pre class="code-example">EA_LOG("GUI", "Dialog box displayed");
+<br>EA_LOG_LEVEL("GUI", kLevelInfo, "Dialog box displayed");
+<br>EA_LOG_FORMATTED("GUI", ("Dialog box %d displayed", id));
+<br>EA_LOG_LEVEL_FORMATTED("GUI", kLevelInfo, ("Dialog box %d displayed", id)); </pre>
+<h2>Making a custom back-end</h2>
+<p>EA_TRACE and EA_LOG calls use the same configurable back-end to write entries to. You can define your own back-end (log reporter) by subclassing the ILogReporter class or (more likely) the LogReporter class (which itself is a subclass of ILogReporter). Here is some example code:</p>
+<pre class="code-example">class LogReporterSample : public EA::Trace::LogReporter<br>{<br>public:<br>    LogReporterSample(const char* name) : LogReporter(name)<br>        { }
+
+    EA::Trace::tAlertResult Report(const EA::Trace::LogRecord&amp; logRecord) 
+    {
+        const char* pOutput = mFormatter-&gt;FormatRecord(logRecord);
+
+        EA::StdC::Printf(&quot;%s&quot;, pOutput);<br>
+        return EA::Trace::kAlertResultNone;
+    }
+};
+
+
+EA::Trace::IServer* pServer   = EA::Trace::GetServer();
+LogReporterSample*  pReporter = new LogReporterSample(&quot;LogReporterSample&quot;);<br>
+pNewServer-&gt;RemoveAllLogReporters();   <span class="code-example-comment">// Optional call which may be useful.</span>
+pServer-&gt;AddLogReporter(pTestReporter);
+</pre>
+<h2>Memory usage </h2>
+<p>EATrace's memory usage comes from the following sources:</p>
+<ul>
+  <li> Server global instance<br>
+    The standard Server class uses about 256 bytes, but you can replace it with a custom Server.<br>
+  </li>
+  <li> Any custom ILogFilter instances you have created and registered.<br>
+    By default the Server creates an instance of LogFilterGroupLevels which uses 32 bytes plus a small variable amount depending on the group/level filters you register. <br>
+  </li>
+  <li> Any custom ILogFormatter instances you have created and registered.<br>
+    By default the Server creates an instance of LogFormatterSimple which uses about 4K of memory. That 4K comes from fixed_string, and you can replace its LogFormatterSimple with something else.<br>
+  </li>
+  <li>Any ILogReporter instances you have created and registered.<br>
+    By default the Server creates an instance of LogReporterDebugger which uses about 48 bytes of memory. By default the Server creates an instance of LogReporterDialog which uses about 48 bytes of memory.<br>
+  </li>
+  <li> For every EA_ASSERT()/EA_LOG()/EA_TRACE() call in the code, a 36 byte struct is created which stores filter information and if you've set the assert to be ignored. These structs are allocated in static memory and not dynamically on the heap, so you don't see them in the heap memory you give EATrace.<br>
+  </li>
+  <li> The TraceHelperTable, which is just a vector of pointers to the above 36 byte structs.</li>
+</ul>
+<p></p>
+<hr>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+</body>
+</html>

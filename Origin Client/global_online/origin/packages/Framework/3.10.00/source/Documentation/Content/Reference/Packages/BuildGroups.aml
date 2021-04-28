@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="efabd9f3-1e0e-43de-b90d-9180c835b8af" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+    <introduction>
+      <para>
+        Groups are the way for Framework 2 to put additional example, test, or tool build units 
+        into a <token>package</token> and have a standard way to build these groups selectively.
+      </para>
+    </introduction>
+    <section address="BuildGroups">
+      <title>Build Groups</title>
+      <content>
+        <para>There are four build Groups supported by Framework</para>
+        <table>
+          <tableHeader>
+            <row>
+              <entry>
+                <para>Group</para>
+              </entry>
+              <entry>
+                <para>Purpose</para>
+              </entry>
+              <entry>
+                <para>Targets</para>
+              </entry>
+            </row>
+          </tableHeader>
+          <row>
+            <entry>
+              <para>runtime</para>
+            </entry>
+            <entry>
+              <para>"main" build unit library, program or Dll.</para>
+            </entry>
+            <entry>
+              <para>build, slnruntime, run, ... </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>example</para>
+            </entry>
+            <entry>
+              <para>Example code. Demonstrates how to use runtime code </para>
+            </entry>
+            <entry>
+              <para>example-build, slnexample, example-run, ... </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>test</para>
+            </entry>
+            <entry>
+              <para>Test code. Tests Package runtime code.</para>
+            </entry>
+            <entry>
+              <para>test-build, slntest, test-run ... </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>tool</para>
+            </entry>
+            <entry>
+              <para>Tool code. Usually tools are additional executables that are used in a build process or for other helper purposes.</para>
+            </entry>
+            <entry>
+              <para>tool-build, slntool, tool-run... </para>
+            </entry>
+          </row>
+        </table>
+        <para>
+          By convention most of the Framework 2 setting names start with a name of the group to define Buildtypes,
+          source files, include directories, etc.
+        </para>
+        <para>
+          For packages with <link xlink:href="6e7efae2-2b91-4be3-bade-f98dee8c2a5f">modules</link>
+          group name is followed by a module name.
+        </para>
+
+        <code language="xml" title="Example below demonstrates how to specify two groups runtime and test in a Package Build File">
+
+          &lt;project default="build"&gt;
+          &lt;!-- Define package name and version. --&gt;
+          &lt;package name="library_example" targetversion="1.00.00" /&gt;
+
+          &lt;!-- Define runtime group ------------------------------&gt;
+
+          &lt;property name="runtime.buildtype" value="Library" /&gt;
+
+          &lt;property name="runtime.includedirs" &gt;
+          ${package.dir}/include
+          &lt;/property&gt;
+
+          &lt;fileset name="runtime.sourcefiles" &gt;
+          &lt;includes name="${package.dir}/source/*.cpp" /&gt;
+          &lt;/fileset>
+
+          &lt;!-- Define test group ------------------------------&gt;
+
+          &lt;property name="test.buildtype" value="Program" /&gt;
+
+          &lt;fileset name="test.sourcefiles" &gt;
+          &lt;includes name="${package.dir}/source/test/*.cpp" /&gt;
+          &lt;/fileset&gt;
+
+          &lt;/project&gt;
+        </code>
+
+        <code language="xml" title="Package with modules 'MyLibrary' and 'MyTest'">
+
+          &lt;project default="build"&gt;
+          &lt;!-- Define package name and version. --&gt;
+          &lt;package name="library_example" targetversion="1.00.00" /&gt;
+
+          &lt;!-- Define runtime group ------------------------------&gt;
+
+          &lt;property name="runtime.MyLibrary.buildtype" value="Library" /&gt;
+
+          &lt;property name="runtime.MyLibrary.includedirs" &gt;
+          ${package.dir}/include
+          &lt;/property&gt;
+
+          &lt;fileset name="runtime.MyLibrary.sourcefiles" &gt;
+          &lt;includes name="${package.dir}/source/*.cpp" /&gt;
+          &lt;/fileset>
+
+          &lt;!-- Define test group ------------------------------&gt;
+
+          &lt;property name="test.MyTest.buildtype" value="Program" /&gt;
+
+          &lt;fileset name="test.MyTest.sourcefiles" &gt;
+          &lt;includes name="${package.dir}/source/test/*.cpp" /&gt;
+          &lt;/fileset&gt;
+
+          &lt;/project&gt;
+        </code>
+        <alert class="note">
+          <para>
+            When building <legacyItalic>test</legacyItalic>, <legacyItalic>example</legacyItalic>, or <legacyItalic>tool</legacyItalic> groups Nant will introduce implicit build dependency on the runtime group
+            (all build modules in the runtime group), unless dependencies between modules of two groups are
+            specified explicitly (can be empty dependency).
+          </para>
+        </alert>
+        <mediaLink>
+          <image xlink:href="Build_Groups_1"/>
+        </mediaLink>
+        <para>
+          If, for example, <legacyItalic>test</legacyItalic> (or <legacyItalic>runtime</legacyItalic>) group has builddependency on 
+          another package this dependency is only for <legacyItalic>runtime</legacyItalic> group in that dependent package:
+        </para>
+        <code language="xml" title=" ">
+          &lt;project default="build"&gt;
+            &lt;!-- Define package name and version. --&gt;
+            &lt;package name="library_example" targetversion="1.00.00" /&gt;
+
+            &lt;!-- Define runtime group ------------------------------&gt;
+
+            &lt;property name="runtime.buildtype" value="Library" /&gt;
+
+            &lt;property name="runtime.includedirs" &gt;
+              ${package.dir}/include
+            &lt;/property&gt;
+
+            &lt;fileset name="runtime.sourcefiles" &gt;
+              &lt;includes name="${package.dir}/source/*.cpp" /&gt;
+            &lt;/fileset&gt;
+
+            &lt;property name="runtime.builddependencies"&gt;
+              packageA
+            &lt;/property&gt;
+
+            &lt;!-- Define test group ------------------------------&gt;
+
+            &lt;property name="test.buildtype" value="Program" /&gt;
+
+            &lt;fileset name="test.sourcefiles" &gt;
+              &lt;includes name="${package.dir}/source/test/*.cpp" /&gt;
+            &lt;/fileset&gt;
+
+            &lt;property name="test.builddependencies"&gt;
+              packageB
+            &lt;/property&gt;
+
+          &lt;/project&gt;
+        </code>
+        <mediaLink>
+          <image xlink:href="Build_Groups_2"/>
+        </mediaLink>
+
+        <alert class="note">
+          <para>
+            Build dependency is defined between packages, not between groups, but is only applies to <legacyBold>runtime</legacyBold> group.
+          </para>
+        </alert>
+      </content>
+    </section>
+
+    <relatedTopics>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

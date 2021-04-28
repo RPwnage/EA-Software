@@ -1,0 +1,62 @@
+<project xmlns="schemas/ea/framework3.xsd">
+    <property name="EATHREAD_DEBUGFLAGS_ON" value="@{OptionSetGetValue('config-options-common', 'debugflags')} == on"/>
+    <property name="EA_SCEDBG_ENABLED" value="${EA_SCEDBG_ENABLED??0}" unless="${EATHREAD_DEBUGFLAGS_ON} == true"/>
+    <property name="EA_SCEDBG_ENABLED" value="${EA_SCEDBG_ENABLED??1}" if="${EATHREAD_DEBUGFLAGS_ON} == true"/>
+    <property name="EA_CAPILANO_DBG_ENABLED" value="${EA_CAPILANO_DBG_ENABLED??0}" unless="${EATHREAD_DEBUGFLAGS_ON} == true"/>
+    <property name="EA_CAPILANO_DBG_ENABLED" value="${EA_CAPILANO_DBG_ENABLED??1}" if="${EATHREAD_DEBUGFLAGS_ON} == true"/>
+
+    <fileset name="package.EAThread.java.classes" basedir="${package.EAThread.builddir}/${config}/bin/EAThread/classes" >
+        <includes name="**\*.class"/>
+    </fileset>
+	
+	<!-- when the build type is set on the module's public data the libs will be determined automatically by framework -->
+	<do unless="@{StrCompareVersions(${nant.version}, '6.1.0.0')} gte 0">
+		<fileset name="package.EAThread.libs">
+			<includes name="${package.EAThread.builddir}/${config}/lib/${lib-prefix}EAThread${lib-suffix}" />
+		</fileset>
+	</do>
+	
+	<!-- The build script is using custom buildtypes that extend these default build types,
+    but for determining the binary locations in the public data we can use the default build types -->
+    <property name="EAThreadBuildType" local="true" value="Library"/>
+    <property name="EAThreadBuildType" local="true" value="DynamicLibrary" if="${Dll??false}"/>
+	
+	<!-- This property is deprecated and included for backwards compatibility only.  Please use the module specific property instead (package.EAThread.EAThread.includedirs). -->
+	<property name="package.EAThread.includedirs" value="${package.EAThread.dir}/include" />
+
+	<!-- This property globally removes deprecated EAThread code from the public API 
+
+	 Note: This property is only useful when trying to detect if *any*
+	 client modules reference any deprecated code.
+
+	 A more typical scenario is for the maintainer of a particular module to
+	 wish to know whether their module is currently using any deprecated API
+	 from any of its dependencies. For this use case, this property will
+	 result in too much noise as it will flag use of the deprecated code
+	 from any module, not just the maintainers module. Instead, maintainers
+	 should temporarily define EA_REMOVE_DEPRECATED_API internally to their
+	 module's build instead of globally.
+
+	 -->
+	<do if="${package.EAThread.remove_deprecated_api??false}">
+		<property name="package.EAThread.defines">
+			${property.value}
+			EATHREAD_REMOVE_DEPRECATED_API
+		</property>
+	</do>
+		
+    <!-- EAThread exports one single runtime library and its include directories are in "include", so it can use all default values for this task. -->
+	<publicdata packagename="EAThread" if="@{StrCompareVersions(${nant.version}, '6.1.0.0')} gte 0">
+        <module name="EAThread" buildtype="${EAThreadBuildType}">
+            <includedirs>
+                ${package.EAThread.includedirs}
+            </includedirs>
+			<libs-external>
+				<includes name="${package.kettlesdk.libdir??}/libSceDbg_stub_weak.a"             if="${config-system} == 'kettle' and ${EA_SCEDBG_ENABLED} == 1"/>
+				<includes name="toolhelpx.lib" asis="true"                                       if="${config-system} == 'capilano' and ${EA_CAPILANO_DBG_ENABLED} == 1"/>
+				<includes name="-ldl" asis="true"                                                if="${config-system} == unix or ${config-system} == unix64 or ${config-system} == android"/>
+				<!-- Link libdl.a, which implements dlopen, dlclose, etc. -->
+			</libs-external>
+        </module>
+    </publicdata>
+</project>

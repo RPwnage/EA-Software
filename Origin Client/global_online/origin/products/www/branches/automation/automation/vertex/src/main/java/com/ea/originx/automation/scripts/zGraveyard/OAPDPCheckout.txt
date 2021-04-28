@@ -1,0 +1,155 @@
+package com.ea.originx.automation.scripts.checkout;
+
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.Waits;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.login.LoginPage;
+import com.ea.originx.automation.lib.pageobjects.store.*;
+import com.ea.originx.automation.lib.resources.OriginClientData;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+import java.util.ArrayList;
+
+/**
+ * Test PDP checkout on client and browser
+ *
+ * @author rocky
+ */
+public class OAPDPCheckout extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 1016688)
+    @Test(groups = {"checkout", "release_smoke", "int_only"})
+    public void testPDPCheckout(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String userName = userAccount.getUsername();
+
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_STANDARD);
+        final String entitlementName = entitlement.getName();
+
+        boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        if (isClient) {
+            logFlowPoint("Launch Origin and register as a new user on client"); // 1
+        }
+        logFlowPoint("Navigate to PDP page and click buy button"); // 2
+        if (!isClient) {
+            logFlowPoint("verify login page appears on browser"); // 3
+        }
+        if (!isClient) {
+            logFlowPoint("Create new user account from login page and verify user is able to login on browser"); // 4
+        }
+        logFlowPoint("Proceed purchasing entitlement and verify packart on Review Order Page"); // 5
+        logFlowPoint("Verify total price on Review Order Page");// 6
+        logFlowPoint("Click complete order button and verify navigating to Thank You Page"); // 7
+        if (!isClient) {
+            logFlowPoint("Verify there is an origin download link on Thank You Page on browser"); // 8
+        }
+        logFlowPoint("Verify there is an order history link on Thank You Page"); // 9
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (isClient) {
+            if (MacroLogin.startLogin(driver, userAccount)) {
+                logPass("Successfully created user and logged in as: " + userName + " on client");
+            } else {
+                logFailExit("Could not create user on client");
+            }
+        }
+
+        //2
+        if (MacroPDP.loadPdpPage(driver, entitlement)) {
+            logPass("Successfully navigated to " + entitlementName + "'s PDP and click buy button");
+        } else {
+            logFailExit("Failed to navigate to " + entitlementName + "'s PDP");
+        }
+        new PDPHeroActionCTA(driver).clickBuyButton();
+
+        //3
+        if (!isClient) {
+            final LoginPage loginPage = new LoginPage(driver);
+            loginPage.waitForPageToLoad();
+            ArrayList<String> tabs = new ArrayList<>(driver.getWindowHandles());
+            driver.switchTo().window(tabs.get(1));
+            if (Waits.pollingWait(loginPage::isOnLoginPage)) {
+                logPass("Navigated to PDP page for " + entitlementName + " Verified login page appears on browser when clicking buy button");
+            } else {
+                logFailExit("Failed: Cannot verify login page on browser");
+            }
+
+            //4
+            driver.switchTo().window(tabs.get(0));
+            loginPage.clickRegistrationLink();
+            MacroLogin.quickRegister(userAccount, driver);
+            if (Waits.waitIsPageThatMatchesOpen(driver, OriginClientData.MAIN_SPA_PAGE_URL, 15)) {
+                logPass("Verified login by pressing 'Enter' successful for user " + userName);
+            } else {
+                logFailExit("Failed: Cannot login by pressing 'Enter' for user " + userName);
+            }
+        }
+
+        //5
+        PaymentInformationPage paymentInfoPage = new PaymentInformationPage(driver);
+        paymentInfoPage.waitForPaymentInfoPageToLoad();
+        Waits.pollingWait(() -> paymentInfoPage.verifyPaymentInformationReached());
+        paymentInfoPage.enterCreditCardDetails();
+        Waits.pollingWait(paymentInfoPage::isProceedToReviewOrderButtonEnabled);
+        paymentInfoPage.clickOnProceedToReviewOrderButton();
+        ReviewOrderPage reviewOrder = new ReviewOrderPage(driver);
+        reviewOrder.waitForPageToLoad();
+        if (reviewOrder.verifyPackArtExists()) {
+            logPass("Verified there is a packart on Review Order Page");
+        } else {
+            logFailExit("Could not verify a packart on Review Order Page");
+        }
+
+        //6
+        if (reviewOrder.verifyTotalCost()) {
+            logPass("Verified total price is same as tax + subTotal");
+        } else {
+            logFailExit("Could not verify total price");
+        }
+
+        //7
+        reviewOrder.clickCompleteOrderButton();
+        ThankYouPage thankYouPage = new ThankYouPage(driver);
+        thankYouPage.waitForThankYouPageToLoad();
+        if (Waits.pollingWait(thankYouPage::verifyThankYouPageReached)) {
+            logPass("Clicked on 'complete order' button and navigated to Thank You Page successfully");
+        } else {
+            logFailExit("Could not purchase the product");
+        }
+
+        //8
+        if (!isClient) {
+            if (thankYouPage.verifyOriginDownloadLink()) {
+                logPass("Verify there is an origin download link on Thank You Page on browser");
+            } else {
+                logFailExit("Could not verify an origin download link on Thank You Page on browser");
+            }
+        }
+
+        //9
+        if (thankYouPage.verifyViewOrderHistoryLink()) {
+            logPass("Verify there is an order history link on Thank You Page");
+        } else {
+            logFailExit("Could not verify an order history link on Thank You Page");
+        }
+
+        softAssertAll();
+    }
+
+}

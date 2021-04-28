@@ -1,0 +1,74 @@
+<project name="IGO64" default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+
+  
+  <property name="dirtysdk-samples" value="false" />
+  <property name="eaconfig.rtti" value="on" />	
+	
+	<!-- ******************* -->
+	<!-- Package declaration -->
+	<!-- ******************* -->
+	<property name="package.IGO64.dir"  value="@{PathGetFullPath('.')}"/>
+	<property name="package.IGO64.version"  value="@{PathGetFileName(@{PathGetFullPath('.')})}"/>
+	<package name="IGO64" targetversion="${package.IGO64.version}"/>
+    <property name="runtime.originClient.outputdir" value="${package.IGO64.dir}/../../originClient/dev/runtime" />
+		
+	<!-- ******************* -->
+    <!-- Package dependencies -->
+    <!-- ******************* -->
+	<dependent name="OriginConfig" />
+	<dependent name="OriginVersion" />
+	<dependent name="VisualStudio" />
+	<dependent name="openSSL" />
+	<dependent name="twitch" />
+	<property name="package.VisualStudio.platformtoolset" value="v120_xp"/>
+	
+  <!-- This enables the NANT built MadCHook  -->
+  <property name="module.MadCHook.dir" value="${package.IGO64.dir}/../madCodeHook3" />
+  <include file="${module.MadCHook.dir}/MadCHook3.xml" if="${config-system} == 'pc' || ${config-system} == 'pc64'"/>
+
+  <!-- This enables the NANT built IGOIPC  -->
+  <property name="module.IGOIPC.dir" value="${package.IGO64.dir}/../../IGOIPC" />
+  <include file="${module.IGOIPC.dir}/IGOIPC.xml" if="${config-system} == 'pc' || ${config-system} == 'pc64'"/>
+
+  <!-- This enables the NANT built IGOProxy -->
+  <property name="module.IGOProxy.dir" value="${package.IGO64.dir}/../../IGOProxy" />
+  <include file="${module.IGOProxy.dir}/IGOProxy.xml" if="${config-system} == 'pc64'"/>
+
+  <!-- This enables the NANT built IGO  -->
+  <property name="module.IGO.dir" value="${package.IGO64.dir}/../../IGO" />
+  <include file="${module.IGO.dir}/IGO.xml" if="${config-system} == 'pc' || ${config-system} == 'pc64'"/>
+  
+  <!-- Removed clean-twitch because now that it's in the packages, I would think we don't need to rebuild it, but need to check with Thomas
+  <target name="clean-custom" depends="clean-madchook clean-igoipc clean-twitch clean-igoproxy clean-igo">
+  -->
+  <target name="clean-custom" depends="clean-madchook clean-igoipc clean-igo">
+    <call target="clean-igoproxy"  if="${config-system} == 'pc64'" />
+    <delete dir="${package.IGO.dir}/temp" />
+    <delete dir="${package.IGO.bin}" />
+    <delete dir="${package.IGO.dir}/lib" />
+    <delete file="${package.IGO.dir}/target/IGO64dist.zip" />
+  </target>
+  
+  <target name="archive">
+	<copy todir="${package.IGO.dir}/temp">
+		<fileset basedir="${package.IGO.bin}">
+			<includes name="x64/*.*" />
+			<includes name="igoproxy64${debug-suffix}.exe" />
+			<includes name="igo64${debug-suffix}.dll" />
+			<includes name="igoproxy64${debug-suffix}.pdb" />
+			<includes name="igo64${debug-suffix}.pdb" />
+		</fileset>
+	</copy>
+	<zip zipfile="${package.IGO.dir}/target/IGO64dist.zip">
+		<fileset basedir="${package.IGO.dir}/temp">
+			<includes name="**" />
+		</fileset>
+	</zip>
+  </target>
+</project>

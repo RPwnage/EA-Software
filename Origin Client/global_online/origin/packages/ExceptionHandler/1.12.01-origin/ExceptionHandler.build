@@ -1,0 +1,198 @@
+<project name="ExceptionHandler" default="build">
+
+    <property name="Dll" value="false" unless="@{PropertyExists('Dll')}" />
+
+    <optionset name="config.targetoverrides">
+        <option name="test-build"    value="include" />
+        <option name="test-buildall" value="include" />
+        <option name="test-run"      value="include" />
+        <option name="test-runall"   value="include" />
+    </optionset>
+
+
+    <!-- Package declaration -->
+    <!-- Get the version number from current directory -->
+    <property name="currDir"  value="@{PathGetFullPath('.')}"/>
+    <property name="currVer"  value="@{PathGetFileName('${currDir}')}"/>
+    <package  name="ExceptionHandler" targetversion="${currVer}"/>
+
+
+    <!-- You can set global properties in your masterconfig.xml file like so:    -->
+    <!--   <globalproperties>                                                    -->
+    <!--       EATECH_WARNINGSASERRORS=1                                         -->
+    <!--   </globalproperties>                                                   -->
+    <property name="EATECH_WARNINGSASERRORS" value="0" unless="@{PropertyExists('EATECH_WARNINGSASERRORS')}" />
+
+
+
+    <!-- Create extra build types which simply add some additional compiler arguments -->
+    <optionset name="config-options-generated-c" fromoptionset="config-options-program-c">
+        <option name="buildset.name" value="GeneratedC"/>
+        <option name="warningsaserrors" value="off" if ="${EATECH_WARNINGSASERRORS} == 0"/>
+        <option name="warningsaserrors" value="on"  if ="${EATECH_WARNINGSASERRORS} == 1"/>
+    </optionset>
+    <task name="GenerateBuildOptionset" configsetname="config-options-generated-c" />
+    <optionset name="GeneratedC">
+        <!-- Apple's generated mach_exc*.c code is not alias-safe. -->
+        <option name="cc.options" if="${config-compiler} == gcc and ${config-system} != iphone and ${config-system} != iphone-sim and ${config-system} != osx">
+            @{StrReplace(${option.value}, '-fno-strict-aliasing', '-fstrict-aliasing')}
+        </option>
+        <option name="cc.options" if="${config-compiler} == 'mw'">          
+            @{StrReplace(${option.value}, '-w nofilecaps', '-w filecaps')}
+        </option>
+    </optionset>
+
+
+
+    <!-- ********************* -->
+    <!-- Runtime configuration -->
+    <!-- ********************* -->
+
+    <property name="runtime.buildmodules" value="ExceptionHandler"/>
+    <property name="runtime.ExceptionHandler.buildtype" value="Library" />
+    <property name="runtime.ExceptionHandler.buildtype" value="DynamicLibrary" if="${Dll}"/>
+
+    <property name="runtime.ExceptionHandler.usedependencies">
+        EABase
+        EAIO
+        EASTL
+        EAStdC
+        EAThread
+        EAAssert
+        EACallstack
+        coreallocator
+    </property>
+
+    <property name="runtime.ExceptionHandler.defines">
+        ${property.value}
+        UTF_USE_EAASSERT=1
+    </property>
+
+    <property name="runtime.ExceptionHandler.defines" if="${Dll} and ${config-compiler} == 'vc'">
+        EXCEPTIONHANDLER_API=__declspec(dllexport)
+        EXCEPTIONHANDLER_TEMPLATE_API=__declspec(dllexport)
+    </property>
+    <property name="runtime.ExceptionHandler.defines" if="@{PropertyExists('EA_XBDM_ENABLED')}">
+        ${property.value}
+        EA_XBDM_ENABLED=${EA_XBDM_ENABLED}
+    </property>
+
+    <fileset name="runtime.ExceptionHandler.sourcefiles">    
+        <includes name="${package.dir}/source/*.cpp"/>
+        <includes name="${package.dir}/source/Apple/internal/*.c" optionset="GeneratedC" if="${config-system} == iphone || ${config-system} == iphone-sim || ${config-system} == osx"/>
+    </fileset>
+
+    <fileset name="runtime.ExceptionHandler.bulkbuild.sourcefiles" fromfileset="runtime.ExceptionHandler.sourcefiles"/>
+
+    <property name="runtime.ExceptionHandler.warningsuppression" if="${config-compiler} == 'vc'">
+        -wd4217        <!-- disable warning: "member template functions cannot be used for copy-assignment or copy-construction" -->
+        -wd4350        <!-- disable warning: "behavior change: x called instead of y" -->
+        -wd4530        <!-- disable warning: "C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc" -->
+        -wd4548        <!-- disable warning: "expression before comma has no effect; expected expression with side-effect" -->
+        -wd4619        <!-- disable warning: "#pragma warning : there is no warning number 'xxxx'"  MS being silly here -->
+        -wd4985        <!-- 'ceil': attributes not present on previous declaration. -->
+    </property>
+
+    <property name="runtime.ExceptionHandler.warningsuppression" if="${config-compiler} == 'mw'">
+        -w off        <!-- disable all warnings. We do this only because CodeWarrior doesn't document how to disable some individual warnings -->
+    </property>
+
+    <!-- Apple's generated mach_exc*.c code is not alias-safe. -->
+    <do if="${config-compiler} == gcc and ${config-system} != iphone and ${config-system} != iphone-sim and ${config-system} != osx">
+        <property name="runtime.ExceptionHandler.warningsuppression"> 
+            -Wstrict-aliasing=3
+            -Wextra
+        </property>
+    </do>
+
+
+
+    <!-- ********************* -->
+    <!-- Test configuration    -->
+    <!-- ********************* -->
+
+    <property name="test.buildmodules" value="ExceptionHandlerTest"/>
+
+    <property name="test.ExceptionHandlerTest.buildtype" value="Program"/>
+
+    <property name="test.ExceptionHandlerTest.usedependencies">
+        EABase
+        coreallocator
+    </property>
+    
+    <property name="test.ExceptionHandlerTest.builddependencies">
+        EAIO
+        EASTL
+        EAStdC
+        EAThread
+        EAAssert
+        EACallstack
+        EACOM
+        MemoryMan
+        PPMalloc
+        EATest
+        EAMain
+    </property>
+
+    <property name="test.ExceptionHandlerTest.runtime.moduledependencies">
+        ExceptionHandler
+    </property>
+
+    <property name="test.ExceptionHandlerTest.defines">
+        ${property.value}
+        UTF_USE_EAASSERT=1
+        EA_MEMORY_LEAK_TRACE_ENABLED=1
+    </property>
+    <property name="test.ExceptionHandlerTest.defines" if="@{PropertyExists('EA_XBDM_ENABLED')}">
+        ${property.value}
+        EA_XBDM_ENABLED=${EA_XBDM_ENABLED}
+    </property>
+
+    <property name="test.ExceptionHandlerTest.warningsuppression" if="${config-compiler} == 'vc'">
+        -wd4217        <!-- disable warning: "member template functions cannot be used for copy-assignment or copy-construction" -->
+        -wd4350        <!-- disable warning: "behavior change: x called instead of y" -->
+        -wd4530        <!-- disable warning: "C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc" -->
+        -wd4548        <!-- disable warning: "expression before comma has no effect; expected expression with side-effect" -->
+        -wd4619        <!-- disable warning: "#pragma warning : there is no warning number 'xxxx'"  MS being silly here -->
+        -wd4985        <!-- 'ceil': attributes not present on previous declaration. -->
+    </property>
+
+    <property name="test.ExceptionHandlerTest.warningsuppression" if="${config-compiler} == 'mw'">
+        -w off        <!-- disable all warnings. We do this only because CodeWarrior doesn't document how to disable some individual warnings -->
+    </property>
+
+    <property name="test.ExceptionHandlerTest.includedirs">
+        ${package.dir}/include
+    </property>
+
+    <fileset name="test.ExceptionHandlerTest.sourcefiles">    
+        <includes name="${package.dir}/test/source/*.cpp"/>
+    </fileset>
+    
+    <!-- Libraries -->
+	<task name="AddNetworkLibsToModule" module="test.ExceptionHandlerTest" />
+    
+    <fileset name="test.ExceptionHandlerTest.libs">
+        <includes name="${package.configlibdir}/${lib-prefix}${package.name}${lib-suffix}" />
+
+        <group if="${config-system} == ps3 and @{PropertyExists('package.PlayStation3GCC.appdir')}">
+            <includes name="${package.PlayStation3GCC.appdir}/target/ppu/lib/liblv2dbg_stub.a"/>
+            <includes name="${package.PlayStation3GCC.libsn}"/>
+        </group>
+
+        <group if="${config-system} == ps3 and @{PropertyExists('package.ps3sdk.appdir')}">
+            <includes name="${package.ps3sdk.appdir}/target/ppu/lib/liblv2dbg_stub.a"/>
+            <includes name="${package.ps3sdk.libsn}"/>
+	        <includes name="${package.ps3sdk.appdir}/target/ppu/lib/libsn.a"/>
+        </group>
+
+        <group if="${config-system} == unix or ${config-system} == unix64 or ${config-system} == palm or ${config-system} == android">
+            <includes name="-ldl" asis="true"/> <!-- Link libdl.a, which implements dlopen, dlclose, etc. -->
+        </group>
+
+    </fileset>
+
+</project>
+
+
+

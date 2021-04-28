@@ -1,0 +1,144 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroPackartRating;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+
+import java.util.List;
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the functionality of the edition selector in the PDP page
+ *
+ * @author JMittertreiner
+ */
+public class OAPDPEditionSelector extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 12334)
+    @Test(groups = {"pdp", "full_regression"})
+    public void testPDPEditionSelector(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EntitlementInfo multiEditionEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_STANDARD);
+        EntitlementInfo oneEditionEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.UNRAVEL);
+        final String multiEditionGameName = multiEditionEntitlement.getName();
+        final String oneEditionGameName = oneEditionEntitlement.getName();
+
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+
+        logFlowPoint("Launch Origin and login as user " + userAccount.getUsername()); // 1
+        logFlowPoint("Navigate to the " + multiEditionGameName + " PDP page"); // 2
+        logFlowPoint("Verify: There are edition selectors for the multiple versions"); // 3
+        logFlowPoint("Verify: The Editions are ordered from highest Value to Lowest Value (Premium > DDX > Standard)"); // 4
+        logFlowPoint("Verify: The currently selected edition is highlighted"); // 5
+        logFlowPoint("Hover over a different edition and verify that the Pack Art, Title, "
+                + "and Purchase information change to the other edition while hovering"); // 6
+        logFlowPoint("Verify: The Short Description greys out while hovering"); // 7
+        logFlowPoint("Click on a different edition of that edition and verify it loads"); // 8
+        logFlowPoint("Navigate to a PDP page that has a single edition (" + oneEditionGameName + ")"
+                + " and verify there are no edition selectors"); // 9
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Verified login successful to user account: " + userAccount.getUsername());
+        } else {
+            logFailExit("Failed: Cannot login to user account: " + userAccount.getUsername());
+        }
+
+        // 2
+        MacroPDP.loadPdpPage(driver, multiEditionEntitlement);
+        PDPHeroDescription pdpDescription = new PDPHeroDescription(driver);
+        if (pdpDescription.verifyGameTitle(multiEditionGameName)) {
+            logPass("Successfully navigated to Battlefield 4's product detail page");
+        } else {
+            logFailExit("Failed to navigate to Battlefield 4' product detail page");
+        }
+
+        // 3
+        if (pdpDescription.verifyEditionCountIs(3)) {
+            logPass("There are edition selectors for multiple versions");
+        } else {
+            logFailExit("There are no edition selectors for multiple versions");
+        }
+
+        // 4
+        List<WebElement> editions = pdpDescription.getEditions();
+        boolean inOrder = editions.get(0).getText().equals("Premium Edition")
+                && editions.get(1).getText().equals("Digital Deluxe Edition")
+                && editions.get(2).getText().equals("Standard Edition");
+        if (inOrder) {
+            logPass("The editions are ordered most expensive to least");
+        } else {
+            logFailExit("The editions are not ordered most expensive to least");
+        }
+
+        // 5
+        if (pdpDescription.verifyCurrentEditionHighlighted()) {
+            logPass("The currently selected edition is highlighted");
+        } else {
+            logFailExit("The currently selected edition is not highlighted");
+        }
+
+        // 6
+        PDPHeroPackartRating pdpHeroPackartRating = new PDPHeroPackartRating(driver);
+        PDPHeroActionCTA pdpHeroCTAs = new PDPHeroActionCTA(driver);
+        String oldUrl = pdpHeroPackartRating.getPDPHeroPackArtSrc();
+        String oldPurchaseInfo = pdpHeroCTAs.getPurchaseInfo();
+        boolean hoverSuccess = pdpDescription.hoverOnEdition("Digital Deluxe Edition");
+        boolean packArtChanged = !pdpHeroPackartRating.verifyPackArtSrcIs(oldUrl);
+        boolean gameTitleChanged = pdpDescription.verifyGameTitle("Digital Deluxe");
+        boolean purchaseInfoChanged = !pdpHeroCTAs.verifyPurchaseInfoIs(oldPurchaseInfo);
+
+        if (hoverSuccess && packArtChanged && gameTitleChanged && purchaseInfoChanged) {
+            logPass("Verified that the pack art, title and purchase info have changed");
+        } else {
+            logFail("The pack art, title, or purchase info have not changed");
+        }
+
+        // 7
+        if (pdpDescription.isDescriptionFaded()) {
+            logPass("Verified that the short text greys out");
+        } else {
+            logFail("The short text did not grey out");
+        }
+
+        // 8
+        pdpDescription.getEditions().get(0).click();
+        pdpDescription.waitForPdpHeroToLoad();
+        if (pdpDescription.verifyGameTitle("Premium Edition")) {
+            logPass("The Premium Edition PDP loaded");
+        } else {
+            logFail("The Premium Edition PDP did not load");
+        }
+
+        // 9
+        MacroPDP.loadPdpPage(driver, oneEditionEntitlement);
+        boolean gameTitleCorrect = Waits.pollingWait(() -> pdpDescription.verifyGameTitle(oneEditionGameName));
+        boolean noEditionSelector = pdpDescription.verifyEditionCountIs(0);
+        if (gameTitleCorrect && noEditionSelector) {
+            logPass("There are no edition selectors for multiple versions");
+        } else {
+            logFailExit("There are edition selectors for multiple versions");
+        }
+
+        softAssertAll();
+    }
+}

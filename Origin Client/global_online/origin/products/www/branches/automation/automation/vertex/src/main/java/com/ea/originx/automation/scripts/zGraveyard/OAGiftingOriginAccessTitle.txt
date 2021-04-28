@@ -1,0 +1,89 @@
+package com.ea.originx.automation.scripts.gifting;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.resources.AccountTags;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.dialog.FriendsSelectionDialog;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests Gifting a game for an account with Origin Access Subscription
+ *
+ * @author nvarthakavi
+ */
+public class OAGiftingOriginAccessTitle extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 40228)
+    @Test(groups = {"gifting", "full_regression", "int_only"})
+    public void testGiftingOriginAccessTitle(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount gifter = AccountManagerHelper.getTaggedUserAccountWithCountry(AccountTags.SUBSCRIPTION_ACTIVE, "Canada");
+        final EntitlementInfo entitlement_eligible = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.SIMS3);
+        final EntitlementInfo entitlement_ineligible = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.THIS_WAR_OF_MINE);
+        final String entitlementEligibleName = entitlement_eligible.getName();
+        final String entitlementInEligibleName = entitlement_ineligible.getName();
+        final String gifterName = gifter.getUsername();
+
+        logFlowPoint(String.format("Launch Origin and login as user '%s' and navigate to the PDP of '%s'", gifterName, entitlementEligibleName)); // 1
+        logFlowPoint("In the PDP page verify on clicking 'You can also purchase' link, the 'Buy' drop down CTA appears"); // 2
+        logFlowPoint("From the buy drop down menu, select 'Gift this game' and verify in the friends selection dialog appears"); // 3
+        logFlowPoint(String.format("Navigate to the PDP of '%s' and verify the 'Buy as Gift' CTA does not appear", entitlementInEligibleName)); // 4
+
+        // 1
+        final WebDriver driver = startClientObject(context, client, ORIGIN_CLIENT_DEFAULT_PARAM, "/can/en-us");
+        MacroLogin.startLogin(driver, gifter);
+        if (MacroPDP.loadPdpPage(driver, entitlement_eligible)) {
+            logPass("Successfully logged into " + gifterName + " and navigated to " + entitlementEligibleName + "'s PDP");
+        } else {
+            logFailExit("Failed to log into " + gifterName + " and navigate to " + entitlementEligibleName + "'s PDP");
+        }
+
+        // 2
+        PDPHeroActionCTA pdpHeroCTAEligible = new PDPHeroActionCTA(driver);
+        pdpHeroCTAEligible.clickYouCanPurchaseLink();
+        boolean buyDropDownIsVisible = Waits.pollingWait(pdpHeroCTAEligible::verifyBuyDropdownArrowVisible);
+        if (buyDropDownIsVisible) {
+            logPass("Verified On clicking the 'You can also purchase' link, the 'Buy' dropdown CTA appears");
+        } else {
+            logFailExit("Failed: On clicking the 'You can also purchase' link, the 'Buy' dropdown CTA does not appear");
+        }
+
+        // 3
+        pdpHeroCTAEligible.selectBuyDropdownPurchaseAsGift();
+        FriendsSelectionDialog friendsSelectionDialog = new FriendsSelectionDialog(driver);
+        if (friendsSelectionDialog.waitIsVisible()) {
+            logPass("Successfully selected 'Gift this game' from the dropdown menu and verified the friends dialog appears ");
+        } else {
+            logFailExit("Failed to select 'Gift this game' from the dropdown menu and the friends dialog does not appear ");
+        }
+
+        // 4
+        friendsSelectionDialog.clickCloseCircle();
+        friendsSelectionDialog.waitForClose();
+        PDPHeroActionCTA pdpHeroCTAIneligible = new PDPHeroActionCTA(driver);
+        MacroPDP.loadPdpPage(driver, entitlement_ineligible);
+        pdpHeroCTAIneligible.unhideBuyButtonViaYouCanPurchaseLink();
+        boolean buyAsGiftNotAvailable = Waits.pollingWait(() -> !pdpHeroCTAIneligible.verifyBuyDropdownPurchaseAsGiftItemAvailable());
+        if (buyAsGiftNotAvailable) {
+            logPass("Successfully navigated to " + entitlementInEligibleName + "'s PDP and verified the 'Buy as Gift' CTA does not appear");
+        } else {
+            logFailExit("Failed to navigate to " + entitlementInEligibleName + "'s PDP or the 'Buy as Gift' CTA appears");
+        }
+        softAssertAll();
+    }
+}

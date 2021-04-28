@@ -1,0 +1,178 @@
+﻿<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <!--
+    There are <dependent> calls in RevolutionSDK for RevolutionCodeWarrior
+    and RevolutionNDev within RevolutionSDK, but those are within a Framework1
+    package, so have fixed version numbers.  By doing them here we get to do
+    them in Framework2 style, so can specify the version numbers in the masterconfig.xml
+    file.  Those versions will override the hard-coded ones in the RevolutionSDK
+    package.
+    -->
+  <dependent name="RevolutionCodeWarrior"/>
+  <dependent name="RevolutionNDev"/>
+  <dependent name="RevolutionSDK" />
+
+  <property name="__private_using_radix" value="false"/>
+  <property name="__private_using_radix" value="true" unless="@{StrIndexOf('${package.RevolutionCodeWarrior.version}','Radix')} == -1"/>
+
+  <property name="config-system"      value="rev"/>
+  <property name="config-compiler"    value="mw"/>
+  <property name="config-platform"    value="rev-mw"/>
+
+  <property name="lib-prefix"        value=""/>
+  <property name="lib-suffix"        value=".a"/>
+
+  <property name="exe-suffix"        value=".elf"/>
+  <!-- used to run test programs during build -->
+
+  <property name="build.pathstyle"    value="Unix"/>
+
+  <!-- Compile in parallel on multiple CPUs         -->
+  <property name="cc.parallelcompiler"    value="true"/>
+
+  <!-- <cc> task properties -->
+  <property name="cc.defines">
+    ${property.value}
+    EA_PLATFORM_REVOLUTION
+  </property>
+
+  <property name="package.VisualStudio.exportbuildsettings" value="false"/>
+  <property name="cc-before" value="${cc}"/>
+  <dependent name="VisualStudio"/>
+  <fail message="ERROR: eaconfig requires a VisualStudio package which supports the 'package.VisualStudio.exportbuildsettings' property.  Please update your masterconfig.xml."
+        unless="'${cc-before}' == '${cc}'"/>
+
+  <do if="'${package.VisualStudio.version}' gte '9.0.0'">
+    <property name="config-vs-version" value="9.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '10.0.0'">
+    <property name="config-vs-version" value="10.0"/>
+  </do>
+  <do if="'${package.VisualStudio.version}' gte '11.0.0'">
+    <property name="config-vs-version" value="11.0"/>
+  </do>
+
+
+  <optionset name="config-options-common">
+    <option name="buildset.as.defines" >
+      @{OptionSetGetValue('config-options-common', 'buildset.as.defines')}
+      ${as.defines}
+    </option>
+    <option name="buildset.as.options" >
+      @{OptionSetGetValue('config-options-common', 'buildset.as.options')}
+      ${as.options}
+    </option>
+    <option name="buildset.cc.defines" >
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.defines')}
+      ${cc.defines}
+    </option>
+    <option name="buildset.cc.includedirs" >
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.includedirs')}
+      ${cc.includedirs}
+    </option>
+    <option name="buildset.cc.options" >
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.options')}
+      ${cc.options}
+    </option>
+    <option name="buildset.lib.options" >
+      @{OptionSetGetValue('config-options-common', 'buildset.lib.options')}
+      ${lib.options}
+    </option>
+    <option name="buildset.link.librarydirs" >
+      @{OptionSetGetValue('config-options-common', 'buildset.link.librarydirs')}
+      ${link.librarydirs}
+    </option>
+    <option name="buildset.link.options" >
+      @{OptionSetGetValue('config-options-common', 'buildset.link.options')}
+      ${link.options}
+      -msgstyle gcc <!--Controls the style used to show error and warning messages.-->
+      -nowraplines  <!--Controls the word wrapping of messages. -->
+    </option>
+  </optionset>
+
+  <optionset name="config-options-dynamiclibrary" >
+    <option name="generatedll"              value="on" />
+    <option name="buildset.name"                        value="DynamicLibrary" />
+    <option name="buildset.tasks"                       value="asm cc wii-lcf link wii-rso" />
+    <option name="buildset.cc.defines"                  value="EA_DLL" />
+    <option name="buildset.link.options">
+      -partial
+    </option>
+
+    <option name="lcf.type"             value="partial"/>
+    <option name="lcf.template"         value="${package.RevolutionSDK.appdir}\include\dolphin\eppc.lcf"/>
+    <option name="lcf.path"             value="%outputdir%/%outputname%_partial.lcf"/>
+    
+    <option name="linkoutputname" value="%outputdir%/%outputname%.elf" />
+
+    <option name="rso"  value="${package.RevolutionSDK.appdir}\X86\bin\makerso.exe"/>
+    <option name="rso.options">
+      -a
+      %outputdir%/%outputname%.elf
+    </option>
+  </optionset>
+
+  <optionset name="config-options-rsoprogram">
+    <option name="buildset.name"        value="ProgramWithRSO" />
+    <option name="build.tasks"          value="asm cc wii-lcf link wii-rso"/>
+
+    <option name="linkoutputname" value="%outputdir%/%outputname%${exe-suffix}" />
+
+    <option name="lcf"                  value="${package.RevolutionSDK.appdir}\X86\bin\makelcf.exe"/>
+    <option name="lcf.type"             value="static"/>
+    <!-- static -->
+    <option name="lcf.path"             value="%outputdir%/%outputname%.lcf"/>
+    <option name="lcf.options">
+      -o %outputdir%\%outputname%.lcf
+      -s %outputdir%\%outputname%.lst
+      -t ${package.RevolutionSDK.appdir}\include\revolution\eppc.RVL.lcf
+    </option>
+
+    <option name="lcf.libraryfileset" value="build.dlls.all"/>
+
+    <option name="rso"  value="${package.RevolutionSDK.appdir}\X86\bin\makerso.exe"/>
+    <option name="rso.options">
+      -a
+      %outputdir%/%outputname%.elf
+      -e %outputdir%\%outputname%.lst
+    </option>
+  </optionset>
+
+
+  <property name='rso.global_destructor.src'  value='${package.RevolutionCodeWarrior.appdir}\PowerPC_EABI_Support\Runtime\Src\global_destructor_chain.c'/>
+
+  <property name='link.template.librarydir'  value='-l "%librarydir%/"'/>
+  <property name='link.template.libraryfile' value='"%libraryfile%"'/>
+  <property name="link.template.commandline">
+    %options%
+    %objectfiles%
+    %librarydirs%
+    %libraryfiles%
+  </property>
+
+  <property name="platform.sdklibs.regular">
+    ${package.RevolutionCodeWarrior.regularlibs}
+    ${package.RevolutionSDK.regularlibs}
+  </property>
+
+  <property name="platform.sdklibs.debug">
+    ${package.RevolutionCodeWarrior.debuglibs}
+    ${package.RevolutionSDK.debuglibs}
+  </property>
+
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="cc.useresponsefile" value="true"/>
+
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="link.useresponsefile" value="true"/>
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="lib.useresponsefile" value="true"/>
+
+  <!-- Define default sdata settings -->
+  <property name="rev.mw.sdata" value="0" unless="@{PropertyExists('rev.mw.sdata')}"/>
+  <property name="rev.mw.sdata2" value="0" unless="@{PropertyExists('rev.mw.sdata2')}"/>
+
+</project>

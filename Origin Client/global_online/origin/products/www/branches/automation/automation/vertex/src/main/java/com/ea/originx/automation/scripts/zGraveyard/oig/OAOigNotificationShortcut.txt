@@ -1,0 +1,139 @@
+package com.ea.originx.automation.scripts.zGraveyard.oig;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.helpers.EACoreHelper;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.macroaction.MacroSettings;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.CountryInfo;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.Notification;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import java.awt.event.KeyEvent;
+import org.apache.commons.lang3.tuple.Pair;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests that the OIG notification displays the correct key bindings.
+ *
+ * @author caleung
+ */
+public class OAOigNotificationShortcut extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 11153)
+    @Test(groups = {"oig", "client_only", "full_regression"})
+    public void testOAOigNotificationShortcut(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EACoreHelper.extendNotificationExpiryTime(client.getEACore());
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.DA_2);
+        final String entitlementName = entitlement.getName();
+        final String entitlementOfferId = entitlement.getOfferId();
+        final String entitlementProcessName = entitlement.getProcessName();
+
+        final int[] newOigKeycodes = {KeyEvent.VK_CONTROL, KeyEvent.VK_F5};
+        final Pair<String, String> newOigKeyStrings = Pair.of("Ctrl", "F5");
+        final Pair<String, String> oldOigKeyStrings = Pair.of("Shift", "F1");
+
+        UserAccount user = AccountManagerHelper.registerNewThrowAwayAccountThroughREST(CountryInfo.CountryEnum.CANADA.getCountry());
+
+        logFlowPoint("Log into Origin and entitle a game that has 'OIG Notifications'."); // 1
+        logFlowPoint("Navigate to the 'Game Library' and download the game."); // 2
+        logFlowPoint("Launch the game and verify the OIG notification toast appears indicating to press " + oldOigKeyStrings); // 3
+        logFlowPoint("Close the game."); // 4
+        logFlowPoint("Navigate to the 'OIG Settings' and Set the OIG keyboard shortcut to Ctrl + F5."); // 5
+        logFlowPoint("Navigate to the 'Game Library' and launch the game."); // 6
+        logFlowPoint("Verify the 'OIG Notification' toast appears indicating to press " + newOigKeyStrings); // 7
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        MacroLogin.startLogin(driver, user);
+        boolean isPurchaseSuccessful = MacroPurchase.purchaseEntitlement(driver, entitlement);
+        if (isPurchaseSuccessful) {
+            logPass("Successfully logged into Origin and purchased " + entitlementName);
+        } else {
+            logFailExit("Could not log into Origin or failed to purchase " + entitlementName);
+        }
+
+        // 2
+        MacroSettings.changeCloudSaveSettings(driver, false); // turn off cloud save to disable alerts
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        navBar.gotoGameLibrary();
+        boolean downloaded = MacroGameLibrary.downloadFullEntitlement(driver, entitlementOfferId);
+        if (downloaded) {
+            logPass("Successfully downloaded " + entitlementName);
+        } else {
+            logFailExit("Failed to download " + entitlementName);
+        }
+
+        // 3
+        GameTile gameTile = new GameTile(driver, entitlementOfferId);
+        entitlement.addActivationFile(client);
+        gameTile.play();
+        Waits.pollingWaitEx(() -> entitlement.isLaunched(client));
+        Notification notification = new Notification(driver);
+        Waits.pollingWait(notification::isOigNotificationWindowPresent);
+        if (notification.verifyOIGToastMessageContainsKeys(oldOigKeyStrings)) {
+            logPass("The OIG notification toast contained a message about pressing " + oldOigKeyStrings);
+        } else {
+            logFail("The OIG notification toast did not appear or did not contain a message about pressing " + oldOigKeyStrings);
+        }
+        notification.waitForOIGToastToClose(); // wait for notification to close so it doesn't appear when we re-launch the entitlement
+
+        // 4
+        ProcessUtil.killProcess(client, entitlementProcessName);
+        if (!ProcessUtil.isProcessRunning(client, entitlementProcessName)) {
+            logPass("Successfully closed " + entitlementName);
+        } else {
+            logFailExit("Failed to close " + entitlementName);
+        }
+
+        // 5
+        client.stop();
+        ProcessUtil.killOriginProcess(client);
+        driver = startClientObject(context, client); // restart client so window is at front for setting shortcut
+        MacroLogin.startLogin(driver, user);
+        if (MacroSettings.setOIGShortcut(driver, newOigKeyStrings, newOigKeycodes)) {
+            logPass("Successfully set the OIG keyboard shortcut to Ctrl+F5.");
+        } else {
+            logFailExit("Failed to set the OIG keyboard shortcut to Ctrl+F5.");
+        }
+
+        // 6
+        new NavigationSidebar(driver).gotoGameLibrary();
+        new GameTile(driver, entitlementOfferId).play();
+        boolean isLaunched = Waits.pollingWaitEx(() -> entitlement.isLaunched(client));
+        if (isLaunched) {
+            logPass("Successfully launched " + entitlementName);
+        } else {
+            logFailExit("Failed to launch " + entitlementName);
+        }
+
+        // 7
+        notification = new Notification(driver);
+        Waits.pollingWait(notification::isOigNotificationWindowPresent); // wait for the notification to show up first
+        if (new Notification(driver).verifyOIGToastMessageContainsKeys(newOigKeyStrings)) {
+            logPass("The OIG notification toast contained a message about pressing " + newOigKeyStrings);
+        } else {
+            logFail("The OIG notification toast did not appear or did not contain a message about pressing " + newOigKeyStrings);
+        }
+        ProcessUtil.killProcess(client, entitlementProcessName);
+
+        softAssertAll();
+    }
+}

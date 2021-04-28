@@ -1,0 +1,243 @@
+<project name="IGO" default="build">
+	
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.IGO.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.IGO.version"  value="@{PathGetFileName('${package.IGO.dir}')}"/>
+    <package name="IGO" targetversion="${package.IGO.version}"/>
+	
+    <!-- ******************* -->
+    <!-- Package dependencies -->
+    <!-- ******************* -->
+    <dependent name="OriginConfig" />
+    <dependent name="OriginVersion" />
+	<property name="package.VisualStudio.platformtoolset" value="v120_xp"/>
+
+    <!-- ***************************** -->
+    <!-- Build Configuration properties-->
+    <!-- ***************************** -->
+    <!-- Remove the -std=c99 compiler option while using the Apple LLVM compiler -->
+    <property name="eaconfig.rtti" value="on" />
+    <property name="dirtysdk-samples" value="false" />
+    <property name="osx-base-sdk-version" value="10.7" />
+    <property name="osx-deployment-target-version" value="10.7" />
+
+    
+    <BuildType name="IGO.buildtype" from="OriginProgram">
+        <option name="buildset.cc.defines">
+            ${option.value}
+            INJECTED_CODE
+        </option>
+        <option name="RTTI" value="on" />
+        <remove>
+            <link.options value="-framework CoreServices"/>
+            <link.options value="-framework Foundation"/>
+            <link.options value="-framework AudioToolBox"/>
+        </remove>
+        <option name="clanguage" value="on" />
+    </BuildType>
+  <property name="runtime.IGO.osx-frameworks" >
+			-framework Carbon
+			-weak_framework OpenGL
+			-weak_framework AGL
+			-weak_framework Cocoa
+			-weak_framework Foundation
+  </property>
+
+	<property name="runtime.IGO.osx-extra-link-options" value="-sectcreate __TEXT __info_plist ${package.dir}/source/IGO-Info.plist"/>
+
+    <property name="runtime.buildmodules" value="IGO" />
+    <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+    <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+
+    <property name="module.IGO.dir" value="${package.dir}/.." />
+    <property name="runtime.IGO.buildtype" value="IGO.buildtype" />
+
+    <property name="runtime.IGO.xcode-osx-template-dir" value="${package.IGO.dir}/XCodeTemplate/IGO-xcode.template" />
+    <property name="runtime.IGO.outputdir" value="${package.builddir}/build/XCodeOSX/build/${config-xcode-type}" />
+    <property name="runtime.IGO.targetdir" value="${package.dir}/target" />
+    <property name="runtime.IGO.outputname" value="IGO.dylib" />
+
+    <property name="runtime.IGO.osx-universal-lib" value="true" readonly="true"/>
+	<!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<target name="generate-code" depends="moc-compile" />
+	<property name="runtime.IGO.prebuildtarget" value="IGO-generate-code" />
+
+  
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.IGO.vcproj.pre-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.IGO.prebuildtarget}
+	</property>
+
+	
+	<!-- ********************************************************** -->
+	<!-- Package USE dependencies 	                                -->
+	<!-- inclusion into the project but does not affect build order -->
+	<!-- ********************************************************** -->
+	<property name="runtime.IGO.usedependencies">
+	</property>
+	
+	<!-- ********************************************************** -->
+	<!-- Package BUILD dependencies 			        -->
+	<!-- inclusion into the project, affects build order 	        -->
+	<!-- ********************************************************** -->
+
+	<property name="runtime.IGO.builddependencies">
+        coreallocator
+        EABase
+        EATrace
+        EAStdC
+        EAThread
+        EASTL
+        EAAssert
+        EACallstack
+        EABase
+	</property>
+
+	
+	<!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+	<property name="runtime.IGO.includedirs" >
+        	${property.value}
+		${module.IGO.dir}/.
+		${module.IGO.dir}/..
+		${module.IGO.dir}/../IGOIPC
+        ${module.IGO.dir}/../engine/dev/include/engine/igo
+		${module.IGO.dir}/../..
+		${module.IGO.dir}/Disasm
+	</property>
+
+    <fileset name="runtime.IGO.headerfiles" basedir="${module.IGO.dir}/.">
+        <includes name="MacDllMain.h" />
+        <includes name="HookAPI.h" />
+        <includes name="Helpers.h" />
+        <includes name="IGO.h" />
+        <includes name="IGOApplication.h" />
+        <includes name="IGOWindowGovernor.h" />
+        <includes name="IGOInfoDisplay.h" />
+        <includes name="IGOLogger.h" />
+        <includes name="IGOTelemetry.h" />
+		<includes name="IGOInfoDisplay.h" />
+        <includes name="IGOSharedStructs.h" />
+        <includes name="IGOSurface.h" />
+        <includes name="IGOWindow.h" />
+        <includes name="MacInputHook.h" />
+        <includes name="Macmach_override.h" />
+        <includes name="MacOGLFunctions.h" />
+        <includes name="MacSystemPreferences.h" />
+        <includes name="OGLHook.h" />
+		<includes name="OGLShader.h" />
+        <includes name="OGLSurface.h" />
+        <includes name="OGLDump.h" />
+
+        <includes name="MacJRSwizzle.h" />
+        <includes name="MacCursorHook.h" />
+        <includes name="MacRenderHook.h" />
+
+        <includes name="../IGOIPC/IGOIPC.h" />
+        <includes name="../IGOIPC/IGOIPCBuffer.h" />
+        <includes name="../IGOIPC/IGOIPCClient.h" />
+        <includes name="../IGOIPC/IGOIPCConnection.h" />
+        <includes name="../IGOIPC/IGOIPCImageBin.h" />
+        <includes name="../IGOIPC/IGOIPCMessage.h" />
+        <includes name="../IGOIPC/IGOIPCServer.h" />
+        <includes name="../IGOIPC/IGOIPCUtils.h" />
+
+        <includes name="IGOTrace.h" />
+        <includes name="MacWindows.h" />
+        
+        <includes name="Disasm/misc.h" />
+        <includes name="Disasm/disasm.h" />
+        <includes name="Disasm/disasm_x86.h" />
+        <includes name="Disasm/disasm_x86_tables.h" />
+        <includes name="Disasm/cpu.h" />
+    </fileset>  
+  
+
+	<!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+	<fileset name="runtime.IGO.sourcefiles" basedir="${module.IGO.dir}/.">
+		<includes name="DllMain.cpp" />
+        <includes name="HookAPI.cpp" />
+        <includes name="Helpers.cpp" />
+        <includes name="IGO.cpp" />
+        <includes name="IGOApplication.cpp" />
+        <includes name="IGOWindowGovernor.cpp" />
+        <includes name="IGOLogger.cpp" />
+        <includes name="IGOTelemetry.cpp" />
+		<includes name="IGOInfoDisplay.cpp" />
+        <includes name="IGOSurface.cpp" />
+        <includes name="IGOWindow.cpp" />
+        <includes name="Macmach_override.c" />
+        <includes name="MacSystemPreferences.cpp" />
+        <includes name="OGLHook.cpp" />
+		<includes name="OGLShader.cpp" />
+        <includes name="OGLSurface.cpp" />
+        <includes name="OGLDump.cpp" />
+
+        <includes name="MacJRSwizzle.mm" />
+        <includes name="MacCursorHook.mm" />
+        <includes name="MacInputHook.mm" />
+        <includes name="MacRenderHook.mm" />
+
+        <includes name="../IGOIPC/IGOIPC.cpp" />
+        <includes name="../IGOIPC/IGOIPCBuffer.cpp" />
+        <includes name="../IGOIPC/IGOIPCClient.cpp" />
+        <includes name="../IGOIPC/IGOIPCConnection.cpp" />
+        <includes name="../IGOIPC/IGOIPCImageBin.cpp" />
+        <includes name="../IGOIPC/IGOIPCMessage.cpp" />
+        <includes name="../IGOIPC/IGOIPCServer.cpp" />
+        <includes name="../IGOIPC/IGOIPCUtils.cpp" />
+
+        <includes name="MacWindows.cpp" />
+        
+        <includes name="Disasm/misc.c" />
+        <includes name="Disasm/disasm.c" />
+        <includes name="Disasm/disasm_x86.c" />
+        <includes name="Disasm/cpu.c" />
+	</fileset>
+
+  <fileset name="runtime.IGO.libs" >
+  </fileset>
+	
+	<fileset name="runtime.IGO.moc_sourcefiles" basedir="${module.IGO.dir}" append="true"> 
+	</fileset> 
+
+	<target name="sign-exe">
+	</target>
+	
+    <target name="IGO-generate-code" >
+        <!-- get the options from the current config -->
+  </target>
+        
+  <target name="clean-custom">
+    <delete dir="${nant.project.buildroot}" />
+  </target>
+
+
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+	
+   <target name="runtime.IGO.postbuildtarget">
+        </target>
+
+</project>
+
+
+
+

@@ -1,0 +1,1 @@
+These files implement type traits in a way that is compatible with older compilers such as GCC 2.95 but are otherwise less desirable. For example, these type traits are defined in a way that creates significantly more debug symbol information than standard versions that come with this package.

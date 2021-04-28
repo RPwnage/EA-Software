@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="EscalationClient" default="build">
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+
+	<!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+	<property name="package.EscalationClient.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.EscalationClient.version"  value="@{PathGetFileName('${package.EscalationClient.dir}')}"/>
+    <package name="EscalationClient" targetversion="${package.EscalationClient.version}"/>
+	<property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+    
+	<!-- ******************* -->
+    <!-- Package dependencies -->
+    <!-- ******************* -->
+	<dependent name="OriginConfig" />
+	<dependent name="OriginVersion" />
+	<dependent name="VisualStudio" if="${config-system} == 'pc'" />
+	<dependent name="Qt" />
+	<dependent name="openSSL" />
+    <dependent name="services" />
+
+	<!-- ***************************** -->
+	<!-- Build Configuration properties-->
+	<!-- ***************************** -->
+	<BuildType name="EscalationClient.buildtype" from="OriginProgram">
+	<option name="buildset.cc.defines">
+		${option.value}
+		QT_LARGEFILE_SUPPORT
+		QT_DLL
+		QT_THREAD_SUPPORT
+		QT_XML_LIB
+		QT_NETWORK_LIB
+		QT_CORE_LIB
+		</option>
+	</BuildType>		
+
+  <property name="runtime.buildtype" value="EscalationClient.buildtype" />
+	<property name="runtime.outputdir" value="${package.EscalationClient.dir}/bin"/>
+	<property name="runtime.outputname" value="OriginClientService"/>
+
+  <property name="runtime.EscalationClient.outputdir" value="${runtime.outputdir}" />
+  <property name="runtime.EscalationClient.outputname" value="${runtime.outputname}" />
+  
+	<!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<target name="generate-code" depends="moc-compile ui-compile" />
+	<property name="runtime.prebuildtarget" value="generate-code" />
+
+  
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.vcproj.pre-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.prebuildtarget}
+	</property>
+
+	
+	<!-- ********************************************************** -->
+	<!-- Package USE dependencies 																	-->
+	<!-- inclusion into the project but does not affect build order -->
+	<!-- ********************************************************** -->
+	<property name="runtime.usedependencies">
+		OriginConfig
+		OriginVersion
+		openSSL
+		Qt
+	</property>
+	
+	<!-- ********************************************************** -->
+	<!-- Package BUILD dependencies 																-->
+	<!-- inclusion into the project, affects build order 						-->
+	<!-- ********************************************************** -->
+
+	<property name="runtime.builddependencies">
+		coreallocator
+		EABase
+		EAIO
+		EATrace
+		EAStdC
+		EAThread
+		EASTL
+		BugSentry
+		EAAssert
+		DirtySDK
+		EACallstack
+		PPMalloc
+		ExceptionHandler
+		EABase
+		TelemetryAPI
+		TelemetrySDK
+		services
+	</property>
+
+
+    <!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+	<property name="runtime.includedirs" >
+		${package.EscalationClient.dir}/include
+    ${package.services.includedirs}
+	</property>
+
+	<property name="runtime.includedirs" if="${config-system} == 'pc'">
+		${property.value}
+		${package.VisualStudio.appdir}\VC\INCLUDE
+	</property>
+
+  <fileset name="runtime.headerfiles" basedir="${package.dir}">
+    <includes name="${package.EscalationClient.dir}/**/*.h" />
+  </fileset>  
+  
+
+	<!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+	<fileset name="runtime.sourcefiles" basedir="${package.dir}">
+		<includes name="${package.EscalationClient.dir}\source\*.cpp" />
+	</fileset>
+
+  <fileset name="runtime.libs" >
+		<includes name="${package.Qt.libdir}\qtmain${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}\Qt5Sql${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}\Qt5Xml${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}\Qt5XmlPatterns${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}\Qt5Gui${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}\Qt5Widgets${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}\Qt5Network${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}\Qt5Core${debug-suffix}.lib"/>
+		<group if="${config-system} == 'pc'" >
+			<includes name="${package.VisualStudio.appdir}/VC/lib/comsuppw.lib" />
+			<includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/userenv.lib" />
+			<includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/winhttp.lib" />
+			<includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/version.lib" />
+		</group>
+		<includes name="${package.openSSL.libdir}/libeay32${debug-suffix}.lib"/>
+		<includes name="${package.openSSL.libdir}/ssleay32${debug-suffix}.lib"/>
+  </fileset>
+	
+    <target name="dumpsources">
+		<foreach property="fname" item="FileSet" in="runtime.sourcefiles">
+			<echo message="source ${fname}" />
+		</foreach>
+	</target>
+
+	<fileset name="runtime.ui_sourcefiles" basedir="${package.dir}" append="true">
+		<includes name="**\*.ui" />
+	</fileset>	
+
+	<fileset name="runtime.moc_sourcefiles" basedir="${package.EscalationClient.dir}" append="true"> 
+	</fileset> 
+
+	<!-- construct the paths to include the moc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+		<property name="sourcefile" value="${moc.output.dir}\moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>	
+	
+	<do if="${config-system} == 'pc'">	
+		<fileset name="runtime.resourcefiles">
+			<includes name="${package.EscalationClient.dir}\Resources\EscalationService.rc" />
+		</fileset>
+	</do>
+
+	<!--
+	<fileset name="runtime.vcproj.additional-manifest-files">
+		<includes name="${package.EscalationClient.dir}\Resources\EscalationService.manifest" />
+	</fileset>
+-->
+	<property name="runtime.res.includedirs">
+		${package.OriginVersion.dir}\include
+	</property>
+
+	
+	<!-- get the options from the current config -->
+	<property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.buildtype}','cc.defines')}"/>
+	<property name="runtime.moc_includedirs" value="${runtime.includedirs}"/>
+	
+	<target name="sign-exe">
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="${runtime.outputname}" in="${runtime.outputdir}/${runtime.outputname}.exe" retries="${signing.retries.default}" timestamp="${codesign.timestamp}"/>
+	</target>	
+	
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+	
+
+	<property name="postbuild.target.list">
+		${property.value}
+		embed-manifest
+	</property>
+	
+	<property name="postbuild.target.list" if="${config-type} == 'opt'" >
+		${property.value}
+		sign-exe
+	</property>
+	
+	<target name="embed-manifest">
+		<exec program="${package.WindowsSDK.kitbin.dir}\mt.exe">
+			<args>
+				<arg value="/manifest ${package.EscalationClient.dir}\Resources\EscalationService.manifest /outputresource:${package.EscalationClient.dir}\bin\OriginClientService.exe;1" /> 
+			</args>
+			</exec>
+	</target>		
+	
+	<target name="post-build-tasks">
+		<foreach property="runtarget" item="String" in="${postbuild.target.list}">
+			<call target="${runtarget}" />
+		</foreach>
+	</target>
+	
+	<!-- NANT Postbuild target. Will execute this after compiling happens. -->
+	<property name="runtime.postbuildtarget" value="post-build-tasks" />
+  
+	<!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+	<property name="runtime.vcproj.post-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:codesign.timestamp=${codesign.timestamp} ${runtime.postbuildtarget}
+	</property>	
+	
+	<target name="clean-custom">
+    <delete>
+			<fileset basedir="${runtime.EscalationClient.outputdir}">
+				<includes name="${runtime.EscalationClient.outputname}.*"/>
+			</fileset>
+		</delete>
+	</target>
+</project>

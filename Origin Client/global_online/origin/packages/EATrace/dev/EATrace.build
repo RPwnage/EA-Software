@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="EATrace" default="build">
+
+    <property name="Dll" value="false" unless="@{PropertyExists('Dll')}" />
+
+    <optionset name="config.targetoverrides">
+        <option name="test-build" value="include" />
+        <option name="test-buildall" value="include" />
+        <option name="test-run" value="include" />
+        <option name="test-runall" value="include" />
+    </optionset>
+
+
+    <!-- Package declaration -->
+    <!-- Get the version number from current directory -->
+    <property name="currDir" value="@{PathGetFullPath('.')}" />
+    <property name="currVer" value="@{PathGetFileName('${currDir}')}" />
+    <package name="EATrace" targetversion="${currVer}" />
+
+
+    <!-- Options -->
+    <!-- To enable options put (e.g.) <globalproperties>EATrace.EATRACE_GLOBAL_ENABLED=1</globalproperties> -->
+    <!-- in your masterconfig file or use -D:EATrace.EATRACE_GLOBAL_ENABLED=1 on the nant command line.     -->
+    <!-- The EATrace.EATRACE_XXX values here directly correspond to EAIO config #defines.                   --> 
+    <property name="EATECH_WARNINGSASERRORS" value="0" unless="@{PropertyExists('EATECH_WARNINGSASERRORS')}" />
+    <!-- EATrace.EATRACE_DEBUG_BREAK_ABORT_ENABLED -->
+    <!-- EATrace.EATRACE_GLOBAL_ENABLED            -->
+
+
+    <!-- Create extra build types which simply add some additional compiler arguments -->
+    <optionset name="config-options-library-extra" fromoptionset="config-options-library">
+        <option name="buildset.name" value="LibraryExtra" />
+        <option name="warningsaserrors" value="off" if="${EATECH_WARNINGSASERRORS} == 0" />
+        <option name="warningsaserrors" value="on" if="${EATECH_WARNINGSASERRORS} == 1" />
+    </optionset>
+    <task name="GenerateBuildOptionset" configsetname="config-options-library-extra" />
+    <optionset name="LibraryExtra">
+        <option name="cc.options" if="${config-compiler} == 'gcc'">
+            @{StrReplace(${option.value}, '-fno-strict-aliasing', '-fstrict-aliasing')}
+        </option>
+        <option name="cc.options" if="${config-compiler} == 'mw'">
+            @{StrReplace(@{StrReplace(${option.value}, '-w nofilecaps', '-w filecaps')}, '-w nosysfilecaps', '-w sysfilecaps')}
+        </option>
+    </optionset>
+
+
+
+    <!-- ********************* -->
+    <!-- Runtime configuration -->
+    <!-- ********************* -->
+    
+    <property name="runtime.buildmodules" value="EATrace" />
+    <property name="runtime.EATrace.buildtype" value="LibraryExtra" />
+    <property name="runtime.EATrace.buildtype" value="DynamicLibrary" if="${Dll}" />
+
+    <property name="runtime.EATrace.usedependencies">
+        EABase
+        coreallocator
+        EAAssert
+        EASTL
+        EAStdC
+        EAThread
+        EAIO
+    </property>
+
+    <fileset name="runtime.EATrace.sourcefiles">    
+        <includes name="${package.dir}/source/*.cpp" />
+    </fileset>
+
+    <fileset name="runtime.EATrace.bulkbuild.sourcefiles" fromfileset="runtime.EATrace.sourcefiles" />
+
+    <property name="runtime.EATrace.defines" if="${Dll} and ${config-compiler} == 'vc'">
+        EATRACE_API=__declspec(dllexport)
+    </property>
+
+    <property name="runtime.EATrace.defines">
+        ${property.value}
+        UTF_USE_EAASSERT=1
+    </property>
+
+    <property name="runtime.EATrace.defines" if="@{PropertyExists('EATrace.EATRACE_DEBUG_BREAK_ABORT_ENABLED')}">
+        ${property.value}
+        EATRACE_DEBUG_BREAK_ABORT_ENABLED=${EATrace.EATRACE_DEBUG_BREAK_ABORT_ENABLED}
+    </property>
+    <property name="runtime.EATrace.defines" if="@{PropertyExists('EATrace.EATRACE_GLOBAL_ENABLED')}">
+        ${property.value}
+        EATRACE_GLOBAL_ENABLED=${EATrace.EATRACE_GLOBAL_ENABLED}
+    </property>
+
+    <property name="runtime.EATrace.warningsuppression" if="${config-compiler} == 'vc'">
+        -wd4217        <!-- disable warning: "member template functions cannot be used for copy-assignment or copy-construction" -->
+        -wd4530        <!-- disable warning: "C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc" -->
+        -wd4619        <!-- disable warning: "#pragma warning : there is no warning number 'xxxx'"  MS being silly here -->
+        -wd4548        <!-- disable warning: "expression before comma has no effect; expected expression with side-effect" -->
+    </property>
+
+    <property name="runtime.EATrace.warningsuppression" if="${config-compiler} == 'gcc'">
+        -Wstrict-aliasing=3
+        -Wextra
+    </property>
+
+
+
+
+    <!-- ********************* -->
+    <!-- Test configuration    -->
+    <!-- ********************* -->
+
+    <property name="test.buildmodules" value="EATraceTest" />
+    
+    <property name="test.EATraceTest.buildtype" value="Program" />
+
+    <fileset name="test.EATraceTest.deploy-contents-fileset" basedir="${package.configbindir}/test">
+        <includes name="**" />
+    </fileset>
+
+    <property name="test.EATraceTest.usedependencies">
+        EABase
+        coreallocator
+    </property>
+
+    <property name="test.EATraceTest.builddependencies">
+        EAAssert
+        EASTL
+        EAStdC
+        MemoryMan
+        EAThread
+        PPMalloc
+        EAIO
+        EATest
+    </property>
+
+    <property name="test.EATraceTest.runtime.moduledependencies">
+        EATrace
+    </property>
+
+    <property name="test.EATraceTest.defines">
+        ${property.value}
+        UTF_USE_EAASSERT=1
+        EA_MEMORY_LEAK_TRACE_ENABLED=1
+    </property>
+
+    <property name="test.EATraceTest.defines" if="@{PropertyExists('EATrace.EATRACE_DEBUG_BREAK_ABORT_ENABLED')}">
+        ${property.value}
+        EATRACE_DEBUG_BREAK_ABORT_ENABLED=${EATrace.EATRACE_DEBUG_BREAK_ABORT_ENABLED}
+    </property>
+    <property name="test.EATraceTest.defines" if="@{PropertyExists('EATrace.EATRACE_GLOBAL_ENABLED')}">
+        ${property.value}
+        EATRACE_GLOBAL_ENABLED=${EATrace.EATRACE_GLOBAL_ENABLED}
+    </property>
+
+    <property name="test.EATraceTest.warningsuppression" if="${config-compiler} == 'vc'">
+        -wd4217        <!-- disable warning: "member template functions cannot be used for copy-assignment or copy-construction" -->
+        -wd4530        <!-- disable warning: "C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc" -->
+        -wd4619        <!-- disable warning: "#pragma warning : there is no warning number 'xxxx'"  MS being silly here -->
+        -wd4548        <!-- disable warning: "expression before comma has no effect; expected expression with side-effect" -->
+    </property>
+
+    <property name="test.EATraceTest.includedirs">
+        ${package.dir}/include
+    </property>
+    
+    <fileset name="test.EATraceTest.sourcefiles">    
+        <includes name="${package.dir}/test/source/*.cpp" />
+    </fileset>
+    
+    <fileset name="test.EATraceTest.libs">
+        <includes name="${package.configlibdir}/${lib-prefix}${package.name}${lib-suffix}" />
+    </fileset>
+
+    <do if="${config-system}=='ps3'">
+      <fileset name="test.EATraceTest.libs" append="true">
+        <includes name="${package.ps3sdk.appdir}/target/ppu/lib/libsn.a" />
+      </fileset>
+    </do>
+
+</project>
+
+
+
+

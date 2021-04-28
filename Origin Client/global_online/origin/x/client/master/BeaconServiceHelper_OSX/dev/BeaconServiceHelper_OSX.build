@@ -1,0 +1,182 @@
+<project name="BeaconServiceHelper_OSX" default="build">
+	
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.BeaconServiceHelper_OSX.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.BeaconServiceHelper_OSX.version"  value="@{PathGetFileName('${package.BeaconServiceHelper_OSX.dir}')}"/>
+    <package name="BeaconServiceHelper_OSX" targetversion="${package.BeaconServiceHelper_OSX.version}"/>
+	
+	<!-- ******************* -->
+    <!-- Package dependencies -->
+    <!-- ******************* -->
+	<dependent name="OriginConfig" />
+	<dependent name="OriginVersion" />
+
+	<!-- ***************************** -->
+	<!-- Build Configuration properties-->
+	<!-- ***************************** -->
+    <property name="eaconfig.rtti" value="on" />
+    <property name="dirtysdk-samples" value="false" />
+  <property name="osx-base-sdk-version" value="10.7" />
+    
+  <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+  <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+
+  <!-- OriginWebHelper module section -->
+  
+  <property name="module.OriginWebHelper.dir" value="${package.dir}/source/OriginWebHelper" />
+  <property name="runtime.OriginWebHelper.buildtype" value="BeaconServiceHelper_OSX.buildtype" />
+
+  <property name="runtime.OriginWebHelper.bundledir" value="${package.builddir}/build/XCodeOSX/build/${config-xcode-type}/OriginWebHelper.app" />
+  <property name="runtime.OriginWebHelper.pluginsdir" value="${runtime.OriginWebHelper.bundledir}/Contents/plugins" />
+  <property name="runtime.OriginWebHelper.frameworksdir" value="${runtime.OriginWebHelper.bundledir}/Contents/Frameworks" />
+  <property name="runtime.OriginWebHelper.resourcesdir" value="${runtime.OriginWebHelper.bundledir}/Contents/Resources" />
+  <property name="runtime.OriginWebHelper.outputdir" value="${runtime.OriginWebHelper.bundledir}/Contents/MacOS" />
+  <property name="runtime.OriginWebHelper.outputdir" value="${nant.project.buildroot}/XCodeOSX/SubProjects/${package.name}/${package.version}/OriginWebHelper/build/${config-xcode-type}/OriginWebHelper.app/Contents/MacOS" />
+  <property name="runtime.OriginWebHelper.targetdir" value="${package.dir}/target" />
+  <property name="runtime.OriginWebHelper.outputname" value="com.ea.origin.WebHelper" />
+  
+  <property name="runtime.OriginWebHelper.xcode-osx-template-dir" value="${package.BeaconServiceHelper_OSX.dir}/XCodeTemplate/BeaconServiceHelper-xcode.template" />
+  <property name="runtime.OriginWebHelper.plist.template" value="${package.BeaconServiceHelper_OSX.dir}/source/OriginWebHelper/OriginWebHelper-Info.plist" />
+  <property name="runtime.OriginWebHelper.plist" value="${package.BeaconServiceHelper_OSX.dir}/source/OriginWebHelper/OriginWebHelper-Info-versioned.plist" />
+
+	<property name="runtime.OriginWebHelper.extra-link-options" value="-sectcreate __TEXT __info_plist ${runtime.OriginWebHelper.plist} -sectcreate __TEXT __launchd_plist ${package.BeaconServiceHelper_OSX.dir}/source/OriginWebHelper/OriginWebHelper-Launchd.plist" if="${config-type} == 'debug'"/>
+	<property name="runtime.OriginWebHelper.extra-link-options" value="-sectcreate __TEXT __info_plist ${runtime.OriginWebHelper.plist} -sectcreate __TEXT __launchd_plist ${package.BeaconServiceHelper_OSX.dir}/source/OriginWebHelper/OriginWebHelper-Launchd.plist" if="${config-type} == 'opt'"/>
+
+	<BuildType name="BeaconServiceHelper_OSX.buildtype" from="OriginProgram">
+    <option name="buildset.cc.defines">
+      ${option.value}
+ 		</option>
+    <option name="RTTI" value="on" />
+	</BuildType>
+
+  <!-- Remove unneeded default frameworks -->
+  <property name="runtime.OriginWebHelper.remove.link.options">
+    -framework CoreServices
+    -framework AudioToolBox
+    -framework Foundation
+  </property>
+  
+  <property name="runtime.buildmodules" value="OriginWebHelper" />
+
+	<!-- ********************************************************** -->
+	<!-- Package USE dependencies 																	-->
+	<!-- inclusion into the project but does not affect build order -->
+	<!-- ********************************************************** -->
+	<property name="runtime.OriginWebHelper.usedependencies">
+	</property>
+	
+	<!-- ********************************************************** -->
+	<!-- Package BUILD dependencies 																-->
+	<!-- inclusion into the project, affects build order 						-->
+	<!-- ********************************************************** -->
+
+	<property name="runtime.OriginWebHelper.builddependencies">
+	</property>
+
+  <property name="runtime.OriginWebHelper.osx-frameworks" >
+    -framework Security
+    -framework ApplicationServices
+  </property>
+
+	<!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	<!-- NANT preprocess target. Step that happens before project generation -->
+  <property name="runtime.OriginWebHelper.preprocess" value="update-plist" />
+  
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<property name="runtime.OriginWebHelper.prebuildtarget" value="update-plist" />
+	
+	<!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+	<property name="runtime.OriginWebHelper.includedirs" >
+        ${property.value}
+		${module.OriginWebHelper.dir}
+        ${package.OriginVersion.includedirs}
+	</property>
+
+    <fileset name="runtime.OriginWebHelper.headerfiles" basedir="${module.OriginWebHelper.dir}">
+        <includes name="**/*.h" />
+    </fileset>  
+  
+
+	<!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+	<fileset name="runtime.OriginWebHelper.sourcefiles" basedir="${module.OriginWebHelper.dir}">
+		<includes name="**/*.cpp" />
+		<includes name="**/*.mm" />
+	</fileset>
+
+	<target name="OriginWebHelper-sign-exe">
+	</target>
+
+  <target name="update-plist" >
+    <echo message="Updating versions in plist files" />
+    <!-- Get the current version -->
+    <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+      <property name="config" value="${config}" />
+    </nant>
+    <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+    <!-- Update the plist with the new version number -->
+    <property name="plist" value="" />
+    <property name="version.nextline" value="false" />
+
+    <foreach property="line" item="Line" in="${runtime.OriginWebHelper.plist.template}">
+      <!-- Check for CFBundleVersion in line and put the version in the next line -->
+      <do if="${version.nextline}" >
+        <property name="line" value="&lt;string&gt;${version}&lt;/string&gt;" />
+        <property name="version.nextline" value="false" />
+      </do>
+      <do if="@{StrIndexOf(${line},'CFBundleVersion')} != -1">
+        <property name="version.nextline" value="true" />
+      </do>
+
+      <!-- Check for OriginDev in line and put the new cert in the next line -->
+      <do if="(@{StrIndexOf(${line},'OriginDev')} != -1) and @{PropertyExists('jenkins')}" >
+        <property name="line" value="@{StrReplace(${property.value},'OriginDev','Developer ID Application: Electronic Arts Inc.')}" />
+      </do>
+
+      <property name="plist" value="${property.value}&#10;${line}" />
+    </foreach>
+    <echo message="${plist}" file="${runtime.OriginWebHelper.plist}" />
+  </target>
+
+  <target name="clean-custom">
+    <delete dir="${nant.project.buildroot}" />
+    <delete dir="${package.BeaconServiceHelper_OSX.dir}/XCodeOSXTemplate" />
+  </target>
+
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+
+   	<target name="runtime.OriginWebHelper.postbuildtarget">
+  <!--
+   		<echo message="Copying OriginWebHelperImpl to exe dir" />
+      	<exec program="cp" failonerror="false">
+        	<args>
+          		<arg value="-f" />
+          		<arg value="-R" />
+          		<arg value="-P" />
+          		<arg value="${nant.project.buildroot}/SubProjects/BeaconService_OSX/${package.BeaconService_OSX.version}/OriginWebHelperImpl/build/${config-xcode-type}/OriginWebHelperImpl.dylib" />
+          		<arg value="${runtime.OriginWebHelper.outputdir}" />
+        	</args>
+      	</exec> -->
+	</target> 
+</project>
+
+
+
+

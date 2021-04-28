@@ -1,0 +1,227 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+    <dependent name="ps3sdk" />
+
+    <property name="config-available-processors" value="spu ppu"/>
+
+    <property name="default-lib-prefix"             value="lib" />
+    <property name="default-lib-suffix"             value=".a" />
+    <property name="default-exe-suffix"             value=".elf"/>
+    <property name="default-dll-suffix"             value=".prx"/>
+    <property name="default-secured-dll-suffix"     value=".sprx"/>
+    <property name="default-secured-exe-suffix"     value=".self"/>
+
+    <property name="exe-suffix"             value="${exe-suffix.${config-system}??${exe-suffix??${default-exe-suffix}}}"/>
+    <property name="lib-prefix"             value="${lib-prefix.${config-system}??${lib-prefix??${default-lib-prefix}}}"/>
+    <property name="lib-suffix"             value="${lib-suffix.${config-system}??${lib-suffix??${default-lib-suffix}}}"/>
+    <property name="dll-suffix"             value="${dll-suffix.${config-system}??${dll-suffix??${default-dll-suffix}}}"/>
+    <property name="secured-exe-suffix"     value="${secured-exe-suffix.${config-system}??${secured-exe-suffix??${default-secured-exe-suffix}}}"/>
+    <property name="secured-dll-suffix"     value="${secured-dll-suffix.${config-system}??${secured-dll-suffix??${default-secured-dll-suffix}}}"/>
+
+  <!-- IM - I think I don't need this anymore -->
+  <property name="package.VisualStudio.exportbuildsettings" value="false"/>
+    <dependent name="VisualStudio"/>
+
+    <!-- pointer size -->
+    <property name="platform-ptrsize" value="32bit"/>
+    <!-- registers size -->
+    <property name="platform-wordsize" value="64bit"/>
+
+    <!-- Compile in parallel on multiple CPUs         -->
+    <property name="cc.parallelcompiler"    value="true"/>
+
+    <!-- <build> task properties -->
+    <property name="build.pathstyle"    value="Unix"/>
+
+    <!-- Always use response files, to avoid overflowing the command-line. -->
+    <property name="link.useresponsefile" value="true"/>
+
+    <!-- Always use response files, to avoid overflowing the command-line. -->
+    <property name="lib.useresponsefile" value="true"/>
+
+    <!-- Swapped options and includedirs so that -nostdinc can be specified in cc.options in general.xml -->
+    <property name="cc.template.commandline">
+        %defines%
+        %options%
+        %includedirs%
+        -o "%objectfile%"           <!-- object file -->
+        "%sourcefile%"             <!-- source file -->
+    </property>
+    <property name="as.template.commandline"    value="${ps3sdk.as.template.commandline}" if="@{PropertyExists(ps3sdk.as.template.commandline)}"/>
+    <property name="cc.template.includedir"     value='-I "%includedir%"'/>
+    <property name="cc.template.define"         value='-D %define%'/>
+
+    <property name='link.template.librarydir'  value='-L "%librarydir%"'/>
+    <property name='link.template.libraryfile' value='"%libraryfile%"'/>
+    <property name='link.template.objectfile'  value='"%objectfile%"'/>
+    <property name="link.template.commandline">
+        %options%
+        %objectfiles%
+        %librarydirs%
+        -Xlinker --start-group
+        %libraryfiles%
+        -Xlinker --end-group
+    </property>
+
+    <!-- NOTE. whenever link options contain -oformat=fself or fsprx build target dismisses this postlink step -->
+    <!--
+    <property name="link.postlink.program" value="${package.ps3sdk.appdir}\host-win32\bin\make_fself" />
+    -->
+
+    <property name="link.postlink.commandline" >
+      %linkoutputname%
+      %securelinkoutputname%
+    </property>
+
+    <!-- clear options exported by ps3sdk package -->
+    <property name="cc.options"/>
+    <property name="as.options"/>
+    <property name="link.libraries"/>
+
+    <optionset name="config-options-common">
+        <option name="cc" value="${cc}"/>
+        <option name="as" value="${as}"/>
+        <option name="link" value="${link}"/>
+        <option name="lib" value="${lib}"/>
+        <option name="preprocess"/>
+        <option name="postprocess"/>
+        <!--- cc -->
+        <option name="buildset.cc.includedirs">
+            ${option.value}
+            ${cc.includedirs}
+        </option>
+        <!--- link -->
+        <option name="buildset.link.options">
+            ${option.value}
+            ${link.options}
+        </option>
+        <option name="embedguid" value="on"/>
+    </optionset>
+
+    <!-- These are "mixin" OptionSets, for settings and overrides which are PPU/SPU specific -->
+
+    <optionset name="config-options-ps3-ppu">
+        <option name="cc.compilerinternaldefines" value="__PPU__"/>
+    </optionset>
+
+    <optionset name="config-options-ps3-spu">
+        <option name="ps3-spu" value=""/>
+        <option name="config-platform" value="ps3-gcc"/>
+        <option name="cc.compilerinternaldefines" value="__SPU__"/>
+        // PS3 SPU has to use relative paths due to the limit of SPUNAME name (32 chars)
+        // It also doesn't need to generate SELF files, so we omit the post-link step.
+        // NB:  We're not currently restoring the 'link.userelativepaths' setting, plus this
+        // override doesn't seem to fix all the path length problems anyway. -->
+        <option name="link.userelativepaths" value="true"/>
+        <option name="link.postlink.program" value=""/>
+        <option name="linkoutputname"       value="%outputdir%\%outputname%${exe-suffix}" />
+        <option name="securelinkoutputname" value="%outputdir%\%outputname%${exe-suffix}" />
+    </optionset>
+
+    <optionset name="config-options-program">
+        <option name="buildset.link.librarydirs">
+            ${link.librarydirs}
+        </option>
+        <option name="buildset.link.options">
+            -Wl,--oformat=fself
+        </option>
+        <option name="linkoutputname" value="%intermediatedir%\%outputname%${exe-suffix}" />
+        <option name="securelinkoutputname" value="%outputdir%\%outputname%${secured-exe-suffix}" />
+        <option name="link.postlink.commandline">
+          %linkoutputname%
+          %securelinkoutputname%
+        </option>
+    </optionset>
+
+  <optionset name="config-options-library">
+    <option name="liboutputname" value="%outputdir%/${lib-prefix}%outputname%${lib-suffix}" />
+  </optionset>
+
+
+  <optionset name="config-options-dynamiclibrary" >
+        <option name="generatedll"              value="on" />
+        <option name="buildset.cc.defines"      value="EA_DLL" />
+        <option name="buildset.link.librarydirs">
+            ${link.librarydirs}
+        </option>
+        <option name="buildset.link.options" if="${config-compiler} == 'sn'">
+            -Wl,--oformat=fsprx
+        </option>
+        <option name="buildset.link.libraries">
+          ${package.ps3sdk.libsn}
+          ${package.ps3sdk.appdir}\target\ppu\lib\fno-exceptions\fno-rtti\libm.a
+          ${package.ps3sdk.appdir}\target\ppu\lib\libio_stub.a
+          ${package.ps3sdk.appdir}\target\ppu\lib\fno-exceptions\fno-rtti\libc_stub.a
+          ${package.ps3sdk.appdir}\target\ppu\lib\liblv2_stub.a
+          ${package.ps3sdk.appdir}\target\ppu\lib\fno-exceptions\fno-rtti\libstdc++_stub.a
+        </option>
+        <option name="linkoutputname"       value="%intermediatedir%\%outputname%${dll-suffix}" />
+        <option name="securelinkoutputname" value="%outputdir%\%outputname%${secured-dll-suffix}" />
+        <option name="link.postlink.commandline">
+          %linkoutputname%
+          %securelinkoutputname%
+        </option>
+    </optionset>>
+
+    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    Convert PS3 system include paths from -I to -isystem.  This
+    tells the compiler that they are system headers (and to ignore warnings
+    in them).
+  
+    When using -isystem we have to move them from cc.includedirs to
+    cc.options.  We use this task for both PPU and SPU builds, so that
+    we can have warnings-as-errors enabled even though Sony-supplied system
+    headers often have warnings in them.
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+    <!-- 
+    Set version specific libraries
+  If you need to use the dpm libs of TypeB/TypeC, do these if you're using FW2/eaconfig:
+  1. Derive your build type (optionset) from appropriate optionset, says config-options-library.
+  2. Set standardsdklibs to custom in your optionset
+  3. In its standardsdklibs.custom.link option, include those dpm libs
+  -->
+    <fail unless="@{PropertyExists('package.ps3sdk.regularlib')}"
+      message="Property package.ps3sdk.regularlib is required by this release of eaconfig. Please use a release of ps3sdk that defines this property."/>
+    <property name="platform.sdklibs.regular">
+        ${package.ps3sdk.regularlib}
+    </property>
+    <property name="platform.sdklibs.debug">
+        ${package.ps3sdk.debuglib}
+    </property>
+    <property name="platform.sdklibs.regular-spu">
+        @{OptionSetGetValue('ps3spu', 'regularlib')}
+    </property>
+    <property name="platform.sdklibs.debug-spu">
+        @{OptionSetGetValue('ps3spu', 'debuglib')}
+    </property>
+
+    <createtask name="GenerateBuildOptionsetSPU">
+        <parameters>
+            <option name="configsetname" />
+        </parameters>
+        <code>
+            <GenerateBuildOptionsetSPU configsetname="${GenerateBuildOptionsetSPU.configsetname}"/>
+        </code>
+    </createtask>
+
+
+   <include file="options/load-ps3-options.xml"/>
+
+  <taskdef assembly="${nant.project.temproot}/eaconfig/structured-extension-ps3.dll">
+    <sources>
+      <includes name="structured_xml_extensions/structured-extension-ps3.cs"/>
+    </sources>
+  </taskdef>
+
+  <!-- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <!-- +-+-  Visual Studio solution generation related data       -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <!-- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <property name="visualstudio.9.0.platform.name" value="Win32"/>
+  <property name="visualstudio.platform.name" value="PS3"/>
+
+
+</project>

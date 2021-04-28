@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="e5f2ede9-418e-4e65-86a8-f4654e712243" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>What is Structured XML</para>
+    </introduction>
+
+    <section address="Overview">
+      <title>Overview</title>
+      <content>
+        <para>
+          Structured XML is a set of <link xlink:href="44df9582-e180-4d2f-bdaa-636ef7322d7b">Framework Tasks</link>
+          with attributes and nested elements used to define various properties, filesets and optionsets.
+        </para>
+        <para>
+          Structured XML forms a layer on top of a regular Framework syntax described in
+          <link xlink:href="c10319f4-648f-46e6-87dd-1c36e5eb9198">build</link> scripts section,
+          This means that Structured XML tasks store data (properties, filesets, optionsets) using traditional Framework
+          build file syntax.
+        </para>
+        <para>
+          As a result it can be easily mixed with traditional Framework script for easier, gradual transition to the new syntax.
+        </para>
+        <para>
+          In Framework (nant) there are only few datatypes like <codeInline>&lt;property&gt;</codeInline>,
+          <codeInline>&lt;fileset&gt;</codeInline>, and <codeInline>&lt;optionset&gt;</codeInline>.
+          All build inputs are defined by the names of these data types, which makes it difficult to
+          author build documents (mistyped names are not caught by the Framework and just ignored), input is
+          combersome when complex data structures need to be described through string properties.
+          Structured XML is designed to help with above problems. It provides easier to read and write input format,
+          allows for Visual Studio intellisense, and better data authoring.
+        </para>
+        <para>Here is example of traditional build file with several different types of dependencies between modules:</para>
+        <code language="xml" title=" ">
+
+          .         &lt;project default="build"&gt;
+
+          .           &lt;package name="example" targetversion="1.00.00" /&gt;
+
+          .           &lt;property name="runtime.buildmodules" value="ExampleLib ExampleProgram" /&gt;
+
+          .           &lt;property name="runtime.ExampleLib.buildtype" value="Library" /&gt;
+          .           &lt;property name="runtime.ExampleLib.usedependencies"&gt;
+          .             OtherPackage
+          .           &lt;/property&gt;
+          .           &lt;property name="runtime.ExampleLib.includedirs"&gt;
+          .             ${package.dir}/include
+          .           &lt;/property&gt;
+          .           &lt;fileset name="runtime.ExampleLib.headerfiles"&gt;
+          .             &lt;includes name="${package.dir}\include\ExamplePackage\*.h"/&gt;
+          .           &lt;/fileset&gt;
+          .           &lt;fileset name="runtime.ExampleLib.sourcefiles"&gt;
+          .             &lt;includes name="source\Lib\ExampleLib.cpp"/&gt;
+          .           &lt;/fileset&gt;
+
+          .           &lt;property name="runtime.ExampleProgram.buildtype" value="Program"/&gt;
+          .           &lt;property name="runtime.ExampleProgram.builddependencies"&gt;
+          .             OtherPackage
+          .           &lt;/property&gt;
+          .           &lt;property name="runtime.ExampleProgram.runtime.moduledependencies"&gt;
+          .             ExampleLib
+          .           &lt;/property&gt;
+          .           &lt;property name="runtime.ExampleProgram.OtherPackage.runtime.buildmodules"&gt;
+          .             ModuleInOtherPackage
+          .           &lt;/property&gt;
+          .           &lt;property name="runtime.ExampleProgram.includedirs"&gt;
+          .             ${package.dir}/include
+          .           &lt;/property&gt;
+          .           &lt;fileset name="runtime.ExampleProgram.headerfiles"&gt;
+          .             &lt;includes name="${package.dir}\include\ExamplePackage\*.h"/&gt;
+          .           &lt;/fileset&gt;
+          .           &lt;fileset name="runtime.ExampleProgram.sourcefiles"&gt;
+          .             &lt;includes name="source\App\ExampleProgram.cpp"/&gt;
+          .           &lt;/fileset&gt;
+          .         &lt;/project&gt;
+        </code>
+        <para>
+          Dependencies for the module "ExampleProgram" are defined by the three different properties and some of them have quite complex names:
+        </para>
+        <code language="xml" title=" ">
+
+          .         &lt;!-- build dependency on another package "OtherPackage" --&gt;
+          .         &lt;property name="runtime.ExampleProgram.builddependencies"&gt;
+          .           OtherPackage
+          .         &lt;/property&gt;
+          .         &lt;!-- build dependency on another module in runtime group --&gt;
+          .         &lt;property name="runtime.ExampleProgram.runtime.moduledependencies"&gt;
+          .           ExampleLib
+          .         &lt;/property&gt;
+          .         &lt;!-- This property says that ExampleProgram depends on a single module from "OtherPackage" package --&gt;.
+
+          .         &lt;property name="runtime.ExampleProgram.OtherPackage.runtime.buildmodules"&gt;
+          .           ModuleInOtherPackage
+          .         &lt;/property&gt;
+
+        </code>
+
+        <para>
+          The same type of information is expressed much cleaner in structured XML:
+        </para>
+        <code language="xml" title=" ">
+          .         &lt;project default="build"&gt;
+
+          .           &lt;package name="example" targetversion="1.00.00" /&gt;
+
+          .           &lt;Library name="ExampleLib"&gt;
+          .             &lt;dependencies&gt;
+          .               &lt;use&gt;OtherPackage&lt;/use&gt;
+          .             &lt;/dependencies&gt;
+          .             &lt;includedirs&gt;${package.dir}/include&lt;/includedirs&gt;
+          .             &lt;headerfiles&gt;
+          .               &lt;includes name="${package.dir}/include/ExamplePackage/*.h"/&gt;
+          .             &lt;/headerfiles&gt;
+          .             &lt;sourcefiles&gt;
+          .               &lt;includes name="${package.dir}/source/Lib/ExampleLib.cpp"/&gt;
+          .             &lt;/sourcefiles&gt;
+          .           &lt;/Library&gt;
+
+          .           &lt;Program name="ExampleProgram"&gt;
+          .             &lt;dependencies&gt;
+          .               &lt;!-- dependency: package_name/group[optional]/module_name--&gt;
+          .               &lt;build&gt;
+          .                 OtherPackage/ModuleInOtherPackage
+          .                 example/ExampleLib
+          .               &lt;/build&gt;
+          .             &lt;/dependencies&gt;
+          .             &lt;includedirs&gt;${package.dir}/include&lt;/includedirs&gt;
+          .             &lt;headerfiles&gt;
+          .               &lt;includes name="${package.dir}/include/ExamplePackage/*.h"/&gt;
+          .             &lt;/headerfiles&gt;
+          .             &lt;sourcefiles&gt;
+          .               &lt;includes name="source/App/ExampleProgram.cpp"/&gt;
+          .             &lt;/sourcefiles&gt;
+          .           &lt;/Program&gt;
+
+          .         &lt;/project&gt;
+        </code>
+        <para>
+          Despite the strict syntax, structured XML provides the same amount of flexibility as traditional Framework script
+          and it can be combined with traditional Framework script. Here is an example of changing the buildtype dynamically:
+        </para>
+        <code language="xml" title=" ">
+          .         &lt;Program name="example"&gt;
+          .           &lt;buildtype name="DynamicLibrary" if="${build_dynamic_library}"/&gt;
+          .           . . . . .
+          .           . . . . .
+          .         &lt;/Program&gt;
+        </code>
+
+      </content>
+    </section>
+    <relatedTopics>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

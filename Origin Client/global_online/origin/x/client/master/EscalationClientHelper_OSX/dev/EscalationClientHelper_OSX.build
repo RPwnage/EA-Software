@@ -1,0 +1,170 @@
+<project name="EscalationClientHelper_OSX" default="build">
+	
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.EscalationClientHelper_OSX.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.EscalationClientHelper_OSX.version"  value="@{PathGetFileName('${package.EscalationClientHelper_OSX.dir}')}"/>
+    <package name="EscalationClientHelper_OSX" targetversion="${package.EscalationClientHelper_OSX.version}"/>
+	
+	<!-- ******************* -->
+    <!-- Package dependencies -->
+    <!-- ******************* -->
+	<dependent name="OriginConfig" />
+	<dependent name="OriginVersion" />
+
+	<!-- ***************************** -->
+	<!-- Build Configuration properties-->
+	<!-- ***************************** -->
+    <property name="eaconfig.rtti" value="on" />
+    <property name="dirtysdk-samples" value="false" />
+  <property name="osx-base-sdk-version" value="10.7" />
+    
+  <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+  <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+
+  <!-- OriginESHelper module section -->
+  
+  <property name="module.OriginESHelper.dir" value="${package.dir}/source/OriginESHelper" />
+  <property name="runtime.OriginESHelper.buildtype" value="EscalationClientHelper_OSX.buildtype" />
+
+  <property name="runtime.OriginESHelper.bundledir" value="${package.builddir}/build/XCodeOSX/build/${config-xcode-type}/OriginESHelper.app" />
+  <property name="runtime.OriginESHelper.pluginsdir" value="${runtime.OriginESHelper.bundledir}/Contents/plugins" />
+  <property name="runtime.OriginESHelper.frameworksdir" value="${runtime.OriginESHelper.bundledir}/Contents/Frameworks" />
+  <property name="runtime.OriginESHelper.resourcesdir" value="${runtime.OriginESHelper.bundledir}/Contents/Resources" />
+  <property name="runtime.OriginESHelper.outputdir" value="${runtime.OriginESHelper.bundledir}/Contents/MacOS" />
+  <property name="runtime.OriginESHelper.outputdir" value="${nant.project.buildroot}/XCodeOSX/SubProjects/${package.name}/${package.version}/OriginESHelpr/build/${config-xcode-type}/OriginESHelper.app/Contents/MacOSs" />
+  <property name="runtime.OriginESHelper.targetdir" value="${package.dir}/target" />
+  <property name="runtime.OriginESHelper.outputname" value="com.ea.origin.ESHelper" />
+  
+  <property name="runtime.OriginESHelper.xcode-osx-template-dir" value="${package.EscalationClientHelper_OSX.dir}/XCodeTemplate/EscalationClientHelper-xcode.template" />
+  <property name="runtime.OriginESHelper.plist.template" value="${package.EscalationClientHelper_OSX.dir}/source/OriginESHelper/OriginESHelper-Info.plist" />
+  <property name="runtime.OriginESHelper.plist" value="${package.EscalationClientHelper_OSX.dir}/source/OriginESHelper/OriginESHelper-Info-versioned.plist" />
+
+	<property name="runtime.OriginESHelper.extra-link-options" value="-sectcreate __TEXT __info_plist ${runtime.OriginESHelper.plist} -sectcreate __TEXT __launchd_plist ${package.EscalationClientHelper_OSX.dir}/source/OriginESHelper/OriginESHelper-Launchd.plist" if="${config-type} == 'debug'"/>
+	<property name="runtime.OriginESHelper.extra-link-options" value="-sectcreate __TEXT __info_plist ${runtime.OriginESHelper.plist} -sectcreate __TEXT __launchd_plist ${package.EscalationClientHelper_OSX.dir}/source/OriginESHelper/OriginESHelper-Launchd.plist" if="${config-type} == 'opt'"/>
+
+	<BuildType name="EscalationClientHelper_OSX.buildtype" from="OriginProgram">
+    <option name="buildset.cc.defines">
+      ${option.value}
+ 		</option>
+    <option name="RTTI" value="on" />
+	</BuildType>
+
+  <!-- Remove unneeded default frameworks -->
+  <property name="runtime.OriginESHelper.remove.link.options">
+    -framework CoreServices
+    -framework AudioToolBox
+    -framework Foundation
+  </property>
+  
+  <property name="runtime.buildmodules" value="OriginESHelper" />
+
+	<!-- ********************************************************** -->
+	<!-- Package USE dependencies 																	-->
+	<!-- inclusion into the project but does not affect build order -->
+	<!-- ********************************************************** -->
+	<property name="runtime.OriginESHelper.usedependencies">
+	</property>
+	
+	<!-- ********************************************************** -->
+	<!-- Package BUILD dependencies 																-->
+	<!-- inclusion into the project, affects build order 						-->
+	<!-- ********************************************************** -->
+
+	<property name="runtime.OriginESHelper.builddependencies">
+	</property>
+
+  <property name="runtime.OriginESHelper.osx-frameworks" >
+    -framework Security
+    -framework ApplicationServices
+  </property>
+
+	<!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	<!-- NANT preprocess target. Step that happens before project generation -->
+  <property name="runtime.OriginESHelper.preprocess" value="update-plist" />
+  
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<property name="runtime.OriginESHelper.prebuildtarget" value="update-plist" />
+	
+	<!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+	<property name="runtime.OriginESHelper.includedirs" >
+        ${property.value}
+		${module.OriginESHelper.dir}
+        ${package.OriginVersion.includedirs}
+	</property>
+
+    <fileset name="runtime.OriginESHelper.headerfiles" basedir="${module.OriginESHelper.dir}">
+        <includes name="**/*.h" />
+    </fileset>  
+  
+
+	<!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+	<fileset name="runtime.OriginESHelper.sourcefiles" basedir="${module.OriginESHelper.dir}">
+		<includes name="OriginESHelper.cpp" />
+	</fileset>
+
+	<target name="OriginESHelper-sign-exe">
+	</target>
+
+  <target name="update-plist" >
+    <echo message="Updating versions in plist files" />
+    <!-- Get the current version -->
+    <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+      <property name="config" value="${config}" />
+    </nant>
+    <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+    <!-- Update the plist with the new version number -->
+    <property name="plist" value="" />
+    <property name="version.nextline" value="false" />
+
+    <foreach property="line" item="Line" in="${runtime.OriginESHelper.plist.template}">
+      <!-- Check for CFBundleVersion in line and put the version in the next line -->
+      <do if="${version.nextline}" >
+        <property name="line" value="&lt;string&gt;${version}&lt;/string&gt;" />
+        <property name="version.nextline" value="false" />
+      </do>
+      <do if="@{StrIndexOf(${line},'CFBundleVersion')} != -1">
+        <property name="version.nextline" value="true" />
+      </do>
+
+      <!-- Check for OriginDev in line and put the new cert in the next line -->
+      <do if="(@{StrIndexOf(${line},'OriginDev')} != -1) and @{PropertyExists('jenkins')}" >
+        <property name="line" value="@{StrReplace(${property.value},'OriginDev','Developer ID Application: Electronic Arts Inc.')}" />
+      </do>
+
+      <property name="plist" value="${property.value}&#10;${line}" />
+    </foreach>
+    <echo message="${plist}" file="${runtime.OriginESHelper.plist}" />
+  </target>
+
+  <target name="clean-custom">
+    <delete dir="${nant.project.buildroot}" />
+    <delete dir="${package.EscalationClientHelper_OSX.dir}/XCodeOSXTemplate" />
+  </target>
+
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+
+   <target name="runtime.OriginESHelper.postbuildtarget">
+	</target> 
+</project>
+
+
+
+

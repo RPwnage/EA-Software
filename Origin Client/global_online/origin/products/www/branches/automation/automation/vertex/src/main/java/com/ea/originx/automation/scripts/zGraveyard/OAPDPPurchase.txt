@@ -1,0 +1,209 @@
+package com.ea.originx.automation.scripts.rtb;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.helpers.EACoreHelper;
+import com.ea.originx.automation.lib.helpers.EmailFetcher;
+import com.ea.originx.automation.lib.helpers.I18NUtil;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.macroaction.MacroSettings;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHero;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.PaymentInformationPage;
+import com.ea.originx.automation.lib.pageobjects.store.ReviewOrderPage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.CountryInfo;
+import com.ea.vx.originclient.resources.LanguageInfo;
+import com.ea.vx.originclient.resources.OSInfo;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.vx.originclient.utils.TestCleaner;
+import com.ea.vx.originclient.utils.Waits;
+import java.util.Locale;
+import java.util.Set;
+import javax.mail.Message;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Tests the purchase of different entitlements through their PDPs for Run The Business (RTB).
+ *
+ * Environment parameters must be set for this test. 'PROCESS_NAME' and 'PARTIAL_PDP_URL'
+ * must be set for the entitlement to be tested.
+ *
+ * @author caleung
+ */
+public class OAPDPPurchase extends EAXVxTestTemplate {
+
+    public void testRTBPurchase(ITestContext context, CountryInfo.CountryEnum countryEnum, LanguageInfo.LanguageEnum languageEnum) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        WebDriver driver;
+
+        final UserAccount user = AccountManagerHelper.registerNewThrowAwayAccountThroughREST(countryEnum.getCountry());
+
+        final String entitlementPartialPDPURL = OSInfo.getEnvValue("PARTIAL_PDP_URL");
+        final String processName = OSInfo.getEnvValue("PROCESS_NAME");
+
+        // clear the local app data
+        new TestCleaner(client).clearLocalSettings(true);
+
+        // change country and language
+        EACoreHelper.overrideCountryTo(countryEnum, client.getEACore());
+        driver = startClientObject(context, client);
+        MacroLogin.startLogin(driver, user);
+        MacroSettings.setLanguage(driver, client, languageEnum);
+        Waits.sleep(10000);
+        client.stop();
+        ProcessUtil.killOriginProcess(client);
+
+        I18NUtil.setLocale(new Locale(languageEnum.getLanguageCode(), countryEnum.getCountryCode()));
+        I18NUtil.registerResourceBundle("i18n.MessagesBundle");
+
+        logFlowPoint("Log into Origin with a newly registered account for a specific locale."); // 1
+        logFlowPoint("Go to the product page of an entitlement and verify that the 'PDP Hero' banner is displayed."); // 2
+        logFlowPoint("Click the 'Buy' CTA, continue with checkout flow, and ensure the 'Review Order' page is reached."); // 3
+        logFlowPoint("Verify entitlement purchase is successful."); // 4
+        logFlowPoint("Check the email for the account used and save the email for QA."); // 5
+        logFlowPoint("Verify redemption instructions are correct and properly localized in the confirmation email."); // 6
+        logFlowPoint("Go to the 'Game Library' after purchase and verify that the correct product appears in the 'Game Library'."); // 7
+        logFlowPoint("Verify the entitlement can be downloaded and installed."); // 8
+        logFlowPoint("Verify the entitlement can be played."); // 9
+        logFlowPoint("Go back to the entitlement's PDP page and verify there is a message informing the user " +
+                "they own the game and that they cannot purchase it."); // 10
+
+        // 1
+        driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, user)) {
+            logPass("Successfully logged into Origin.");
+        } else {
+            logFailExit("Failed to log into Origin.");
+        }
+
+        // 2
+      //  MacroPDP.loadPartialPDPURL(driver, entitlementPartialPDPURL);
+        // get entitlement name and offer id then build EntitlementInfo
+        PDPHeroDescription pdpHeroDescription = new PDPHeroDescription(driver);
+        String entitlementName = pdpHeroDescription.getGameTitle();
+        String entitlementOfferID = new PDPHero(driver).getOfferID();
+
+        EntitlementInfo entitlement = EntitlementInfo.configure()
+                .name(entitlementName)
+                .offerId(entitlementOfferID)
+                .processName(processName)
+                .partialPdpUrl(entitlementPartialPDPURL)
+                .build();
+
+        Set<String> guidsBefore = entitlement.getWindowsGUIDs(client); // gets all guids before installing entitlement
+
+        if (new PDPHero(driver).verifyPDPHeroReached()) {
+            logPass("Successfully navigated to " + entitlementName + "'s PDP page.");
+        } else {
+            logFailExit("Failed to navigate to " + entitlementName + "'s PDP page.");
+        }
+
+        // 3
+        new PDPHeroActionCTA(driver).clickBuyButton();
+        if (countryEnum.getCountry().equals("Russian Federation")) { // Russia goes through Yandex ('Review Order' page shows up then directs user to payment via Yandex)
+            PaymentInformationPage paymentInfoPage = new PaymentInformationPage(driver);
+            paymentInfoPage.waitForPaymentInfoPageToLoad();
+            Waits.pollingWait(() -> paymentInfoPage.verifyPaymentInformationReached());
+            paymentInfoPage.clickOnProceedToReviewOrderButton();
+        } else {
+            MacroPurchase.handlePaymentInfoPage(driver, false);
+        }
+        ReviewOrderPage reviewOrderPage = new ReviewOrderPage(driver);
+        boolean isReviewOrderPageReached = Waits.pollingWait(() -> reviewOrderPage.verifyReviewOrderPageReached());
+        if (isReviewOrderPageReached) {
+            logPass("Verified the 'Review Order' page has been reached and saved prices for later checks.");
+        } else {
+            logFailExit("Failed to verify the 'Review Order' page has been reached.");
+        }
+
+        // 4
+        if (countryEnum.getCountry().equals(CountryInfo.CountryEnum.RUSSIA.getCountry())) { // do payment through Yandex
+            reviewOrderPage.clickPayNowAndContinueToThirdPartyVendor();
+            MacroPurchase.handleYandexPaymentInfoPage(driver);
+        } else {
+            reviewOrderPage.clickPayNow();
+        }
+        if (MacroPurchase.handleThankYouPage(driver)) {
+            logPass("Verified that the user was able to purchase the entitlement.");
+        } else {
+            logFailExit("Failed to verify that the user was able to purchase the entitlement.");
+        }
+
+        // 5
+        EmailFetcher emailFetcher = new EmailFetcher(user.getUsername());
+        boolean isRedemptionInstructionsLocalized = false;
+        boolean isEmailSaved = false;
+        Message orderConfirmation = emailFetcher.waitAndGetEmailWithSubject(I18NUtil.getMessage("orderConfirmationSubject"));
+        if (orderConfirmation != null) {
+            isRedemptionInstructionsLocalized = emailFetcher.verifyRedemptionInstructions(orderConfirmation);
+            isEmailSaved = emailFetcher.saveMessageAsHTML(orderConfirmation, client); // Extract e-mail as HTML for QA
+        }
+        if (isEmailSaved) {
+            logPass("Successfully saved the confirmation email.");
+        } else {
+            logFail("Failed to receive or save the confirmation email.");
+        }
+
+        // 6
+        if (isRedemptionInstructionsLocalized) {
+            logPass("Verified the redemption instructions are localized.");
+        } else {
+            logFail("Failed to verify the redemption instructions are localized.");
+        }
+
+        // 7
+        new NavigationSidebar(driver).gotoGameLibrary();
+        boolean isGameInLibrary = MacroGameLibrary.verifyGameInLibrary(driver, entitlementName);
+        if (isGameInLibrary) {
+            logPass("Verified that the purchased game appears in the 'Game Library'.");
+        } else {
+            logFailExit("Failed to verify that the purchase game appears in the 'Game Library'.");
+        }
+
+        // 8
+        Waits.sleep(3000); // sleep because sometimes 'download' may not be in context menu right away
+        boolean isDownloadedAndInstalled = MacroGameLibrary.downloadFullEntitlement(driver, entitlementOfferID);
+        if (isDownloadedAndInstalled) {
+            logPass("Verified the game can be downloaded and installed.");
+        } else {
+            logFailExit("Failed to verify that the game can be downloaded and installed.");
+        }
+
+        // 9
+        Waits.sleep(3000); // sleep because sometimes 'play' may not be in context menu right away
+        boolean isPlayable = MacroGameLibrary.launchAndExitGame(driver, entitlement, client);
+        Set<String> guidsAfter = entitlement.getWindowsGUIDs(client);
+        MacroGameLibrary.silentUninstallEntitlementGivenGuid(guidsBefore, guidsAfter, driver, entitlement, client);
+        if (isPlayable) {
+            logPass("Verified that the purchased game can be played.");
+        } else {
+            logFail("Failed to verify that the purchased game can be played.");
+        }
+
+        // 10
+      //  MacroPDP.loadPdpPage(driver, entitlement);
+        PDPHeroActionCTA pdpHeroActionCTA = new PDPHeroActionCTA(driver);
+        boolean isBuyButtonVisible = pdpHeroActionCTA.isBuyButtonVisible();
+        boolean isOwnGameMessageVisible = new PDPHeroActionDescriptors(driver).verifyOwnedProductStatusMessage();
+        if (isOwnGameMessageVisible && !isBuyButtonVisible) {
+            logPass("Verified that there is a message informing the user that they own the game and that the user " +
+                    "cannot purchase the game.");
+        } else {
+            logFail("Failed to verify that there is a message informing the user that they own the game or that the user " +
+                    "cannot purchase the game.");
+        }
+
+        softAssertAll();
+    }
+}

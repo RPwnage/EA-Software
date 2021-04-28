@@ -1,0 +1,4375 @@
+DirtySock SDK 2.11.3 - November 23, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        PS2Isp
+            Rebuilt to pick up NetConn library change.
+        
+    DirtySock (All)
+        Ticker
+            pTicker->uLocalEventsCount was not being decremented in _TickerApiDelete() 
+            which was causing the internal counters to be out of sync which would in turn
+            prevent the "hello" packet from being sent to the ticker server in some scenarios.
+            This resulted in non-localized ticker events to be sent to the client.
+
+    DirtySock (IOP)
+        Connect-i
+            Changed strDev and strIsp fields from 60 characters to 62 characters.  
+            This is required for SCEI compliance, as the strIsp field is required to 
+            be able to store up to twenty Japanese characters in UTF-8 format, and 
+            each UTF-8 Japane se character takes three bytes.
+            
+        Rpc-i
+            Incorporated a bug fix from Kaz Okuda which should eliminate a condition
+            where an alarm used by Rpc-e could fail under obscure game conditions. 
+  
+    DirtySock (PS2)
+        NetConn
+            Changed strDev and strIsp fields from 60 characters to 62 characters.  
+            This is required for SCEI compliance, as the strIsp field is required to 
+            be able to store up to twenty Japanese characters in UTF-8 format, and 
+            each UTF-8 Japane se character takes three bytes.
+
+    Build (All)
+        Removed "overwrite" capability from makefiles.
+
+
+DirtySock SDK 2.11.2 - November 9, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        DirtyDNAS
+            Update DirtyDnas.doc to include a section on game disk layout 
+            detailing what to do with the auth.dat file and the dirtydnas.elf 
+            files.
+
+    DirtySock (All)
+        CommUDP
+            Removed per-ref critical section, and replaced the only use of this 
+            per-ref critical section with a use of the CommUDP global critical 
+            section.  This fixed a rare bug where NetGameLinkDestroy() could destroy 
+            a LinkRef that was currently being processed by a CommUDP-triggered 
+            callback event.
+
+        HLBudApi
+            Added HLBListGetBuddyCountByFlags to count buddies by various types
+            such as permanent or invited buddies.
+
+            Fix for a problem where a buddy with a msg/challenge etc. is logically 
+            "deleted" due to cancel/revoke invite etc -- don't remove the buddy 
+            from the buddy list. If buddy was "temp", keep him around when the 
+            "permanent" part of the buddy is deleted.
+
+            Fixed CancelGame Invite bug.  It will now iterate through all 
+            outstanding (sent) invites and revoke each one.
+
+            Fixed bug where sending a Game Invite Response of REVOKE caused the
+            game invite RECEIVED flag to clear.  Also fixed it such that sending 
+            a game response of REJECT will not cause the game invite SENT flag 
+            to clear.
+
+            Fix a race condition occurring when a buddy is blocked at the same time
+            as the transaction to get the the first msg from a buddy. 
+
+            Fix a race condition in buddy where rapid invite/cancel/invite causes
+            a server RADM/RNOT race.
+            
+            Fix a race condition when blocking a temp buddy.  When a msg arrives 
+            from the buddy, don't get pending response due to temp flag being cleared.
+
+        LobbyLan
+            Fixed LobbyLanLeaveGame() to simply withdraw any game advertisement 
+            (if hosting) rather than destroying the Advertising ref.  This prevents 
+            already received advertisements from other machines from being wiped out.
+
+        NetGameUtil
+            Changed NetGameUtilWithdraw() to simply withdraw an advertisement
+            instead of destroying the advert ref.
+
+        ProtoMangle
+            Added parameters to ProtoMangleDecodeSyslinkAdvert for session keys.
+
+    DirtySock (IOP)
+        CryptRSA
+            Drop thread priority to 50 instead of 47 during session key creation, 
+            to allow VoIP, at its default priority, to execute at a higher priority.  
+            This prevents a bug from occurring where reconnecting to the lobby 
+            server while VoIP is still active causes the VoIP audio to halt for 
+            the duration of the session key generation.
+
+    DirtySock (PSP)
+        NetConnPSP
+            Switched from using an event variable of type "enum SceNetAdhocctlEvent" 
+            to using an event variable of type int, for compatibility with 
+            runtime 0.8, which replaced the enum definition with defines.
+
+            Removed SCE_ERROR_NET_WLAN_NO_SPACE from error name table for 
+            version 0.8 runtime compatibility.
+            
+            Added periodic IBSS scanning.
+                
+    DirtySock (Xbox)
+        NetConnXbox
+            Added silent logon option.
+
+            Added ability to set the maximum number of secure keys that can be 
+            registered to NetConnStartup() by passing the argument -maxkey=#, 
+            where # is the number of secure keys.
+            
+        HLBudApi
+            Fixed bug where race condition on Xbox might cause invited buddies 
+            to be loaded, but lost during Connect. (We now no longer destroy 
+            Roster on Connect, and make sure RosterCallback can be registered 
+            even if DispList exists. )
+
+
+DirtySock SDK 2.11.1 - October 19, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        VoIP 
+            Fixed a bug in VoipConnectionSetRecvMask(), where the reguser callback 
+            could be called during connection, before the user ID is available to 
+            register.  
+
+    Contrib (PC)
+        WinSake
+            Added Solution File.
+            Fixed WSAFDIsSet process address acquisition.
+        
+    Contrib (PS2)   
+        VoIP
+            Directly register user on connection init instead of setting recv mask.  
+            This prevents a situation from occuring where the receive mask is 
+            updated during the connection phase (before init), before the user ID
+            is available, preventing the user ID from being registered on init.
+
+    Contrib (Xbox)
+        DirtyStrings
+            Fix error string referring incorrectly to "Your ISP" to instead 
+            say "Xbox Live"
+
+        VoIP
+            Fixed an Xbox-only order-of-operations bug where a registered XUID 
+            would be unregistered before the priority for that user was set to never.
+
+    DirtySock (All)
+        HLBudApi
+            Handle a case where buddy accepts game invite only after inserting new game. 
+            DirtySock now also fires the Game Invite Ready flag if the buddy Accepts 
+            the invite, and is already in the created game.
+
+            Re-enabled local checking of buddy count on inviting or blocking a buddy.
+            Essentially, it will now return HLB_ERROR_FULL immediately, 
+            instead of waiting for the server to check.
+
+            Made Game Invite Accept Timeout configurable so "same games" 
+            can override via HLBOverrideConstants.
+
+        ProtoAries
+            Fix a bug in ProtoAriesConnect that meant that the server name that
+            is cached in the ProtoAriesRefT was not re-set if ProtoAriesConnect was
+            called with a pServer value of 0.  The bug meant that LobbyApi would
+            always ignore the slave address passed back by the re-director and
+            instead always use the address of the re-director.  Since the default
+            configuration is to run the re-director and slave(s) on the same box
+            then it explains why the bug was not detected for a long time.
+
+
+DirtySock SDK 2.11.0 - October 1, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        VoIP
+            Rebuilt library to bring up to date with code.  This fixes possible linker
+            errors referencing VoipStatus2().
+            
+    DirtySock (All)
+        HLBudApi
+            Added HLBListCancelAllInvites() function to Reject/Revoke any pending
+            game or buddy invites.  Typically for use by clients prior to a "block".
+
+        LobbyApi
+            Fixed bugs in _LobbyApiCancelOneShotCB() reported by Wes Santee.
+
+    DirtySock (PSP)
+        First working version, built and tested against Sony 0.70 using SN.  See
+        doc\psp\readme_100104.doc for more information.
+
+    DirtySock (Xbox)
+        NetConnXbox
+            Fixed System Link mode at interface startup to only rely on
+            XNetGetEthernetLinkStatus() returning TRUE, instead of looking at the
+            result of XNetGetTitleXnAddr().
+
+
+DirtySock SDK 2.10.1 - September 21, 2004
+
+New in this release:
+
+    DirtySock (All)
+        LobbyLan
+            LobbyLan is a LAN lobby manager that supplies LAN game creation and
+            advertising through use of NetGame/ProtoAdvt.  Games can be joined/left,
+            and can be password protected.  Custom game parameters up to 116 chars
+            in length are supported in the game advertisements.  The number of games
+            viewable and the number of clients allowed per game are specified by the
+            application.  All platforms (including Xbox System Link) are supported.
+
+Changes/Bugfixes in this release:
+
+    DirtySock (All)
+        HLBudApi
+            Fixed bug where the (preConn) list for holding Temp buddies before connected
+            was not getting freed when in-Game (HLBApiSuspend).  This left "LobbyAlloc"
+            memory around.
+
+            Reduce stack size on a SendChatMsg of SendMsgToGroup to around 1k from 8k by
+            breaking up the list of users on a group message.
+
+            Made a fix where, if a client goes into Passive mode (Suspend) and then
+            erroneously calls Connect instead of calling Resume, the roster wasn't
+            uploaded.
+
+        LobbyUtf8
+            Reduced maximum allowed bytes in a UTF-8 code sequence from six to four in
+            accordance with the latest standard.
+            
+            Fixed a bug in _Utf8GetNumBytes() that was causing Utf8StrLen() to incorrectly
+            calculate the string length of a UTF-8 encoded string.
+
+        ProtoAdvt
+            Fixed advert refresh in ProtoAdvtAnnounce() to actually refresh/resend an
+            advertisement when the address and/or note fields change, not kill it.
+
+    DirtySock (PC & Xbox)
+        DirtyLibWin
+            Added code to NetCritEnter() to yield to lower-priority threads to give them
+            a chance to acquire the critical section if the current thread couldn't acquire
+            the InterlockedExchange variable.  This avoids a rare race condition where a
+            lower-priority thread has acquired the InterlockedExchange variable but was
+            switched out before it could acquire the critical section.
+
+        DirtyNetWin
+            Fixed a bug where SocketDestroy() was called with sockets in the socket list,
+            in which case those sockets would be shut down but their memory would not be
+            freed.
+
+    DirtySock (Xbox)
+        NetConnXbox
+            Fixed system link startup to correctly detect the interface being ready for
+            use.  This bug prevented NetConnStatus('conn') from ever returing a '+isp
+            result when the Xbox was not hooked up to a router or WAN, but was instead
+            directly connected to another Xbox or a hub.
+            
+        ProtoMangle
+            Added a parameter to ProtoMangleDecodeSyslinkAdvert() to store the amount
+            of characters consumed from the input stream.  If the new parameter is specified
+            as NULL it is ignored.
+
+    
+DirtySock SDK 2.10.0 - September 14, 2004
+
+Changes/Bugfixes in this release:
+
+    DirtySock (All)
+        HLBudApi
+            Added a new param in HLBApiOverrideConstants() to flag that some clients do
+            NOT support (text) messages.  This flag is sent to the server via presence,
+            and the server won't send messages to such a client.
+
+            Disallow buddy list opertions, like FlagTemp Buddy, InviteBuddy etc when in
+            Passive mode.
+            
+            Do not reload roster if server reconnects while in PASSive mode.
+
+    DirtySock (Xbox)
+        NetConnXbox
+            Added XNetUnregisterKey() to NetConnDisconnect().  Normally, the key is
+            unregistered when XNetCleanup() is called from NetConnShutdown().  However,
+            explicitly unregistering it in NetConnDisconnect() allows connecting and
+            reconnecting without completely shutting down DirtySock.
+    
+            
+DirtySock SDK 2.9.3 - August 31, 2004
+
+Changes/Bugfixes in this release:
+
+    DirtySock (All)
+        HLBudApi
+            On a Connect, in case this is a re-connect, destroy any roster,
+            if present.
+
+    DirtySock (IOP)
+        ProtoAries-i
+            Fixed a double-allocation memory leak introduced in release 2.8.3.
+
+    DirtySock (PC)
+        DirtyNetWin
+            Added code to protect against closing an invalid socket.
+
+    DirtySock (PS2)
+        NetConnPS2
+            Added debug-only warnings if required network IRXs (dev9, smap, ppp,
+            and pppoe) are not loaded when NetConnStartup() is called.
+            
+    DirtySock (PSP)
+        Initial port to hardware library/toolchain under linux environment.  The
+        pre-compiled libs included with the distribution remain the emulator
+        libraries from the 2.9.2 distribution.
+        
+        DirtyLibPSP
+            Initial port to PSP hardware.  Compiles but is currently untested.
+
+    DirtySock (Xbox)
+        BuddyApi
+        HLBudApi
+        XbFriends
+            Allow client to set an optional GameState string of 32 char on a Cross
+            Game Invite for Xbox -- picked up on ..HasAcceptedGame call.
+            
+        ProtoPing
+            Added code to handle a case where XOnlineTaskContinue() on a task
+            handle produced by XOnlineGetUserSession() can return undocumented
+            failure codes.  Such a condition now results in a ping value of
+            zero (which means a timeout).
+            
+
+Dirtysock SDK 2.9.2 - August 24, 2004
+
+Changes/Bugfixes in this release:
+
+    DirtySock (All)
+        LobbyApi
+            Clamp minimum connection timeout to five seconds, warn (debug only) if
+            connection timeout is less than ten seconds.
+        
+        LobbyBase64
+            Fix a decoding bug in LobbyBase64 that was reported by Bill Lipa.  Added a
+            unit test to lobbybase64test.c that tests the fix.
+
+        NetGameUtil
+            Added new accessor 'sock' to NetGameUtilStatus() to get a CommRef's socket
+            ref, for shared socket support.
+    
+        ProtoMangle
+            Shared socket support - a new connect function, ProtoMangleConnectSocket(),
+            has been added that takes a socket ref.
+    
+        ProtoPing    
+            Changed method of determining if a ping is a "server" ping or not to
+            handle the case where a user being pinged has the same IP address as
+            the server.  This change does not apply to Xbox ProtoPing.
+
+    DirtySock (Xbox)
+        ProtoMangle
+            Fixed _ProtoMangleDecode() (used by ProtoMangleDecodeSyslinkAdvert()) to
+            properly decode the hex-encoded values.
+        
+        ProtoPing
+            Added new ping response field indicating the number of retries required.
+            This field will be zero for all platforms except for Xbox.
+        
+        
+Dirtysock SDK 2.9.1 - August 17, 2004
+
+Changes/Bugfixes in this release:
+
+    DirtySock (All)
+        HLBudApi
+            Dont cache the low level Roster, as buddyapi can clear it on disconnect.
+        
+        LobbyTagField
+            Fixed overflow issue in Binary7 encoding if negative lengths are passed to
+            TagFieldSetBinary7.
+
+            TagFieldSetNumber() was not correctly encoding the value 0x80000000.  It
+            was getting encoded as -0 instead of -2147483648 due to limits in the value
+            of signed integers.
+
+        ProtoUDP
+            Fix an out of bounds write to an array allocated on the stack in the PS2 EE
+            ProtoUdpSendTo.  Spotted by Ryan Butterfoss.  This fix is only needed by
+            any team that chose to use ProtoUdp directly -- the only ProtoUdp use in
+            DirtySock is by TickerApi and it does not use ProtoUdpSendTo.
+                        
+    DirtySock (IOP)
+        Connect-i
+            Detect ISP missing on config load.
+            
+            
+Dirtysock SDK 2.9.0 - August 3, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (PC)
+        VoIP
+            Initial version.  This version is a direct port of the PS2 version and is in
+            fact fully compatible with it.  There is a small amount of additional
+            functionality present to allow device selection - see the voice.c file in the
+            "tester" sample: (sample\common\tester\source\voice.c for the source,
+            sample\common\tester\project\win32\tester.exe for the precompiled test
+            application).  The command within tester is "voice <ip address>" to start a
+            voice session with a peer. Currently only the default ADPCM codec is supported
+            so the bandwidth per connection is still quite high (~4.5k/sec). More advanced
+            codecs with reduced bandwidth requirements are being considered for >2p titles
+            for both PC and PS2 versions.
+
+    Contrib (PS2)
+        DirtyDnas
+            Fixed SCEI error strings to have DNAS consistently quoted.
+            
+            Fixed a couple of string errors in SCEE/Spanish and SCEE/Portuguese.
+
+    Contrib (Xbox)
+        VoIP
+            Moved thread creation after last error return in VoipStartup() so as to prevent
+            the thread being left dangling if the function errors out.
+
+    DirtySock (All)
+        BuddyApi
+            Fixed bug where if it gets error on blocking a buddy (e.g. because list is
+            full), it would also delete the buddy from the in mem buddy list.
+        
+        DirtyAddr
+            Removed extraneous semicolon from extern "C" statement that was causing
+            a Metrowerks compiler warning.
+        
+        HLBudApi
+            If I have blocked a user, and receive a game invite from him, auto-reject
+            that game invite.
+
+        WebOffer
+            Increased suggested memory size to allow for localized TOS.
+            
+    DirtySock (PSP)
+        Initial PSP port.  Note that as there is no network functionality available yet,
+        this version of the library may be linked against, but do not expect calling
+        DirtySock functions to work.  Currently, the makefile may be used to build against
+        the Sony/Cygwin toolchain (pass SONYTC=1 on the make commandline or set it as
+        an environmental variable) or the SN toolchain (default).  The libraries that come
+        with the DirtySDK distribution are emulator-suitable SN libraries; hardware libraries
+        will be released at some point in the future.
+        
+
+Dirtysock SDK 2.8.3 - July 27, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        PS2Isp
+            Fixed periodic memcard check to not recognize a non-PS2 card as valid.
+            This fixes a problem that showed up as a PocketStation not being properly
+            rejected.
+        
+    Contrib (Xbox)
+        XboxIsp
+            Added implicit System Link support.
+        
+    DirtySock (All)
+        HLBudApi
+            Fixed Memory leak when Invite/Revoke-Invite (aka cancel) a buddy.
+            
+            Added a client configurable limit on messages per buddy -- needed for
+            APT issue.
+            
+            Clean up of buddy mem leak -- use a callback to delete high level buddy,
+            if lower level buddy is about to be zapped.
+
+        LobbyApi
+            Added safe handling of NULL Aries or PingManager refs at creation time.
+        
+        LobbyTagField
+            Fixed bug in TagFieldDelete that would not eliminate the final TAB when
+            the last item in a record was deleted.
+
+        ProtoAdvt
+            Bumped up note field to 192 bytes.
+            
+        ProtoMangle
+            Added ProtoMangleDisconnect().  This function should be called when the
+            game session (or VoIP session, if in the FE) is complete.  It is only
+            required for the Xbox, but exists as an empty function on other platforms,
+            so it may be called from platform-independent code.
+            
+        XmlFormat
+            Added reserved character encoding to XML strings
+        
+    DirtySock (IOP)
+        Connect-i
+            Added code to detect a missing dev or cnf file.  Added a new error flag,
+            NETCONN_CFGDEVMISS, if the dev file is missing.
+            
+        ProtoAries
+            Safe handling of failure to allocate module state in create(), plus
+            diagnostic in that case.
+    
+    DirtySock (PS2)
+        ProtoAries
+            Added diagnostics if create fails.
+
+    DirtySock (Xbox)
+        NetConn
+            Added System Link support.  Pass "-syslink" to NetConnStartup to enable.
+            
+        ProtoMangle
+            Added two new functions, ProtoMangleEncodeSyslinkAdvert() and
+            ProtoMangleDecodeSyslinkAdvert(), to support System Link play.
+        
+            
+Dirtysock SDK 2.8.2 - July 20, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (Xbox)
+        VoIP
+            Fix to prevent voice from going to both headset and speaker in certain
+            circumstances.
+
+    DirtySock (All)
+        HLBudApi
+            Fixed bug where if waiting for server to respond to an op, and received a
+            msg from a (new) temp buddy, it could get discarded.
+            
+        LobbyRank
+            Fix LobbyRankCategoryFetch so that if a request is made for the last
+            category requested then a second request is not made to the server and the
+            cache values are used instead.  Fix LobbyRankCategoryFetch and
+            LobbyRankFetch so that they cancel any outstanding server request when they
+            are called.  Together these fix some problems with attempting to load one
+            category/list while a previous request is still pending.  If your UI does
+            does not allow the user to cancel and reissue a ranking request then these
+            changes are not actually required since your UI will not allow the problem
+            to occur.
+        
+        ProtoAries
+            Added possible refresh of note field on ProtoAdvtAnnounce() of a previously
+            announced advertisement.  The addr field already supported refresh, this change
+            is just to add the same functionality to the note field.
+            
+        WebOffer
+            Various WebOffer related buffers that hold user-visibile text now have
+            their size in bytes defined in terms of the average width in bytes of a
+            chartacter that will be stored in there.  The default width is 2 which an
+            avarage of the 1-3 bytes that a Greek, Korean, Japanese ... etc. character
+            requires when encoded as UTF-8.
+
+    DirtySock (PS2)
+        NetConn
+            Renamed new reset handler functions from NetConnShutdown* to NetConnReset*
+            to prevent name collisions with other NetConnShutdown calls unrelated to the
+            reset handler.
+
+
+Dirtysock SDK 2.8.1 - July 13, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        DirtyDnas
+            Fixed possible buffer overrun creating DNAS error code string which was
+            exposed by the new Greek strings, and added code to print a warning if the
+            string is truncated.  Also doubled the buffer size to account for the Greek
+            error code strings being slightly longer than the old buffer size.
+
+    Contrib (Xbox)
+        VoIP
+            Fixed _VoipRegisterRemoteTalkerCb() to not require a strict TRUE value for
+            bRegister.
+            
+            Fixed a bug where blank users could be registered for connections that are
+            not active, if VoIP was initialized with more than one peer connection and
+            VoipSpeaker() was called with an argument greater than one (same fix was
+            applied to PS2 in 2.8.0).
+
+    DirtySock (All)
+        BuddyApi
+            Fixed bug re ps2 game invite response not sending Resource.
+        
+        HLBudApi
+            Fixed parsing of resource for domain to handle extra / for send msg. Caused
+            messages from FIFA to non FIFA games to not be delivered.
+
+        LobbyChal
+            Set timeout on receipt of challenge.
+
+        LobbyCommonDefs
+            Changed CODE_PLATFORM #ifdef check to #ifdef _XBOX so users of DirtySock SDK
+            don't need to define the CODE_PLATFORM stuff.
+
+        LobbyDispList
+            Fixed a problem in DispListSet which incorrectly applied filter when record
+            data was changed.
+
+        LobbyPingManager
+            Added LobbyPingManagerCancelRequest().
+        
+        LobbyTagField
+            Added TagField floating point.
+
+        ProtoAdvt
+            Added code to guard against buffer trashing in ProtoAdvtAnnounce().
+
+        WebOffer
+            The WebOffer setup structure now has a strCountry field where the two
+            character ISO country code can be specified.  This is surfaced as the
+            tag-field key "FROM" (to be consistent with how countries are used
+            elsewhere).
+        
+    DirtySock (IOP)
+        Connect-i
+            Added new check to detect and reject combinations with invalid ifc/dev
+            hardware type pairings.
+            
+            
+    DirtySock (Xbox)
+        HLBudApi
+            Override talk to Xbox in DEBUG mode ONLY.
+        
+        NetConn
+            Added Auto-QoS support.  Immediately after connection to the SG a QoS request
+            is made against the Xbox Live service (this can take up to 10 seconds to
+            complete).  The QoS information can then be retrieved with NetConnStatus(),
+            using the following selectors:
+            
+                'bpsd' - Bits per second downstream.
+                'bpsu' - Bits per second upstream.
+                'mrtt' - Median round-trip time.
+                
+            If the information is not yet available, -1 will be returned.
+    
+    Sample (Xbox)
+        XbLogon
+            Added Xbox API Monitor scripts for logon failure testing.  These scripts
+            should be used instead of the XDK supplied scripts.
+    
+    Sample (Win32)
+        Flame2
+            Added CDEV dialog box to persona select window to allow Flame2 to simulate
+            sending cheat responses to the server.  If the box is left empty, no cheat
+            response is sent (as previous).
+            
+            Added a logout button to the main window.
+                    
+
+Dirtysock SDK 2.8.0 - July 6, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        DirtyDnas
+            Integrated new Sony v5.1_final error strings worksheet, released July 5th.
+
+        PS2Isp
+            Added a debug print.
+            
+    Contrib (IOP)
+        Voip
+            Fixed a bug where blank users could be registered for connections that are
+            not active, if VoIP was initialized with more than one peer connection and
+            VoipSpeaker() was called with an argument greater than one.
+            
+            Added extra debugging (define VOIP_HEADSET_DEBUG as TRUE to enable, disabled
+            by default).
+            
+            Fixed a bug where users were compared with memcmp instead of strcmp to
+            determine what channel an incoming voice packet belonged to.  This could
+            result in uninitialized data causing voice data to never be accepted and
+            thus never played.
+
+    DirtySock (All)
+        BuddyApi
+            Fixed bug where if using callbacks, the Title was not there, due to order
+            in which callback was fired.
+            
+            Server had problems with extra RSRC string on buddy response, so we removed it.
+
+        HLBudApi
+            When a buddy is flagged as "NoReply", now marks buddy list as changed too.
+        
+        ProtoAries        
+            If the server timed out the slave connection because it was idle *and* the
+            user waited long enough for the crypto ticket to expire then when they next
+            tried to log in the server it would correctly reject the ticket and so
+            LobbyApi would attempt to connect to the re-director to get a new ticket.
+            If the original re-director connection was over SSL then this re-connection
+            should also be over SSL.  However, a bug in the generic ProtoAries code
+            meant that the re-director re-connection would be done in plain text.  The
+            fix is a one-liner to flush some state so that the re-connection will use
+            SSL.  Note this bug did *not* affect the PS2 since it uses a PS2 specific
+            version of ProtoAries which does not have this bug.
+        
+        ProtoHttp
+            Added ProtoHttp deprecation wrapper (defaults to off).  To activate, define
+            _PROTOHTTP_DEPRECATED before including protohttp.h.  Doing so redefines all
+            ProtoHttp calls to be ProtoHttps calls instead.
+        
+        ProtoSSL
+            ProtoSSL now supports certificates with a SHA1 signature.
+
+    DirtySock (IOP)
+        Connect-i
+            Removed previous test for invalid configuration files that would trip on certain
+            valid files.  Added a new test for invalid ISP settings files that does not trip
+            on valid files.
+        
+        Startup-i
+            Memdump enhancements: added Inet pool memdump, added mdumpflag= parameter to IRX
+            for recurring memdump.
+
+    DirtySock (PS2)
+        NetConn
+            Added new memdump flags (NETCONN_MEMDUMP_*).
+            
+            Changed NetConnIOPMemDump() to take memdump flags.  Specify NETCONN_MEMDUMP_ALL
+            for previous behavior.
+        
+        ProtoHttp-e
+        ProtoHttps-e
+            Changed to pass the HTTP receive buffer size down to the IOP.  Previously, zero
+            was being passed, which resulted in the minimum 2k buffer being allocated by
+            ProtoHttpCreate() in protohttp(s).c.  Additionally, changed to override input
+            buffer size and set it to 4k.  This improves throughput about 2x over the previously
+            implicit 2k that was being used with very little extra memory overhead (and the
+            memory is transient anyway).  With these changes it is possible to download at
+            ~134k/sec.
+
+
+Dirtysock SDK 2.7.4 - June 29, 2004
+
+    *** IMPORTANT NOTE ***
+    
+    As of the 2.7.4 release, there has been a change made to VoIP for the PS2 that will
+    require a code change.  VoipMicrophone() has been repurposed (and brought in line
+    with the Xbox version) to specify which connections mic data will be sent to, instead
+    of simply enabling/disabling the PS2 headset microphone.  To enable/disable the PS2
+    microphone, VoipControl('micr') should be used moving forward.  As the PS2 microphone
+    is initially disabled, without a call to VoipControl('micr') no voice data will ever
+    be sent, so please make sure to insert a call to enable the microphone when upgrading
+    to a 2.7.4+ version of VoIP.
+    
+    **********************
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        DirtyDnas
+            Added Greek as a supported language option for SCEE.
+
+            Added default language define.
+            
+        DirtyStrings
+            Added new alert table entry to ps2isp_en.c.
+            
+            Added an alert table entry for handling of EC_INV_ZIPCODE error code returned
+            by 'acct' command.
+            
+        PS2Isp
+            Added support for warning that some network configurations are invalid,
+            including a new alert.
+            
+            Added memcard check after load to make sure the memcard is still inserted.
+            If not, throw up a -mgr alert.
+            
+        VoIP
+            Cleaned up setting send/recv masks and registering/unregistering users on
+            connection/disconnection to use VoipConnectionSet(Send|Recv)Mask.
+
+            Implemented multiconnect VoipMicrophone() and VoipSpeaker().  Implemented
+            VoipControl('micr') to take the place of the previous functionality of
+            VoipMicrophone().
+            
+            Added send and recv masks to status info that is DMA'd to the EE.  Added
+            VoipControl() functions to replace hard-coded RPC functions.
+
+            Fixed bug setting recording volume after headset re-enumeration.
+
+    DirtySock (All)
+        LobbyApi
+            A +ses sent from the server to the client now additionally contains
+            LADDR<x> for each opponent <x>, where LADDR is that opponent's local IP
+            address.  LobbyApiPlayerT now contains a new uLocalAddr field which is
+            where LADDR is unpacked into.  Change made to facilitate two PS2s behind
+            the same NAPT box being able to connect in a quick match by connecting on
+            their internal IP address.
+
+        LobbyTagField
+            Fix TagFieldGetDelim so that it doesn't terminate when it sees UTF-8
+            encoded strings.  As a side effect this fixes a problem with LobbyStatbook
+            and LobbyRank returning less results than desired if any of the data
+            contains strings with UTF-8 encoded characters in them.
+
+        NetConn
+            Added extended info flags field to NetConfigRecT structure (for PS2's benefit).
+                    
+    DirtySock (IOP)
+        Connect-i
+            Added support for returning extended info flags when parsing a configuration
+            file into a configuration list.
+        
+        DirtyNetIOP
+            Added flag to request more verbose DNS error result.
+
+        ProtoAries-i
+            Fix a PS2 crypto specific bug.  If the server timed out the slave
+            connection because it was idle *and* the user waited long enough for the
+            crypto ticket to expire then when they next tried to log in the server
+            would correctly reject the ticket but LobbyApi would not see the disconnect
+            as being crypto related and so not retry the re-director connection.
+            Instead the connection would eventually time out at which point the next
+            connection would succeed.  The fix is to change the way the PS2 IOP
+            ProtoAries code handles the disconnect case, so that instead of flushing
+            the crypto state right away, it just marks the header as not being
+            encrypted and then the crypto state is flushed when the next call is made
+            to ProtoAriesSetKey.
+            
+    DirtySock (PS2)
+        DirtyNetPS2
+            Fixed NetPrintfCode to automatically work with a test kit running under
+            ProView.
+            
+            Made NetPrintfCode() thread safe.
+        
+        HLBudApi
+            Added a cancel game invite function -- to tear down game invite on ps2.
+            
+            Fixed the session id for ps2 game invites-- passed as param to buddy.
+
+        LobbyLogin
+            Added MAC and MID (PS2 only) to 'acct' requests.  This allows the server to
+            detect a user using banned hardware and return the blocked error code in
+            response.
+            
+            Added EC_INV_ZIPCODE error code handling.
+
+        NetConn
+            Added optional PS2 shutdown handler.
+
+        ProtoPing            
+            ProtoPingRequestServer() was calling ProtoPingRequest() on the IOP side,
+            which prevented the bServer entry of the ping result structure from being
+            correctly set.  This further prevented server pings issued by LobbyApi
+            from working.
+
+    DirtySock (Xbox)
+        BuddyApi
+            Fixed return code bug on invite accept.
+                    
+        ProtoMangle
+            Fixed to reset to IDLE state on completion.
+            
+            Added shutdown of online task handle in ProtoMangleDestroy().  Lack of this
+            shutdown was causing a problem where ProtoMangleDestroy() could not be used
+            to abort a current demangling session.
+            
+        ProtoPing
+            Set ping sequence to start at one, so the sequence number returned by
+            ProtoPingRequest() and ProtoPingRequestServer() on success will not collide
+            with those functions returning zero if there is an error.
+        
+
+Dirtysock SDK 2.7.3 - June 22, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Replaced the sum of the hash of two strings with the hash of the concatenation
+            of two strings, as it is more likely to be unique without the addition.
+            
+            Buddy/Ticker message localization support.
+
+    Contrib (PS2)
+        PS2Isp
+            Switched to enforcing PS2ISP_MAXCONFIG (currently six) instead of four as the
+            maximum number of supported network configurations.
+
+    Contrib (Xbox)
+        VoIP
+            Fixed VoipStartup() to not cache ref until after successful startup.
+
+    DirtySock (All)
+        HLBudApi
+            Defined a formal type for roster sort callback.
+
+            Added HLBApiCreate2() which takes memory Alloc/Free functions for those that want
+            buddy memory allocated separately, since some of it stays in game.
+        
+        LobbyChal
+            Added return code to LobbyChalInitiateChallenge() indicating whether the challenge
+            initiation was successful or not.
+        
+        LobbyCommonDefs
+            Moved LOBBYSETTING_xxx definitions to lobbycommondefs to make them available on the
+            server.
+        
+        LobbyTagField
+            TagFieldSetStructure() now escapes : and = when encoding strings to prevent other
+            TagField function confusion when parsing.
+        
+        NetConn
+            Unregister any registered idle callbacks at shutdown.
+            
+            Added debug warnings for various NetConnIdle events (redundant adds, deletes
+            of handlers that aren't registered, handlers that are still registered at shutdown).
+
+        TourneyApi
+            Adjusted TourneyApiGetNextGame() so the filter function provided can return a score
+            (0-n) for each game and then to choose the game with the highest score rather than just
+            the first valid one the filter function returns.  This should be backward compatible
+            with the previous TRUE/FALSE return codes.
+
+    DirtySock (IOP)
+        Removed CommSRP and CommTCP from IRX.  This saves ~7k of code space in the final IRX.
+    
+        Rpc-i
+            Changed to not allow wakeup during rpc calls.  This fixes a problem where
+            sceInetSendto() can be blocking internally and an EE RPC call wakes up the IOP
+            causing the send to fail with a -418 (KE_RELEASE_WAIT) error.  This problem
+            has only been seen in games with a very high traffic volume.
+
+    DirtySock (PS2)
+        BuddyApi
+            Added fields for GINV on PS2.
+            
+        NetConn
+            Implemented -coop option for NetConnStartup(), to allow DirtySock to cooperate with
+            any other systems that are also using the Inet stack.  Internally this remaps to
+            $USE-EXISTING$, which causes DirtySock to assume the network adapter has been started
+            by someone else and to attach itself to the active adapter.
+            
+        Rpc-e
+            Added debug cycle count to printout for tranasction buffer wait.
+
+    DirtySock (Xbox)
+        LobbyLogin
+            Added new context LOBBYLOGIN_CONTEXT_DUPLICATE.  This context is transitioned to when
+            a 'dupl' error is received from the server in response to the 'auth' request.  At this
+            point the title should use the WebOffer "duplicate" script to handle this situation.
+            
+        NetConn
+            Only return -msg error the first time it occurs; on reconnect allow user to log
+            on without error.
+
+            Added more verbose error message when failing to register key.
+            
+            Implemented -coop option for NetConnStartup(), to allow DirtySock to cooperate with
+            any other systems that are also using the networking hardware.  Internally this remaps
+            to "-nosecure", which causes DirtySock to start up the networking hardware in insecure
+            mode.  This allows the Xbox to communicate with other PCs/consoles for debugging purposes
+            but cannot be used to ship a game.
+
+        ProtoMangle
+            Added caching of registered key and unregister on create.  NOTE - this requires
+            that a single ProtoMangleCreate() and ProtoMangleDestroy() pair be used for a
+            given demangling session.
+            
+
+Dirtysock SDK 2.7.2 - June 15, 2004
+
+    *** IMPORTANT NOTE ***
+    
+    As of the 2.7.2 release, the file netconn.c (which used to exist separately
+    by that name for pc, ps2, and xbox) has been replaced by a single common file
+    also named netconn.c, and the individual platform files have been renamed
+    netconnwin.c, netconnps2, and netconnxbox respectively.  Please make sure that
+    the old netconn.c files that used to exist in the pc\, ps2\, and xbox\ directories
+    are removed from your source control and/or local harddrive so the old versions
+    are not referenced in lieu of the new netconn.c.
+    
+    **********************
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Added unique ticker ID generation for scores based on the sum of a
+            hash of the home and away users.
+            
+            Switched to use VOIP_REMOTE_CONNECTED to indicate a voice chat is taking
+            place instead of VOIP_REMOTE_ACTIVE.
+            
+            Added code to ignore roster download buddy presence updates.
+    
+    Contrib (PS2)
+        PS2Isp
+            Removed PS2ISP_HW_USB from PS2ISP_HW_ALL define.
+            
+            Added a new parameter to PS2IspCreate() to enable/disable multitap
+            support.  The parameter is actually a function pointer to the single mtap
+            function PS2Isp calls, so if it is passed as NULL instead, the multitap
+            library will not need to be linked against.  Also added two defines,
+            PS2ISP_MTAP_SUPPORTED and PS2ISP_MTAP_UNSUPPORTED, to pass for this
+            parameter.  Use PS2ISP_MTAP_SUPPORTED to keep the previous behavior.
+    
+    DirtySock (All)
+        CommUDP
+            Added optional connection identifier support to fix multiconnect so as to
+            not require serialization to match each peer up with its expected host
+            connection ref.
+            
+        NetConn
+            Consolidated common NetConn functions into a common NetConn file.
+
+        DirtyLibWin
+            Changed NetLibCreate() to take a thread priority parameter.
+            
+        DirtyNetWin
+            Changed SocketCreate() to take a thread priority parameter.
+        
+        HLBudApi
+            Flag old Presence as -1 if it came due to a refresh of this client, to stop
+            spamming ticker with "buddy online" messages.
+            
+            Added const to set presence char params passed in.
+    
+        LobbyApi
+            Fixed lobbyapiprintf to have special handling for print(%s) which passes
+            through original buffer avoiding 4K limit.
+            
+        LobbyLib
+            Added LobbyHash(), a function to calculate a 32bit CRC-based hash of the
+            given input string.
+
+        LobbyLogin
+            Fixed cheat device detection to not MD5 hash uninitialized memory, which was
+            causing random errors in the hash result being returned to the server.
+    
+        NetGameUtil
+            Added a new control option 'advf' to set the advertising frequency
+            (in seconds).
+            
+        TourneyApi
+            Added TourneyApiGetNextGame() to find the next scheduled, unplayed
+            game for a given user.
+
+        WebOffer
+            Fixed typo in news screen setup with overwrote buttons 3&4 with
+            buttons 1&2.
+
+    DirtySock (IOP)
+        Startup-i.c
+            Implemented DirtySock IRX parameter "thpri" to set DirtySock IRX thread
+            priorities.  If the parameter is unspecified it defaults to the previous
+            value, 9 for each.
+
+    DirtySock (PC)
+        DirtyLibWin
+            Updated NetPrintfCode to special case print(%s) and avoid 4K buffer limit.
+
+        NetConnWin
+            Renamed from NetConn, moved platform common functions to common NetConn file.
+            
+    DirtySock (PS2)
+        NetConnPS2
+            Renamed from NetConn, moved platform common functions to common NetConn file.
+
+    DirtySock (Xbox)
+        DirtyLibWin
+            Updated NetPrintfCode to special case print(%s) and avoid 4K buffer limit.
+        
+        DirtyNetWin
+            Eliminated DNS lookup in secure mode to comply with Xbox TCR.  When in secure
+            mode, any DNS request that is for a named address (not dot notation) is
+            set to an address that will be remapped to the security gateway.
+        
+        LobbyLogin
+            Removed code that handled an auth/imst response to allow login of an xbox
+            client to a ps2 server.
+            
+            Fixed cheat device detection to not MD5 hash uninitialized memory, which was
+            causing random errors in the hash result being returned to the server.
+                
+        NetConnXbox
+            Renamed from NetConn, moved platform common functions to common NetConn file.
+
+
+Dirtysock SDK 2.7.1 - June 8, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        DirtyStrings
+            Text bug fix in PS2Isp error strings.
+
+        PS2Isp
+            Bumped up supported network configuration max to six.  This allows PS2Isp to
+            internally load up to six configurations.
+            
+            Added temporary clamp of network config count to a max of four.  This will be removed
+            next week.
+
+    Contrib (Xbox)
+        DirtyStrings
+            Text bug fix in XboxIsp error strings.
+            
+        XboxIsp
+            Changed '-inv' error response to launch to account management instead of online menu.
+
+    DirtySock (All)
+        HLBudApi
+            Allow temp buddies to be added (flagged) prior to being connected. This solves the
+            problem of LobbyGlue adding Tourney buddies before connection to the buddy server.
+
+        LobbyChal
+            When accepting a challenge, LobbyChalAcceptChallenge previously sent a message to the
+            opponent, and then sent a message to the server.  This order has been reversed to avoid
+            a server race condition when one user is broadband and the other user is modem, which
+            could cause the challenge parameters to not be processed by the server.
+
+        LobbyCommondefs
+            Added badname, cheating, and screaming feedback types.
+            
+        LobbyStatbook
+            Added LobbyStatbookRowWidth to the client-side LobbyStatbook API.  Added
+            support for an optional WIDTH value to the server-side stats.cfg.  Both
+            changes made to allow the CFE group to display the last 10 opponents using
+            the LobbyStatbook.  Change requested by Mike Upton.
+        
+        TourneyApi
+            Added TourneyApiGetGameListByUser() API to allow clients to get a list of ALL games
+            scheduled for a given user in a given round.
+        
+    DirtySock (PS2)
+        LobbyLib
+            Fixed timezone calculation to account for daylight savings.
+
+    DirtySock (XBOX)
+        BuddyApi
+            Poll and update a few times when getting Title Name, as per XDK.
+            
+        LobbyLogin
+            If connecting securely, remap server name to a static IP address to prevent a
+            TCR-violating DNS lookup.  The static IP address can be anything non-zero, as it
+            will be remapped to the SG address anyway.
+
+        NetConn
+            Added 'serv' function to NetConnStatus(), to return the secure service ID.
+            
+            Added ethernet plug pulling detection and error result during XBL login process.
+
+        ProtoPing
+            Rewrote server ping to use XNetQosLookup() for faster ping response than
+            XNetServiceLookup().
+            
+        XbFriends
+            Changed to not sit in a loop waiting for title name; Let caller pump update
+            as needed.
+        
+
+Dirtysock SDK 2.7.0 - June 3, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Changed LobbyGlueSetBuddyTickerScore() to take a pressame string so game teams can
+            control the exact formatting of their in-game presence same string.
+    
+    Contrib (PS2)
+        DirtyStrings
+            PS2Isp Text bug fix.
+            
+        VoIP
+            Fixed so DVICompStateT from remote user does not have to be aligned (required
+            for modem awareness change).
+            
+            Fixed to not send if either the local user or the remote user is a modem user.
+    
+    DirtySock (All)
+        BuddyApi
+            Fix bug where rosterChange callback fired on every update due to end roster check.
+            
+            Presence compare.
+            
+            Fix race condition on RADM and RNOT msg when buddies invite each other simultaneously.
+
+            No longer send TCKL on initialization as server does not need it.
+
+            As server is slow to respond with RNOT, make local (in mem) changes 
+            when user accepts/reject/blocks a buddy invite, prior to server response.
+            This was an NCAA bug.
+
+            Fixed bug where find user callback might be called too early -- before usch response and user records are back.
+
+            [XBOX] Added API to GetMyTitleName --based on infor from server and xdk
+            
+            [XBOX] On Suspend -- dont enumerate the XDK, re-connect on a resume.
+
+        HLBudApi
+            Fixed NCAA bug of limit of 25 invited Friends showing up.
+            
+            Fix NCAA bug where mutual block caused soft lock, due to extra RADM message sent.
+        
+            Renamed make buddy api call, as it is deprecated.
+
+        LobbyApi
+            Re-enabled client-side session key generation, if there is no session key given
+            by the server.
+        
+        LobbyCommon
+            Made LOBBYAPI_MIN_PERSONA_LEN platform dependent.  Min size is 3 for PS2/PC and
+            1 for XBOX.
+        
+        LobbyCustom
+            Bumped LOBBYAPI_MAX_ROOM_CRIT_VALUES up to 8 from 4 to allow more room for custom
+            room filters.
+
+        LobbyTagField
+            Added TagFieldFindNext() function to allow for iteration over tag field records.
+        
+        TickerApi
+            If the event id (TickerRecordT.iId) passed to TickerApiInsert is non-zero
+            then TickerApiInsert will now first try and remove any event with the same
+            event id in the queue before attempting to insert the new event.
+            
+            Fix for NCAA bug 6483: calling TickerApiIdentity to flip the filter
+            settings back and forth did not reset the flag that strips duplicate
+            headers of successive sports events.  Change made by Alan Wood and myself.
+            
+            Extended the ticker client<->server protocol to exchange more information
+            about the size and composition of the client queue.  For example, the
+            hard-coded low&high water marks in previous versions are now replaced by 
+            values that come from the server in response to a 'hello' message.  This
+            enables the server to alter the values dynamically if necessary.  Bumped
+            the protocol version to 8.
+    
+
+Dirtysock SDK 2.6.3 - May 25, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Implemented Buddy/Ticker score duplicate removal.  This is to fix the
+            situation where ClientA is friends with both ClientB and ClientC, who
+            happen to be playing each other.  Previous to this change, ClientA would
+            get two Buddy/Ticker score updates, one from ClientB, the other from
+            ClientC.
+            
+            Fixed bug where color extraction was broken and would extract a white color
+            with the intensity of the red channel.
+            
+            Added "FRIENDS" prefix to buddy/ticker scores.
+            
+            Made buddy/ticker scores repeat three times.
+            
+            Changed to only update HLBud VoIP status if HLBud is connected.
+            
+            Fixed buddy presence formatting in LobbyGlueSetBuddyTickerScore() to be
+            away/home.
+            
+    Contrib (PS2)
+        DirtyStrings
+            Added new lobbylogin alert to handle EC_TOO_MANY.
+
+            Added "unformatted" alert separate from "no valid ps2 memcard inserted" alert.
+
+        PS2Isp
+            Added AOL support - if there is an extended CHAP error message on auth
+            failure, replace the auth alert's "body" text with the CHAP error message.
+            
+            Added a function to filter CHAP error strings to replace any non-printable
+            characters with spaces.
+            
+            Removed USB adapter warning in final builds.
+
+            Added "unformatted" alert separate from "no valid ps2 memcard inserted" alert.
+            
+            Fixed a transition bug when aborting a connection to ISP.
+
+        VoIP
+            Removed automatic name generation (when VoipConnect2/VoipSetLocalUser are
+            not used) as it was interfering with the ability of VoIP to connect when
+            address transation was occuring (one or more clients were behind a NAT).
+
+            Cleanup + renamed VoipConnect2 port parameters for clarity.
+
+            Fixed VoipPrintfCode to not use semaphore if it is -1 (before init or after
+            shutdown).  This problem only occurred when unloading VoIP IRX.
+            
+            Moved check for unload request in main loop to start of main loop, before
+            started up check, so that an unload request will work when voip isn't started
+            up.
+            
+            Changed VoipControl to return an int.
+ 
+    Contrib (Xbox)
+        DirtyStrings
+            Text bug fix with lobby connection timeout alert.
+
+        VoIP
+            Handle send error of WSAEHOSTUNREACH - shut down the connection if we get one.
+
+            Fixed memory trashing when remote user is voice banned.  Also added code to
+            ensure that data packets never overwrite their buffer.
+            
+            Added an extra layer of voicebanning protection.  VoIP prevents sending of
+            voice data to a voicebanned user, but in case a voicebanned user somehow gets
+            voice data, it will be dropped instead of being played.
+
+            Cleanup + renamed VoipConnect2 port parameters for clarity.
+ 
+            Changed VoipControl to return an int.
+ 
+            Changed VoipControl('port') to return whether the port remapping was successful
+            or not.
+ 
+    DirtySock (All)
+        BuddyApi
+            Mark roster as dirty when buddy initial ROST loaded, or client might miss
+            some "ignored buddies".
+
+            Added support for securing the client<->buddy server connection via SSL.
+            Note that the smallest change possible was made which means that the code
+            is now redundantly using ProtoNameAsync to resolve the hostname when that
+            is also done inside ProtoAries.  Removing the use of ProtoNameAsync will be
+            the subject of a separate change.
+
+            If found game invite before roster load, it got lost.
+
+            Presence C/B not being called due to bad clearing of bEndRoster flag.
+
+        CryptRSA
+            The RNG in CryptRSA has been replaced with a simpler/quicker RNG.
+        
+        CommUDP
+            Added send error tracking.
+            
+        HLBudApi
+            Added a temp buddy type of session, for tracking Xbox last 10 "session" buddies.
+
+            Default sort was not considering Online state -- online buddies should be on top,
+            before alpha sort.
+
+            On Resume (after game), the VOIP presence (ie extra flags) were being cleared, when
+            they should not have been.
+
+            Changed Reject/Block of invite to remove bud immediately (NCAA request).
+    
+            On resume, request roster before set presence, so stored msg will appear after roster,
+            and won't hit the "temp" buddy limit of 1.
+
+            VOIP presence can be set before HLBud has connected, so cache it.
+            
+            Immediate action in remove from list on Reject/Block response.
+
+        LobbyApi
+            Changed LobbyApiUpdate to use the symbolic name PROTOARIES_SECURE_SSL in the
+            call to ProtoAriesSecure rather than the literal value 1 (which happens to
+            be the value of PROTOARIES_SECURE_SSL).
+
+        LobbyTagField
+            Added indirect copying to TagFieldPrintf.
+            
+            Fixed a bug in TagFieldSetCopy that included spaces when parsing tag names.
+
+        ProtoSSL
+            Add a new OTG CA certificate (with an exponent of 3) and deprecate (but
+            leave in there) the previous OTG CA certificate (with an exponent of
+            2^16+1).  The advantage of the new CA and the certificates it signs are
+            that it takes about 8x less time to perform an exponentiation on the
+            client.
+        
+        TickerApi
+            Changed to allow TickerApiIdentity to be called before TickerApiConnect has been
+            called.  This was requested by NCAA so as to allow the user to control the reception
+            of buddy presence and score information even if no connection is ever made to the
+            ticker server.
+
+        WebOffer
+            Raised "reasonable memory" clamp from 64K to 1M.
+
+    DirtySock (IOP)
+        Connect-i
+            Added DEBUG_AOLCHAPMESSAGE, a conditional compile flag (defaults to off) that allows
+            testing of AOL CHAP error message responses.
+            
+        CryptRSA
+            Changed to reduce DirtySock IRX thread priority to 47 during encryption so as to not starve
+            libpad threads.  Priority is restored to its previous value (9) after encryption is complete.
+            
+            The RNG is now has a more random seed.
+
+    DirtySock (PC)
+        DirtyNetWin
+            Added a mapping of WSAEHOSTUNREACH to SOCKERR_UNREACH.
+
+    DirtySock (PS2)
+        LobbyLogin
+            Added new lobbylogin alert to handle EC_TOO_MANY.
+
+    DirtySock (Xbox)
+        CommUDP
+            Added disconnection after a send returns SOCKERR_UNREACH.
+        
+        DirtyNetWin
+            Added a mapping of WSAEHOSTUNREACH to SOCKERR_UNREACH.
+
+        NetConn
+            Removed -xbl error return from IDLE state (defaults to -lst).
+            
+            Added shutdown flags to NetConnShutdown(), to allow application to shutdown the
+            NetConn while leaving the network active (for launching to Account Management in
+            the Dashboard).
+
+            Fixed to safely handle XOnlineGetLogonUsers() returning NULL.
+            
+            Added NetConnStatus('plug') support.
+            
+            
+Dirtysock SDK 2.6.2 - May 18, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Fixed spacing and flipped home/away scores.
+            
+            Made LobbyGlueSetBuddyTickerScore() independent of the LobbyGlue ref
+            so it may be called in-game, when LobbyGlue is presumably shut down.
+            
+            Don't send logged off message to ticker if the new buddy status is
+            PASSIVE.
+            
+            Text string change for logon/logoff message for Xbox version's benefit
+
+    Contrib (PS2)
+        DirtyDnas
+            Switched to using define name for internal error instead of
+            hardcoding -704.
+            
+            Only encode uniqueID if the UniqueID operation was successful.
+    
+        DirtyStrings
+            Text bug fix from Bryan Sefcik.
+            
+        PS2Isp
+            Fixed to include PS2ISP_HW_ETH definition in PS2ISP_HW_ALL macro.
+            
+            Fixed a bug where memcard polling was enabled during connect to ISP.
+            
+            Fixed DNAS retry to not immediately abort again.
+            
+        Voip
+            Fixed bug allocating a connection by ID instead of with
+            VOIP_CONNID_NONE.
+            
+            Fixed bug where pConnection[iMaxConnection] could be referenced in
+            VoipConnect and VoipConnect2, if not using VOIP_CONNID_NONE.
+            
+    Contrib (Xbox)
+        Voip
+            Fixed bug where pConnection[iMaxConnection] could be referenced in
+            VoipConnect and VoipConnect2, if not using VOIP_CONNID_NONE.
+            
+            Fixed connection attempt when receiving constant voice data.
+            
+            Added VoipSpeaker() to header.
+            
+        XboxIsp
+            Set context to specific reason we launched into dashboard, so the game
+            will know where it came from.
+            
+    DirtySock (All)
+        BuddyApi
+            Fixed bug where if un-mute a wannabe buddy, it got removed from
+            the list.
+            
+            Masked the "susr" error on findUser; client will now simply see an 
+            empty list.
+    
+            Ignore any bad roster msgs (null users) sent by server.
+            
+        LobbyApi
+            Removed MAC address as a required field (MID) to LobbyApiCreate().
+            
+            Swapped order version key and data submitted in auth, acct, or pass
+            LobbyApi requests is merged, so that duplicate fields are merged with
+            preference to the field value in the command instead of the field value
+            in the version key.
+
+        LobbyFindUser
+            LobbyFindUser() now performs local lookup for user in display list and
+            for 'self' before looking in the cache to always return the most relevant
+            info (cache may be out of date relative to display list/self).
+
+        HLBudApi
+            Fixed problem of Presence blip even if requested "Offline".
+            
+            Fixed check on count of Ignored buddies, is independant of buddy count.
+
+        TickerApi
+            The user's persona is now included in keep-alive messages in order to
+            provide the ticker server more flexibility as to how user's are indexed.
+            Since this is a protocol change, the internal client<->server protocol
+            version has been bumped up by one (to 7).
+            
+            Bumped up the buffer size for a keep-alive message to 128 just to make sure
+            that a long context and user-name doesn't overflow the buffer.
+
+        Tourney
+            TourneyApiNewsT encode/decode strint for TagFieldSet/GetStructure() was incorrect
+            resulting in truncated news text.
+            
+        XmlFormat
+            Broke out XmlFormatPrint into direct-call and va_args versions.
+            
+            Fixed parsing bug in attribute assignment and made an epoch time of zero
+            return the current time.
+
+    DirtySock (PC)
+        LobbyLib
+            Fixed DST LobbyZone calculation.
+                    
+    DirtySock (PS2)
+        LobbyLogin
+            Go back to SLOGIN_LOAD for any error in the LOGIN context that is not an
+            invalid master account or invalid password.
+            
+            Fixed normal LOGIN to call _LobbyLoginDoLogin, so it can append MID and MAC.
+            
+            Bumped up response buffer size to deal with 'pers' transaction results
+            that are > 256 characters.
+            
+    DirtySock (Xbox)
+        LobbyLogin
+            Fixed to send cheat challenge response to server in 'pers' request.
+    
+            Added MAC address reporting to 'auth' and 'pers' transactions.
+            
+            Changed "SHARE" tagfield to "SPAM" in the LOBBYLOGIN_CONTEXT_SHARE context.
+            
+            Set SHARE field for 'auth' in SHARE context to one.
+            
+            Bumped up response buffer size to deal with 'pers' transaction results
+            that are > 256 characters.
+    
+            Set MID=XUID in 'auth' transaction.
+    
+        NetConn
+            Fixed to return user auth errors before attempting to get service
+            result.
+
+            Made NetConnMAC not save the MAC address if it can't get it.
+            
+        ProtoMangle
+            Pass-through port info from ProtoMangleConnect() to ProtoMangleComplete()
+            to improve compatibility with PS2/PC ProtoMangle.
+        
+            
+        LobbyLib
+            Fixed DST LobbyZone calculation.
+            
+            
+            
+Dirtysock SDK 2.6.1 - May 11, 2004
+
+    *** IMPORTANT NOTE ***
+    
+    (This change has taken place - please read)
+    
+    In order to properly support both XBOX gamer tags and PS2 personas in game
+    (buddy lists, etc), you need to ensure that all buffers allocated for
+    personas are large enough.  You should always use the LOBBYAPI_PERSONA_BUF
+    #define when allocating buffers to store personas.  It is suspected that
+    LOBBYAPI_MAX_PERSONA_LENGTH is used in some game code for buffer lengths.
+    These instances MUST be changed.  The LOBBYAPI_MAX_PERSONA_LENGTH definition
+    has been removed in this release and replaced with LOBBYAPI_MAX_PERSONA_LEN.
+    The name change is simply a means of trying to force people to make sure
+    their code is correct.  LOBBYAPI_MAX_PERSONA_LEN should only be used in
+    length comparisons (eg. to limit the length of a persona that a user can
+    enter when creating an account).  LOBBYAPI_MAX_PERSONA_LEN has been defined
+    as 15 for XBOX versions of the SDK and 12 for PS2.
+
+    **********************
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Do not report a headset is available unless we are broadband.
+            
+            Ignore buddy events from temp buddies when sending buddy evenst to ticker.
+            
+            Added support for registering temp buddies based on lobbyapi 'budd' event
+            message - initially used to automatically add your next tournament opponent
+            as a temp buddy.
+
+    Contrib (PS2)
+        DirtyDnas
+            Changed to make -7xx errors non-fatal.
+            
+        DirtyStrings
+            New LobbyLogin text bug fixes from Jim Preston.
+            
+            New PS2Isp alert entry.
+    
+        PS2Isp
+            Moved DirtyDnasInit() to PS2IspCreate().  This works better with the elf
+            relocation code only happening on Create.  This means that every time Create()
+            is called, the elf should be loaded immediately before, and whenever Shutdown()
+            is called, the elf should be disposed of immediately after.
+            
+            Added hardware filtering and an alert for unsupported hardware.  Note that
+            if you are supplying your own error tables instead of using the DirtyStrings
+            tables you will need to add a new alert.
+
+        VoIP
+            Enhanced VoipConnectionStop to be able to handle VOIP_CONNID_ALL and to handle
+            invalid connIDs as well.
+            
+            Made it so VoipShutdown() protects against being called when the module is
+            already shut down.
+            
+            Updated VoipConnectionStop to dispose of the socket if there are no remaining
+            connections (mirroring previous PS2 change).
+            
+            Protected VoipRemote() from invalid connection IDs.
+            
+    Contrib (Xbox)
+        DirtyStrings
+            XboxIsp text change from Bryan Sefcik.
+            
+        VoIP
+            Enhanced VoipConnectionStop to be able to handle VOIP_CONNID_ALL and to handle
+            invalid connIDs as well.
+            
+            Made it so VoipShutdown() protects against being called when the module is
+            already shut down.
+            
+            Voiceban changes:
+                Don't report headset as ok if voice banned.
+                Don't send voice data if voice banned.
+                Don't send voice data to a voice banned user.
+                
+            Fixed a bug where registering a remote user would not register to play to
+            speakers if speaker playback is set.
+            
+            Protected VoipRemote() from invalid connection IDs.
+            
+
+    DirtySock (All)
+        Encryption changes (PC & PS2)
+            Some more crypto tweaking has gone on this week: both the client&server have
+            had their crypto protocol version bumped from V1 to V2 in this release because
+            some of the crypto structures needed to change in order to improve security.
+            To avoid the situation of some clients not being able to talk to some servers,
+            the change is backwards compatible at the cost of resorting to no encryption
+            in some scenarios, specifically :-
+
+                                       server
+                                 V1             V2
+                     V1        secure        insecure
+            client
+                     V2        insecure       secure
+
+            where
+                V1 = client or server with version <= 2.6.0
+                V2 = client or server with version >= 2.6.1
+
+            As before this only affects PS2&PC, Xbox supplies its own crypto and thus does
+            not use ours.
+            
+        BuddyApi
+            Increased msg len to 255.
+            
+            Extra presence string size bumped to 64 from 40.
+            
+            Only allow 1 message from a Temp buddy as per JimP.
+
+        HLBudApi            
+            HLBListSendMsgToGroup  and HLBListSendChatMsg  now take optional callback for tracking sent messages.
+
+            HLBOverrideConstants has extra param for user wanting to track sent messagages via a poll.
+
+            Allow for messages of 200 char.
+            
+            Add new api to send previously set Presence.
+            
+        LobbyApi
+            Converted reputation value to integer from string (UserT->iReputation and
+            LobbyApiUserT->iReputation).  Old strReputation field left in place and still
+            populated for backward compatibility.
+            
+        LobbyChal
+            Fixed a bug involving simultaneous challenges - now respond as busy in that case.
+            
+            Fixed a bug involving an accept on one side at the same time as a cancel on the other.
+            
+        LobbyCommonDefs
+            Added #defines for feedback types.  LOBBYAPI_FEEDBACK_TYPE_xxx.
+            
+            Renamed TOURNEY_NOTIFY_OP_xxx to LOBBYAPI_NOTIFY_OP_xxx and moved to
+            lobbycommondefs.h for access in client.
+        
+        LobbyFindUser
+            Fixed problem with offline user's color not being decoded properly (was using
+            CL tag instead of RGB).
+
+        LobbyTagField
+            Made sure ^ characters are encoded as %5E in TagFieldSetString.
+            
+        ProtoUDP
+            ProtoUdpUpdate: turned off weak source address checking on the Xbox since
+            a) it isn't needed given that the traffic is running over IPsec and therefore
+            cannot be faked and b) the address checks don't work due to the way Xbox
+            mangles IP addresses in secure mode.
+
+    DirtySock (Xbox)
+        DirtyNetWin
+            Implemented unencrypted (using IPPROTO_VDP) UDP sending for all peer-peer (defined
+            as port<8000) traffic.
+
+        LobbyLogin
+            Added default remap table in case the server does not specify XBOX_REMAP.
+            
+        ProtoMangle
+            Fixed to get local XUID in ProtoMangleConnect() instead of ProtoMangleCreate(), so
+            ProtoMangleCreate() may be called before the user has logged on.
+            
+                    
+
+Dirtysock SDK 2.6.0 - May 4, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Drop the repeat count of the buddy event inserted by the lobby glue code
+            down to 1 so that the event only appears once.
+
+    Contrib (PS2)
+        DirtyStrings
+            PS2Isp error string fixes from Jim Preston.
+            
+            Reorganized alert table to sync with PS2Isp changes.
+            
+            Changed text for 'pset' to match text for 'logn'.
+            
+        PS2Isp
+            Major memory card fixes including multitap detection and memcard flow
+            fixes.
+            
+            Added support for retrieving CHAP error messages (AOL support).
+            
+            Reorganized memory card/multitap memory card alerts.  NOTE - for users
+            not using the DirtyStrings library, this requires reorganizing alert
+            tables.
+
+            Added PS2IspClearAlert().  This function is required for PS2Isp to be
+            able to resync memcard status and should be called when the user buttons
+            through an alert.
+            
+            Fixed to clear network configs when memory card is removed during
+            connection.
+            
+            Fixed ISP connection timeouts - 120 seconds for modems, 30 for broadband
+            (previously was 45 seconds regardless, which was causing problems with
+            dialup configurations where the first number was busy).
+
+            Enabled uniqueID.
+
+        VoIP
+            Fixed EE memory stomp - the DMA buffer allocated for IOP->EE status DMA
+            was not padded to a multiple of 16 bytes and in the current configuration
+            12 bytes after the status structure were being overwritten.
+
+            Don't allow startup when not shutdown.
+
+    Contrib (Xbox)
+        DirtyStrings
+            Text fixes from Jim Preston.
+        
+        VoIP
+            Don't allow startup when not shutdown.
+
+    DirtySock (All)
+        CryptSTP1
+            CryptStp1OpenWallet now returns an integer indicating whether the wallet
+            could be opened or not.  If the wallet cannot be opened in the context of
+            ProtoAries then the Aries connection will continue in plain text.
+        
+        HLBudApi
+            Fixed callback set functions that did not allow clearing via passing the
+            callback pointer as NULL.
+        
+            Added the Game Presence and JoinGame feature.
+
+            Fixed bug where unblocked buddy did not refresh list.
+        
+        LobbyApi
+            Added FROM as a required parameter to LobbyApiCreate().
+
+            Changed LobbyApiUpdate so that instead of sending the
+            @tic and @dir messages before the re-director connection
+            had been established, thereby requiring lower levels to
+            queue the packets, the messages are now only sent once
+            the re-director connection has been established.
+            
+            Changed to work with new ProtoAriesSetKey parms.
+        
+        LobbyChal
+            Added LobbyChalGetStatus().
+            
+        LobbyCommonDefs
+            Obsoleted LOBBYAPI_MAX/MIN_PERSONA_LENGTH macros.  Replaced with
+            LOBBYAPI_MAX/MIN_PERSONA_LEN.
+
+        LobbyStatbook
+            Fix a memory leak in LobbyStatbookFetchView detected by Stephen
+            Rozner.
+
+        ProtoAries
+            ProtoAriesSetKey no longer takes a secret and ticket, instead it takes an
+            opaque 'key' and key length.
+
+        ProtoUDP
+            Fix so that if ProtoUdpConnect is called again on an existing ProtoUdpT, 
+            then instead of reporting that connect has already been called, the old
+            connection is cleared and the new connection is initiated.  This fixes a
+            problem for any clients that simply call TickerApiConnect (which uses
+            ProtoUdpConnect) to re-connect the ticker if the lobby connection is lost
+            for any reason.  Previously the TickerApiConnect would have failed due to
+            the established UDP connection.
+
+        TickerApi
+            TickerApiQuery will now silently drop any events in the queue that don't
+            match the current filter set.  Previously only TickerApiInsert would drop
+            them if filter set didn't match.  However, only doing the filtering in
+            TickerApiInsert didn't take account of changes to the filter while there
+            were events backed up in the client-side queue as happens if the display
+            speed is significantly less than the ticker period.  Bug reported by Mathew
+            Thazhmon.
+
+            TickerApiQuery will now remove the header (e.g. MLB, NHL, ... etc.) from
+            the event that it returns if the header is for a sports event and it is the
+            same header as the preceeding event returned by TickerApiQuery.  Change
+            requested by Jim Preston.
+
+            If the local ticker event has a a non-zero repeat count then append it to
+            the client's local queue rather than inserting it by priority as was done
+            before.
+
+            TickerApiInsert has been changed so that, assuming the event passes the
+            filter test, then TickerApiInsert will now only return
+            TICKER_ERR_OVERFLOW if the queue is full and the new event has a lower
+            priority than the last event in the queue.  If the new event has a higher
+            priority than the last event in the queue then space occupied by the last
+            event is recycled in order to make it available for the new event and the
+            new event inserted in the correct position according to its priority.  This
+            change was made to ensure that if a buddy event is added to a queue full of
+            sports events then the buddy event will get added instead of being dropped
+            as occured prior to this change.
+
+    DirtySock (IOP)
+        connect-i
+            Made ethernet link absence detection wait five seconds after a connection
+            attempt is initiated before bailing, to allow time for the physical link
+            to establish itself if the cable was plugged in at the same time as the
+            connection was initiated.
+            
+            Fixed max CHAP error message size.
+            
+            Fixed modemo redial count calculation.  The code previously calculated
+            the number of phone numbers, when the redial count is supposed to be one
+            minus the number of phone numbers.
+            
+        ProtoAries-i
+            Fix a problem whereby if the user pulled the network cable on the PS2 long
+            enough for the lobby to disconnect, put the cable back in and then tried to
+            re-connect to the lobby the user would immediately get disconnected again
+            right after the establishment of the TCP connection to the lobby
+            re-director.  Problem reported by Mathew Thazhmon who also confirmed the
+            fix.
+
+            ProtoAriesSetKey no longer takes a secret and ticket, instead it takes an
+            opaque 'key' and key length.
+
+    DirtySock (PS2)
+        ProtoAries-e
+            ProtoAriesSetKey no longer takes a secret and ticket, instead it takes an
+            opaque 'key' and key length.
+        
+    DirtySock (Xbox)
+        BuddyApi
+            Add the feature -- Joinable Presence-- can set it, see it and Join a Game on Xbox.
+            
+            Added support for game presence and joining game via Xdk.
+            
+        HLBudApi
+            Add the feature -- Joinable Presence-- can set it, see it and Join a Game on Xbox.
+            
+            Fix bug where getLastState was not shown PEND for async ops.
+            
+        LobbyLogin
+            Send XUID flags to server.  Also set XUID and XUID flags on pers as well as
+            auth transaction.
+
+        ProtoPing
+            Make ping fail immediately and warnn in case where we are offline to avoid annoying
+            XOnline popup warning.
+            
+        XBFriends
+            Add the feature -- Joinable Presence-- can set it, see it and Join a Game on Xbox.
+            
+            Talk to Xdk to Join a Game.
+            
+            Changed HasAcceptedGame to check for CrossGame ve Joined game.
+
+
+Dirtysock SDK 2.5.3 - April 27, 2004
+
+    *** IMPORTANT NOTE ***
+    
+    As of the 2.5.1 release, use of new XOnline libraries (newer than the December
+    XDK libraries) is required for operation with DirtySock.  These libraries may
+    be downloaded from the DirtySock FTP server.  The versions currently available
+    are not certified for shipping, but we are expecting certified libraries soon.
+    
+    **********************
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Added TickerApi parameter to LobbyGlueCreate() to support Buddy -> Ticker
+            event propogation.  The pTickerApi parameter may be passed in as NULL,
+            in which case this functionality will be disabled and the module will
+            function identically to the previous version.
+            
+            Added automatic propogation of Buddy "extra" presence information to
+            Ticker, and automatic "is online" and "is offline" events based on buddy
+            status.  These ticker events are qualified as buddy events.  Currently
+            this is hardcoded to "is online" and "is offline" - in the next release,
+            the default will be changed to "is logged on" and "is logged off" and an
+            API will be added to change these strings for SKUs that require localization.
+            Additionally, color support will be added.  To set "extra" presence
+            information, use the new HLBApi call HLBApiPresenceExtra(), followed by
+            HLBApiPresenceSend() to actually send to the buddy server.
+    
+    Contrib (PS2)
+        DirtyStrings
+            Updated lobbylogin alert text from Jim Preston.
+            
+            Added new ps2isp alert entries for memory card alerts when a
+            multitap is plugged into slot one.
+            
+        PS2Isp
+            Fixed a bug where pulling the memcard while simultaneously selecting
+            a network configuration would return a network configuration alert,
+            instead of an alert informing the user the memcard had been pulled.
+
+            Multitap detection and alert support.  Note that PS2Isp now requires
+            libmtap to be linked against, and mtapman.irx to be loaded.
+            
+        Voip
+            Added ee/iop mismatch warning.
+            
+            NAT+multiconnect support 1: fully implemented userID and switched to
+            using userID to match connections instead of address when setting up
+            a connection.  If a userID is not supplied (ie, VoipConnect() is used)
+            voip synthesizes a userID out of the connection address.
+            
+            NAT+multiconnect support 2: switched to using incoming address/port
+            combination to match data to an established connection, instead of
+            just using address.
+
+            Added socket close on disconnection, if no connections left after
+            disconnection.  This prevents having a socket lying round bound to
+            the given bind port, and preventing other APIs (eg ProtoMangle) from
+            binding to that port.
+
+            Fixed a couple of shutdown/startup bugs including a memory leak and
+            a state problem that caused headset enumeration to not be quite right
+            after a shutdown/startup cycle.
+
+    Contrib (Xbox)
+        XboxIsp
+            Changed to comply with TCR L1-1-15 to allow the user to access the
+            network troubleshooter as well as attempt to log on with a gamertag,
+            even if we know the ISP connection failed.
+
+    DirtySock (All)
+        BuddyApi
+            Fixed to save email addr and flag when setting it.
+            
+            Fixed problem with Game Revoke event and C/b not showing.
+            
+            Added support for "extra presence" API.
+
+            Changed to call presence callback only if roster upload done.
+
+        HLBudApi
+            Fixed bug where 'Going Offline' still sent presence with suspend/resume.
+            
+            Added "extra presence" API to support Buddy -> Ticker events (manged by
+            LobbyGlue).
+            
+            Since GameInvites are now sync, but client expects Async, support a Async
+            for these APIs.
+
+        TickerApi
+            Added support for transparent re-connect to the ticker server.  That is, if
+            the user has requested events, the ticker server has sent some and then no
+            more events arrive, then the ticker client sends the server all the
+            user's identity info again.  The main purpose of this change is to cover
+            the case of a live ticker server upgrade.  Without this change, then in
+            that scenario the user's ticker feed would dry up until some user action
+            caused an explicit ticker logout and login which at worst would be the next
+            time they when offline and then online again.
+            
+            Fixed TickerApiIdentity so that if the user had requested events from the
+            server previously, then if they request that events be turned off then the
+            update is actually sent to the server.  Previously an update was not sent
+            to the server if the request was that no events were desired.  Also updated
+            the Unix ticker sample to show this change in action.
+
+            To facilitate stats. gathering by the ticker server the ticker client
+            will now send a 'hello' message to the server even if the user has
+            requested that the server not send any events.
+            
+    DirtySock (PS2)
+        DirtyLibPS2
+            (Debug only) - Removed obsolete (and broken) code to detect ProView
+            for NetPrintf(), replaced with up to date (and not broken) code.
+            Temporarily disabled as when ProView is detected, the print code
+            causes the system to hang.
+            
+        LobbyLogin
+            Changes to fix broken states in Persona Select.  If a user has logged
+            in to the game and another user tries to delete the same persona, the
+            deletion was not handled correctly.  Instead of staying in the same
+            context, go to the previous context to allow selection of another
+            persona.  Also fixes trying to log in with an invalid persona because
+            it's been deleted - it bails out to the main account login context.
+            
+    DirtySock (IOP)
+        ProtoAries-i
+            Fixed a disconnect problem on PS2 when encryption was enabled.  This problem
+            first showed up in 2.5.2, as that was the first SDK release that had PS2
+            encryption enabled by default.
+
+     DirtySock (Xbox)
+        BuddyApi
+            Fixed a bug introduced in 2.5.2, where a final build would compile
+            out a required call to XbFriendsCreate().
+            
+            Fixed Xbox message bug where .XBL showed in user, other cleanup on
+            invites.
+
+            Added more actions to invite enum since they are formally supported
+            in XDK.
+
+        CommSRP
+        CommTCP
+            Mirrored CommUDP code to poll for input on a Peek() event.  Was already
+            compiled in for PC, now the same code is compiled in for Xbox as well.
+
+        LobbyLogin
+            Added XFLAGS=XUID.dwUserFlags to 'auth' command.
+
+        ProtoPing
+            Changed ProtoPingResponse to handle NULL for pResponse and pBufLen.
+                        
+        XbFriends
+            Fixed bug re game invite reply of "remove bud".
+
+
+Dirtysock SDK 2.5.2 - April 20, 2004
+
+New in this release:
+
+    Compiled HTML help for Xbox (doc\chm\xbox).
+    
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Fixed to clear glue ref on init.
+            
+            Added voiceban support for xbox.
+    
+    Contrib (PS2)
+        DirtyStrings
+            Lobby alert updates from Jim Preston.
+            
+            New memory card alert.
+            
+        PS2Isp
+            Added memory card "warning" alerts.
+            
+            Added PS2ISP_STATUS_MEMCARD, and changed memory card loading in
+            PS2ISP_CONTEXT_LOADCFG to be deferred.  This allows an application
+            to use this status to know when a load operation is actually taking
+            place so as to be able to correctly throw up a loading dialog.
+            
+        Voip
+            Ignore incoming voice data if we're not playing.
+            
+            Fixed to not allow duplicate connections to the same address.
+
+            Work in progress on getting voip to take userIDs and use
+            those to match up connections to users.
+
+    Contrib (Xbox)
+        DirtyStrings
+            String update from Bryan Sefcik.
+            
+    DirtySock (All)
+        BuddyApi
+            Fixed bug where game ready was flagged before other user logged in. 
+            
+            Added title to presence.
+            
+            Game invite --will return eAction to callback, set Presence offline.
+        
+        CommAll
+        CommSRP
+        CommTCP
+        CommUDP
+            Added host/peer addr/port info.
+        
+        HLBudApi
+            Fixed title api.
+            
+            Added make offline in presence.
+        
+        LobbyApi
+            Add local IP address to LobbyApiUserT record.
+        
+        LobbyChal
+            Added param to LobbyChalDeclineChallenge() to specify the reason for the
+            decline, and respond appropriately.
+            
+        LobbyCommonDefs
+            Added new LOBBYAPI_MAX_PERSONA_LEN #define which will replace
+            LOBBYAPI_MAX_PERSONA_LENGTH shortly to ensure that all games are using
+            the correct #defines.  This define should only be used for name length
+            checking.  LOBBYAPI_PERSONA_BUF should be used when allocating space
+            for a persona.  XBOX and PS2 specific defines were added to set this
+            length appropriately.
+            
+        LobbyRank
+            If the user asks for 0 rows, then let them get 0 rows back.
+            Previously if 0 was asked for then they would get the server configured
+            default number of rows.
+            
+        NetGameUtil
+            Get peerip and hostip from commref.
+
+            Added NetGameUtilAdvert2() which passes through the 'note' field to
+            ProtAdvtAnnounce().
+            
+            Added a macro, NetGameUtilAdvert(), to map old calls to the new format,
+            with an empty notes field.
+
+        ProtoAdvt
+            Fixed to copy note field from incoming packet to snoop buffer packet.
+        
+        ProtoHttp
+            Updated mktime with to fix a possible problem with overflow in certain
+            cases which might have caused ProtoHttpInfo(..., 'date') to return the
+            wrong value.
+            
+        ProtoSSL
+            Install the modulus of OTG CA certificate.  This replaces the
+            temporary one that has been in place for a few weeks.
+            
+        TickerApi
+            The generic filtering mechanism provided via TickerApiGetFilters,
+            TickerApiGetFilterCount and TickerApiUpdateFilter is now deprecated.
+            All filtering is now restricted to the choices provided in the
+            TickerFilterE field the TickerIdentityT.
+        
+            If TICKER_FILTER_NONE is requested then the user does not want any
+            events so don't waste the ticker server's time by connecting to it.
+
+            All calls to the debug printing routine now go through a macro so that they
+            can be completely compiled out in a release build.
+
+            Win32 doesn't have vsnprintf, use _vsnprintf instead.
+
+            TickerApiIdentity() so that user's can change their identity information
+            (main use is updating filters) while they are connected to the ticker
+            server.  Requested by EAC.
+
+        WebOffer        
+            Added busy dialog cancel, added buttons 3/4 to news, terminate URL string
+            correctly in bootstrap script.
+
+    DirtySock (IOP)
+        DirtyNetIOP
+            Added SocketGetLocalAddr().
+
+        ProtoAries-i
+            Re-worked the PS2 ProtoAries code to use CryptStp1, modelling it on the
+            changes made to the generic ProtoAries code in change #5686.  As a
+            by-product this means that the client<->slave connection is now encrypted
+            by default on PS2.
+        
+    DirtySock (PS2)
+        LobbyLogin
+            Fixed autologin to not actually change context during the process,
+            and removed the autologin hack from the idle function that used to
+            be necessary to prevent context changes from firing the user
+            callback during the autologin process.
+
+        ProtoAries-e
+            Fixed sync bug in ProtoAriesStatus.
+        
+    DirtySock (Xbox)
+        BuddyApi
+            Deal with server not sending A on RNOT change for Xbox, and, do xdk
+            stuff after login auth response to avoid race conditions.
+
+        LobbyLogin
+            Fixed autologin to not actually change context during the process,
+            and removed the autologin hack from the idle function that used to
+            be necessary to prevent context changes from firing the user
+            callback during the autologin process.
+            
+        NetConn
+            Removed "test" environment and set ID for "prod" environment.
+        
+        ProtoPing
+            Moved XNetQosListen() from ProtoPingCreate() to netconn connection
+            sequence as ProtoPingCreate() needs to be able to be called before a
+            connection is established.
+                    
+            
+Dirtysock SDK 2.5.1 - April 13, 2004
+
+New in this release:
+    
+    Ping functionality has been added to the Xbox library.  The interface
+    has changed due to Xbox requirements, and the integer address that ProtoPingRequest
+    takes has been changed to a DirtyAddrT (which is now supplied by the Lobby
+    server in the LobbyUserT record).  This initial implementation is via the function
+    ProtoPingRequest2 to prevent the ProtoPingRequest() interface change from breaking
+    current implementations, but this function will be renamed to ProtoPingRequest()
+    for the next major release and ProtoPingRequest2 will be removed at that time.
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Fixed to clear glue ref on init.
+            
+    Contrib (PS2)
+        DirtyDnas
+            Removed double transaction for Unique ID.
+            
+            DNAS 4.0 error strings (preliminary).
+            
+            New tool for creating error strings in DNAS from Sony's excel
+            spreadsheet.  It is still necessary to format the spreadsheet,
+            save in unicode, and convert to UTF-8, but this tool will allow
+            strings in text files to be parsed and used to create 'C' files
+            for DNAS.
+            
+            Fixed makefile MKDIR command to create directories before building
+            the libraries - previously a "gnumake dist" on a clean checkout
+            would fail because the STATIC directory was not present.
+            
+        DirtyStrings
+            Removed EC_BLACKLIST error code table entry.
+
+        PS2Isp
+            Fixed bug - if no dialtone is detected, user received "No memory card
+            detected" error message.  Added a missing IOP return code to the IOP
+            return code table to make the error string table and the iop table
+            match.
+
+    Contrib (Xbox)
+        DirtyStrings
+            LobbyLoginErr_En
+                Removed error results that will not occur on an xbox server.
+                
+        XboxIsp
+            Changed to keep in sync with NetConn.  added SERVICEID param
+            in SELECT context.
+            
+            Added serviceID param to XboxIspAutomatic.
+    
+    DirtySock (All)
+        BuddyApi
+            Fixed a bug with Set Email Forwarding callback not being called.
+            
+            Display list create in separate function, so mutelist can use it.
+            
+        LobbyApi
+            Don't process +usm message is display list isn't allocated - was
+            causing crash.
+
+            Modified to compile out debug printing in release builds.
+
+        LobbyRank
+            If the requested ranking list has already been downloaded then the
+            server is not called, the cached data is returned.  Previously this
+            unconditionally called the callback at this point to signal completion,
+            which was obviously a problem for those not using the callback interface.
+            So, the callback is now only called if defined.  The problem detected by
+            Wa Kan.
+
+        NetConn
+            Added selector to return xnkid to NetConnStatus().
+
+        TickerApi
+            As per email from Roy&Gordon, added TICKER_FILTER_BUDDY_SCORES to
+            indicate only buddy scores are required (TICKER_SHOW_BUDDY_SCORES in
+            producers's terminology), and deprecated TICKER_FILTER_ONE_SPORT and
+            TICKER_FILTER_ONLY_NEWS since they are no longer required.
+
+            Also as per the email from Roy&Gordon, add TICKER_FILTER_NONE
+            (TICKER_SHOW_NONE in their terminology).
+
+        WebOffer
+            Fixed missing goto table entry for button 4.
+            
+    DirtySock (PS2)
+        LobbyLogin
+            Removed EC_BLACKLIST error code handling.
+            
+    DirtySock (Xbox)
+        DirtyNetWin
+            Fixed SocketHost to work with static configurations as well as dhcp
+            configurations.  This fixed a bug that caused NetConnStatus('addr')
+            to not work with static configurations.
+    
+        LobbyLogin
+            Fixed autologin callback to not fire until successful login is
+            complete (or an error occurs).  This mirrors a fix that was made
+            to LobbyLogin for PS2 previously.
+            
+            Added server-driven secure address remapping support.
+            
+            Removed error results that will not occur on an xbox server.
+            
+        NetConn
+            Added ability to pass in serviceID to NetConnConnect.  The serviceID
+            may be symbolic ("dev", "test", or "prod" depending on the environment)
+            or a string-encoded hexadecimal number otherwise.
+            
+            Moved passcode from second parameter to NetConnConnect to strIsp field
+            of NetConfigRecT to make room for serviceID in second parameter.
+            
+            Fixed bug where XOnlineLogonTaskContinue could be called with a null href
+
+            General cleanup and reorg of code.
+            
+            Get and register session even in insecure mode.
+            
+        ProtoMangle
+            Switched to use DirtyAddrs as input.
+            
+            Redocumented.            
+            
+        ProtoPing
+            Moved to proto\xbox.
+            
+            First working Xbox version.
+            
+        XbFriends
+            Fixed bug with disconnect and enumerate, which caused a problem
+            on reconnect.
+            
+    Sample (PS2)
+        DirtyDnas
+            Changed the DirtyDNAS sample application to loop through all of the
+            error codes in all of the languages, as well as print out the region
+            and language in human-readable print (non-numeric values – strings
+            like “North America”) at the debugging console.  Everything still
+            works the same – it’s just able to flip through a bunch more error
+            messages now.             
+                        
+    Sample (Win32)
+        Flame2
+            Added Xbox login capability.  To login to an Xbox server, check the
+            "Xbox" checkbox on the Account Login window.  Enter the gamertag as
+            the account name, and enter the textual network-order version of the
+            XUID.qwUserID as the password.  You can find out what the textual
+            network-order XUID.qwUserID is by logging in with xblogon, which
+            prints this information both to the TTY and to the monitor.
+
+
+Dirtysock SDK 2.5.0 - April 6, 2004
+
+    *** IMPORTANT NOTE ***
+    
+    As of the 2.4.3 release, the Xbox libraries are configured to work by default
+    in secure mode.  To disable secure mode, change NetConnStartup(""); to
+    NetConnStartup("-nosecure").
+    
+    **********************
+
+New in this release:
+
+    DirtySock (All)
+        CryptSTP1
+            New session ticket protocol version 1 -- all the required code
+            to handle client and server session encryption via tickets.
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+        LobbyGlue
+            Fixed to clear glue ref on init.
+
+    Contrib (PS2)
+        VoIP
+            First release of >2p version.
+
+    Contrib (Xbox)
+        VoIP
+            Implemented a working VoipStatus('hset') command.
+            
+            Fixed to not clear VOIP_REMOTE_ACTIVE when we receive a ping.  This
+            ensures that the flag will be set when a voice packet is received and
+            remain set until disconnection.
+        
+        XboxIsp
+            Changed to allow XboxIspLaunch() to work after module has been
+            shut down (by passing NULL instead of the module ref).
+            
+            Removed nickname banning as we do not support nicknames.  Redid the
+            way voice banning is determined to align with netconn change.  Voice
+            ban status can be retrieved from XboxIsp by calling XboxIspParams() in
+            the DONE context.
+            
+            Fixed to return noservice error when a non-pin netconn error occurs
+            in the enterpin context.
+            
+    DirtySock (All)
+        BuddyApi
+            Fixed server response of block on invite etc.
+        
+        CryptMD5
+            Allow output buffers < MD5_BINARY_SIZE to output partial MD5 hash
+            (used by encryption which uses 64bit checksum).
+
+        HLBudApi
+            Presence is now utf8 to 8 bit translated, if a utf8 table is
+            registered.
+            
+            Fixed problem of temp flag showing on wannabe buddy.
+            
+        LobbyApi
+            Added transaction timeout + lobbyapicontrol
+
+            Added transaction timeout support, defaulting to thirty seconds.  This
+            safely allows a shorter timeout when the user issues a transaction request
+            to the server than the idle timeout.  The recommended minimum timeout is
+            twenty seconds.
+            
+            Added LobbyApiControl() to allow setting of idle timeout and transaction
+            timeout values ('itim' and 'rtim' respectively).  LobbyApiSetIdleTimeout
+            will be deprecated in the future in favor of LobbyApiControl(pApi, 'itim', iVal).
+            
+        LobbyChal
+            Added ability to not send cancel message to peer when cancelling
+            a challenge.
+            
+            Replaced instances of LOBBYAPI_MAX_PERSONA_LENGTH with LOBBYAPI_PERSONA_BUF.
+
+        LobbyRank            
+            Replaced instances of LOBBYAPI_MAX_PERSONA_LENGTH with LOBBYAPI_PERSONA_BUF.
+
+        ProtoAries (non-PS2)
+            Removed explicit encryption code and updated to use CryptSTP1 instead.
+            
+        ProtoSSL
+            Fixed a bug in ProtoSSLStat introduced in DirtySDK 2.4.4 that caused PS2
+            HTTPS to fail.
+
+    DirtySock (PC)
+        DirtyNet
+            Added winsockapi protection to prevent include difficulties with winsock.h.
+            
+    DirtySock (PS2)
+        LobbyLogin
+            Don't attempt to auto-login persona if persona is empty.
+
+    DirtySock (XBOX)
+        DirtyNet
+            Added winsockapi protection to prevent include difficulties with winsockx.h.
+            
+        HLBudApi
+            Added xbfriends.h to Xbox project.
+            
+        LobbyLogin
+            Fixed autologin support.
+            
+            Added setting of purchase banning status to 'auth' and 'pers' transactions.
+            
+        NetConn
+            Disabled key registration in insecure mode.
+            
+            Removed "banned" results from online status return.  Client apps
+            should now get that information for themselves from the xuid, which can be
+            retrieved with NetConnStatus('xuid', &Xuid, sizeof(Xuid)).
+            
+            Added '-lst' error (XONLINE_E_LOGON_CONNECTION_LOST) to logon process.
+            
+            Added '-xbl' error to login process, in case an undocumented error occurs.
+            
+            Added polling of online status once logged on.  To check online status, poll
+            NetConnStatus('onln', NULL, 0).  While logged in, this will return TRUE.  If
+            this does not return TRUE, call NetConnStatus('conn', NULL, 0) to get the reason
+            for the disconnection.  If online, the selector 'conn' will return '+onl'.  If
+            disconnected, it will currently return one of three things:
+                
+                '-lst' = XONLINE_E_LOGON_CONNECTION_LOST
+                '-dup' = XONLINE_E_LOGON_KICKED_BY_DUPLICATE_LOGON
+                '-xbl' = any other error return from XOnlineLoginTaskGetResults().
+            
+        XbFriends
+            Added invite fix for xbox.
+            
+            Support another "GameAccepted" api; Added test support for muting to Xbox.
+        
+
+Dirtysock SDK 2.4.4 - March 30, 2004
+
+    *** IMPORTANT NOTE ***
+    
+    PS2 VoIP Multi-connect work is in progress.  The libraries and public headers for
+    PS2 and IOP VoIP included in this SDK release are identical to the previous release,
+    however the source is currently in a state of flux.  Please do not rebuild
+    the libraries yourselves as they will not work.
+
+    **********************
+
+New in this release:
+
+    DirtySock (Xbox)
+        ProtoMangle
+            Module to handle secure address negotiation.
+
+Changes/Bugfixes in this release:
+
+    Contrib (PS2)
+        DirtyStrings
+            Updated ps2isperr_en.c and lobbyerr_en.c with latest text bug fixes
+            from Jim Preston.
+            
+        Voip
+            Changed to use iopfixup to strip all debug info.
+
+    Contrib (Xbox)
+        Voip
+            Fixed disconnect bug.
+            
+            Fixed speaker mapping, so toggling speaker on/off now works properly.
+
+            Changed to only init connection if we are in CONN state.
+            
+            Fixed a memory-stomping bug where VoipConnectionSend() could overflow
+            the packet buffer if it were called enough times before calling
+            VoipConnectionUpdate().
+            
+            Added support for setting the active port instead of always assuming
+            port zero (not yet fully working, still use port zero).
+            
+            Fixed bug shutting down when no connection was ever started.
+            
+            Fixed VoipConnectionAllocate() bug that prevented reconnection after
+            disconnection.
+            
+            First working secure peer-peer communication.
+
+        XboxIsp
+            Added alert handling for NetConnConnect() failure.
+            
+            Changed invalid account error to launch to the online menu.
+
+    DirtySock (All)
+        BuddyApi
+            Added game ready state -- also clear presence.
+            
+            Various fixes -- tiburon integration; also, new Game invite flags c/b.
+            
+            Do the game invite, but not game response for now.
+            
+            Support for game invite timeout.
+            
+            Removed fake invite msgs, added game invite t.o, game invite c/b will
+            now give type of event, friends disconnect support.
+            
+        HLBudApi        
+            Added game ready state -- also clear presence.
+
+            Varius fixes -- tiburon integration; also, new Game invite flags c/b.
+
+            Don't call game invite c/b immediately, wait for server.
+
+            Removed fake invite msgs, added game invite t.o, game invite c/b will
+            now give type of event, friends disconnect support.
+            
+            Changed to flag update for game ready case.
+
+        LobbyRoomlist
+            Added length argument to LobbyRoomlistImage() and LobbyRoomlistResource().
+
+        ProtoAries
+            Uses updated ProtoSSLStat call to detect connections.
+        
+        ProtoHttps
+            Uses updated ProtoSSLStat call to detect connections.
+        
+        ProtoSSL
+            Dropped secure record size to 2^14 instead of 2^15 (as per standard),
+            only allocate SSL memory in secure mode, improved master key generation,
+            made comments more consistent with modern standards, made all functions
+            that return errors use SOCKERR_xxx codes.
+            
+            Added initial random call (grabs time first time module called), made
+            "at use" time call add to old value, changed ARC4 key iteration count to 3.
+            
+            Changed ProtoSSLStat to mirror SocketStat except 'stat' is special cased
+            for SSL sessions (does not go TRUE until SSL connect is complete).
+
+        WbocApi
+            Fixed enumeration of divisions to reset at end of neighbourhood.
+            
+        WebOffer
+            Alerts now have 4 button support. Use BTN4=”blah” to define the
+            fourth button name.
+
+            News data is always returned with \n end-of-line characters. Any
+            processing required to display such data must be done on the client.
+            The sample application has been updated to display news correctly
+            (since Windows expects \r\n end-of-line sequences).
+
+            A script can now return a result code to the application. This is
+            done via GOTO with a target of “$exit=<value>”. Call the WebOfferResult
+            function to retrieve the exit code. The offering sample has been updated
+            to display non-zero exit values via a windows popup.
+
+            The WebOffer system now supports both GET and POST (used to only support
+            POST). When a script consisting of only an http:// line is passed, the
+            code now uses GET instead of POST to retrieve the script from the server.
+
+            Because of the http:// POST->GET change, the old http scripts hosted on
+            dirtysock.ea.com have a new format:
+
+                WAS=http://dirtysock.ea.com/cgi-bin/postlogger?file=offer3
+                NOW=http://dirtysock.ea.com/postlogger/offer3.txt
+
+            The GET support was added to facilitate news and terms & condition
+            support. A sample terms & condition example has been added with exit
+            codes:
+
+                http://dirtysock.ea.com/postlogger/offer4.txt
+
+            There are five different sample scripts that can be tried via the server:
+
+                http://dirtysock.ea.com/postlogger/offer1.txt
+                http://dirtysock.ea.com/postlogger/offer2.txt
+                http://dirtysock.ea.com/postlogger/offer3.txt
+                http://dirtysock.ea.com/postlogger/offer4.txt
+                http://dirtysock.ea.com/postlogger/offer5.txt
+
+            In addition to running the scripts, you can now also retrieve them via a
+            web browser due to the new GET access.
+            
+    DirtySock (IOP)
+        Now uses iopfixup to strip all debug info.
+        
+    DirtySock (Xbox)
+        DirtyNetWin
+            Updated SocketInfo('stat') so that it uses select() to determine
+            successful connections and getpeername to detect successful connections
+            that have been disconnected.
+            
+            Added low-level address remapping via SocketControl('xmap') to support
+            Xbox Live.
+            
+            Fixed broken SocketLookup XNDNS allocation/free.
+
+        LobbyLogin
+            Modified to send XUID to server.
+            
+        NetConn
+            Set up socket mapping to allow initial connection to any server through
+            security gateway.  Working security gateway connection support.
+            
+            Fixed NetConnShutdown() to properly clean up XNet.
+            
+            Switched to using NULL instead of INVALID_HANDLE for the logon task
+            handle, as XOnlineLogon sets the handle to NULL on failure.
+            
+        XbFriends
+            Added game ready state -- also clear presence.
+            
+            Varius fixes -- tiburon integration; also, new Game invite flags c/b.
+
+            Removed fake invite msgs, added game invite t.o, game invite c/b will
+            now give type of event, friends disconnect support.
+
+
+Dirtysock SDK 2.4.3 - March 23, 2004
+
+    *** IMPORTANT NOTE ***
+    
+    As of the 2.4.3 release, the Xbox libraries are configured to work by default
+    in secure mode.  To disable secure mode, change NetConnStartup(""); to
+    NetConnStartup("-nosecure").
+    
+    **********************
+
+New in this release:
+
+    Contrib
+        Voip (All)
+            Added VOIP_REMOTE_DISCONNECTED.  If this flag is set, the opponent has
+            disconnected from the session.  Currently, this flag is only set on
+            timeout, and the timeout condition is set to five seconds.
+            
+        Voip (Xbox)
+            First version of VoIP for Xbox.  See the README_XBOX.TXT file in contrib\voip\doc
+            for more info.
+
+    Sample (Xbox)
+        Friends1
+            New sample app that does buddies on Xbox, and can be used to test Cross
+            Game Invite.
+            
+        Friends2
+            Same as Friends1, but has different title id. See ReadMe.txt in
+            DirtySDK\sample\xbox\friends1.
+            
+        Voctest
+            New sample to test VoIP on Xbox.
+
+
+Changes/Bugfixes in this release:
+
+    Contrib
+        PS2Isp
+            Wrapped alert setting for easier debugging.
+            
+            Changed Abort in SELECT context, and Alert in SELECT and DNAS contexts, to
+            always go back to LOADCFG context.
+
+        XboxIsp - (thanks to Bryan Sefcik)
+            Added XboxIspGetAlertEnum().
+            
+            Added more dashboard launch support.
+            
+            Added XOnlineCleanup call where appropriate.
+            
+            Added XboxIspHasAcceptedGame(), to see if a cross-game invite is in place.
+
+    DirtySock (All)
+        BuddyApi
+            BuddyApiCreate() no longer calls ProtoAriesSecure to ensure no encryption
+            since the default for ProtoAries is to not use encryption.
+    
+        CryptArc4
+            Changes for ticket/key-server based encryption.
+    
+        HLBudApi
+            Fixed bug -- msgs were not added after reach the max limit.
+            
+            New APIs for utf8 to 8 bit translation.
+            
+            Cross Game Invites added, and tested in buddies.
+ 
+ Added support for utf8 to 8bit character conversion to High Level Buddy.
+    
+        LobbyApi
+            Added support for user reputation/credit rating. LobbyApiUserT->strReputation
+            now populated via +usr and +who messages.
+            
+            Processing of +usm message wasn't checking set index correctly so display lists
+            were never getting updated.
+            
+            Changes for ticket/key-server based encryption.
+            
+        LobbyFindUser
+            Add option to LobbyFindUser() to control whether cache is checked when
+            doing a lookup.
+            
+        LobbyPingManager
+            Added new function PingManagerInvalidateCache().
+    
+        LobbyTagField
+            Added TagFieldFindIdx support function to allow easier lookup of tags like
+            NAME5 - eg. TagFieldFindIdx(pRecord, "NAME", 5).
+    
+        NetConn        
+            Changed so any call to NetConnStatus() when NetConn is not active (except
+            for 'open') will print a diagnostic error message and return an error
+            code.  User code should check 'open' status to determine if NetConn is active
+            or not.
+            
+        ProtoAries
+            Changes for ticket/key-server based encryption.
+            
+        TickerApi
+            TickerApiConnect() now takes an additional argument, a TickerIdentityT value
+            that contains information about the user and their preferences.  See the
+            ticker sample programs for examples on how to fill the identity value.
+            Alternately pass in NULL to retain the behaviour of the previous version.
+            
+         WebOffer
+            New WEBOFFER_CMD_NEWS screen type. This is a screen that can display an
+            arbitrary sized chunk of text (within the limit of the script) with two
+            buttons (both name/color definable). The title of the news screen can also
+            be set.
+
+            The WEBOFFER_CMD_BUSY screen has had the message field expanded from 31
+            characters to 255. The script can also set the minimum display time for
+            this popup to conform with TCR requirements.
+
+    DirtySock (PS2)
+        LobbyLogin
+            Error out of LobbyLoginSubmitCB if submitting while not IDLE.
+            
+            Fixed transition to OFFLINE to pop entire context stack.
+
+        ProtoAries-e
+        ProtoAries-i
+            Changes for ticket/key-server based encryption.
+
+    DirtySock (Xbox)
+        LobbyLogin
+            Fixed a crash bug with 'down' alert handling.
+            
+            Error out of LobbyLoginSubmitCB if submitting while not IDLE.
+
+            Fixed transition to OFFLINE to pop entire context stack.
+         
+        NetConn   
+            Added XOnlineCleanup when shutting down.
+            
+            Initial security gateway support.
+            
+            Initial support for handling unformatted or corrupted memcards
+            in NetConnQuery().
+            
+        XbFriends
+            New api to set buddies.
+            
+            Can add and remove/reject/remove a buddy for real now.
+
+    Sample (Win32)
+        Offering
+            The Offering Sample application has been updated to use the latest
+            API and also now shows buttons in color (if the button color is specified
+            in a script). The Offering sample should be the authoritative reference
+            for script operation. Note that due to limitations in the application,
+            there may be formatting differences between the sample application and
+            client implementations of the API.
+
+
+Dirtysock SDK 2.4.2 - March 16, 2004
+
+    *** IMPORTANT NOTE ***
+    
+    The TourneyApiGameT->iWinner field usage has been changed to support multiple
+    winners for a given tournament game.  Please release all usages of iWinner with
+    TourneyApiGetGameWinner(pGame, 0).  The field itself has been changed to an
+    unsigned value and is now called uWinner so you will get compile errors everywhere
+    this replacement is necessary.
+    
+    ******************************
+
+    *** IMPORTANT NOTE ***
+    
+    LobbyApiCreate() now requires the following tagfield entries to be present in
+    the pTagField (was vers) parameter:
+    
+        Field Name      Field Description               TagField Type
+        MID             MAC Address                     String
+        SKU             EA SKU number                   String
+        SLUS            First party product code        String
+        VERS            Client's game version string    String
+        LANG            Two-digit ISO language code     String
+
+    If any of these parameters are missing, the Create call will fail and return
+    NULL.
+
+    ******************************
+    
+New in this release:
+
+    DirtySock (All)
+        WebOffer
+            The Web Offer API is a new API that allows the client to provide
+            a simple semi-dynamic offer to be presented to a user under server
+            control. The offer consists of a combination of four components:
+            alerts, promo entry, credit card entry and web server data exchange.
+            By use of a simple script, a sequence of these elements can be
+            chained together to display an offer to a user and let them provide
+            information should billing be required. The authoritative source
+            for how to implement the API is the Offering sample application for
+            Windows located in the sample/win32 directory.
+
+Changes/Bugfixes in this release:
+
+    Contrib
+        DirtyStrings (Xbox)
+            Added invalid pin alert.
+            
+            Changed all message text to conform to current Xbox Login flow
+            document.
+            
+        DirtyStrings (PS2)
+            Updated text from Jim Preston.
+            
+        LobbyGlue (All)
+            Cleaned up and updated code documentation.
+            
+            Added LOBBYAPI_HW_VOIPACT support.
+            
+            Added HLBudApi support.
+            
+        PS2Isp (PS2)
+            Changed Different Configuration error to set an alert and then
+            transition forward to the SELECT context, at which point zero
+            configurations are returned.
+            
+            Added support for querying the IOP about whether the interface
+            is stopped or not.  PS2Isp will now wait in the connect state
+            until the interface is stopped (or a two-second timeout occurs)
+            before trying to connect.  This fixes a bug where a user could
+            disconnect from the ISP and quickly initiate a reconnect before
+            the interface was reported as down.  This would leave the
+            network stack in an unexpected state until another reconnection
+            attempt was performed, at which point the reconnection would
+            succeed.
+            
+        XboxIsp (XBOX)
+            Fixed to close online task if it is open before attempting an
+            Xbox Live connection.  Also changed NetConnDisconnect() to close
+            the online task handle if it is open there.
+            
+            Voicebanning and Nickbanning detection support added.
+            
+            Fixed to go back to LOADUSERS when a memcard change is detected.
+            
+            Working autologin.
+            
+            Added a new function XboxIspLaunch() to launch to the dashboard or
+            launch the updater as appropriate.
+            
+            Added duplicate logon error handling.
+            
+
+    DirtySock (All)
+        BuddyApi
+            Various bug fixes and initial server integration.
+            
+            Fixed double decrement of user found count.
+
+            Updated to use new ProtoAriesConnect with 0 as the server name.
+            
+            Added new error codes, and, msg has a timestamp so as to
+            delete oldest.
+            
+        CryptRSA
+            Re-factored CryptRSAInit to create the CryptRSAInitMaster
+            which effectively does what the old CryptRSAInit did and
+            CryptRSAInitSignature which sets things up for a signature
+            decryption.
+
+            Made _ToWords handle converting input that has an odd
+            length.  This was needed to support dealing with the RSA
+            Secure Server Certificate Authority which has a 1000-bit
+            modulus (125 bytes).
+            
+        HLBudApi
+            Fixed wannabe flag bugs.
+            
+            Added PresenceVOIPSend to send voip state only.  Renamed enum
+            types.
+
+            Added support for deleting oldest msgs.  New server protocal is
+            now default.
+            
+            Clean up error codes etc.
+
+        LobbyApi
+            Removed the calls to ProtoAsyncName since now host to IP
+            resolution is taken care of by ProtoAries becase it needs to know
+            the host name in order to do server certificate validation when
+            connecting over SSL.
+            
+            Added code to make sure all required parameters are present in
+            LobbyApiCreate()'s tagfield parameter, otherwise an error message
+            is printed and NULL is returned.
+
+        LobbyCommondefs
+            Added VOIPACT hardware flag.
+
+        LobbyLogin
+            Fixed to set lobbylogin callback when the context has changed, even
+            if a network operation is not in progress, to handle TOS and SHARE
+            context changes.
+            
+        LobbyRank
+            If the requested ranking list is empty then make sure that the
+            completion status is set correctly in the polling interface i.e.
+            users of LobbyRankStatus(..., 'list').  Without this change, the
+            LobbyRankStatus call will always return 0 (i.e. still processing)
+            in this case.  Users of the callback interface were not affected
+            by the bug, the callback was always called for empty lists.  Problem
+            was detected by Wa Kan.
+
+            Require LOBBYRANK_NAV_USER to be passed to LobbyRankFetch if
+            the desire is to center the resulting list around a specified user.  This
+            was always the intent but previously the centering would sometimes occur
+            even when LOBBYRANK_NAV_USER was not specified and this led to inconsistent
+            results.
+
+            Changed the way the degenerate case of centering a single user is
+            handled internally.  This should have no user visible affect.
+            
+            Always return LOBBYRANK_ERR_BADIDX if called for a WBOC ranking
+            list.  This fixes an out-of-bound reference that was detected by
+            Scott Wilshire & Carlton Chan.
+
+        LobbySetting
+            Added common settings for web password and spam etc.
+
+        ProtoAries
+            Like ProtoSSLConnect, ProtoAriesConnect now takes the server
+            name as an argument as well as the IP address and port.
+            If the server name is not 0 then it is used, if it is 0 then
+            the address is used.  This change is required because
+            ProtoSSL needs to know the server name in order to do a
+            certificate validation check.
+
+        ProtoHttps
+            Officially added ProtoHttpsPost (an incomplete version snuck its
+            way into the previous release).
+            
+        ProtoSSL
+            Added the details of two certificate authorities: RSA Secure
+            Server Certification Authority which is used by EA to sign
+            all secure web servers and an OTG certificate authority that
+            is used to sign all lobby server certificates.
+
+            The certificate send by the server is now validated to
+            ensure that :-
+              * the CN matches the host-name that the client resolved.
+            
+              * a hash of the certificate matches the hash contained in
+                the associated signature that was encrypted by one of
+                the above certificate authorities.
+
+            Added ProtoSSLGetRemoteAddr so that ProtoAries can learn what the
+            remote IP address is in the case where ProtoAries is passed a
+            hostname rather than an IP address.
+
+        RoomlistApi
+            Return EC_OKAY in the callback after a successful download, and fix
+            behaviour when http request is not successful.
+
+        TickerApi
+            Changed TickerApiDestroy() to not call ProtoUdpDestroy unless there was
+            a previous successful ProtoUdpCreate otherwise we end up de-referencing a null
+            pointer.  This scenario could occur if you did a TickerApiCreate,
+            TickerApiConnect (which fails because of a bad pServer parameter) and then
+            call TickerApiDestroy.  The crash was detected by someone on the EAC CFE
+            team.
+       
+        TourneyApi
+            Reworked TourneyApiGameT->iWinner to be a bit field indicating multiple
+            winners rather than a single member ID.
+
+            Updated to use new ProtoAriesConnect with 0 as the server name.
+
+        WbocApi
+            Fixed Wboc rank category to use proper enum value.
+
+    DirtySock (IOP)
+        Connect-i
+            Added support for tracking whether the network interface is stopped
+            or not, and added a selector ('stop') to RpcNetworkStatus() to
+            communicate that information to the EE.
+
+        ProtoHttps-i
+            Added ProtoHttpsPost wrappers.
+
+    DirtySock (PS2)
+        NetConn
+            Added support for querying whether the network interface is
+            stopped or not.
+                        
+        ProtoHttps-e
+            Added ProtoHttpsPost wrappers.
+                        
+    DirtySock (XBOX)
+        Added:
+            gameconfigapi.c and gameconfigapi.h.
+            lobbysetting.c and lobbysetting.h.
+            lobbycommondefs.h
+            xbfriends.c
+            
+        NetConn
+            Added NetConnMAC() support.
+            
+            Added new XBL login error results.
+            
+            Reorganized, and moved XBL polling to an idle function instead of having
+            it be called by calling NetConnStatus('conn').
+            
+            Added quality of service query (may be removed in the future if it isn't
+            necessary).
+
+
+Dirtysock SDK 2.4.1 - March 9, 2004
+
+    *** IMPORTANT NOTE ***
+
+    As of the 2.4.1 release, the Xbox libraries and samples included with
+    DirtySock SDK are built against the December 2003 XDK release.
+
+    **********************
+    
+New in this release:
+
+    Contrib
+        LobbyGlue
+            New auxiliary library to provide lobby support that requires multiple
+            different independent modules to be linked together.  This first version
+            includes support for automatically updating a user's hardware flags,
+            specifically LOBBYAPI_HWFLAG_BBAND and LOBBYAPI_HWFLAG_USBHSET.
+
+    DirtySock (All)
+        CreditCard
+            New API.
+            
+        (Multiple modules)
+            Optional secure server communication support.  Initially disabled.
+            
+        XbFriends
+            First version.
+        
+Changes/Bugfixes in this release:
+
+    Contrib
+        DirtyStrings (Xbox)
+            New alert strings.
+           
+        PS2Isp
+            Changed to make zero configurations not an error.
+
+            Compiled out partial memcard port 2 support.
+
+            Fixed to ignore invalid memory card types.
+            
+            Fixed to sync any outstanding memcard polling before
+            proceeding to DNAS or DONE contexts.
+            
+        Voip (All)
+            Added VoipGetRef for use by LobbyGlue.
+            
+        XboxIsp
+            Xbox-specific alert support.
+
+    DirtySock (All)
+        BuddyApi
+            Make sure that ProtoAriesSecure is called with 0 so that if
+            the ProtoAries default is changed to secure, the buddy still
+            runs unencrypted.
+            
+            Added API support for Game Invites. Other changes to talk to server
+            for invites, but, not enabled yet.
+            
+        CommUDP
+            Fixed a bug where unreliable sends weren't acking reliable receives
+            correctly, which could induce a stall in rare cases where one side was
+            sending purely unreliable data, and the other was sending reliable data.
+            
+        CryptRSA
+            Replaced _GetRandom with a PRNG from Knuth's TAOCP.
+            Exported the new CryptRSASeedRandom and CryptRSAGetRandom functions
+            so that they can be used by other modules, most notably ProtoSSL.
+        
+        HLBudApi
+            Added API support for Cross Game Invite.  Fake implementation for now,
+            using chat messages -- both sides will see invite, and can accept/reject
+            etc. New functions are HLBListAnswerGameInvite() and HLBBudGetGameInviteFlags().
+
+            Fixed bug where callbacks were not called in fake implementaton of Buddy
+            invite/accept.
+    
+        LobbyApi
+            Added LobbyApiSecure to allow client control over whether the
+            client<->lobby connection is secure or not.
+            
+            Added 'secu' selector to LobbyApiInfoInt to allow the client to
+            determine if the connection is secure or not.
+
+            If the @dir response contains SECURE=1 then unconditionally tries to
+            use SSL to connect to the slave even if LobbyApiSecure was
+            called with 0 (or not called at all).
+
+            Include user's hardware flags (HWFLAG) in +who, +usr, and 'onln'
+            messages to client.
+
+            Send async 'game' packets on LOBBYAPI_CBTYPE_EVNT when game that user is
+            joined to changes.
+            
+            Added 'logn' selector to LobbyApiInfoInt, a TRUE/FALSE indication of
+            whether the local user is fully logged in or not.
+        
+        LobbyCommondefs
+            Split LOBBYAPI_FL_xxx flags into separate room, user, mesg flags.
+            
+            Added LOBBYAPI_FL_ROOM_LOCALIZE and LOBBYAPI_FL_ROOM_SPONSOR flags.
+        
+        LobbyFindUser
+            Added parameter to LobbyFindUser() to limit search to online users.
+            
+            LobbyFindUser() for local user was returning garbage.
+        
+        LobbyLogin
+            Fix for lobbylogin callback in autologin mode.
+            
+        LobbyRank
+            Eliminated a race condition in earlier versions that could have
+            led to a ranking list containing stale data.  The scenario goes something
+            like this: start downloading a list (on a slow connection), flush it before
+            it has finished, start downloading another list (which due to the
+            underlying caching could end up using the slot formally occupied by the
+            list that was flushed).  There is a window in there after the second
+            request is issued but before the server sees it that the server could still
+            be sending data for the first list and so this would now end up in the
+            second list.  Race condition was discovered while checking the code in the
+            course of answering a question about LobbyRankFlush.
+
+        LobbyRoomlist
+            Bug fix for LobbyRoomlistLookupRoomName().
+
+        LobbySetting
+            Added callback to LobbySettingSave().
+            
+        ProtoAries
+            Added ProtoAriesSecure to control whether the any outbound
+            connections are encrypted or not.
+            
+            Added 'secu' selector to ProtoAriesSatus to allow the client to
+            determine if the connection is secure or not.
+        
+        ProtoSSL
+            Bumped up the signature data size from 128 to 256 to cope with a
+            wider set of certificate types.
+            
+            Body of _GetRandom replaced by a call to CryptRSAGetRandom.
+            
+            Added ProtoSSLAccept, ProtoSSLBind and ProtoSSLListen
+            in support of the ProtoSSLification of ProtoAries.  Note that
+            ProtoSSLAccept only works in unsecure mode.
+            
+        WBOC
+            Fixed Wboc division room creation.
+
+    DirtySock (Non-PS2)
+        ProtoAries
+            All the BSD-style socket calls have been replaced with an
+            appropriate call to ProtoSSL.
+            
+    DirtySock (PS2)
+        ProtoHttp-e
+        ProtoHttps-e
+            Fix a bug in the PS2 ProtoHttp and ProtoHttps code that caused the cache
+            not to be flushed during the first ProtoHttp(s)Data call and thus caused
+            data to be lost in some circumstances.
+
+    DirtySock (IOP)
+        ProtoAries-i
+            All the SocketXXX calls have been replaced with the appropriate
+            call to ProtoSSL.
+            
+        ProtoHttp-i
+            ProtoHttp(IOP): now parses "Last-Modified" and converts it to an epoch
+            date, so it is now possible to get the last changed date of a file on
+            PS2 now.
+            
+    DirtySock (Xbox)
+        NetConn
+            New error conditions returned when Xbox Live logon fails.
+            
+            Fixed 'conn' check that was invalidly rejecting static IP
+            configurations.
+            
+
+Dirtysock SDK 2.4.0 - March 2, 2004
+
+New in this release:
+
+    DirtySock (All)
+        Added LobbyApiFindUser API to get info for online users.
+
+Changes/Bugfixes in this release:
+
+    Contrib
+        DirtyStrings
+            Added new ps2isp alert.
+           
+        PS2Isp
+            Added memcard polling and initial memcard support.
+            
+            Removed NetConnDisconnect() from DNAS error condition, and added it back
+            to Timeout condition where it was erroneously removed from before.
+            
+        Voip
+            First version of Multi-connect cross-platform API.
+            
+        XboxIsp
+            Added passcode support.
+
+    DirtySock (All)
+        HLBudApi
+            New accept/invite commit model  and other 2.5 api changes.
+    
+        LobbyApi
+            Fixed LobbyApiDebug to be able to handle a pMsg with NULL pData.
+
+            Add 'stat' event to LOBBYAPI_CBTYPE_EVNT callback when server stats are updated.
+            
+            Bumped LOBBYAPI_MAX_PLAYERS from 4 to 8.
+            
+            Added LobbyApiListAvailable() to find a free display list in a given range.
+            
+            Switched user color to 8bit RGBA color struct.
+    
+        LobbyChal
+            Fixed server 'chal' cancel to use proper PERS=* form.
+            
+            Fixed LobbyChalCancelChallenge() to send 'chal' cancel before messaging the
+            opponent that the challenge has been cancelled; otherwise, if the opponent
+            is considered in game, the message is not delivered.
+            
+        LobbyRank
+            Fixed LobbyRankStatus(..., 'list') so that it doesn't return a non-zero value
+            until the underlying ranking list has been downloaded (the callback-based
+            interface didn't have this problem).
+
+        LobbyRoomlist
+            Added max allowable memory usage for Roomlist API, and modifications to deal
+            with memory limitations.
+            
+        NetGameLink
+            Compiled out spamming (on PC and Xbox) printf.
+            
+        TickerApi
+            Increase the size of 3 stack allocated buffers from 32 bytes to 64 bytes in
+            order to cope with longest possible combination of context and buddy name.
+            This should fix a problem of not being able to register for buddy events
+            against servers which have been registered with long names in the ticker
+            server.
+            
+            In TickerApiConnect, if the connect fails for any reason then ensure that
+            the internal pTicker->pUdp is 0 so that any call to TickerUpdate will be a
+            no-op.  This fixes an uninitialised memory read detected by valgrind.
+
+        WBOC
+            Completed client-side WBOC implementation.
+
+    DirtySock (PS2)
+        ProtoAries-e
+            Fixed alignment bug with ProtoAriesStatus structure.
+
+    DirtySock (Xbox)
+        CommUDP
+            Compile in peek fix for Xbox as well as for PC.
+            
+        NetConn
+            Added passcode support.                    
+            
+
+Dirtysock SDK 2.3.3 - February 24, 2004
+
+New in this release:
+
+    Contrib (Xbox)
+        DirtyStrings
+            New for Xbox.
+            
+    Doc
+        Xbox
+            Added Porting.doc.
+
+    DirtySock (Xbox)
+        NetConn
+            Initial Xbox implementation.        
+    
+Changes/Bugfixes in this release:
+
+    Contrib
+        DirtyStrings
+            Added disconnection, INV_NEW_PASS, and UNKNOWN_USER alerts, fixed a spelling
+            error, tab fixes.
+            
+            Text bug fixes.
+
+    DirtySock (All)
+        LobbyApi
+            Added support for async updates for games returned in a 'gsea' command.
+            
+            Allow client to receive async server stat updates about number of users,
+            games, etc.
+            
+            Update LobbyApiInfoInt('lcnt') to return the proper number of users in
+            rooms + lobby when server stats are enabled via "'sele' STATS=<interval>".
+
+        LobbyChal
+            Support optional server params to LobbyChal mechanism to allow things like
+            EVID and EVGID to be passed down for tournament games.
+
+        LobbyLogin
+            Reorganized: lobbylogin.c/h moved to ps2-specific folders, so as to allow
+            Xbox-specific version to coexist in SDK.
+        
+            Major context/flow change to support shared login.
+            
+            Added Terms Of Service Agreement context.
+            
+            Made LobbyLoginAlert never return NULL - always returns "unknown error"
+            alert if the alert does map to any of the recognized error codes.
+
+            Added special case 'down' error handling.
+            
+            Log promo question/answer to log file on persona authentication.
+            
+            Set info alerts to start at 0x1000, so they won't change as new "normal"
+            alerts are added.
+            
+        LobbyRank
+            Added LOBBYRANK_BUDDY_SELF -- underlying functionality of
+            downloading just current user's stats in previous release,
+            just this macro was missing.
+
+            LobbyRankFetch now attempts to avoid calling the server if the
+            requested data has already been downloaded.  An explanation of
+            exactly what is done is included in the Notes section of
+            LobbyRankFetch.
+            
+            Ensure that if there are no rows (ranking list is empty) then the
+            user's callback is still called if it is defined.
+
+            The contents of the pBuddyList are now also examined when determining
+            if the LobbyRankFetch is being called with the same arguments (and so
+            the list does not need to be re-freshed).
+            
+            If LobbyRankFetch is called with a single user in the buddy list
+            and iRows == 1, then only one row will be returned, the one for that user.
+            If iRows == 0 then the server configured number of rows will be returned.
+
+        LobbyStatbook
+            Bumped up the maximum view name size to 12 bytes to cover sending down
+            both country and language information.  This is an internal detail of the
+            statbook and is not visible to clients.
+
+        RoomlistApi
+            Fixed bug where roomlist API attempts to parse non successful http
+            responses, added support for non-sequential images in a category.
+            
+        TourneyApi
+            Added TourneyApiReqCancelUpdates() to cancel async tournament updates
+            from the server.
+            
+    DirtySock (PS2)
+        NetConn
+            Changed NetConnConnect to take a NetConfigRecT pointer instead of a pointer
+            to the strLoad entry as a part of making NetConn platform independent.
+            
+    Sample (Xbox)
+        XbLogon
+            New.
+            
+
+Dirtysock SDK 2.3.2 - February 17, 2004
+
+New in this release:
+
+    DirtySock (All)
+        LobbyRank
+            Added LobbyRankScrollxxx functions.
+            
+            Added LobbyRankColumnDescript function.
+
+        LobbyStatbook
+            Added LobbyStatBookDescript.
+
+        LobbySetting
+            Added LobbySetting API. Module is stubbed; accepts gets/sets but does not 
+            save settings with server.
+
+
+Changes/Bugfixes in this release:
+
+    DirtySock (All)
+        LobbyCustom
+            Added team ids to OppoInfoT.
+    
+        LobbyLogin
+            Added behavior flags.
+            
+            Added alternate behavior - LOGINAFTERCREATE.
+            
+            Added additional GetParms() params in SELPERS state - PROMO_R, PROMO_G, PROMO_B
+
+        LobbyRank
+            Fix a bug that caused a crash when accessing more than 4
+            ranking lists.
+
+            LobbyRankRowAttrib now supports LOBBYRANK_ATTR_SELF.
+            
+            LobbyRankAttrib now supports LOBBYRANK_ATTR_ONLINE.
+            
+            LobbyRankFetch now only ignores iTimeout.
+            
+            Added LobbyRankColumnDescript to support EAC wireframe requirement
+            that each (short) column name have an associated (longer) description.
+            
+            Changed the internals of LobbyRankFetch so that it passes down
+            the category, index and variation instead of the list index.  This makes it
+            possible for any WBOC calculations to be done on the server.
+
+            Send up the parameters to support LobbyRankParm as part of the
+            LobbyCategoryFetch so that they can be used *before* the list is
+            downloaded.
+
+        LobbyStatbook
+            LobbyStatbook: Added LobbyStatbookRowDescript to support EAC statbook
+            wireframes which call for each row having a name (LobbyStatbookRowName) and
+            a description (new LobbyStatbookRowDescript).
+
+        HLBudapi
+            Added support for setting/getting Email forwarding settings
+            for IM. Buddapi.c/.h
+            
+            Added support for setting/getting Email forwarding settings for IM.
+            
+        WBOCApi
+            Major implementation work for WBOC.
+
+    DirtySock (PS2)
+        ProtoAries-e
+            Changed status structure to be static, so it won't ever be in the
+            scratchpad.
+            
+        ProtoUdp
+            Fixed off by one error in calling InvalidDCache.
+            
+    Sample (PS2)
+        ticker2
+            Changed the Makefile so that this can now be compiled
+            using gcc2953 under Windows -- previous versions caused the
+            linker to crash.  As a result of this, the sample can no
+            longer be linked with the Sony Linux-based PS2 toolchain.
+
+
+Dirtysock SDK 2.3.1 - February 10, 2004
+
+New in this release:
+
+    DirtySock (All)
+        LobbyRank
+            Added the LobbyRank API.  Note not all the required
+            functionality is implemented.  See the LobbyRank
+            documentation for details on which parts are incomplete.
+            
+        WBOCApi
+            New World Biggest Online Competition API.
+            
+        XmlFormat
+            Simple, efficient module for formatting XML that can be sent
+            to external systems or downstream feeds.
+
+    Sample (Unix)
+        ranker
+            A simple command line program that uses most of the
+            facilities of the LobbyRank API.
+
+    Sample (Win32)
+        ranker
+            A simple command line program that uses most of the
+            facilities of the LobbyRank API.
+
+Changes/Bugfixes in this release:
+
+    Contrib 
+        DirtyDnas
+            Rebuilt against 2.8.1 - the version released in DirtySDK 2.3.0 was built
+            against a damaged 2.8.1 install and could crash,
+
+    DirtySock (All)
+        HLBudApi
+            When buddy temp flag is set or cleared, indicate or c/b that the roster
+            has changed.
+                
+        LobbyApi
+            'room' command wasn't updating LobbyApiRefT's current room state like
+            a 'move' command does, resulting in LobbyApiInfoPtr('room') returning
+            NULL after a room creation (prior to a subsequent +who message being
+            received).  Restructured 'move' command result processing to work with
+            'room' command result.
+            
+            'user' selector for LobbyApiInfoPtr() was being used for two different
+            data selections.  Changed second usage to use 'self' selector instead
+            (the one that returns the LobbyApiUserT for the current user).
+            
+            Added iCount to LobbyApiTrophyT
+            
+        LobbyLogin
+            Fixed to not truncate master names to 12 characters.
+            
+            Fixed to trigger LobbyLogin callback on a GOTO transition after an
+            ALERT transition (eg LOSTNAME alert).
+            
+        LobbyRoomlist
+            Added new LobbyRoomlistLookupRoomName() call.
+            
+        LobbyTagField
+            TagFieldFind would walk past the start a buffer if the name to find was
+            longer than the tag it was currently comparing against.
+            
+        TourneyApi
+            Added EC_MANY to TourneyApiReqCreate.
+            
+    DirtySock (PS2)
+        NetConn
+            Added param to NetConnShutdown() to allow disabling of shutting down
+            the RPC mechanism.
+            
+        Rpc-e
+            Restore intc handler if anyone else has it registered when shutting
+            down RPC handler.
+            
+
+Dirtysock SDK 2.3.0 - February 3, 2004
+
+    *** IMPORTANT NOTE ***
+
+    As of the 2.3.0 release, the PS2 libraries and samples included with
+    DirtySock SDK are built against the 2.8.1 Sony runtime libraries.
+
+    **********************
+
+New in this release:
+
+    DirtySock (All)
+        Favorites
+            New API to allow for easy tracking of "favorite" items within a
+            category.
+
+        LobbyCommonDefs.h
+            Split from lobbycommon.h to allow more control in lobbycustom.h.
+
+        LobbyStatbook
+            Added the LobbyStatbook API.
+
+    Sample (Unix)
+        statbook
+            A simple command line program that uses most of the
+            facilities of the LobbyStatbook API.
+
+    Sample (Win32)
+        statbook
+            A simple command line program that uses most of the
+            facilities of the LobbyStatbook API.
+
+Changes/Bugfixes in this release:
+
+    Contrib
+        PS2Isp (PS2)
+            Removed disconnect from DNAS error condition, added disconnect before
+            connecting.
+
+            Made input alert table pointer const.
+            
+        DirtyStrings (All)
+            Made alert tables const.
+
+    DirtySock (All)
+
+        HLBudApi
+            Added  HLBTempBuddyType_Enum to hlbudapi.h
+
+            Removed callback from HLBListFlagTempBuddy() and HLBListUnFlagTempBuddy(),
+            as they are local operations.
+
+            Added HLBListDeleteTempBuddy() -- will be ignored if buddy is "permanent".
+
+            Added HLBBudTempBuddyIs(), a new call to return the type of temp buddy.
+
+        DirtyNet.h
+            Added comments to socket error codes.
+
+        LobbyApi
+            Added LobbyApiUserT.attr and LobbyApiUserT.uColor.
+
+            Added LobbyApiServerTime.
+
+            Added 'budd' global event callback messages.
+
+            LobbyAPI now stores LobbyApiUserT for current user which can be fetched by
+            LobbyApiInfoPtr(ref, 'user') and is updated by +who and +usr messages.
+
+            Added LobbyApiGetUserInfo() to look up a user in the LOBBYAPI_LS_USERS
+            display list by name.
+
+            Added support for user level and medals to LobbyApiUserT.
+
+        LobbyCodes
+            Added ranking error code EC_RANK_UNKNOWN_VIEW.
+
+        LobbyChal
+            Fixed to disable timeouts in ST_INGM state as well as ST_IDLE state.
+
+        LobbyLogin
+            Fixed case where CREATE->PMAIL->DUPACCT:<previous> would go to PMAIL state
+            instead of CREATE state.
+
+            Fixed to remove contexts from stack after successful CREATE call.
+
+            Changed to transition back to CONNECTED state when transitioning to previous
+            from SELPERS state.
+
+            Made input alert table pointer const.
+
+        LobbyRank
+            Fixed some errors in the LobbyRankRowAttrib description.
+
+        LobbyTagField
+            TagFieldSetStructure() would access memory past the end of the provided
+            structure if a wildcard was given in the formatter (eg. "l*").
+
+            Code space optimization - converted flag_decode array from int to char,
+            and moved the bitshift into code.
+
+            Allow TagFieldSetString to directly transfer characters > 128 without
+            encoding; fixed bug in _DecodeBinary7 which counted source bytes read rather
+            than destination bytes written, causing destination buffer size to be
+            treated as smaller than it really is.
+
+        TickerApi
+            TickerApi, the iMsToDisplayFor is now set for server
+            generated events and the TickerApi will ensure that
+            TickerQpiQuery will not return a new event until the
+            display time for the current event has expired or the
+            new event has a higher priority.
+
+
+Dirtysock SDK 2.2.3 - January 27, 2004
+
+Changes/Bugfixes in this release:
+
+    Contrib (All)
+
+        LobbyStrings
+            Updated alert strings.
+
+    DirtySock (All)
+
+        GameConfigAPI
+            Implemented stubbed methods in GameConfig API and cleaned up header
+
+        LobbyApi
+            Renamed LobbyApiRoomT.desc to LobbyApiRoomT.strDesc to avoid naming conflicts
+            with Tiburon's SQL preprocessor.
+
+        LobbyChal
+            Fixed a bug where LobbyChalAccept() was not correctly checking the challenge
+            type (LOBBYCHAL_CHALTYPE_GAME vs LOBBYCHAL_CHALTYPE_VOIP/other).
+
+        LobbyLogin
+            Added MAIL to EDITACCT context params.
+
+            Fixed EDITACCT transition callback bug.
+
+            Added validation flag for PERS field, and added validation code for the fields
+            submitted in the following contexts: LOBBYLOGIN_CONTEXT_LOGIN,
+            LOBBYLOGIN_CONTEXT_DUPACCT, LOBBYLOGIN_CONTEXT_PMAIL, LOBBYLOGIN_CONTEXT_LOSTNAME,
+            LOBBYLOGIN_CONTEXT_LOSTPASS, LOBBYLOGIN_CONTEXT_EDITACCT, LOBBYLOGIN_CONTEXT_ADDPERS,
+            and LOBBYLOGIN_CONTEXT_DUPPERS.
+
+        LobbyTagField
+            Added support for TagFieldGetString to read Binary7-encoded data.
+            
+        RoomListApi
+            Fixed a bug handling non-successful http transactions.
+            
+            Fixed a memory leak.
+
+        TourneyApi
+            Removed TourneyApiConnect() - made it implicit.
+
+
+    Sample (Win32)
+        Flame2
+            Added GameConfigAPI test code.
+
+        Tourney
+            Added back-to-back flag when creating tourneys.
+
+
+Dirtysock SDK 2.2.2 - January 20, 2004
+
+New in this release:
+
+    DirtySock (XBox)
+        Initial port of DirtySock to the XBox, for use by games using the XBox to
+        prototype PSP games.
+    
+    Sample (XBox)
+
+        Gamer
+            Initial port of Gamer sample to XBox.
+
+        Tester
+            Initial port of Tester sample to XBox.  Doesn't really work yet as there
+            is no interface/keyboard support as of yet.
+
+        Ticker
+            Initial port of Ticker sample to XBox.  Aside from yucky scrolly text, it
+            works.
+
+Changes/Bugfixes in this release:
+
+    All Headers
+        Removed extraneous semicolon in "#ifdef __cplusplus }; #endif" statement to
+        avoid producing warnings under CodeWarrior.
+
+    Contrib (All)
+
+        LobbyStrings
+            Added a missing error message to lobbylogin_en error message table.
+
+    DirtySock (All)
+
+        BuddyApi
+            Added GetResource api.
+            
+            Fixed timeout bug on AddBuddy.
+
+        HLBudapi
+            Added missing MsgList functions.
+
+            Partially updated documentation, bug fixes.
+
+            FindUsers and SendMsgToGroup should now work with server (server avail Jan 21).
+
+        LobbyChal
+            Fixed to notify server of challenge cancellation, if server thinks user is
+            in game.
+
+            Re-added handling of async 'play' response and forwarding of it to the
+            LobbyChal callback, but only if the challenge has not been cancelled.  Games
+            that use LobbyChal should use the LobbyChal callback as the source for their
+            'play' event, rather than the global event callback.
+
+            Documented 'chal' callback type.
+
+        LobbyLogin
+            Added submit in DUPPERS context.
+
+            Added callback support to LobbyLoginSetContext, which is now named
+            LobbyLoginSetContextCB.
+            
+            Added a define of LobbyLoginSetContext() to LobbyLoginSetContextCB with
+            null context and null user data pointer.
+            
+            Added defines for min/max DOB fields to lobbylogin.h.
+
+        RoomlistApi
+            Renamed GetRoomHandle() to LobbyRoomlistHandle()
+
+        TickerApi
+            Maximum message size has been bumped from 128 to 192 bytes to
+            allow up to an 8-player buddy score to be displayed.
+
+    DirtySock (PS2)
+
+        NetConn
+            Made NetConnMAC transfer buffer static, so it won't be on the stack and
+            therefore won't be in the scratchpad, if the stack is in the scratchpad.  IOP
+            DMA to the scratchpad does not work, and this change avoids that situation.
+
+        DirtyNetIOP
+            Removed subnet broadcast hack, which is not necessary since Sony 2.5.2+.  Additionally,
+            broadcast packets sent to the subnet broadcast address were not visible to XBox
+            stack.
+
+        Rpc-e
+            Added warning print for case where the IOP output buffer is in the scratchpad.
+    
+    Sample (Win32)
+        Flame2
+            Flame no longer allocates it's own room display list, instead it uses the one
+            allocated by the Roomlist API (all clients using the Roomlist API should follow
+            the same pattern).
+
+            Moved 'play' handler to chal callback
+
+
+Dirtysock SDK 2.2.1 - January 13, 2004
+
+New in this release:
+
+    DirtySock (All)
+        GameConfigApi
+            Added new API (some stubs) for retrieving downloadable content from the server.
+
+Changes/Bugfixes in this release:
+
+    DirtySock (All)
+        CommUDP
+            Made two stack-based RawUDPPacketT instances static to remove them from the stack,
+            to prevent the PS2 socket threads from creating stack overflow conditions under certain
+            multi-connection conditions.
+
+        HLBudApi
+            Added FindUsers and UserFound api for searching for users. Has a stubbed server implementation.
+
+            Complete server integration for group send (broadcast)msg. Has a stubbed server implementation.
+
+            Change HLBApiConnect -- clients now (optionally) register c/b using HLBApiRegisterConnectCallback. 
+
+        LobbyLogin
+            Added 'user' command, issued when transitioning from SELPERS to EDITACCT context.
+
+            Added support for promo text in LOBBYLOGIN_CONTEXT_SELPERS context through LobbyApiParams().
+
+            Changed DELPERS context to look for PERS=<personaname> instead of DELPERS=<personaindex>.
+
+            Fixed 'cper' bug where internal persona list was not correctly refreshed with the newly
+            created persona name.
+
+    Sample (PS2)
+        Buddy
+            Changed easo.ea.com to messaging.ea.com.
+
+    Sample (All)
+        Tester
+            Changed demangler name from demangler01.ea.com to PROTOMANGLE_SERVER
+            (demangler.ea.com), the approved production demangler name.
+
+
+Dirtysock SDK 2.2.0 - January 6, 2004
+
+New in this release:
+
+    Contrib
+        PS2Isp
+            New high-level PS2Isp documentation has been added.
+
+    Doc
+        A LobbyLogin whitepaper has been added.
+
+    DirtySock (All)
+        RoomlistApi
+            Added new API for retrieving room categories from the server.
+
+    Samples (PS2)
+        ticker2
+            A simple application that shows the TickerApi in action.
+
+    Samples (Win32)
+        ticker
+            A simple console application that shows the TickerApi in action.
+
+    Samples (Unix)
+        ticker
+            A simple command line program that shows the TickerApi in action.
+
+Changes/Bugfixes in this release:
+
+    Contrib
+        DirtyStrings (All)
+            Added lobbylogin strings for "sent password" and "sent account info"
+            alerts. 
+
+    DirtySock (All)
+
+        HLBudApi
+            Added periodic auto-reconnects after disconnection, so that titles will
+            automatically reconnect to the Buddy Server after a service interruption.
+
+        LobbyApi
+            LobbyApi has been modified to save the results of the 'auth' and 'pers'
+            transactions.  These results may be retrieved with LobbyApiInfoPtr(), with
+            selectors of 'autd' and 'perd' respectively.
+
+            Added 'lcnt' selector to LobbyApiInfoInt(), to return the total number of
+            users in rooms.
+
+            Added stub for LobbyApiRoomEnter().
+
+        LobbyLogin
+            Added PMAIL support.
+
+            Added lost name and lost password support.
+
+            Added sentpass and sentinfo informational alerts.
+
+            Moved setting of ALTS field from application to API for CREATE
+            and ADDPERS contexts.
+
+            Added disable of autologin on transition to DONE context.  Also fixed
+            to allow disable of autologin from any context.
+
+            Added header documentation for LobbyApiSubmitCB() describing what parameters
+            are available for each context.
+
+            Fixed LobbyLoginAbort() to only disconnect in CONNECT context, and to
+            cancel the LobbyApi callback if not in CONNECT context.
+
+            Added validation of transitions to LobbyLoginSetContext() - only valid
+            transitions are now allowed.
+
+            Added a new function, LobbyLoginGetLastResponse(), to communicate the
+            response of the last server request to the application.
+
+        LobbyPingManager
+            Reduced ping packet size from a fixed 128 bytes to 20-30 bytes, depending
+            on the size of the data.            
+
+        TickerApi
+            TickerApiConnect arguments have changed as a result of the
+            implementation changing from using the LobbyApi chat channel
+            to carry ticker messages to using UDP.  See any of the TickerApi
+            samples for details on how to update existing
+            TickerApiConnect calls.
+
+    Samples (PS2)
+        
+        Lobby
+            Updated to work with new LobbyLogin API changes.
+
+
+Dirtysock SDK 2.1.2 - December 19, 2003
+
+New in this release:
+
+    Doc
+
+        A new LobbyChal whitepaper has been added.
+            
+
+Changes/Bugfixes in this release:
+
+    Contrib
+
+        DirtyDnas
+            Disabled logging of authentication results being performed in debug mode
+            only.
+
+        DirtyStrings
+            Moved dirtystrings.h to platform-dependent folder
+
+            Added pc build for dirtystrings.
+
+        PS2Isp
+            Fixed a bug where ref was not memset to zero on allocation.
+
+    DirtySock (All)
+
+        LobbyApi
+            Split LobbyApiInfo into LobbyApiInfoInt and LobbyApiInfoPtr
+
+            Added automated download of config file (news7).
+
+        LobbyChal
+            Made LobbyChal parm limit more explicit, and enforced at the API level.
+
+        LobbyLogin
+            Added to Windows makefile.
+
+            Windows build fix.
+
+            Fixed a bug where ref was not memset to zero on allocation.
+
+
+Dirtysock SDK 2.1.1 - December 16, 2003
+
+New in this release:
+
+    Contrib
+
+        DirtyStrings
+            New library to hold error strings for different DirtySock modules.  Each
+            module and language variant is in a separate file so that only the tables
+            that are used will be linked in.  This initial version has string tables
+            for ps2isp and lobbylogin.
+
+    DirtySock Library (All)
+
+        LobbyBase64
+            Base64 encoding routines.
+
+
+Changes/Bugfixes in this release:
+
+    Contrib
+
+        DirtyDnas
+            Fixed SCEI/Japanese error -617, as well as SCEI/Japanese error strings
+            which were using non-ASCII quotes to use ASCII quotes.
+
+            Fixed immediate-return errors that are TRC displayable to display with
+            TRC errors, instead of "Unknown Client Error".
+
+        PS2Isp
+            Transition changes and some bugfixes in managing internal state.
+            Compiled HTML Help is now available.  High-level documentation is
+            still forthcoming.
+
+    DirtySock Library (All)
+
+        BuddyApi
+            Added new FIFA product ids for JP EURO and Korea, as well as TOTAL
+            Football.
+            
+        HLBudApi
+            Added temp buddy functions + misc other changes/updates.
+
+        LobbyApi
+            Changed LobbyApiConnect() to not return an error if a NULL callback is
+            specified.
+
+        LobbyChal
+            Added generic type support (for VoIP challenges), and added 'busy'
+            condition when a user challenges another user that is already involved
+            in a challenge negotiation process.
+
+        LobbyLogin
+            Major changes and updates to flesh out and refine interface.
+
+            Added status callback support.
+
+            Implemented autologin.
+
+            Input validation support.
+
+        LobbyPingManager
+            Disabled spam by default.
+
+    Samples (PS2)
+
+        Lobby
+            Major rework to more cleanly integrate PS2Isp and LobbyLogin.
+
+    Samples (Win32)
+
+        Chatter2
+            Support for adding/deleting explicit temp buddies, misc cleanup.
+            
+
+Dirtysock SDK 2.1.0 - December 9, 2003
+
+New in this release:
+
+    General
+        Added cheesy index page.
+
+    Contrib
+
+        DirtyElf
+            Stand-alone relocatable elf library.  See doc for more details.
+
+        PS2Isp
+            High-level API to manage connecting to ISP + DNAS.  NOTE: this
+            is a work in progress and is not complete at this time.  Use of PS2Isp
+            is currently demonstrated in the ps2 lobby sample.  Documentation
+            is forthcoming.
+
+    DirtySock Library (All)
+    
+        HLBudApi
+            High-level API to manage and simplify use of BuddyApi.
+
+        LobbyApi
+            Moved shared server/client defines to lobbycommon.h.
+            
+            Moved "customization" parameters (buffer sizes, etc) to lobbycustom.h.
+
+        LobbyChal
+            High-level API to manage peer challenges.  Documentation is forthcoming.
+
+        LobbyLogin
+            High-level API to manage logging in to a lobby server.  NOTE: this
+            is a work in progress and is not complete at this time.  Use of
+            LobbyLogin is currently demonstrated in the ps2 lobby sample.
+            Documentation is forthcoming.
+
+        LobbyPingManager
+            API to manage pinging in a network-friendly mannner.  Used
+            transparently by LobbyApi; may also be called stand-alone.
+
+        ProtoMangle
+            Added whitepaper documentation.
+
+    Samples
+
+        Chatter2
+            Chatter2 is the reference application for the new high-level
+            BuddyApi (HLBudApi)
+            
+
+Changes/Bugfixes in this release:
+
+
+    General
+        Separated compiled HTML help for different platforms.
+
+        Rewrote PS2 makefiles to work by default with the new toolchain
+        (2.95.3) instead of the old (2.9-ee-991111).  Set an environmental
+        variable "DSOCK_OLDTC=1" to build against the old toolchain.
+
+        Changed some function prototype parameters to not conflict with
+        the Tiburon SQL parser.
+
+    Contrib
+
+        VoIP
+            Made module unloadable.
+
+    DirtySock Library (All)
+        Removed dependencies on old Tiburon types.
+
+        CommUDP
+            Unreliable transport support.
+
+            Fixed to work with up to 512 byte (user data) packets.
+            
+        LobbyApi
+            Multi-user game play support (2 to LOBBYAPI_MAX_PLAYERS players).
+
+            Custom async message support added.  Incoming custom async messages
+            are forwarded to any LOBBYAPI_CBTYPE_EVENT callbacks that are installed.
+
+            Removed 8192 rank limit.
+
+            Modified to support multiple global callbacks per type.
+
+            Added global idle callback.
+
+            Added global event callback.  Events that were previously polled through
+            LobbyApiEvent() are now routed through this callback.
+
+            Deprecated LobbyApi events (LOBBYAPI_EV_*).
+
+            Deprecated LobbyApiFree() and LobbyApiEvent().
+
+            Deprecated EAFN_* defines.
+
+            Changed LOBBY_CBTYPE_* enums to LOBBYAPI_CBTYPE_* enums for better
+            consistency.
+
+            Changed to call LobbyPingManager() on the user list.  The user list
+            is rotated through one user per call to LobbyApiUpdate() and, and the
+            current user is pinged through LobbyPingManger (which uses a caching
+            scheme to reduce the number of pings actually sent).  If the ping times
+            out, the user<->lobby ping value is retained.
+
+            Added LOBBYAPI_FL_CHAL flag to mark challenge messages.
+
+            Added a timeout to LobbyApiConnect().  Also modified LobbyApiConnect()
+            to return the callback ID so it may be cancelled.
+
+            Added LobbyApiSetIdleTimeout() to enable setting of the idle timeout
+            value.
+
+            Changed LobbyApiListFind to LobbyApiListFindByName(), added
+            LobbyApiListFindByKey().  Also changed returns from boolean to the actual
+            data pointers.
+
+            Use LobbyApiExtractPlayRecord() to populate LobbyApiPlayT for +ses
+            packet.  Make sure LobbyApiPlayT.ident is set.
+
+            Include user's game identifier in +usr messages and populate it into
+            LobbyApiUserT structure for user display list.
+
+            Added transaction ID to LobbyApiMsgT structure.
+
+            Added LobbyApiDisconnect().
+
+        LobbyTagField
+
+            Enhanced TagFieldGetEpoch() to handle dates formatted without spaces or
+            separators.  Current date format is "2003.11.24 9:50:35" but now GetEpoch
+            will parse dates without separators or with any non-digit characters as
+            separators.
+
+            Single quote (') is not longer used to quote strings.  Fixes
+            inconsistency between TagFieldGetString and TagFieldSetString.
+
+        NetGameLink
+            Upped maximum packet size to 512.
+
+        NetGameUtil
+            Added warning and error return if no valid protocol specified
+            in NetGameUtilConnect().
+
+            Added NetGameUtilControl() to allow changing of Comm buffer paramters
+            (packet size, number of packets in the send/recv buffers).  Note that
+            this function must be called before NetGameUtilConnect().
+
+        ProtoAries
+            Added listen support (not currently very well tested).
+
+            
+    DirtySock Library (PS2)
+    
+        NetConn.c
+            Added NetConnIOPMemDump(), a debug-only function to dump IOP memory
+            to the IOP TTY on demand.
+
+        ProtoMangle-e.c
+            Added throttle to ProtoMangleComplete(), until we can find the RPC bug
+            that seems to arise if RPC calls are called too fast.
+            
+        Rpc-e
+            Added debug sanity checks for rpc xfer from IOP-EE.
+            
+    DirtySock Library (IOP)
+        Incorporated TW2003 fixes to build under MetroWerks.
+        Made module unloadable.
+        Updated iopcodesize.xls spreadsheet (doc\ps2\).
+            
+        Connect-i
+            Added -lnk (NOLINK) error code - provides faster resolution
+            than waiting for ~lnk state to timeout.
+            
+            Reduced size of env buffer from 4k to 2k.
+
+        Rpc-i
+            Added debug sanity checks for rpc xfer from IOP-EE.
+            
+    DirtySock Library (PC)
+    
+        CommSer
+        CommTAPI
+            Moved to pc-specific directory.
+
+        Pogo*
+            Fixed C++ compile errors.
+    
+    Samples (PC)
+    
+        Flame2
+            Added commandline support and autologin.
+
+            Rewrote challenge interface to use LobbyChal.
+
+            Tab fixes.
+            
+    Samples (PS2)
+            
+        Lobby
+            Rewrote ISP connection and Login to use PS2Isp
+            and LobbyLogin, respectively.

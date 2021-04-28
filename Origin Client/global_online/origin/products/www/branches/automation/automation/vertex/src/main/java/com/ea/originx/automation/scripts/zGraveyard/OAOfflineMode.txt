@@ -1,0 +1,108 @@
+package com.ea.originx.automation.scripts.zGraveyard;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroSocial;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.common.TakeOverPage;
+import com.ea.originx.automation.lib.pageobjects.discover.DiscoverPage;
+import com.ea.originx.automation.lib.pageobjects.login.LoginPage;
+import com.ea.originx.automation.lib.pageobjects.social.SocialHub;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test offline mode and various other status changes
+ *
+ * @author mkalaivanan
+ */
+public class OAOfflineMode extends EAXVxTestTemplate {
+
+    @Test(groups = {"client", "client_only", "full_regression"})
+    public void testOfflineMode(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+
+        logFlowPoint("Launch and login to Origin with " + userAccount.getUsername()); //1
+        logFlowPoint("Switch to Offline mode"); //2
+        logFlowPoint("Switch to Online mode"); //3
+        logFlowPoint("Switch Status to Away"); //4
+        logFlowPoint("Switch Status to Invisible"); //5
+        logFlowPoint("Switch Status to Online"); //6
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        LoginPage loginPage = initPage(driver, context, LoginPage.class);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged into Origin with the user");
+        } else {
+            logFailExit("Could not log into Origin with the user");
+
+        }
+
+        //2
+        MacroSocial.restoreAndExpandFriends(driver);
+        MainMenu mainMenu = new MainMenu(driver);
+        mainMenu.selectGoOffline();
+        SocialHub socialHub = new SocialHub(driver);
+        DiscoverPage discoverPage = new NavigationSidebar(driver).gotoDiscoverPage();
+        sleep(3000); //Let the social hub stabilize to become offline
+
+        boolean verifyMainWindowUserOffline = discoverPage.verifyOfflineMessageExists() && socialHub.verifyUserOffline();
+        if (verifyMainWindowUserOffline) {
+            logPass("Verify main window and user presence is offline successful");
+        } else {
+            logFailExit("Verify main window and user presence is offline unsuccessful");
+        }
+
+        //3
+        mainMenu.selectGoOnline();
+        //Wait for the presence to change
+        sleep(2000);
+        //minimize social hub if it can be minimized for it to allow to click on Take over page
+        socialHub.minimizeSocialHubIfMinimizable();
+        new TakeOverPage(driver).closeIfOpen();
+
+        MacroSocial.restoreAndExpandFriends(driver);
+        boolean verifyMainWindowOnline = discoverPage.isRecommendationVisible();
+        if (verifyMainWindowOnline) {
+            logPass("Verify main window is online successful");
+        } else {
+            logFailExit("Verify main window is online unsuccessful");
+        }
+
+        //4
+        socialHub.setUserStatusAway();
+        if (socialHub.verifyUserAway()) {
+            logPass("Status switch to Away successful");
+        } else {
+            logFailExit("Status switch to Away unsuccessful");
+        }
+
+        //5
+        socialHub.setUserStatusInvisible();
+        if (socialHub.verifyUserInvisible()) {
+            logPass("Status switch to Invisible successful");
+        } else {
+            logFailExit("Status switch to Invisible unsuccessful");
+        }
+
+        //6
+        socialHub.setUserStatusOnline();
+        if (socialHub.verifyUserOnline()) {
+            logPass("Status switch to Online successful");
+        } else {
+            logFailExit("Status switch to Online unsuccessful");
+        }
+        softAssertAll();
+    }
+
+}

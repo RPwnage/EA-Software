@@ -1,0 +1,188 @@
+package com.ea.originx.automation.scripts.pdp;
+
+
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+
+import com.ea.originx.automation.lib.resources.games.Sims4;
+
+import com.ea.originx.automation.lib.resources.games.Battlefield4;
+
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+
+import com.ea.vx.annotations.TestRail;
+
+import com.ea.vx.originclient.account.AccountManager;
+
+import com.ea.vx.originclient.account.UserAccount;
+
+import com.ea.vx.originclient.client.OriginClient;
+
+import com.ea.vx.originclient.client.OriginClientFactory;
+
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+
+import org.openqa.selenium.WebDriver;
+
+import org.testng.ITestContext;
+
+import org.testng.annotations.Test;
+
+
+
+/**
+
+ * Test to verify buying a DLC at its PDP Page has a 'Base Game Warning'
+
+ * above the purchase button and will hide it the warning if the user owns the
+
+ * base game.
+
+ *
+
+ * @author aachtymichuk
+
+ */
+
+public class OAPDPBaseGameWarning extends EAXVxTestTemplate{
+
+
+
+    @TestRail(caseId = 1613992)
+
+    @Test(groups = {"pdp", "full_regression"})
+
+    public void testPDPBaseGameWarning(ITestContext context) throws Exception{
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+
+
+        final String dlcName = Sims4.SIMS4_DLC_BACKYARD_NAME;
+
+        final String dlcOfferID = Sims4.SIMS4_DLC_BACKYARD_OFFER_ID;
+
+        final String dlcPartialPDPUrl = Sims4.SIMS4_DLC_BACKYARD_PARTIAL_PDP_URL;
+
+
+
+        final String entitledDlcName = Battlefield4.BF4_BRONZE_BATTLEPACK_NAME;
+
+        final String entitledDlcOfferID = Battlefield4.BF4_BRONZE_BATTLEPACK_OFFER_ID;
+
+        final String entitledDlcPartialPDPUrl = Battlefield4.BF4_BRONZE_BATTLEPACK_PARTIAL_PDP_URL;
+
+
+
+        EntitlementInfo entitledBase = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_STANDARD);
+
+
+
+        UserAccount userAccount = AccountManager.getEntitledUserAccount(entitledBase);
+
+        String username = userAccount.getUsername();
+
+
+
+        logFlowPoint("Login in as an unentitled user."); //1
+
+        logFlowPoint("Load PDP page that the user owns the base game for."); //2
+
+        logFlowPoint("Verify that the base game warning message is not visible"); //3
+
+        logFlowPoint("Load PDP page that the user does not own the base game for."); //4
+
+        logFlowPoint("Verify that the base game warning message is visible"); //5
+
+
+
+        //1
+
+        WebDriver driver = startClientObject(context, client);
+
+        if (MacroLogin.startLogin(driver, userAccount)) {
+
+            logPass("Verified login successful as unentitled user " + username);
+
+        } else {
+
+            logFailExit("Failed: Cannot login as unentitled user " + username);
+
+        }
+
+
+
+        //2
+
+        if (MacroPDP.loadPdpPage(driver, entitledDlcName, entitledDlcOfferID, entitledDlcPartialPDPUrl)) {
+
+            logPass(String.format("Verified PDP page for '%s' opens", entitledDlcName));
+
+        } else {
+
+            logFailExit(String.format("Failed: Cannot open PDP page for '%s'", entitledDlcName));
+
+        }
+
+
+
+        //3
+
+        PDPHeroActionDescriptors descriptors = new PDPHeroActionDescriptors(driver);
+
+        if (descriptors.verifyBaseGameRequiredMessageVisible() == false) {
+
+            logPass("Message indicating user requires a base game to purchase this product is not visible");
+
+        } else {
+
+            logFailExit("Failed: Message indicating user requires a base game is visible");
+
+        }
+
+
+
+        //4
+
+        if (MacroPDP.loadPdpPage(driver, dlcName, dlcOfferID, dlcPartialPDPUrl)) {
+
+            logPass(String.format("Verified PDP page for '%s' opens", dlcName));
+
+        } else {
+
+            logFail(String.format("Failed: Cannot open PDP page for '%s'", dlcName));
+
+        }
+
+
+
+        //5
+
+        if (descriptors.verifyBaseGameRequiredMessageVisible()) {
+
+            logPass("Message indicating user requires a base game to purchase this product is visible");
+
+        } else {
+
+            logFailExit("Failed: Message indicating user requires a base game is not visible");
+
+        }
+
+
+
+        softAssertAll();
+
+    }
+
+
+
+}
+

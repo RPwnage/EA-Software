@@ -1,0 +1,589 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<title>EAPatchClient</title>
+<style type="text/css">
+.code-example {display: block;
+	background-color: #e0e0f0;
+	margin-left: 3em;
+	margin-right: 3em;
+	margin-top: 1em;
+	margin-bottom: 1em;
+	padding: 8px;
+	border: solid 2px #a0a0d0;
+	font-family: monospace;
+	font-size: 9pt;
+	white-space: pre;
+}
+.codeComment {color: #999999}
+.HighlightedText {color: #0066FF}
+.faq-answer {    	display: block;
+    	margin: 4pt 1em 0.5em 1em;
+}
+</style>
+</head>
+
+<body>	
+<h1>EAPatchClient</h1>
+<p>EAPatchClient is a library for executing EAPatches. Features include:</p>
+<ul>
+  <li>Resumable and cancellable patching.</li>
+  <li>Can be built as a DLL on platforms that support it, or built and linked directly as a library.</li>
+  <li>Supports efficient differential patching (server download of only the minimal content needed).</li>
+  <li>Ability to add, remove, and overwrite files and directories.</li>
+  <li>Supports using a standard HTTP server. </li>
+  <li>Relatively simple usage; can execute a patch in a few lines of code. </li>
+  <li>Scales to multi-gigabyte sizes. </li>
+  <li>Portable to at least  XBox 360, PS3, Windows, NextGen A, NextGen B, Unix, OSX, mobile.</li>
+  <li>Depends on relatively few packages, most of which teams are already using (e.g. EASTL). </li>
+  <li>Runtime telemetry is collected and optionally reported. </li>
+  <li>The patching process uses a RESTful design, for reliability and scalability. </li>
+  <li>Supports multiple simultaneous patches and add-ons. </li>
+  <li>Can run asynchronously in the background. </li>
+  <li>Allows the developer to specify resource usage limitations.</li>
+</ul>
+<p>A more extensive  technical description of the EAPatch system can be found in the <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/doc/EAPatchTechnicalDesign.html">technical design document</a>.</p>
+<p>The package also comes with an EAPatchClientApp.exe project and a unit test project, but these are more useful for EAPatchClient  package developers than package users. </p>
+<h2><a name="PatchingProcess" id="PatchingProcess"></a>The patching process </h2>
+<p>In order to use the EAPatchClient to perform a patch or download, it's useful to understand the setup and what occurs. In summary: </p>
+<ol>
+  <li>There is a directory or file on your local computer which you will be patching. It's OK there is nothing there previously.</li>
+  <li>There is a server which has one or more patches, each typically in its own directory. The server is a standard web server.</li>
+  <li>In a patch's directory is a  .eaPatchImpl file, which defines the instructions EAPatchClient uses to apply the patch. </li>
+  <li>Another file in that directory is a .eaPatchInfo file, which is a description of the patch (name, supported platforms, .eaPatchImpl file location, etc.) </li>
+  <li>There are other files in that directory which comprise the patch contents. </li>
+  <li>Patches are created with the EAPatchMaker utility (or library), which uses a user-provided starter .eaPatchImpl file as input. </li>
+  <li>The EAPatchBuilder class uses the .eaPatchImpl file and other server patch content files to update the aforementioned local directory or file(s) to be patched.</li>
+  <li>EAPatchBuilder optimizes the patching by downloading only what's necessary from the server, as it can analyze the existing local files and use their data to the extent possible. </li>
+  <li>EAPatchBuilder does this at the sub-file level. If a local 1GB file has a new version on the server that differs by only 1K, then only 1K will be downloaded.</li>
+  <li>This patching or downloading is done in a robust manner that can efficiently recover from crashes, lost network connectivity, bad file downloads, etc. </li>
+</ol>
+<h2>Minimal example usage</h2>
+<p>The following demonstrates the minimal code needed for executing a patch:</p>
+<pre class="code-example">#include &lt;EAPatchClient/PatchBuilder.h&gt;
+ 
+EA::Patch::SetAllocator(someAllocator);
+EA::Patch::PatchBuilder builder;<br />
+builder.SetDirPaths(pPatchDestinationDirPath, pPatchLocalDirPath);<br />builder.SetPatchInfo(patchInfo);<span class="codeComment"> // Or call the other version of this function.</span><br />builder.BuildPatchBlocking();<br /><br />EA::Patch::AsyncStatus result = builder.GetAsyncStatus(); <span class="codeComment">// and handle the result.</span></pre>
+<p>The actual code you use wouldn't be much different, though there would likely be a bit of setup application-specific setup code in addition to this. If you want to execute patches asynchronously then there would be a little more code to support that. And if you want to intercept events so you can display status updates then there would be some more code for that. </p>
+<h2>PatchInfo and PatchImpl</h2>
+<p>The <a href="http://eaos.rws.ad.ea.com:8080/@md=d&amp;c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/PatchInfo.h">PatchInfo</a> struct describes the patch at a high level. It has the kind of info you might use to present the patch to the application user, or the kind of info your app would programmatically read in order to tell if it needs to be applied, if there's enough disk space for it, what platforms it supports, etc. Despite the number of fields present, only a few are required, and the rest are optional fields which an application may wish to use. On disk, PatchInfo is stored as a .eaPatchInfo file (XML). </p>
+<pre class="code-example">class PatchInfo
+{
+public:
+    // Const data published by the patch server         /// Generated?     | Required? | Description
+    //-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    String              mPatchInfoURL;                  /// User-specified | Required  | The URL for this PatchInfo. 
+    String              mPatchId;                       /// User-specified | Required  | Unique string, like a GUID. mPatchName is the user-readable name of the patch.
+    String              mPatchClass;                    /// User-specified |           | Indicates whether the patch is a fix, add-on, etc. Case-insensitive.
+    bool                mRequired;                      /// User-specified |           | True if the patch is required in order to further run the application.
+    LocalizedString     mPatchImplURL;                  /// User-specified | Required  | URL for the patch implementation (.eaPatchImpl file) itself. May get redirected by the server.
+    StringArray         mContentIdArray;                /// User-specified |           | Entitlement ids, defined by the people who tie SKUs and users to downloadable entitlements.
+    StringArray         mSKUIdArray;                    /// User-specified |           | List of SKUs which this patch is valid for.
+    LocalizedString     mPatchName;                     /// User-specified |           | Human readable patch name. Must be text only, and not HTML, RTF, etc.
+    LocalizedString     mPatchDescription;              /// User-specified |           | Human readable patch name. Must be text, HTML text, or a URL to an HTML page suitable for displaying a nice looking display of the patch from within the application (e.g. via EAWebKit).
+    LocalizedString     mPatchEULA;                     /// User-specified |           | EULA text. May be HTML text.
+    String              mAppId;                         /// User-specified |           | Name of App which this patch applies to.
+    StringArray         mOSNameArray;                   /// User-specified |           | OSs which this patch applies to. See PATCH_OS.
+    StringArray         mMinOSVersionArray;             /// User-specified |           | Minimum OS versions needed to be able to download and use the patch. Synchronized with mOSNameArray.
+    String              mReleaseDate;                   /// User-specified |           | Date in an ISO 8601 format: "yyyy-MM-dd hh:mm:ss GMT", such as "1994-11-06 08:49:37 GMT" for November 6, 1994.
+    LocalizedString     mLocaleSupport;                 /// User-specified |           | List of supported locales. GetString returns NULL if the locale isn't supported; returns a non-NULL empty string if supported. 
+    StringArray         mSupercedentPatchIdArray;       /// User-specified |           | List of patches which this patch supercedes, and thus aren't necessary if you install this patch.
+    StringArray         mSupercedingPatchIdArray;       /// User-specified |           | List of patches which supercede this patch.
+    StringArray         mDependentPatchIdArray;         /// User-specified |           | List of patches which this patch depends on being installed before this one can be installed.
+    String              mPatchBaseDirectory;            /// User-specified |           | Where the patch goes. The format of this string is platform and possibly application-specific. The application may need to fix this up at runtime before starting the patching process, for example if it's a relative directory or a user-specific directory.
+    String              mUserInfo;                      /// User-specified |           | Optional arbitrary information the user might want to associate with the patch.
+    String              mUserChecksum;                  /// User-specified |           | Optional checksum/hash the user might want to associate with the patch. May have a different meaning than any kind of hash we use elsewhere within this library.
+    uint64_t            mFinalFileSizeUsage;            /// Generated      |           | The sum of the file sizes that an installed version of this patch uses. Doesn't include ignored directories; includes just the files in the patch.
+    uint64_t            mFinalDiskSpaceUsage;           /// Generated      |           | The amount of disk space an installed version of this patch uses. Doesn't include ignored directories; includes just the files in the patch. This is usually a value a little greater than the sum of the file sizes, due to things like file system sector sizes.
+    uint64_t            mIntermediateDiskSpaceUsage;    /// Generated      |           | The max amount of disk space the patch requires to have as part of its download and install. This is > mFinalDiskSpaceUsage, as in the simplest case it could need a full patch image plus intermediate files created by the build process.
+};
+</pre>
+<p>The <a href="http://eaos.rws.ad.ea.com:8080/@md=d&amp;c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/PatchImpl.h">PatchImpl</a> struct <em>implements</em> the patch; it has the data needed to actually apply the patch, as opposed to merely describe it. You don't strictly need to have a PatchInfo struct in order to execute a patch, but you need a PatchInfo. On disk, PatchImpl is stored as a .eaPatchImpl file (XML), though in its PatchEntryArray field it has links to other files which comprise the patch. </p>
+<pre class="code-example">class PatchImpl : public PatchInfo <span class="HighlightedText">// Note that PatchImpl extends PatchInfo and thus a PatchImpl <em>is</em> a PatchInfo.</span>
+{
+public:
+    // Const data published by the patch server:    /// Generated?     | Description
+    //----------------------------------------------------------------------------------------------------------------------------------------------
+    String              mPatchHash;                 /// Generated      | MD5 Hash of entire patch. The MD5 of all files in the directory read in alphabetical depth-first order, skipping ignored directories.
+    String              mPreRunScript;              /// User-specified | Script to run before installing the patch. May be a URL to a Lua script instead of a script itself.
+    String              mPostRunScript;             /// User-specified | Script to run after installing the patch. May be a URL to a Lua script instead of a script itself.
+    FileFilterArray     mIgnoredFileArray;          /// User-specified | Array of files and directories to ignore, specified by wild-card-like filters. The files may be in subdirectories or in the root. Directories are specified by (e.g.) /SomeDir/SomeIgnoredDir/*. If empty then no files are ignored and the entire directory is considered part of the patched data. If * then all files are ignored and only files white-listed by mUsedFileArray will be considered part of the patch.
+    FileFilterArray     mUsedFileArray;             /// User-specified | Array of files and directories to use, specified by wild-card-like filters. The files may be in subdirectories or in the root. Directories are specified by (e.g.) /SomeDir/SomeIgnoredDir/*. Files identified by mUsedFileArray override files identified by mIgnoredFileArray. If empty then all non-ignored files are used. If * then all files are used. 
+    PatchEntryArray     mPatchEntryArray;           /// Generated      | List of all the files+directories in the remote patch.
+};
+</pre>
+<h2>PatchBuilder</h2>
+<p>The building of patches is done by the PatchBuilder C++ class. Most of the other classes in the package are helpers that PatchBuilder uses to get its job done. The primary interface of PatchBuilder looks like this (some functions have been removed for clarity):</p>
+<pre class="code-example">class PatchBuilder<br />{<br />public:<br /><span class="codeComment">    /// Gets/Sets the ClientLimits to use. If SetClientLimits is not called then<br />    /// the global defaults returned by EA::Patch::GetDefaultClientLimits is used<br /></span>    ClientLimits&amp; GetClientLimits();
+    void SetClientLimits(const ClientLimits&amp; clientLimits);
+
+<span class="codeComment">    /// pPatchDestinationDirPath is the directory where the patch is written. The PatchInfo has 
+    /// a mPatchBaseDirectory member which is a relative directory that's appended to this.
+    /// pPatchLocalDirPath is the directory where the pre-patch image exists. If this is an in-place 
+    /// patch then pPatchLocalDirPath should be equal to pPatchDestinationDirPath.
+    /// If either string parameter is NULL then it is not used and the default (empty) is used.
+    /// If bInPlacePatch is true then the patch destination dir and local dir should be equal.
+    /// This function must be called before calling BuildPatchXXX.
+</span>    void SetDirPaths(const char8_t* pPatchDestinationDirPath, const char8_t* pPatchLocalDirPath);
+    void GetDirPaths(String&amp; sPatchDestinationDirPath, String&amp; sPatchLocalDirPath, bool&amp; bInPlacePatch);
+
+<span class="codeComment">    /// Sets the patch to be installed with BuildPatchXXX.
+    /// This function must be called before calling BuildPatchXXX.
+</span>    void SetPatchInfo(const PatchInfo&amp; patchInfo);
+
+<span class="codeComment">    /// Allows you identify a patch by just the minimum required fields.
+    /// This is an alternative to the other SetPatchInfo function, and is useful for the
+    /// case that you aren't downloading a .eaPatchInfo file but rather are directly
+    /// executing a patch at a known URL for the .eaPatchImpl file.
+    /// The arguments to this function are the minimal required to execute a patch, though
+    /// some use cases may require additional fields to be set (e.g. PatchInfo::mPatchBaseDirectory),
+    /// in which case you can manually set them through GetPatchInfo before building the patch 
+    /// or call SetPatchInfo(const PatchInfo&amp;). 
+</span>    void SetPatchInfo(const char8_t* pPatchId, const char8_t* pPatchImplURL);
+    PatchInfo&amp; GetPatchInfo();
+
+<span class="codeComment">    /// Main entrypoint for building (downloading, installing) a patch.<br />    /// SetDirPaths and SetPatchInfo must have been called before calling this.
+    ///
+    /// The return value indicates whether the action completed successfully or with error.
+    /// If the operation was cancelled via CancelRetrieval, the return value will be <br />    /// true (as there was no error), HasError will return false, but GetAsyncStatus will
+    /// return kAsyncStatusCancelled instead of kAsyncStatusCompleted. 
+    /// If the return value is false, then errorResult contains the error information and 
+    /// GetAsyncStatus will return kAsyncStatusAborted. To tell if the operation completed
+    /// successfully, check for GetAsyncStatus == kAsyncStatusCompleted, as it will only 
+    /// ever be kAsyncStatusCompleted if it completed without error. 
+</span>    bool BuildPatchBlocking();
+
+<span class="codeComment">    /// BuildPatchAsync
+    /// This is an async version of BuildPatchBlocking, and it returns immediately, 
+    /// after the creation of a background task which begins executing BuildPatchBlocking.
+    /// The return value indicates whether the async operation started successfully.
+    /// You can use GetAsyncStatus and GetState to poll the state of this operation.
+    /// SetDirPaths and SetPatchInfo must have been called before calling this.
+</span>    bool BuildPatchAsync();
+
+<span class="codeComment">    /// Halts an existing patch build operation if it's active. 
+    /// If waitForCompletion is true then this function doesn't return until the 
+    /// patching has stopped and all of the resources are released.
+    /// This function does not remove the partially installed patch from the system
+    /// but rather leaves everything as it is. If you want to remove the partially
+    /// installed patch as well, then call the Cancel function.
+    /// The patch can be resumed at a later time with another call to BuildPatchXXX,
+    /// or the patch can be cancelled at a later time with a call to Cancel.
+    /// Sets bPatchStopped to true if a patch was being built which could be stopped. Note that 
+    /// it's possible that at the time of the Stop call BuildPatchXXX may be executing, but 
+    /// at that same instant it completes and results in Stop setting bPatchStopped to false.
+    /// The return value is the PatchBuilder class error state upon return of Stop.
+    /// The difference between this and Cancel is that Cancel rolls back the patch.
+</span>    bool Stop(bool waitForCompletion, bool&amp; bPatchStopped);
+
+<span class="codeComment">    /// This stops BuildPatchBlocking/BuildPatchAsync if they are executing, and rolls
+    /// back the patch directory to its pre-patch state. The difference between this and
+    /// Stop is that Stop doesn't roll back the patch.
+</span>    bool CancelPatchBlocking();
+
+<span class="codeComment">    /// Stops an existing patch build operation if it's active, and cancels the patch<br />    /// application process by removing the partially installed patch files and renaming
+    /// any renamed files and directories to their original names. 
+    /// If waitForCompletion is true then this function doesn't return until the 
+    /// cancel operation is complete and all of its resources are released.
+    /// Sets bPatchStopped to true if a patch was being built which could be cancelled. Note that 
+    /// it's possible that at the time of the Cancel call BuildPatchXXX may be executing, but 
+    /// at that same instant it completes and results in Cancel setting bPatchStopped to false.
+    /// The return value is the PatchBuilder class error state upon return of Cancel.
+    /// The difference between this and Stop is that Stop doesn't roll back the patch.
+</span>    bool Cancel(bool waitForCompletion, bool&amp; bPatchCancelled);
+
+<span class="codeComment">    /// Gets the current status of BuildPatchBlocking.
+    /// BuildPatchBlocking is completed when the AsyncStatus is one of the 
+    /// done states (completed, cancelled, aborted). 
+    /// Error may come with any AsyncStatus state except kAsyncStatusNone<br />    /// and kAsyncStatusCompleted. Check this class' ErrorBase for the Error.
+</span>    AsyncStatus GetAsyncStatus() const;
+
+<span class="codeComment">    /// Only one callback can be registered.
+</span>    void RegisterPatchBuilderEventCallback(PatchBuilderEventCallback* pCallback, void* pUserContext);
+
+<span class="codeComment">    /// Only one callback can be registered.
+</span>    void RegisterTelemetryEventCallback(TelemetryEventCallback* pCallback, void* pUserContext);
+};
+</pre>
+<h2>PatchBuilder setup</h2>
+<p>Before executing a patch build via PatchBuilder::BuildPatchBlocking or BuildPatchAsync, a few things need to be set up. The minimum that needs to be set up is the following: </p>
+<ul>
+  <li>The directory paths (SetDirPaths)</li>
+  <li>The PatchInfo (SetPatchInfo) </li>
+</ul>
+<p>The directory paths specify where the patch occurs on disk, and the PatchInfo specifies what the patch itself is. </p>
+<pre class="code-example">void SetDirPaths(const char8_t* pPatchDestinationDirPath, const char8_t* pPatchLocalDirPath);<br /><br />void SetPatchInfo(const PatchInfo&amp; patchInfo);
+void SetPatchInfo(const char8_t* pPatchId, const char8_t* pPatchImplURL);
+</pre>
+<p>pPatchDestinationDirPath specifies the directory where the patch will be written. It may be an empty directory or may be a directory where a previous version of the content exists which will be replaced by the patch content. pPatchLocalDirPath specifies the directory where a previous version of the content exists, though it may be NULL if there is no previous content. pPatchLocaDirPath allows you to write a patch to pPatchDestinationDirPath but use pre-existing content from a different location specified by pPatchLocalDirPath. If pPatchDestinationDirPath == pPatchLocalDirPath then it's assumed you are overwriting content in-place. The important purpose of specifying previous content is that it allows for minimizing the amount of downloaded data required. </p>
+<p>While pPatchDestinationDirPath and pPatchLocaDirPath specify disk directories, patches can in fact be written to a memory-based file system as opposed to a disk-based file system. </p>
+<p>Other setup functions exist which may be needed for some unusual cases. See <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/PatchBuilder.h">EAPatchClient/PatchBuilder.h</a> for the full class declaration and all functions. </p>
+<h2>Synchronous (blocking) patching</h2>
+<p>Synchronous patching refers to executing a patch as a blocking library call to PatchBuilder::BuildPatchBlocking(). That call could take anywhere from seconds to hours to return, depending on the patch size and network speed. Thus you want to use BuildPatchBlocking only if you are calling it from a separate thread or if you are using it in some tool in which this is acceptable. </p>
+<p>While BuildPatchBlocking won't return until it's done, you can still register callbacks with RegisterPatchBuilderEventCallback and RegisterTelemetryEventCallback and get callbacks during the execution. However, none of these callbacks are guaranteed to occur with any frequency or minimum time between them.</p>
+<h2>Asynchronous (non-blocking) patching</h2>
+<p>Asynchronous patching refers to executing a patch as a background library call to PatchBuilder::BuildPatchAsync(). BuildPatchAsync starts a background thread and returns right away. Its return value indicates merely if the background thread could be started. So how do you tell when the patch build is complete? </p>
+<p>There are two primary ways of telling that an async patch has completed:</p>
+<ul>
+  <li>Calling GetAsyncStatus.</li>
+  <li>Registering for events and waiting for the EAPatchStop event. </li>
+</ul>
+<p>You can also call  GetState() and check for kStateEnd, but GetAsyncStatus tells you not just if it ended by how. AsyncStatus identifies if the patch completed successfully, if it's still executing, if it was intentionally cancelled, if it was aborted due to an unrecoverable error, etc.: </p>
+<pre class="code-example">enum AsyncStatus<br />{<br />
+    kAsyncStatusNone,       <span class="codeComment">/// The action (e.g. file retrieval) hasn't started.</span> 
+    kAsyncStatusStarted,    <span class="codeComment">/// The action is occurring.</span>
+    kAsyncStatusCancelling, <span class="codeComment">/// The action is in the process of being cancelled by the user. </span><br />    kAsyncStatusCompleted,  <span class="codeComment">/// The action succeeded.</span>
+    kAsyncStatusDeferred,   <span class="codeComment">/// The action was stopped, but can be re-started later.</span>
+    kAsyncStatusCancelled,  <span class="codeComment">/// The action was explicitly cancelled, which is not the same as aborted by error.</span>
+    kAsyncStatusAborted,    <span class="codeComment">/// The action failed and stopped due to the reason specified by the Error.</span>
+    kAsyncStatusCrashed     <span class="codeComment">/// The action failed and stopped due to a crash (exception) or due to having the process or thread killed.</span>
+};
+
+bool IsAsyncOperationInProgress(AsyncStatus status);</p>
+bool IsAsyncOperationEnded(AsyncStatus status);</pre>
+<p>The EAPatchStop event is simply a callback that tells you the patch execution is done, and what it's resulting AsyncStatus is. It's called EAPatchStop instead of EAPatchCompleted because it may have ended in error, without completing the patch. </p>
+<h2>Events</h2>
+<p>EAPatchClient lets you register a callback to receive a number of notifications about the patching progress. These allow you to display a simple or detailed real-time report about the patching progress. This is done via the following C++ interface class: </p>
+<pre class="code-example">class PatchBuilderEventCallback
+{
+public:
+    virtual void EAPatchStart                (PatchBuilder*, intptr_t userContext);
+    virtual void EAPatchProgress             (PatchBuilder*, intptr_t userContext, double patchProgress);
+    virtual void EAPatchRetryableNetworkError(PatchBuilder*, intptr_t userContext, const char8_t* pURL);
+    virtual void EAPatchNetworkAvailability  (PatchBuilder*, intptr_t userContext, bool available);
+    virtual void EAPatchError                (PatchBuilder*, intptr_t userContext, Error& error);
+    virtual void EAPatchNewState             (PatchBuilder*, intptr_t userContext, int newState);
+    virtual void EAPatchBeginFileDownload    (PatchBuilder*, intptr_t userContext, const char8_t* pFilePath, const char8_t* pFileURL);
+    virtual void EAPatchEndFileDownload      (PatchBuilder*, intptr_t userContext, const char8_t* pFilePath, const char8_t* pFileURL);
+    virtual void EAPatchRenameFile           (PatchBuilder*, intptr_t userContext, const char8_t* pPrevFilePath, const char8_t* pNewFilePath);
+    virtual void EAPatchDeleteFile           (PatchBuilder*, intptr_t userContext, const char8_t* pFilePath);
+    virtual void EAPatchRenameDirectory      (PatchBuilder*, intptr_t userContext, const char8_t* pPrevDirPath, const char8_t* pNewDirPath);
+    virtual void EAPatchDeleteDirectory      (PatchBuilder*, intptr_t userContext, const char8_t* pDirPath);
+    virtual void EAPatchStop                 (PatchBuilder*, intptr_t userContext, AsyncStatus asyncStatus);
+};</pre>
+<p>To use this, you need to make a subclass of PatchBuilderEventCallback and implement the functions you are interested in. Other functions are handled silently by default in the base class.</p>
+<p> For example: </p>
+<pre class="code-example">class MyEventCallback : public PatchBuilderEventCallback
+{
+public:
+    void EAPatchProgress(PatchBuilder*, intptr_t, double patchProgress)
+         { printf(&quot;%1.f percent complete\n&quot;, patchProgress * 100); }
+    void EAPatchNetworkAvailability(PatchBuilder*, intptr_t, bool available)
+         { printf(&quot;Network connectivity %s\n&quot;, available ? &quot;gained&quot; : &quot;lost&quot;); }
+    void EAPatchStop(PatchBuilder*, intptr_t, AsyncStatus asyncStatus)
+         { printf(&quot;Patch complete, result = %s\n&quot;, GetAsyncStatusString(asyncStatus)); }
+};
+ <br />MyEventCallback callback;
+PatchBuilder    builder;
+
+builder.RegisterPatchBuilderEventCallback(&amp;callback, 0);
+. . .
+builder.BuildPatchAsync();
+. . .
+</pre>
+<p>EAPatchDirectoryRetriever offers similar event handling. See <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/PatchDirectory.h">EAPatchClient/EAPatchDirectory.h</a> for its interface.</p>
+<h2>Telemetry</h2>
+<p>EAPatch provides generation of telemetry-related events. These are different from patch building events, as they are about metrics and not about status or progress. For example, the telemetry tells you how many bytes were downloaded from the server as part of a patch, and what the download rate was in bytes per second. Telemetry is useful for storing for later analysis, and you typically would use a telemetry uploading service (<a href="https://developer.origin.com/documentation/display/telemetry/Telemetry">EA has one</a>) to upload this data. EAPatch provides telemetry data as a simple struct of strings which can be converted to whatever format your telemetry uploading system requires. </p>
+<p>For example, upon completing a patch, the following telemetry data is calculated and sent to the registered callback: </p>
+<pre class="code-example">struct TelemetryPatchBuildEnd : public TelemetryBase
+{
+    PatchBuilder& mPatchBuilder;                <span class="codeComment">/// The instance that generated this telemetry.</span>
+    String        mPatchImplURL;                <span class="codeComment">/// Where the .eaPatchImpl came from.</span>
+    String        mPatchId;                     <span class="codeComment">/// The PatchInfo::mPatchId value.</span>
+    String        mPatchCourse;                 <span class="codeComment">/// "New" or "Resume" or "None". Indicates if this patch execution was a new execution, ...</span>
+    String        mPatchDirection;              <span class="codeComment">/// "Build" or "Cancel" (always build in this case). Indicates if this identifies a ...</span>
+    String        mStatus;                      <span class="codeComment">/// See enum AsyncStatus. One of "Completed", "Deferred, "Cancelled, "Aborted", "Crashed"</span>
+    String        mDownloadSpeedBytesPerSecond; <span class="codeComment">/// Floating point value.</span>
+    String        mDiskSpeedBytesPerSecond;     <span class="codeComment">/// Floating point value.</span>
+    String        mImplDownloadVolume;          <span class="codeComment">/// uint64_t sum of bytes downloaded as the .eaPatchImpl file. 0 if the build ...</span>
+    String        mDiffDownloadVolume;          <span class="codeComment">/// uint64_t sum of bytes downloaded as .eaPatchDiff files. 0 if the build...</span>
+    String        mFileDownloadVolume;          <span class="codeComment">/// uint64_t sum of bytes downloaded as patch files. 0 if the build never...</span>
+    String        mFileDownloadVolumeFinal;     <span class="codeComment">/// uint64_t sum of all bytes needed to complete the build. 0 if the build never ...</span>
+    String        mFileCopyVolume;              <span class="codeComment">/// uint64_t sum of bytes copied. 0 if the build never made it that far.</span>
+    String        mFileCopyVolumeFinal;         <span class="codeComment">/// uint64_t sum of bytes needed to complete the build. 0 if the build never made ...</span>
+    String        mPatchTimeEstimate;           <span class="codeComment">/// uint64_t seconds to complete a patch that wasn't completed in a single shot.</span>
+    String        mPatchTime;                   <span class="codeComment">/// uint64_t seconds to complete an uninterrupted patch.</span>
+};
+</pre>
+<p>To use this, you need to make a subclass of PatchBuilderEventCallback and implement the functions you are interested in. Other functions are handled silently by default in the base class.</p>
+<p> For example: </p>
+<pre class="code-example">class MyTelemetryCallback : public TelemetryEventCallback
+{
+public:
+    void TelemetryEvent(intptr_t, TelemetryPatchBuildEnd&amp; tpbe);
+         { printf(&quot;Patch telemetry result: %s %s ...\n&quot;, tpbe.mPatchImplURL.c_str(), tpbe.mFileDownloadVolumeFinal.c_str()); }
+<span class="codeComment">    // Can implement other Telemetry functions here if desired.</span>
+};
+ <br />MyTelemetryCallback callback;
+PatchBuilder        builder;
+
+builder.RegisterTelemetryEventCallback(&amp;callback, 0);
+. . .
+builder.BuildPatchAsync();
+. . .
+</pre>
+<p>EAPatchDirectoryRetriever offers similar telemetry. See <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/PatchDirectory.h">EAPatchClient/EAPatchDirectory.h</a> for its interface.</p>
+<h2>PatchDirectoryRetriever</h2>
+<p>While patches are described in .eaPatchInfo files as described above, there is still the question of where the application gets the .eaPatchInfo file. That's up to the application, but a formally supported option for it is the EAPatchDirectory system. </p>
+<p>With this scheme, the list of available patches is stored in a simple text file on the patch server, and when you want to present to the user a list of avaialable patches, you use PatchDirectoryRetriever to get the list. See the <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/EAPatchMaker/dev/doc/EAPatchMaker.html#EAPatchDir">EAPatchMaker documentation </a>for a description of .eaPatchDir files. You still need to give the PatchDirectoryRetriever a URL, but in this case the URL is unchanging and can be compiled into the app, whereas if you are offering a selection of patches to the user, the individual .eaPatchInfo files may be changing over time.</p>
+<p>Patch directories are optional, as an app might be written in such a way as to bypass the directories and just download and install the desired .eaPatchInfo or .eaPatchImpl directly, which is like going into a restaurant and telling the waiter, &quot;I don't need to the menu, just give me the French Toast, please.&quot; </p>
+<p> The PatchDirectoryRetriever class in <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/PatchDirectory.h">EAPatchClient/PatchDirectory.h</a> downloads the set of available patches (PatchInfos) listed in in the .eaPatchDir file. Upon completion of the download you will have a list of PatchInfo objects you can present to the user or programmatically process. The primary interface of PatchDirectoryRetriever: </p>
+<pre class="code-example">class PatchDirectoryRetriever
+{
+public:<span class="codeComment">
+    /// Gets/Sets the EA::Patch::Server to use. If SetServer is not called then
+    /// the global server returned by EA::Patch::GetServer is used. The supplied Server
+    /// must be valid for the lifetime of retrieval operations.
+</span>    Server* GetServer();
+    void    SetServer(Server* pServer);
+
+<span class="codeComment">    /// GetPatchDirectory
+    /// Returns a copy of the retrieved PatchDirectory.
+    /// The return value is true if the PatchDirectory is valid as a result of having 
+    /// been successfully retrieved.
+</span>    bool GetPatchDirectory(PatchDirectory& patchDirectory);
+
+<span class="codeComment">    /// As with the rest of the EAPatchClient, errors are reported as they occur to 
+    /// the handler set by RegisterUserErrorHandler. Only a single download can be 
+    /// active at a time for an instance of PatchDirectoryRetriever, and false will 
+    /// be returned (kEAPatchErrorIdAlreadyActive) if a retrieval is active.
+    /// This is a blocking call which probably should be called in a thread other 
+    /// than the main thread.
+</span>    bool RetrievePatchDirectoryBlocking();
+
+<span class="codeComment">    /// RetrievePatchDirectoryAsync
+    /// This is an async version of RetrievePatchDirectoryBlocking, and it returns
+    /// immediately, after the creation of a background task to do the retrieval.
+    /// The return value indicates whether the async operation started successfully.
+    /// You can use GetAsyncStatus to poll the state of this operation.
+</span>    bool RetrievePatchDirectoryAsync();
+
+<span class="codeComment">    /// Cancels an existing download if it's active. 
+    /// If waitForCompletion is true then this function doesn't return until the 
+    /// cancel operation is complete and all of its resources are released.
+    /// Can be called while either RetrievePatchDirectoryBlocking or RetrievePatchDirectoryAsync
+    /// is executing. If RetrievePatchDirectoryBlocking is executing then this causes it
+    /// to return false. If RetrievePatchDirectoryAsync is executing then this causes the
+    /// AsyncStatus to become kAsyncStatusCancelled. In both cases the operation is halted.
+    /// A new call to RetrievePatchDirectory can be made at any time after calling CancelRetrieval.
+</span>    void CancelRetrieval(bool waitForCompletion);
+
+<span class="codeComment">    /// Gets the current status of RetrievePatchDirectoryAsync.
+    /// Tells if RetrievePatchDirectoryAsync is busy downloading a PatchDirectory, for example.
+    /// RetrievePatchDirectoryAsync is completed when the AsyncStatus is one of the 
+    /// done states (completed, cancelled, aborted). 
+    /// Error may come with any AsyncStatus state except kAsyncStatusNone
+    /// and kAsyncStatusCompleted. Check this class' ErrorBase for the Error.
+</span>    AsyncStatus GetAsyncStatus() const;
+
+<span class="codeComment">    /// Only one callback can be registered.
+</span>    void RegisterPatchDirectoryEventCallback(PatchDirectoryEventCallback* pCallback, intptr_t userContext);
+
+<span class="codeComment">    /// Only one callback can be registered.
+</span>    void RegisterTelemetryEventCallback(TelemetryEventCallback* pCallback, intptr_t userContext);
+};
+</pre>
+<p>Example usage: </p>
+<pre class="code-example">Server                  server;
+PatchDirectoryRetriever retriever;
+  
+server.SetPatchDirectoryURL(&quot;http://mypatchserver.ea.com/MyGame/MyPatches.eaPatchDir&quot;);
+retriever.SetServer(&amp;server);
+retriever.RetrievePatchDirectoryBlocking();  <span class="codeComment">// Or you can do this asynchronously.</span>
+
+if(retriever.GetAsyncStatus() == kAsyncStatusCompleted)
+{
+    PatchDirectory patchDirectory;
+ 
+    retriever.GetPatchDirectory(patchDirectory);
+    <span class="codeComment">// patchDirectory is a list of PatchInfos which you can now use.</span>
+}
+</pre>
+<h2>HTTP</h2>
+<p>EAPatchClient internally uses an HTTP class which handles all HTTP transfers. Normally that is hidden from the user of EAPatchClient, but the user may have reason to access the HTTP class directly.</p>
+<p>HTTP downloads files into EA::IO::IStream objects. An IStream is a generic read/write interface, and it can be a FileStream, a MemoryStream, or various custom stream types. HTTP expects the user to manage the lifetime of the stream, and HTTP just writes to that stream. Thus if you want to download from a URL into a disk file, you need to create and open the file first, then hand its stream to HTTP, then close the file yourself when done. You can use the Event system to do these operations in response to callbacks instead of beforehand.</p>
+<p>Example of writing to a disk file:</p>
+<p class="faq-answer"></p>
+<pre class="code-example">#include &lt;EAPatch/HTTP.h&gt;
+#include &lt;EAIO/EAFileStream.h&gt;
+
+EA::IO::FileStream file(&quot;C:\\Temp\\SomeFile.txt&quot;);
+
+if(file.Open(EA::IO::kAccessFlagReadWrite, EA::IO::kCDCreateAlways))
+{
+    http.GetFileBlocking("http://patchserver.ea.com/SomeDir/SomeFile.txt", &file, 0, 0);
+
+    if(http.GetAsyncStatus() == kAsyncStatusCompleted)
+    {
+        <span class="codeComment">file.SetPosition(0);
+        file.GetSize();
+        file.Read(buffer, bufferCapacity);</span>
+        <span class="codeComment">...</span>
+    }
+    else
+    {
+        Error error = http.GetError();
+        <span class="codeComment">...</span>
+    }
+
+    file.Close();
+}
+</pre>
+<p class="faq-answer"></p>
+<p>The following is an abbreviated class declaration which shows the primary functionality of interest. See <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/HTTP.h">EAPatchClient/HTTP.h</a> for the full declaration and documentation.</p>
+<pre class="code-example">class HTTP
+{
+public:
+    enum Event
+    {
+        kEventPreDownload,              <span class="codeComment">/// Called just before the DownloadJob is started.</span> 
+        kEventPostDownload,             <span class="codeComment">/// Called just after a DownloadJob is ended (successfully or otherwise).</span>
+        kEventWrite,                    <span class="codeComment">/// Called during downloading when there is a write to do. </span>
+        kEventIdle,                     <span class="codeComment">/// Called during downloading while waiting for data to arrive.</span>
+        kEventNetworkUnavailable,       <span class="codeComment">/// The network needed for the job appears to now be unavailable.</span>
+        kEventNetworkAvailable,         <span class="codeComment">/// The network needed for the job appears to now be available.</span>
+        kEventRetryableDownloadError,   <span class="codeComment">/// An error occurred which can be re-tried. </span>
+        kEventNonretryableDownloadError <span class="codeComment">/// An error occurred which is not beneficial to be re-tried. </span>
+    };
+ 
+<span class="codeComment">    /// Sets a user-specfied callback function to be henceforth used.
+    /// The caller can use any useful pointer value for handleEventContext.
+</span>    void SetEventHandler(HandleEvent pHandleEvent, intptr_t handleEventContext);
+
+<span class="codeComment">    /// Gets a file from a URL and writes it to pDestFilePath.
+    /// Otherwise acts the same as GetFileBlocking(..., pStream, ...).
+</span>    bool GetFileBlocking(const char8_t* pURL, const char8_t* pDestFilePath, 
+                          uint64_t rangeBegin = 0, uint64_t rangeCount = UINT64_MAX);
+
+<span class="codeComment">    /// Blocks until the operation completes.
+    ///
+    /// The return value indicates whether the action completed successfully or with error.
+    /// If the operation was cancelled via CancelRetrieval, the return value will be 
+    /// true (as there was no error), HasError will return false, but GetAsyncStatus will
+    /// return kAsyncStatusCancelled instead of kAsyncStatusCompleted. 
+    /// If the return value is false, then errorResult contains the error information and 
+    /// GetAsyncStatus will return kAsyncStatusAborted. To tell if the operation completed
+    /// successfully, check for GetAsyncStatus == kAsyncStatusCompleted, as it will only 
+    /// ever be kAsyncStatusCompleted if it completed without error. Note that 
+    ///
+    /// This function should be executed in a different thread than the application's
+    /// UI thread, as otherwise it would block the UI.
+    /// rangeBegin/rangeCount indicates the sub-range within the file that you want 
+    /// to retrieve. A rangeCount of 0 means to read all file bytes, regardless of 
+    /// the value of mRangeBegin. A rangeCount of UINT64_MAX means to get from rangeBegin 
+    /// to the end of the file. The return value indicates if the job could be successfully completed.</span>
+    bool GetFileBlocking(const char8_t* pURL, EA::IO::IStream* pStream, 
+                          uint64_t rangeBegin = 0, uint64_t rangeCount = UINT64_MAX);
+
+<span class="codeComment">    /// Downloads one or more files from the server specifie by SetServer.
+    /// The user specifies the DownloadJob input fields, and this function downloads the
+    /// files and writes the output result fields. 
+    /// The number of jobs passed to this function can be arbitrarily high. It internally
+    /// throttles how much gets processed at once.
+    /// The DownloadJob pointers in the array must be valid throughout the entire call.
+    /// The DownloadJob array is an array of pointers instead of array of objects so that 
+    /// the user can subclass DownloadJob for their own purposes and pass pointers to that.
+    /// See GetFileBlocking for a description of the return value.
+    /// 
+    /// Example usage:
+    ///        DownloadJob downloadJob[2];
+    ///        . . .
+    ///        DownloadJob* downloadJobPtrArray[2] = { &downloadJob[0], &downloadJob[1] };
+    ///        http.GetFilesBlocking(downloadJobPtrArray, EAArrayCount(downloadJobPtrArray));
+    ///</span>
+    bool GetFilesBlocking(DownloadJob* pDownloadJobPtrArray[], size_t downloadJobArrayCount);
+
+<span class="codeComment">    /// Cancels an existing blocking or async download if it's active. 
+    /// If waitForCompletion is true then this function doesn't return until the 
+    /// cancel operation is complete and all of its resources are released.
+    /// A new call to GetFileBlocking or GetFilesBlocking can be made at any time after 
+    /// calling CancelRetrieval. Beware that due to the multithreaded nature of this library,
+    /// if you call CancelRetrieval it's still slightly possible that the operation will complete 
+    /// with a status other than kAsyncStatusCancelled.</span>
+    void CancelRetrieval(bool waitForCompletion);
+
+<span class="codeComment">    /// Gets the current status of GetFileBlocking / GetFilesBlocking.
+    /// GetFilesBlocking is completed when the AsyncStatus is one of the 
+    /// done states (completed, cancelled, aborted). 
+    /// Error may come with any AsyncStatus state except kAsyncStatusNone
+    /// and kAsyncStatusCompleted. Check this class' ErrorBase for the Error.</span>
+    AsyncStatus GetAsyncStatus() const;
+
+<span class="codeComment">    /// Async version of GetFilesBlocking.<br />    /// The pDownloadJobPtrArray must be valid for the entire duration of the async operation,<br />    /// and not just until this function returns. This is because results are written to <br />    /// this array.<br /></span>    bool GetFilesAsync(DownloadJob* pDownloadJobPtrArray[], size_t downloadJobArrayCount);<br />};</pre>
+<h2>EAPatch file types </h2>
+<p>EAPatchClient uses or generates a number of file types that are specific to EAPatch. Each of these types has a name that ends with .eaPatch*, as described below:</p>
+<blockquote>
+  <table border="1">
+    <tr>
+      <th colspan="2">Externally visible file types </th>
+    </tr>
+    <tr>
+      <td>.eaPatchDir</td>
+      <td>Text file which lists .eaPatchInfo URLs. <br />
+      Stored on the server.<br />
+      Created by the user manually. </td>
+    </tr>
+    <tr>
+      <td>.eaPatchInfo</td>
+      <td>Small XML file which correlates to the <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/PatchInfo.h">PatchInfo</a> struct. <br />
+        Stored on the server.        <br />
+      Describes an available patch: it's name where its implementation is, etc. <br />
+      Generated by EAPatchMaker.</td>
+    </tr>
+    <tr>
+      <td>.eaPatchImpl</td>
+      <td>Potentially large XML file which correlates to the <a href="http://eaos.rws.ad.ea.com:8080/@md=d&c=And@//EAOS/EAPatch/DL/EAPatchClient/dev/include/EAPatchClient/PatchImpl.h">PatchImpl</a> struct. <br />
+        Stored on the server.
+        <br />
+      This is the patch itself.<br />
+      Initial version provided by user, a completed version is generated by EAPatchMaker. </td>
+    </tr>
+    <tr>
+      <td>.eaPatchInstalled</td>
+      <td>This file is written by EAPatchClient upon completing a patch. <br />
+        EAPatchClient can be set to not write this file. <br />
+    Generated by EAPatchClient. </td>
+    </tr>
+    <tr>
+      <th colspan="2">Internal file types </th>
+    </tr>
+    <tr>
+      <td>.eaPatchDiff</td>
+      <td>This is part of the patch implementation stored on the server.<br />
+      Generated by EAPatchMaker. </td>
+    </tr>
+    <tr>
+      <td>.eaPatchBFI</td>
+      <td>This is a temporary file during patch building; removed before patch completion. Stored on the client. <br />
+        Generated by EAPatchClient. </td>
+    </tr>
+    <tr>
+      <td>.eaPatchTemp</td>
+      <td>This is a temporary file during patch building; removed before patch completion. Stored on the client.<br /> 
+        Used for files being downloaded from the server before the download is complete. <br />
+Generated by EAPatchClient. </td>
+    </tr>
+    <tr>
+      <td>.eaPatchState</td>
+      <td>This is a temporary file during patch building; removed before patch completion. Stored on the client.<br /> 
+        Used by EAPatchClient to tell what state it was last at upon resuming a restarted patch build. <br />
+Generated by EAPatchClient. </td>
+    </tr>
+    <tr>
+      <td>.eaPatchOld</td>
+      <td><p>This is a temporary file during patch building; removed before patch completion. Stored on the client.<br />
+        Used by EAPatchClient to store pre-patched files while writing the new file in their place. <br />
+      Generated by EAPatchClient. </p>
+      </td>
+    </tr>
+  </table>
+  <p>&nbsp;</p>
+</blockquote>
+<hr />
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+</body>
+</html>

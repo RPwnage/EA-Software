@@ -1,0 +1,130 @@
+<project>
+    <publicdata packagename="EadpFoundation">
+        
+        <do if="${package.EadpFoundation.use_std_stl??false}">
+          <property name="EADPSDK_USE_STD_STL" value="1" local="true" />
+        </do>
+        
+        <do if="${package.EadpFoundation.use_default_allocator??false}">
+          <property name="EADPSDK_USE_DEFAULT_ALLOCATOR" value="1" local="true" />
+        </do>
+
+        <property name="package.EadpFoundation.sharedDefines">
+          EADPSDK_USE_STD_STL=${EADPSDK_USE_STD_STL??0}
+          EADPSDK_USE_DEFAULT_ALLOCATOR=${EADPSDK_USE_DEFAULT_ALLOCATOR??0}
+        </property>
+      
+        <runtime>
+            <BuildType name="ObjectiveCPPLibraryWithARC" from="ObjectiveCPPLibrary" if="${config-system} == iphone">
+                <option name="buildset.cc.options">
+                    ${option.value}
+                    -fobjc-arc
+                </option>
+            </BuildType>
+            <module name="EadpFoundation">
+                <includedirs>
+                    ${package.EadpFoundation.dir}/include
+                </includedirs>
+                <libs/> <!-- use default path -->
+                <dlls if="${Dll??false}">
+                    <includes name="${package.EadpFoundation.builddir}/${config}/bin/EadpFoundation${dll-suffix}"/>
+                </dlls>
+                <java.classes basedir="${package.EadpFoundation.builddir}/${config}/bin/EadpFoundation/classes">
+                    <includes name="**\*.class"/>
+                </java.classes>
+                <publicdependencies>
+                    <do unless="${package.EadpFoundation.use_std_stl??false}">
+                        EASTL
+                        IEAUser
+                    </do>
+                    coreallocator
+                    EABase
+                    EAAssert
+                    EAStdC
+                </publicdependencies>
+            </module>
+        </runtime>
+        <tests unless="${Dll??false}">
+            <module name="EadpFoundation-test"/>
+            <module name="EadpFoundation-test-codegen" if="${config-system} == 'pc64' or ${config-system} == 'iphone'"/>
+        </tests>
+        <examples>
+            <module name="EadpFoundation-demo" />
+        </examples>
+        <tools unless="${Dll??false}">
+            <module name="eadp-sdk-protoc-plugin" if="${config-system} == 'pc64' or ${config-system} == 'osx'"/>
+        </tools>
+        <createtask name="EadpSdkProtoCodegenTask">
+            <parameters>
+                <option name="InputDir"/>
+                <option name="InputFiles"/>
+                <option name="OutputDir" value="Required" />
+                <option name="IncludeDir"/>
+            </parameters>
+            <code>
+                <do unless="'${EadpSdkProtoCodegenTask.InputDir}' == ''">
+                    <fileset name="InputFileset">
+                        <includes name="${EadpSdkProtoCodegenTask.InputDir}/**.proto" />
+                    </fileset>
+                    <foreach item="FileSet" in="InputFileset" property="filename">
+                        <property name="EadpSdkProtoCodegenTask.InputFiles">
+                            ${property.value}
+                            ${filename}
+                        </property>
+                    </foreach>
+                </do>
+                <fail if="'${EadpSdkProtoCodegenTask.InputFiles}' == ''"
+                    message="EadpSdkProtoCodegenTask requires either InputDir prameter or InputFiles parameter." />
+                <property name="host-target" local="true" value="pc64-vc-dev-opt"       if="${nant.platform_host} == 'windows'"/>
+                <property name="host-target" local="true" value="osx-x64-clang-dev-opt" if="${nant.platform_host} == 'osx'"/>
+                <property name="host-target" local="true" value="unix64-gcc-dev-opt"    if="${nant.platform_host} == 'unix'"/>
+                <optionset name="tool-build-opts">
+                    <option name="config" value="${host-target}"/>
+                </optionset>
+                <nant buildfile="${package.EadpFoundation.dir}/EadpFoundation.build" target="tool-build" optionset="tool-build-opts" />
+                <dependent name="protobuf" />
+                <property name="protoc-suffix" value=".exe" if="${nant.platform_host} == 'windows'"/>
+                <mkdir dir="${EadpSdkProtoCodegenTask.OutputDir}"/>
+                <foreach item="String" in="${EadpSdkProtoCodegenTask.InputFiles}" property="protofile">
+                    <property name="timestampfile" value="@{PathToCygwin(${protofile})}" />
+                    <property name="timestampfile" value="@{StrReplace(${property.value},'/','_')}" />
+                    <property name="timestampfile" value="${EadpSdkProtoCodegenTask.OutputDir}/._ts${property.value}" />
+                    <exec program="${package.protobuf.builddir}/${host-target}/bin/tool/protoc${protoc-suffix??}">
+                        <args>
+                            <arg value="--plugin=protoc-gen-EADPSDK=${package.EadpFoundation.builddir}/${host-target}/bin/tool/eadp-sdk-protoc-plugin${protoc-suffix??}"/>
+                            <arg value="--EADPSDK_out=${EadpSdkProtoCodegenTask.OutputDir}"/>
+                            <arg value="-I${EadpSdkProtoCodegenTask.InputDir}" unless="'${EadpSdkProtoCodegenTask.InputDir}' == ''" />
+                            <arg value="-I${EadpSdkProtoCodegenTask.IncludeDir}" unless="'${EadpSdkProtoCodegenTask.IncludeDir}' == ''" />
+                            <arg value="-I${package.protobuf.protobuf.includedirs}"/>
+                            <arg value="-I${package.EadpFoundation.dir}/proto"/>
+                            <arg value="${protofile}"/>
+                        </args>
+                        <inputs>
+                            <includes name="${package.EadpFoundation.builddir}/${host-target}/bin/tool/eadp-sdk-protoc-plugin${protoc-suffix??}" />
+                            <includes name="${EadpSdkProtoCodegenTask.InputDir}/**.proto" unless="'${EadpSdkProtoCodegenTask.InputDir}' == ''" />
+                            <includes name="${EadpSdkProtoCodegenTask.IncludeDir}/**.proto" unless="'${EadpSdkProtoCodegenTask.IncludeDir}' == ''" />
+                        </inputs>
+                        <outputs>
+                            <includes name="${timestampfile}" />
+                        </outputs>
+                    </exec>
+                    <touch file="${timestampfile}" />
+                </foreach>
+            </code>
+        </createtask>
+        <createtask name="EadpSdkProtoCodegenResetTask">
+            <parameters>
+                <option name="TargetDir" value="Required" />
+            </parameters>
+            <code>
+                <echo message="Remove eadp-sdk proto codegen timestamp files in path ${EadpSdkProtoCodegenResetTask.TargetDir}." />
+                <fileset name="GenTimestampFiles" basedir="${EadpSdkProtoCodegenResetTask.TargetDir}">
+                    <includes name="._ts*" />
+                </fileset>
+                <foreach item="FileSet" in="GenTimestampFiles" property="file">
+                    <delete file="${file}" />
+                </foreach>
+            </code>
+        </createtask>
+    </publicdata>
+</project>

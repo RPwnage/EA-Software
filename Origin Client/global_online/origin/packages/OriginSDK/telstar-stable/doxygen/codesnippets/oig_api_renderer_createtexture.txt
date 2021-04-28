@@ -1,0 +1,55 @@
+	int32_t OriginIGORenderer::createTexture2D(const OriginIGORenderingTexture2D_T* input)
+	{
+		if (input != nullptr && input->texID == enumOriginIGOTextureID::ORIGINIGOTEXTUREID_INVALID)
+		{
+			m_textureId++;
+
+			TextureMap::iterator it = m_textures.find(m_textureId);
+			while (it != m_textures.end())	// find a free spot - egde case, where we may have allocated 2<<31 textures in a session
+			{
+				m_textureId++;
+				it = m_textures.find(m_textureId);
+			}
+
+			TextureCreateDesc::SubData subData;
+			uint32_t backgroundFill = 0;
+			if (input->dataSize == 0)
+			{
+				subData.ptr = &backgroundFill;
+				subData.pitch = static_cast<uint32_t>(4);
+			}
+			else
+			{
+				subData.ptr = input->data;
+				subData.pitch = static_cast<uint32_t>(input->width * 4);
+			}
+
+			TextureCreateDesc desc;
+			if (input->dataSize != subData.pitch * input->height)
+			{
+				// if we get an invalid texture, just create a 1x1 dummy texture, because we need the m_textureId
+				subData.ptr = &backgroundFill;
+				subData.pitch = static_cast<uint32_t>(4);
+				desc.width = 1;
+				desc.height = 1;
+			}
+			else
+			{
+				// prevent 0x0 textures
+				desc.width = input->width == 0 ? 1 : input->width;
+				desc.height = input->height == 0 ? 1 : input->height;
+			}
+
+			desc.name << "OIG_Texture_" << m_textureId;
+			desc.type = TextureType_2d;
+			desc.format = m_isSRGB ? RenderFormat_B8G8R8A8_SRGB : RenderFormat_B8G8R8A8_UNORM;
+			desc.subResourceData = &subData;
+			shared_ptr<ITexture> sourceTexture = createYourTexture(desc);
+
+			m_textures[m_textureId] = sourceTexture;
+
+			// return the final texture id
+			return m_textureId;
+		}
+		return enumOriginIGOTextureID::ORIGINIGOTEXTUREID_INVALID;
+	}

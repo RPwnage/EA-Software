@@ -1,0 +1,308 @@
+<project name="originweb" default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="build" value="exclude"/>
+        <option name="clean" value="exclude"/>
+        <option name="package" value="exclude"/>
+    </optionset>
+
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+  <!-- ******************* -->
+  <property name="package.originweb.dir"  value="@{PathGetFullPath('.')}"/>
+  <property name="package.originweb.version"  value="@{PathGetFileName('${package.originweb.dir}')}"/>
+  <package name="originweb" targetversion="${package.originweb.version}"/>
+
+	<property name="force" value="${force??false}"/>
+  <property name="package.originweb.build.dir" value="${package.originweb.dir}/build"/>
+  <property name="package.originweb.stage.dir" value="${package.originweb.build.dir}/stage"/>
+  <property name="web.root.dir" value="${package.originweb.dir}/.."/>
+	<property name="automation.dir" value="${web.root.dir}/automation"/>
+  <property name="app.dir" value="${web.root.dir}/app"/>
+  <property name="mockup.dir" value="${automation.dir}/mockup"/>
+  <property name="jssdk.dir" value="${web.root.dir}/jssdk"/>
+  <property name="i18n.dir" value="${web.root.dir}/i18n"/>
+  <property name="cms.dir" value="${web.root.dir}/cms"/>
+  <property name="components.dir" value="${web.root.dir}/components"/>
+  <property name="tools.dir" value="${web.root.dir}/tools"/>
+  <property name="version.file" value="${package.dir}/version.txt"/>
+
+  <dependent name="npm"/>
+
+  <echo message="islinux = ${islinux}"/>
+  <echo message="isOSX = ${isOSX}"/>
+
+  <include file="${components.dir}/components.xml"/>
+
+  <choose>
+    <do if="${isOSX} == true || ${islinux} == true">
+      <property name="sudo" value="sudo"/>
+      <property name="bower.cmd" value="bower"/>
+      <property name="grunt.cmd" value="grunt"/>
+    </do>
+    <do>
+      <property name="bower.cmd" value="${npm.root}/bower.cmd"/>
+      <property name="sudo" value=""/>
+      <property name="grunt.cmd" value="${npm.root}/grunt.cmd"/>
+    </do>
+  </choose>
+
+	<property name="components.dependencies" value="origin-i18n origin-jssdk"/>
+	<property name="app.dependencies" value="origin-jssdk origin-i18n origin-components"/>
+
+  <optionset name="web.env">
+    <option name="PATH" value="${sys.env.PATH};${package.npm.dir}/dist"/>
+  </optionset>
+
+  <mkdir dir="${package.originweb.build.dir}" unless="@{DirectoryExists(${package.originweb.build.dir})}"/>
+
+  <!-- This origin.exec allows you to be able to run a command on windows and unix -->
+  <createtask name="origin.exec">
+    <parameters>
+      <option name="sudo" value="false"/>
+      <option name="cmd" value="Required"/>
+      <option name="args" value=""/>
+      <option name="workingdir" value="."/>
+      <option name="failonerror" value="true"/>
+      <option name="force" value="false"/>
+    </parameters>
+    <code>
+      <exec program="${origin.exec.cmd}" workingdir="${origin.exec.workingdir}" failonerror="${origin.exec.failonerror}" if="${origin.exec.sudo} == false or (${islinux} == false and ${isOSX} == false)">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="${origin.exec.args}"/>
+          <arg value="--force" if="${origin.exec.force} == true"/>
+        </args>
+      </exec>
+      <exec program="sudo" workingdir="${origin.exec.workingdir}" failonerror="${origin.exec.failonerror}" if="${origin.exec.sudo}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="${origin.exec.cmd}"/>
+          <arg value="${origin.exec.args}"/>
+          <arg value="--force" if="${origin.exec.force} == true"/>
+        </args>
+      </exec>
+    </code>
+  </createtask>
+
+  <target name="clean">
+    <!-- Make sure Cygwin is installed! -->
+    <foreach property="module" item="String" in="${jssdk.dir} ${components.dir} ${i18n.dir} ${app.dir}">
+      <foreach property="subdir" item="String" in="node_modules dist docs_gen bower_components src/bower_components tmp">
+        <choose>
+          <do if="${islinux} == true || ${isOSX} == true">
+            <echo message="Cleaning ${module}/${subdir}"/>
+            <exec program="sudo">
+              <args>
+                <arg value="rm"/>
+                <arg value="-rf"/>
+                <arg value="${module}/${subdir}"/>
+              </args>
+            </exec>
+          </do>
+          <do>
+            <echo message="Cleaning ${module}/${subdir}"/>
+            <exec program="rmdir" failonerror="false">
+              <args>
+                <arg value="/s"/>
+                <arg value="/q"/>
+                <arg value="@{PathToWindows('${module}/${subdir}')}"/>
+              </args>
+            </exec>
+          </do>
+        </choose>
+      </foreach>
+    </foreach>
+  </target>
+
+  <target name="build">
+    <task name="npm-install-grunt" unless="${islinux}"/>
+    <task name="npm-install-grunt-cli" unless="${islinux}" />
+    <task name="npm-install-bower" unless="${islinux}"/>
+    <call target="build-component-packager" if="${jenkins??false}"/>
+    <call target="build-component-packager-dev-tools" if="${jenkins??false}"/>
+    <call target="build-template-compiler"/>
+    <task name="origin.exec" cmd="${npm.cmd}" args="link origin-grunt-template-compiler" workingdir="${components.dir}" sudo="false"/>
+    <foreach property="module" item="String" in="jssdk i18n components">
+      <echo message="Building in ${module}"/>
+      <task name="origin.exec" cmd="${npm.cmd}" args="install" workingdir="${web.root.dir}/${module}" sudo="false"/>
+      <do if="@{PropertyExists('${module}.dependencies')}">
+        <foreach property="submodule" item="String" in="${${module}.dependencies}">
+          <exec program="${bower.cmd}" workingdir="${web.root.dir}/${module}">
+            <env fromoptionset="web.env"/>
+            <args>
+            <arg value="link"/>
+            <arg value="${submodule}"/>
+            </args>
+          </exec>
+        </foreach>
+      </do>
+      <exec program="${bower.cmd}" workingdir="${web.root.dir}/${module}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="install"/>
+        </args>
+      </exec>
+      <exec program="${grunt.cmd}" workingdir="${web.root.dir}/${module}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="--force" if="${force}"/>
+        </args>
+      </exec>
+      <exec program="${bower.cmd}" workingdir="${web.root.dir}/${module}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="link"/>
+        </args>
+      </exec>
+    </foreach>
+    <!-- build the grunt-component-packager -->
+    <do if="${jenkins??false}">
+      <task name="origin.exec" cmd="${npm.cmd}" args="link origin-grunt-component-packager" workingdir="${components.dir}" sudo="false"/>
+      <task name="origin.exec" cmd="${npm.cmd}" args="link origin-grunt-component-packager-dev-tools" workingdir="${components.dir}" sudo="false"/>
+      <exec program="${grunt.cmd}" workingdir="${components.dir}">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value=" --gruntfile Gruntfile-cq.js"/>
+          <arg value="--force" if="${force}"/>
+        </args>
+      </exec>
+    </do>
+    <exec program="${npm.cmd}" workingdir="${app.dir}" >
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <!-- Build the app folder -->
+    <foreach property="module" item="String" in="${app.dependencies}">
+      <exec program="${bower.cmd}" workingdir="${app.dir}" failonerror="false">
+        <env fromoptionset="web.env"/>
+        <args>
+          <arg value="link"/>
+          <arg value="${module}"/>
+        </args>
+      </exec>
+    </foreach>
+    <exec program="${bower.cmd}" workingdir="${app.dir}">
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="install"/>
+        <arg value="-F"/>
+      </args>
+    </exec>
+    <exec program="${grunt.cmd}" workingdir="${app.dir}">
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="${grunt.target??}" />
+        <arg value="--force" if="${force}"/>
+      </args>
+    </exec>
+  </target>
+
+	<target name="jssdk-test">
+    <exec program="${npm.cmd}" workingdir="${jssdk.dir}" >
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <exec program="${bower.cmd}" workingdir="${jssdk.dir}">
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="install"/>
+      </args>
+    </exec>
+    <exec program="${grunt.cmd}" workingdir="${jssdk.dir}">
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="--force" if="${force}"/>
+      </args>
+    </exec>
+    <exec program="${grunt.cmd}" workingdir="${jssdk.dir}">
+      <env fromoptionset="web.env"/>
+      <args>
+        <arg value="functional-test"/>
+      <arg value="--force" if="${force}"/>
+      </args>
+    </exec>
+	</target>
+
+	<target name="dev">
+		<property name="grunt.target" value="dev"/>
+		<call target="build"/>
+	</target>
+
+  <target name="docs">
+    <call target="dev"/>
+    <exec program="${grunt.cmd}" workingdir="${app.dir}">
+        <args>
+          <arg value="docs"/>
+          <arg value="--force" if="${force}"/>
+        </args>
+    </exec>
+  </target>
+
+    <target name="originweb-serve">
+      <task name="npm-install-grunt" unless="${islinux} || ${isOSX}"/>
+      <task name="npm-install-grunt-cli" unless="${islinux} || ${isOSX}"/>
+      <task name="npm-install-bower" unless="${islinux} || ${isOSX}"/>
+      <task name="origin.exec" cmd="${grunt.cmd}" args="serve:nobuild" workingdir="${app.dir}" sudo="true"/>
+    </target>
+
+    <!-- The Plato target uses Plato https://www.npmjs.com/package/plato to perform static code analysis on the Origin -->
+    <!-- web code base. -->
+    <target name="plato">
+      <property name="plato.output.dir" value="${package.builddir}/plato"/>
+      <property name="jshintrc.file" value="${package.originweb.dir}/.jshintrc"/>
+      <property name="plato.source.dirs">
+        ${app.dir}/src
+        ${jssdk.dir}/src
+        ${i18n.dir}/src
+        ${components.dir}/src
+      </property>
+      <task name="origin.exec" cmd="${npm.cmd}" args="install -g plato" workingdir="${package.originweb.dir}" sudo="false"/>
+      <exec program="plato" workingdir="${package.originweb.dir}">
+        <args>
+          <!-- -r = recursive -->
+          <arg value="-r"/>
+          <!-- -d = destination folder -->
+          <arg value="-d ${plato.output.dir}"/>
+          <!-- -l = jshint rc file -->
+          <arg value="-l ${jshintrc.file}"/>
+          <!-- folders to check -->
+          <arg value="${plato.source.dirs}"/>
+        </args>
+      </exec>
+    </target>
+
+    <target name="stage">
+      <delete dir="${package.originweb.stage.dir}"/>
+      <!-- Using Robocopy because Windows does not handle pathnames longer than 260 char. -->
+      <exec program="robocopy" failonerror="false">
+        <args>
+          <arg value="${package.originweb.dir}/dist"/>
+          <arg value="${package.originweb.build.dir}/stage"/>
+          <arg value="/S"/>
+          <arg value="/E"/>
+          <arg value="/XD node_modules"/>
+        </args>
+      </exec>
+      <fail if="${exec.exitcode} > 1" message="Robocopy had an exit code of ${exec.exitcode}. Failed"/>
+    </target>
+
+    <target name="package">
+      <zip zipfile="${package.originweb.dir}/target/${output.filename}">
+        <fileset basedir="${package.originweb.stage.dir}">
+          <includes name="**"/>
+        </fileset>
+      </zip>
+    </target>
+</project>
+
+
+
+

@@ -1,0 +1,248 @@
+<project>
+  <!-- check to see if it's a debug build and set some useful properties -->
+	<do if="${config-name} eq 'dev-debug'" >
+		<property name="debug-suffix" value="d" />
+		<property name="debug-suffix" value="_debug" if="${config-platform} == 'osx-gcc'" />
+		<property name="debug-suffix" value="_debug" if="${config-platform} == 'osx-clang'" />
+		<property name="config-type" value="debug" />
+	</do>
+
+	<do unless="${config-name} eq 'dev-debug'"> 
+		<property name="debug-suffix" value="" />
+		<property name="config-type" value="opt" />
+	</do>
+  
+    <!-- Override the dll-suffix so that dynamic libs on OSX end with a .dylib extension instead of .so -->
+    <property name="dll-suffix" value=".dylib" readonly="true" if="${config-system}=='osx'"/>  
+    
+	<!-- this is the sha1 hash for the Origin private cert -->
+	<property name="cert.sha1" value="1ed252c2dbcca3953ece62561373e1e43eeeb434" />
+
+	<property name="doxygen.workingdir" value="@{PathGetFullPath('${package.OriginConfig.dir}/../..')}" />
+	<property name="originApiDocs.webdir" value="\\opqa-online.rws.ad.ea.com\Webserver\OriginAPIDocs" />
+	<property name="originApiDocs.outputdir" value="${doxygen.workingdir}/docs/html" />
+	<property name="runtime.originClient.targetdir" value="${package.dir}/target"/>
+    <property name="origin.build.version" value="dev" />
+    <property name="origin.branch" value="@{PathGetFileName(@{PathGetFullPath('${package.OriginConfig.dir}/../..')})}" />
+    <property name="automation.s3.bucket" value="client-automation" />
+    <property name="automation.s3.key" value="AKIAIYHMFLKMRZWSVIFQ" />
+    <property name="automation.s3.secret.key" value="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" />
+  <property name="jenkins.url" value="http://ebisu-build01:8080/hudson" />
+	<property name="jenkins.admin.account" value="originautomation" />
+	<property name="jenkins.admin.password" value="ed1a8fabc0b757809ac552a8817db692" />
+  <!-- points to the shared drive on the origin-web docs server. -->
+	<property name="origin.x.docs.root.dir" value="\\origin-web\htdocs"/>
+	<!-- set the default value for codesign.extra.options -->
+	<property name="codesign.extra.options" value="" unless="@{PropertyExists('codesign.extra.options')}"/>
+
+	<!-- set the default value for noqt. To control jobs that we don't want to load Qt -->
+	<property name="noqt" value="false" unless="@{PropertyExists('noqt')}"/>
+
+	<!-- set the default value for timestamp to TRUE -->
+	<property name="codesign.timestamp" value="True" unless="@{PropertyExists('codesign.timestamp')}"/>
+	<fail message="codesign.timestamp must be either 'True' or 'False'" if="${codesign.timestamp} != True AND ${codesign.timestamp} != False"/>
+
+	<!-- Control properties -->
+
+  <!-- use this to set the number of signing retries if it fails. -->
+  <property name="signing.retries.default" value="2" />
+	<property name="p4.user" value="hudson.online" />
+	<property name="p4.port" value="eac-p4proxy:4487" />
+	<property name="p4.password" value="CrMbLmTXe" />
+<!--	<property name="p4.passwd" value="523D4071196BE66A61F17744B0F4041A" /> -->
+	<property name="p4.passwd" value="5FD47B4FF7E337872FCBEE092E3E0D1A" />
+	
+	<property name="origin.doc_modules">
+		originClient
+		engine
+		webWidget
+		server
+	</property>
+	
+	<!-- Where MOC and UI output files will get dumped -->
+	<property name="generatedfiles.output.dir" value="${package.dir}/generated/${config}" />
+
+	<!-- Extra MOC compiler properties -->
+	<property name="moc.compiler.defines" value="-D_MSC_VER=1500 -DWIN32" />
+	<property name="moc.output.dir" value="${generatedfiles.output.dir}" />
+  
+	<!-- extra Qt UI compiler properties-->
+	<property name="ui.compiler.options" value="" />
+	<property name="ui.output.dir" value="${generatedfiles.output.dir}" />
+
+	<property name="rc.output.dir" value="${generatedfiles.output.dir}" />
+	
+	<!-- MIDL compiler properties -->
+	<property name="midl.compiler" value="${package.WindowsSDK.appdir}\bin\midl.exe" if="${config-platform} == 'pc-vc'"/>
+
+	<!-- Enable multi processor compiles -->
+	<property name="eaconfig.build-MP" value="" />
+	
+	<!-- Enable Xoreax Grid Engine -->
+	<property name="incredibuild.usexge" value="false" />
+	
+	<!-- target to clean just the generated files -->
+	<target name="clean-generated" >
+		<delete dir="${moc.output.dir}" />
+		<delete dir="${ui.output.dir}" />
+	</target>
+
+	<!-- Task to sign executables -->
+	<!-- Parameters: 	public.cert 	= if TRUE, sign with the public (release) cert  -->
+	<!-- 							desc					= embedded descrition of the binary to sign with -->
+	<!--							in 						= the path to the binary that you wish to sign.  -->
+	<createtask name="sign" >
+		<parameters>
+			<option name="public.cert" value="Required" />
+			<option name="desc" value="Required" />
+			<option name="in" value="Required" />
+			<option name="retries" value="0" />
+			<option name="timestamp" value="True"/>
+		</parameters>
+		
+		<code>
+			<dependent name="SignTool" />
+			<property name="retries" value="${sign.retries}" />
+			<fail unless="${config-system} == 'pc' OR ${config-system} == 'pc64'" message="&quot;sign&quot; target is only useable on PC. Use &quot;codesign&quot; for OSX" />
+			<fail if="@{CharIsDigit(${retries},0)} == False" message="Task &quot;sign&quot; parameter &quot;retries&quot; is not a number." />
+			<property name="cert.args" value="/f ${package.SignTool.datadir}\ea_cert.pfx /p origin" unless="${sign.public.cert}"/>
+			<property name="cert.args" value="/sha1 ${cert.sha1}" if="${sign.public.cert}"/>
+			<property name="success" value="False" />
+	
+			<echo message="sign.public.cert = ${sign.public.cert}" if="@{PropertyExists('origindebug')}"/>
+			<echo message="retries = ${retries}" if="@{PropertyExists('origindebug')}"/>
+	
+			<property name="count" value="0" />
+			<property name="sign.bat.file" value="${package.builddir}\sign.bat"/>
+			<property name="sign.output.file" value="${package.builddir}\signoutput.txt"/>
+			<property name="timestamp.args" value="/t http://timestamp.verisign.com/scripts/timstamp.dll" />
+      <!-- Turn off timestamping if the variable is false -->
+			<property name="timestamp.args" value="" unless="@{PropertyTrue('sign.timestamp')}"/>
+			
+			
+			<while condition="${count} lte ${retries}" >
+				<delete file="${sign.output.file}"/>
+				<echo file="${sign.bat.file}">
+call ${package.SignTool.exe} sign ${cert.args} /d &quot;${sign.desc}&quot; ${timestamp.args??} ${sign.in}  2>&quot;${sign.output.file}&quot;
+				</echo>
+				<exec program="${sign.bat.file}" failonerror="False" redirectout="True" />
+				<echo message="exitcode = ${exec.exitcode}" if="@{PropertyExists('origindebug')}"/>
+				<do unless="${exec.exitcode} == '0'" >
+					<property name="count" value="@{MathAdd(${property.value},'1')}" />
+					<echo message="Retrying ${count} of ${retries}." if="${count} lte ${retries}"/>
+<!--					<choose>
+						<do if="'${timestamp.args}' eq '/tr ${package.SignTool.verisign.timestamp.url}'">
+							<property name="timestamp.args" value="/t ${package.SignTool.comodoca.timestamp.url}"/>
+						</do>
+						<do if="'${timestamp.args}' eq '/t ${package.SignTool.comodoca.timestamp.url}'">
+							<property name="timestamp.args" value="/t ${package.SignTool.verisign.timestamp.url}"/>
+						</do>
+					</choose> -->
+					<echo message="Trying alternate timestamp server. '${timestamp.args}'"/>
+					<sleep seconds="1" />
+				</do>
+				<do if="${exec.exitcode} == '0'" >
+					<property name="count" value="@{MathAdd(${retries},'1')}" />
+					<property name="success" value="True" />
+				</do>
+			</while>
+			<property name="signoutput" fromfile="${sign.output.file}"/>
+			<fail message="There was an error signing ${sign.in} after ${retries} retries. &#10; ${signoutput}" unless="${success}" />
+		</code>
+	</createtask>
+  
+	<createtask name="codesign.exec" >
+    <fail unless="${config-system} == 'osx'" message="&quot;sign&quot; target is only useable on PC. Use &quot;codesign&quot; for OSX" />
+
+    <parameters>
+			<option name="public.cert" value="Required" />
+			<option name="in" value="Required" />
+			<option name="extra.options" value="" />
+		</parameters>
+    
+    <code>
+      <property name="cert.name" value="OriginDev" />
+      <property name="cert.name" value="Developer ID Application: Electronic Arts Inc." if="${codesign.exec.public.cert}" />
+      <echo message="codesign.exec.extra.options = ${codesign.exec.extra.options}" if="@{PropertyExists('origindebug')}" />
+      <echo message="cert.name = ${cert.name}" if="@{PropertyExists('origindebug')}" />
+      <exec program="codesign" message="Signing ${codesign.exec.in}" >
+        <args>
+          <arg value="${codesign.exec.extra.options}" />
+          <arg value="-f" />
+          <arg value="--timestamp=none" unless="@{PropertyTrue('codesign.timestamp')}"/>
+          <arg value="-s" />
+          <arg value="&quot;${cert.name}&quot;" />
+          <arg value="${codesign.exec.in}" />
+        </args>
+      </exec>
+    </code>
+  </createtask>
+  
+	<!-- target to generate docs and put them on the network -->
+	<target name="api-docs">
+		<dependent name="Doxygen" />
+		<dependent name="GraphViz" />
+		<delete dir="${originApiDocs.outputdir}" if="@{DirectoryExists(${originApiDocs.outputdir})}" />
+		<mkdir dir="${originApiDocs.outputdir}" />
+		<exec program="${package.Doxygen.exe}" commandline="Doxyfile" workingdir="${doxygen.workingdir}">
+			<env>
+				<option name="PATH" value="${package.GraphViz.dir}\installed\bin\" />
+			</env>
+		</exec>
+		<copy todir="${originApiDocs.webdir}">
+			<fileset basedir="${originApiDocs.outputdir}">
+				<includes name="**/*.*" />
+			</fileset>
+		</copy>
+	</target>
+		
+	<target name="get-branch" >
+		<echo message="origin.branch is set to: ${origin.branch}" />
+	</target>
+	
+	<!-- Standard clean target override -->
+	<do if="'@{OptionSetGetValue('eaconfig.targets', 'clean')}' == 'exclude'">  
+		<target name="clean" depends="clean-default clean-generated">
+			<call target="clean-custom" if="@{TargetExists('clean-custom')}" force="true" />
+		</target>
+	</do>
+
+	<!-- targets to dump out compiler info -->
+	<target name="cc-options">
+		<property name="option.type" value="cc.options" />
+		<call target="dump-options" force="true"/>
+	</target>
+
+	<target name="cc-defines">
+		<property name="option.type" value="cc.defines" />
+		<call target="dump-options" force="true"/>
+	</target>
+
+	<target name="link-options">
+		<property name="option.type" value="link.options" />
+		<call target="dump-options" force="true"/>
+	</target>
+
+	<!-- will dump the builtype options specified in the "option.type" property -->
+	<target name="dump-options">
+		<property name="modules" value="" />
+		<do if="@{PropertyExists('runtime.buildmodules')}">
+			<foreach property="module" in="${runtime.buildmodules}" item="String">
+				<echo message="${option.type} for module: ${module}" />
+				<echo message="--------------------------------" />
+				<echo message="--------------------------------" />
+				<foreach property="option" in="@{OptionSetGetValue('${runtime.${module}.buildtype}','${option.type}')}" item="String">
+					<echo message="    @{StrTrim('${option}')}" />
+				</foreach>
+			</foreach>
+		</do>
+		<do unless="@{PropertyExists('runtime.buildmodules')}">
+				<echo message="${option.type} for ${package.name}" />
+				<echo message="--------------------------------" />
+				<foreach property="option" in="@{OptionSetGetValue('${runtime.buildtype}','${option.type}')}" item="String">
+					<echo message="     @{StrTrim('${option}')}" />
+				</foreach>
+		</do>
+	</target>
+</project>
+

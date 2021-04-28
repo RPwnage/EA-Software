@@ -1,0 +1,1784 @@
+/*! ************************************************************************************************/
+/*!
+    \file gamemanager.tdf
+    \attention
+        (c) Electronic Arts. All Rights Reserved.
+*/
+/*! ************************************************************************************************/
+
+[headername="framework/tdf/externalsessiontypes.h"]
+#include "framework/gen/externalsessiontypes.tdf"
+
+[headername="framework/tdf/attributes.h"]
+#include "framework/gen/attributes.tdf"
+
+[headername="framework/tdf/censusdatatype.h"]
+#include "framework/gen/censusdatatype.tdf"
+
+[headername="framework/tdf/entrycriteria.h"]
+#include "framework/gen/entrycriteria.tdf"
+
+[headername="framework/tdf/userextendeddatatypes.h"]
+
+#include "framework/gen/userextendeddatatypes.tdf"
+
+[headername="framework/tdf/network.h"]
+#include "framework/gen/network.tdf"
+
+[headername="framework/tdf/networkaddress.h"]
+#include "framework/gen/networkaddress.tdf"
+
+[headername="util/tdf/utiltypes.h"]
+#include "util/gen/utiltypes.tdf"
+
+[headername="framework/tdf/uuid.h"]
+#include "framework/gen/uuid.tdf"
+
+[headername="gamemanager/tdf/matchmaker_types.h"]
+#include "gamemanager/gen/matchmaker_types.tdf"
+
+// TODO: Disabling proto generation because of circular import caused by Blaze::Util namespace
+[headername="framework/tdf/qosdatatypesnetwork.h", includeProto=false]
+#include "framework/gen/qosdatatypesnetwork.tdf"
+
+[headername="framework/tdf/userdefines.h"]
+#include "framework/gen/userdefines.tdf"
+
+[headername="gamemanager/tdf/gamemanager_types.h"]
+#include "gamemanager/gen/gamemanager_types.tdf"
+
+namespace Blaze
+{
+namespace GameManager
+{
+
+////////////////////////////////////////////////////////////////////////////////
+// SHARED & COMMON TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+// Network Quality of Service (QoS) TDFs ///////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+// Replicated Game State TDFs //////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Information on Connection Concierge hosted connectivity between two peers.", trackChanges = true]
+class HostedConnectivityInfo
+{
+    [tag="hnad", allowref=true, description="The address of the CCS hosting server providing connectivity to this endpoint. Set only if hosted connectivity is used."]
+        NetworkAddress mHostingServerNetworkAddress;
+    [tag="rcid", default=INVALID_CCS_CONNECTIVITY_ID, description="The game console identifier for remote(this ReplicatedGamePlayer) endpoint for CCS purpose."]
+        uint32_t mRemoteLowLevelConnectivityId;
+    [tag="lcid", default=INVALID_CCS_CONNECTIVITY_ID, description="The game console identifier for local endpoint for CCS purpose."]
+        uint32_t mLocalLowLevelConnectivityId;
+    [tag="hsid", default=INVALID_CCS_CONNECTIVITY_ID, description="For a CC-assisted connection, the id of the hosting server providing connectivity between this and local endpoint."]
+        uint32_t mHostingServerConnectivityId;
+    [tag="csid", description="Identifier provided by CCS the first time a connection is made on on a particular DC instance.", default=""]
+        CCSConnectionSetId mHostingServerConnectionSetId;
+};
+
+[description="This represents a player in the game. This object is replicated across the slaves.",
+ tdfid = "hash", trackChanges = true]
+class ReplicatedGamePlayer
+{
+// Common Values Shared with ReplicatedGamePlayerServer:
+    [tag="gid"]  GameId mGameId;
+    [tag="sid", default=DEFAULT_JOINING_SLOT]  SlotId mSlotId;
+    [tag="stat"] PlayerState mPlayerState;
+    [tag="blob", allowref=true] blob mCustomData;
+    [tag="patt", allowref=true] Collections::AttributeMap mPlayerAttribs;
+    [tag="pnet", allowref=true] NetworkAddress mNetworkAddress;
+    [tag="slot", default=SLOT_PUBLIC_PARTICIPANT] SlotType mSlotType;
+    [tag="tidx", default=UNSPECIFIED_TEAM_INDEX, description="The team index occupied by this player."]
+        TeamIndex mTeamIndex;
+    [tag="role", description="The Role this player is assigned to."]
+        RoleName mRoleName;
+    [tag="ugid"] UserGroupId mUserGroupId;
+    [tag="jvmm", default=false] bool mJoinedViaMatchmaking;
+    [tag="time", default="0s", description="join timestamp, TimeValue string when joined in the master." ] // Note default is JOINED_GAME_TIMESTAMP_NOT_JOINED, represented as 0s here as TimeValue defaults don't support named constants.
+        TimeValue mJoinedGameTimestamp;
+    [tag="rcre", default="0s", description="reservation creation timestamp, TimeValue string when reservation is made in the master" ] // Note default is NO_RESERVATION_TIMESTAMP, represented as 0s here as TimeValue defaults don't support named constants.
+        TimeValue mReservationCreationTimestamp;
+    [tag="csid", default=DEFAULT_JOINING_SLOT] SlotId mConnectionSlotId;
+    [tag="jfps", description="To be DEPRECATED as this flag is replaced by PlayerSettings."]
+        bool mHasJoinFirstPartyGameSessionPermission;
+    [tag="pset"] PlayerSettings mPlayerSettings;
+    [tag="encr", description="The user's encrypted id. This may be exposed to external services instead a BlazeId."]
+        EncryptedBlazeId mEncryptedBlazeId;
+    [tag="scen", description="If the player joined the game via Scenario, the Scenario's name."]
+        ScenarioName mScenarioName;
+
+// Subset of UserSessionInfo values from ReplicatedGamePlayerServer:  (TODO Consider just using the mUserInfo directly)
+    [tag="pid"]  PlayerId mPlayerId;
+    [tag="exid", description="DEPRECATED (Use PlatformInfo)"] ExternalId mExternalId;
+    [tag="loc"]  Locale mAccountLocale;
+    [tag="cnty"] uint32_t mAccountCountry;
+    [tag="uid"]  UserSessionId mPlayerSessionId;
+    [tag="name"] string(MAX_PERSONA_LENGTH) mPlayerName;
+    [tag="nasp"] PersonaNamespace mPersonaNamespace;
+    [tag="aids", description="Contains platform ids and current client platform."] PlatformInfo mPlatformInfo;
+    [tag="cong"] ConnectionGroupId mConnectionGroupId;
+    [tag="uuid"] UUID mUUID;
+    [tag="dsui", description="The dirty sock user index of the player on their client"]
+        int32_t mDirtySockUserIndex;
+};
+
+typedef list<ReplicatedGamePlayer> ReplicatedGamePlayerList;
+
+
+// TODO: Reorganize this to use GameCreationData internally.
+// TODO: Disabling proto generation because of circular import caused by Blaze::Util::NetworkQosData
+[description="This represents a game. This object is replicated across the slaves.", 
+ tdfid = "hash", trackChanges = true, generateProto = false]
+class ReplicatedGameData
+{
+    // game identifiers
+    [tag="gnam"] GameName mGameName;
+    [tag="gid"] GameId mGameId;
+    [tag="uuid"] UUID mUUID;
+    [tag="seed", description="a 32 bit number shared between clients"] uint32_t mSharedSeed;
+    [tag="gsid"] GameReportingId mGameReportingId;
+    [tag="gtyp", description="Game Type used for game reporting as passed up in the request."]
+        GameReportName mGameReportName;
+    [tag="vstr"] GameProtocolVersionString mGameProtocolVersionString;
+    [tag="gpvh"] uint64_t mGameProtocolVersionHash;
+    [tag="pres"] PresenceMode mPresenceMode;
+    [tag="prdl"] ClientPlatformTypeList mPresenceDisabledList;
+    [tag="aprs", default=true, description="This boolean flag determines if a game session owns first party presence on the client. This is only utilized on Xbox 360"]
+        bool mOwnsFirstPartyPresence;
+    [tag="npsi", description="DEPRECATED, use ExternalSessionIdentification."]
+        NpSessionId mNpSessionId;
+
+    // game data / settings
+    [tag="ntop"] GameNetworkTopology mNetworkTopology;
+    [tag="voip"] VoipTopology mVoipNetwork;
+    [tag="psas"] PingSiteAlias mPingSiteAlias;
+
+    // game settings
+    [tag="dhst", description="The dedicated server host for the game, if there is one. (For non-failover, will be the same as mTopologyHostInfo)."]
+        HostInfo mDedicatedServerHostInfo;
+    [tag="thst", description="The topology host for the game (everyone connects to this person)."]
+        HostInfo mTopologyHostInfo;
+    [tag="phst", description="The platform speicific host (ie. xbox presence session holder)."]
+        HostInfo mPlatformHostInfo;
+    [tag="ggty", default=GAME_TYPE_GAMESESSION] GameType mGameType;
+
+    [tag="dnet"] NetworkAddressList mDedicatedServerHostNetworkAddressList;
+    [tag="hnet"] NetworkAddressList mTopologyHostNetworkAddressList;
+
+    [tag="nqos"] Blaze::Util::NetworkQosData mNetworkQosData;
+
+    [tag="gsta"] GameState mGameState;
+
+    [tag="gset"] GameSettings mGameSettings;
+    [tag="ocpl", description="The original list provided when the Dedicated Server was created."] 
+        ClientPlatformTypeList mDedicatedServerSupportedPlatformList;
+    [tag="bcpl", description="The list of platforms supported by the Game when it was created, the dynamic list  May be larger than the current ClientPlatformList."] 
+        ClientPlatformTypeList mBasePlatformList;
+    [tag="cpov", description="The list of currently supported client platforms, dynamically updated as new players enter if certain platform crossplay is restricted (a subset of mBasePlatformList)."] 
+        ClientPlatformTypeList mCurrentlyAcceptedPlatformList;
+    [tag="cply", description="True if mBaseGameClientPlatformList was populated with a non-crossplay platform set, meaning this game should be treated as non-crossplay, regardless of the number of platforms permitted to join."] 
+        bool mIsCrossplayEnabled;
+    [tag="icpg", description="True if the game contained multiple platforms at any time while IN_GAME, false otherwise. Platforms in a non-crossplay platform set are treated as a single platform."] 
+        bool mPINIsCrossplayGame;
+
+    [tag="gmrg"] GameModRegister mGameModRegister;
+
+    [tag="attr"] Collections::AttributeMap mGameAttribs;
+    [tag="matr", description="Attributes for the network mesh (typically used by a game server)"]
+        Collections::AttributeMap mMeshAttribs;
+
+    [tag="tame", description="Create game template."]
+        TemplateName mCreateGameTemplateName;
+    [tag="dstr", description="Dedicated server attribute(s)"]
+        Collections::AttributeMap mDedicatedServerAttribs;
+
+    [tag="admn"] PlayerIdList mAdminPlayerList;
+
+    [tag="cap"]  SlotCapacitiesVector mSlotCapacities;
+    [tag="tids"] TeamIdVector mTeamIds;
+    [tag="mcap"] uint16_t mMaxPlayerCapacity;
+    [tag="mncp", default=1] uint16_t mMinPlayerCapacity;
+
+    [tag="rnfo", description="The roles and capacities, and criteria, supported in this game session."]
+        RoleInformation mRoleInformation;
+
+    [tag="crit", description="Players must pass these entry criteria to join this game."]
+        EntryCriteriaMap mEntryCriteriaMap;
+
+    [tag="qcap"] uint16_t mQueueCapacity;
+
+    [tag="prto", default = "0s", description="Overrides the player reservation timeout for joining players.  (Joining Scenarios can override this.)"]
+        TimeValue mPlayerReservationTimeout;
+    [tag="drto", default = "0s", description="Overrides the player reservation timeout for disconnected players."]
+        TimeValue mDisconnectReservationTimeout;
+
+    [tag="pgid", description="Persisted Game id for the game, used only when game setting's enablePersistedGameIds is true."]
+        PersistedGameId mPersistedGameId;
+
+    [tag="pgsr", description="Persisted Game id secret for the game, used only when game setting's enablePersistedGameIds is true."]
+        PersistedGameIdSecret mPersistedGameIdSecret;
+
+    [tag="nres", default=false, description="Flag to indicate that this game is not resetable. This applies only to the CLIENT_SERVER_DEDICATED topology.  The game will be prevented from ever going into the RESETABlE state."]
+        bool mServerNotResetable;
+    [tag="gurl", default=""] GameStatusURL mGameStatusUrl;
+
+    [tag="gead", default="", description="Hostname and Port that the game events will be sent to. " ] 
+        GameStatusURL mGameEventAddress;
+    [tag="gseu", default="", description="URI where event is sent to when the game starts."]
+        GameStatusURL mGameStartEventUri;               
+    [tag="geeu", default="", description="URI where event is sent to when the game ends."]
+        GameStatusURL mGameEndEventUri;                 
+
+    [tag="tid", description="Tournament information.  Optionally used to indicate who owns the tournament, and its id."]
+        TournamentIdentification mTournamentIdentification;
+
+
+    [tag="scid", description="External Session service config identifier"]
+        XblScid mScid;
+    [tag="stmn", description="DEPRECATED, use ExternalSessionIdentification."]
+        XblSessionTemplateName mExternalSessionTemplateName;
+    [tag="esnm", description="DEPRECATED, use ExternalSessionIdentification."]
+        XblSessionName mExternalSessionName;
+    [tag="coid", description="DEPRECATED, use ExternalSessionIdentification."]
+        XblCorrelationId mExternalSessionCorrelationId;
+    [tag="esid", description="External Session identification."]
+        ExternalSessionIdentification mExternalSessionIdentification;
+
+    [tag="ctim"] TimeValue mCreateTime;
+    [tag="pseu"] bool mIsPseudoGame;
+    [tag="ccmd", default=CCS_MODE_INVALID] CCSMode mCCSMode;
+    [tag="pool"] string(64) mCCSPool;
+
+    [tag="psnm", description="Permission system associated with the game.  If the name does not exist, then the global permissions are used instead."]
+    GamePermissionSystemName mPermissionSystemName;
+
+    [tag="eown", description="The external owner info for this game, if there is one."]
+        HostInfo mExternalOwnerInfo;
+};
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Tournament Event TDFs ///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Game Player Event data sent to mGameEventAddress when that feature is used."]
+class ExternalHttpGamePlayerEventData
+{
+    [tag="pid"] BlazeId mBlazeId;
+    [tag="stat"] PlayerState mPlayerState;
+    [tag="encr", description="The user's encrypted id. This may be exposed to external services instead a BlazeId."]
+    EncryptedBlazeId mEncryptedBlazeId;
+};
+
+[description="Game Event data sent to mGameEventAddress when that feature is used."]
+class ExternalHttpGameEventData
+{
+    [tag="gid", description="The id of the game."]
+    GameId mGameId;
+
+    [tag="tid", description="Identification for the Tournament this game is part of."]
+    TournamentIdentification mTournamentIdentification;
+
+    [tag="rost", description="game roster data."]
+    list<ExternalHttpGamePlayerEventData> mGameRoster;
+
+    [tag="err", description="BlazeError code, present if there was known error for the event."]
+    string(-1) mError;
+    
+    [tag="grid", description="Id of the GameReport."]
+    GameReportingId mGameReportingId;
+};
+
+class FindDedicateServerRequireData
+{
+    [tag="thld", description="The minFitThreshold value."]
+        float mMinFitThresholdValue;
+        
+    [tag="valu", description="Desired value for a dedicated server attribute matchmaking rule.  The desired value is case-insensitive, and must be selected from the possible values in the rule definition."]
+        Collections::AttributeValue mDesiredValue;
+};
+
+typedef map<RuleName, FindDedicateServerRequireData> FindDedicatedServerRulesMap;
+
+////////////////////////////////////////////////////////////////////////////////
+// Game Creation TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request object for creation of the game."]
+class CreateGameRequest
+{
+// CreateGame-only values:
+    [tag="pgid", description="Persisted Game id for the game, checked/granted only when game setting's enablePersistedGameIds is true."]
+        PersistedGameId mPersistedGameId;
+    [tag="pgsc", description="Persisted Game id for the game, checked/granted only when game setting's enablePersistedGameIds is true."]
+        blob mPersistedGameIdSecret;
+    [tag="nres", default=false, description="Flag to indicate that this game is not resetable. This applies only to the CLIENT_SERVER_DEDICATED topology.  The game will be prevented from ever going into the RESETABLE state."]
+        bool mServerNotResetable;
+    [tag="gurl"] GameStatusURL mGameStatusUrl;                    // Only relevant for Dedicated Servers
+
+// Tournament Features:   (It may be better to hardcode the event address value in a config file for safety, and choose it based on a lookup.)
+    [tag="gead", description="Hostname and Port that the game events will be sent to. " ] 
+        GameStatusURL mGameEventAddress;
+    [tag="gseu", description="URI where event is sent to when the game starts."]
+        GameStatusURL mGameStartEventUri;               
+    [tag="geeu", description="URI where event is sent to when the game ends."]
+        GameStatusURL mGameEndEventUri;                 
+    [tag="gsen", default="application/json", description="Content type for the event payloads. Valid values are application/json, or application/xml"]
+        string(255) mGameEventContentType;
+
+    [tag="tid", description="Tournament information.  Optionally used to indicate who owns the tournament, and its id."]
+        TournamentIdentification mTournamentIdentification;
+        
+    [tag="etrn", description="Tournament match's external session data"]
+        TournamentSessionData mTournamentSessionData;
+
+    [tag="admn"] PlayerIdList mAdminPlayerList;                   // Not in MM
+    [tag="gctr", description="Used by client to pass in game's data center, could be empty."]
+        Blaze::PingSiteAlias mGamePingSiteAlias;                  // MM uses the real ping site of the user, no reason to change that.
+    [tag="cpov", description="Used to set the acceptable platforms, when creating a Game.  Subject to the global platform restrictions for the users."]
+        ClientPlatformTypeList mClientPlatformListOverride;
+
+    [tag="matr", description="DirtyCast server attribute(s)"]
+        Collections::AttributeMap mMeshAttribs;
+
+    [tag="dstr", description="Dedicated server attribute(s)"]
+        Collections::AttributeMap mDedicatedServerAttribs;
+
+
+
+// These have all been moved to the GameCreationData
+    [tag="tids", description="DEPRECATED - Remove when SDK changes. (Use mTeamIds in GameCreationData instead)."] 
+        TeamIdVector mTeamIds;
+    [tag="pcap", description="DEPRECATED - Prefer the use of the SlotCapacitiesMap"] 
+        SlotCapacitiesVector mSlotCapacities;
+    [tag="pcpm", description="DEPRECATED - Remove when SDK changes. (Use mSlotCapacitiesMap in GameCreationData instead)."] 
+        SlotCapacitiesMap mSlotCapacitiesMap;
+    [tag="gtyp", description="DEPRECATED - Remove when SDK changes. (Use mGameReportName in GameCreationData instead). Game report name as specified via the game reporting configuration. "]
+        GameReportName mGameReportName;
+
+
+// Common Values:
+    [tag="gmcd", description="The data used to create the game. Holds the common data between "]
+        GameCreationData mGameCreationData;
+
+    [tag="pljd", description="Info on the players that may join the GB request. Includes Team choice, Roles, etc."]
+        PlayerJoinData mPlayerJoinData;
+
+    [tag="cmgd", description="Comon data used in Matchmaking, Join Game, and GB Requests. Includes game protocol version string."]
+        CommonGameRequestData mCommonGameData;
+};
+
+
+typedef string(-1) PseudoGameVariantName;
+typedef map<PseudoGameVariantName, uint32_t> PseudoGameVariantCountMap;
+
+[description="Request object for creation of the game."]
+class CreatePseudoGamesRequest
+{
+    // List and count of player games that will be spawned.
+    // Player count of 0 indicates to use the count from the config.
+    [tag="pgvm"] PseudoGameVariantCountMap mPseudoGameVariantCountMap;
+};
+
+
+[description="Request to update the Game session and be distributed to every player when the session is available."]
+class UpdateGameSessionRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="npsi"] NpSessionId mNpSessionId;
+};
+
+[description="Request to update the Game's host migration status."]
+class UpdateGameHostMigrationStatusRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="mtyp"] HostMigrationType mHostMigrationType;
+};
+
+[description="Response to client after creating the game. Note that client will get an auto generated gameid associated with the game."]
+class CreateGameResponse
+{
+    [tag="gid"] GameId mGameId;
+
+    [tag="rei", description="Identities of users that joined the game, from the reserved external players list."]
+    UserIdentificationList mJoinedReservedPlayerIdentifications;
+
+    [tag="esid", description="If game has an external session, its identification."]
+    ExternalSessionIdentification mExternalSessionIdentification;
+};
+
+class EjectHostRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="reph", default=false] bool mReplaceHost;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Template Types //////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+class GetTemplatesAttributesResponse
+{
+    [tag="msid", description="The matchmaking template attributes used per-template."]
+        map<TemplateName, TemplateAttributeMapping> mTemplateAttributes;
+};
+
+
+class CreateGameTemplateRequest
+{
+    [tag="tmpn"] TemplateName mTemplateName;
+    [tag="tmpa"] TemplateAttributes mTemplateAttributes;
+    [tag="pjd"] PlayerJoinData mPlayerJoinData;
+    [tag="cgd"] CommonGameRequestData mCommonGameData;
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Game Destruction TDFs ///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request for the destroying a game"]
+class DestroyGameRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="reas"] GameDestructionReason mDestructionReason;
+};
+
+[description="Response for the destroy request"]
+class DestroyGameResponse
+{
+    [tag="gid"] GameId mGameId;
+};
+
+[description="Request for destroying a list of games"]
+class DestroyGamesRequest
+{
+    [tag="gidl"] GameIdList mGameIdList;
+    [tag="reas", default=SYS_GAME_ENDING] GameDestructionReason mDestructionReason;
+};
+
+[description="Response for the destroy games request"]
+class DestroyGamesResponse
+{
+    [tag="gidl"] GameIdList mGameIdList;
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Join Game TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+// request from client to slave for  player/usergroup join game
+class JoinGameRequest
+{
+// Join Game-only Values:
+    // How we're joining:
+    [tag="jmet", default=JOIN_BY_BROWSING] JoinMethod mJoinMethod;
+
+    // Who we're joining:
+    [tag="gid", default=INVALID_GAME_ID]  GameId mGameId;
+    [tag="user", description="Join a game in which the specified user belongs."]
+        UserIdentification mUser;
+
+    // Debug Values:
+    [tag="slid",
+      default=DEFAULT_JOINING_SLOT,
+      description="Set the slot for the player to join- for development purposes only."]
+        SlotId mRequestedSlotId;
+
+
+// Common Values:
+    [tag="pljd", description="Info on the players that may join the GB request. Includes Team choice, Roles, etc."]
+        PlayerJoinData mPlayerJoinData;
+
+    [tag="cmgd", description="Comon data used in Matchmaking, Join Game, and GB Requests. Includes game protocol version string."]
+        CommonGameRequestData mCommonGameData;
+};
+
+// request from client to slave for join game with a explicit list of blaze ids
+class JoinGameByUserListRequest
+{
+    // How we're joining:
+    [tag="jmet", default=JOIN_BY_BROWSING] JoinMethod mJoinMethod;
+
+    // Who we're joining:
+    [tag="gid", default=INVALID_GAME_ID]  GameId mGameId;
+
+
+// Common Values:
+    [tag="pljd", description="Info on the players that may join the GB request. Includes Team choice, Roles, etc."]
+        PlayerJoinData mPlayerJoinData;
+    [tag="cmgd", description="Comon data used in Matchmaking, Join Game, and GB Requests. Includes game protocol version string."]
+        CommonGameRequestData mCommonGameData;
+};
+
+class JoinGameResponse
+{
+    [tag="gid"] GameId mGameId;
+    [tag="jgs", default=JOINED_GAME] JoinState mJoinState;
+
+    [tag="rei", description="Identities of users that joined the game, from the reserved external players list."]
+    UserIdentificationList mJoinedReservedPlayerIdentifications;
+
+    [tag="esid", description="If game has an external session, its identification."]
+    ExternalSessionIdentification mExternalSessionIdentification;
+
+    [tag="ocal", description="If true, the request's caller was explicitly omitted from the roster."]
+    bool mIsExternalCaller;
+};
+
+[description="Request from an admin client to add a queued player to the game."]
+class AddQueuedPlayerToGameRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="tidx", default=UNSPECIFIED_TEAM_INDEX,
+        description="The TeamIndex to assign the promoted player into. UNSPECIFIED_TEAM_INDEX will assign the player to whichever team has room."]
+        TeamIndex mPlayerTeamIndex;
+    // have to provide an override boolean flag because there's no wildcard role
+    [tag="ovrd", default=false, description="If true, the players currently selected Role should be overriden with the value supplied by the request in mPlayerRole."]
+        bool mOverridePlayerRole;
+    [tag="role", description="If mOverridePlayerRole is true, the player will be promoted from the queue with the role specified here."]
+        RoleName mPlayerRole;
+};
+
+[description="Request from an admin client to move an in-game reserved player to the queue."]
+class DemoteReservedPlayerToQueueRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// GameSetupContext TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description=" No extra data is needed for these contexts, this enum reduces our generated code."]
+enum DatalessContext
+{
+    CREATE_GAME_SETUP_CONTEXT,
+    JOIN_GAME_SETUP_CONTEXT,
+    INDIRECT_JOIN_GAME_FROM_QUEUE_SETUP_CONTEXT,
+    INDIRECT_JOIN_GAME_FROM_RESERVATION_CONTEXT,
+    HOST_INJECTION_SETUP_CONTEXT
+};
+
+[description="A dedicated server was reset to bring the user to this game.", trackChanges = true]
+class ResetDedicatedServerSetupContext
+{
+    [tag="err", description="Error returned by failed dynamic dedicated server creation."]
+        uint32_t mJoinErr;
+};
+
+[description="Dataless setup context.", trackChanges = true]
+class DatalessSetupContext
+{
+    [tag="dctx", description="Enumeration of setup contexts that contain no extra data."]
+        DatalessContext setupContext;
+};
+
+[description="The user has joined the game indirectly.  Generally a game group member tagging along when a game group owner joins the game.", trackChanges = true]
+class IndirectJoinGameSetupContext
+{
+    [tag="grid"] UserGroupId mUserGroupId;
+
+    [tag="rpvc", description="If true, client should check GameProtocolVersionString matches game"]
+        bool mRequiresClientVersionCheck; // GM_AUDIT: Here GG's mis-matchers kick out after join (matching members of GG may get in). We may later add GameProtocolVersionString to UED so all GG members can be checked up front; revisit if we want these extra checks here then. Currently only rpc-callers' GameProtocolVersionString is accessible to check up front at originating rpc. (GOS-7893).
+};
+
+[description="Matchmaking has brought the user to this game directly.", trackChanges = true]
+class MatchmakingSetupContext
+{
+    [tag="usid", description="The usersession id of the matchmaking session."]
+        UserSessionId mUserSessionId; // MM_AUDIT: not used by slave
+
+    [tag="msid", description="The matchmaking session id."]
+        MatchmakingSessionId mSessionId;
+
+    [tag="mscd", description="The matchmaking scenario id."]
+        MatchmakingScenarioId mScenarioId;
+
+    [tag="rslt", description="The overall result of the session: foundGame, createdGame."]
+        MatchmakingResult mMatchmakingResult;
+
+    [tag="fit", description="The actual fit score for the session (if a game was found or created)."]
+        FitScore mFitScore;
+
+    [tag="maxf", description="The max possible fit score for the matchmaking criteria."]
+        FitScore mMaxPossibleFitScore;
+
+    [tag="ttm", description="The time it took to find the match."]
+        TimeValue mTimeToMatch;
+
+    [tag="gent", description="This value indicates if a player is joining or making a reservation in the game."]
+        GameEntryType mGameEntryType;
+
+    [tag="tout", description="The maximum time allowed to find a match."]
+        TimeValue mMatchmakingTimeoutDuration;
+
+    [tag="ettm", description="The estimated time to find a match."]
+        TimeValue mEstimatedTimeToMatch;
+
+    [tag="tusr", description="The total number of online (gameplay) users."]
+        uint64_t mTotalUsersOnline;
+
+    [tag="tugm", description="The total number of users in an online game session."]
+        uint64_t mTotalUsersInGame;
+
+    [tag="tumm", description="The total number of users in matchmaking sessions."]
+        uint64_t mTotalUsersInMatchmaking;
+
+    [tag="tmat", description="The total number of users that were matched by the subsession that finalized, may be greater than the number of users placed into a new game. Always 0 for findgame matchmaking."]
+        uint64_t mTotalUsersMatched;
+
+    [tag="tpma", description="The total number of users that were potentially matched by this session. Always 0 for findgame matchmaking."]
+        uint64_t mTotalUsersPotentiallyMatched;
+
+    [tag="init", description="The initiator of this matchmaking session."]
+        BlazeId mInitiatorId;
+
+    [tag="fjob", description="The id of the finalization job that set up the game."]
+        uint64_t mFinalizationJobId;
+};
+
+[description="Matchmaking has indirectly brought the user to this game.  Generally a game group member being joined after game group owner has matched.", trackChanges = true]
+class IndirectMatchmakingSetupContext
+{
+    [tag="grid"] UserGroupId mUserGroupId;
+
+    [tag="usid", description="The usersession id of the matchmaking session."]
+        UserSessionId mUserSessionId; // MM_AUDIT: not used by slave
+
+    [tag="msid", description="The matchmaking session id."]
+        MatchmakingSessionId mSessionId;
+
+    [tag="mscd", description="The matchmaking scenario id."]
+        MatchmakingScenarioId mScenarioId;
+
+    [tag="rslt", description="The overall result of the session: foundGame, createdGame."]
+        MatchmakingResult mMatchmakingResult;
+
+    [tag="fit", description="The actual fit score for the session (if a game was found or created)."]
+        FitScore mFitScore;
+
+    [tag="maxf", description="The max possible fit score for the matchmaking criteria."]
+        FitScore mMaxPossibleFitScore;
+
+    [tag="ttm", description="The time it took to find the match."]
+        TimeValue mTimeToMatch;
+        
+    [tag="rpvc", description="If true, client should check GameProtocolVersionString matches game"]
+        bool mRequiresClientVersionCheck; // GM_AUDIT: Here PG's mis-matchers kick out after join (matching members of PG may get in). We may later add GameProtocolVersionString to UED so all PG members can be checked up front; revisit if we want these extra checks here then. Currently only rpc-callers' GameProtocolVersionString is accessible to check up front at originating rpc. (GOS-7893)
+
+    [tag="gent", description="This value indicates if a player is joining or making a reservation in the game."]
+        GameEntryType mGameEntryType;
+
+    [tag="tout", description="The maximum time allowed to find a match."]
+        TimeValue mMatchmakingTimeoutDuration;
+
+    [tag="ettm", description="The estimated time to find a match."]
+        TimeValue mEstimatedTimeToMatch;
+
+    [tag="tusr", description="The total number of online (gameplay) users."]
+        uint64_t mTotalUsersOnline;
+
+    [tag="tugm", description="The total number of users in an online game session."]
+        uint64_t mTotalUsersInGame;
+
+    [tag="tumm", description="The total number of users in matchmaking sessions."]
+        uint64_t mTotalUsersInMatchmaking;
+    
+    [tag="tmat", description="The total number of users that were matched by the subsession that finalized, may be greater than the number of users placed into a new game. Always 0 for findgame matchmaking."]
+        uint64_t mTotalUsersMatched;
+
+    [tag="tpma", description="The total number of users that were potentially matched by this session. Always 0 for findgame matchmaking."]
+        uint64_t mTotalUsersPotentiallyMatched;
+
+    [tag="init", description="The initiator of this matchmaking session."]
+        BlazeId mInitiatorId;
+
+    [tag="fjob", description="The id of the finalization job that set up the game."]
+        uint64_t mFinalizationJobId;
+};
+
+[description="Union of various ways a game can be setup.  Provides extra information as to how the game was joined", trackChanges = true]
+union GameSetupReason
+{
+    [tag="dlsc"] DatalessSetupContext datalessSetupContext;
+    [tag="rdsc"] ResetDedicatedServerSetupContext resetDedicatedServerSetupContext;
+    [tag="ijgs"] IndirectJoinGameSetupContext indirectJoinGameSetupContext;
+    [tag="mmsc"] MatchmakingSetupContext matchmakingSetupContext;
+    [tag="imsc"] IndirectMatchmakingSetupContext indirectMatchmakingSetupContext;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Update Connection TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+[description="QoS settings to use for pre-connection validation", trackChanges = true]
+class QosSettings
+{
+    [tag="dura", description="Duration to perform QoS over.", default=5000]
+        uint32_t mDurationMs;
+
+    [tag="intv", description="Interval between QoS packets.", default=250]
+        uint32_t mIntervalMs;
+
+    [tag="size", description="Size of QoS packets, in bytes.", default=50]
+        uint32_t mPacketSize;
+};
+
+[description="QoS info for a mesh connection update."]
+class MeshConnectionQosInfo
+{
+    [tag="ping", description="Ping on this connection."]
+        uint32_t mLatencyMs;
+    [tag="loss", description="Packet loss on this connection, 0-100 percent."]
+        float mPacketLoss;
+};
+
+
+[description="Request to update the blazeServer with info about the endpoints that connected with each other."]
+class MeshEndpointsConnectedRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="tcg"] ObjectId mTargetGroupId;
+    [tag="flgs"] PlayerNetConnectionFlags mPlayerNetConnectionFlags;
+    [tag="qosi"] MeshConnectionQosInfo mQosInfo;
+};
+
+[description="Request to update the blazeServer with info about the endpoints that disconnected with each other."]
+class MeshEndpointsDisconnectedRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="tcg"] ObjectId mTargetGroupId;
+    [tag="flgs"] PlayerNetConnectionFlags mPlayerNetConnectionFlags;
+    [tag="stat"] PlayerNetConnectionStatus mPlayerNetConnectionStatus; // We have two possible values
+};
+
+[description="Request to update the blazeServer with info about the endpoints that lost the connection with each other."]
+class MeshEndpointsConnectionLostRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="tcg"] ObjectId mTargetGroupId;
+    [tag="flgs"] PlayerNetConnectionFlags mPlayerNetConnectionFlags;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Player Removal (leave/kick/ban) TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+// Note: shared between RemovePlayer and leaveGameByGroup slave rpcs
+class RemovePlayerRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+
+    [tag="reas", description="the 'blaze system reason' why the player is being removed."]
+        PlayerRemovedReason mPlayerRemovedReason;
+
+    [tag="cntx", description="a title-defined context (reason code) passed to the removePlayer notification"]
+        PlayerRemovedTitleContext mPlayerRemovedTitleContext;
+
+    [tag="btpl", description="Holding user group's component, type and groupid information."]
+        UserGroupId mGroupId; // only used by leaveGameByGroup
+
+    [tag="sctx", description="a title-defined context for use in reporting and debugging."]
+        string(128) mTitleContextString;
+};
+
+[description="Request a list of user's account be banned from game session."]
+class BanPlayerRequest
+{
+    [tag="gid", description="Game that the players are being banned from"]
+        GameId mGameId;
+
+    [tag="plst", description="BlazeId of the users to ban from the game."]
+        PlayerIdList mPlayerIds;
+
+    [tag="cntx", description="if the users are currently in the game, they're kicked out (with this PlayerRemovedTitleContext)."]
+        PlayerRemovedTitleContext mPlayerRemovedTitleContext;
+};
+
+[description="Request user's account be removed from game session banned list."]
+class RemovePlayerFromBannedListRequest
+{
+    [tag="gid", description="GameId that the player is being removed from game session banned list."]
+        GameId mGameId;
+
+    [tag="pid", description="BlazeId of the user to remove from the game session banned list."]
+        BlazeId mBlazeId;
+};
+
+[description="Request the game id to clear or get the game session banned list."]
+class BannedListRequest
+{
+    [tag="gid", description="Game id"]  GameId mGameId;
+};
+
+class BannedListResponse
+{
+    [tag="banm", description="the banned list of game session"] AccountIdList mBannedMembers;
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Admin Player List TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+[description="Enumeration of admin list update operation."]
+enum UpdateAdminListOperation
+{
+  GM_ADMIN_ADDED = 0,
+  GM_ADMIN_REMOVED,
+  GM_ADMIN_MIGRATED
+};
+
+class UpdateAdminListRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mAdminPlayerId;
+};
+
+class NotifyAdminListChange
+{
+    [tag="gid"]  GameId mGameId;
+    [tag="alst", description="The player acted upon (added/removed)"]
+        PlayerId mAdminPlayerId;
+    [tag="oper"] UpdateAdminListOperation mOperation;
+    [tag="uid", description="The admin who performed the admin change. When operation is GM_ADMIN_MIGRATED, this player has lost their admin rights."]
+        PlayerId mUpdaterPlayerId;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Update Game Settings TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+// GAME STATE
+class AdvanceGameStateRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="gsta"] GameState mNewGameState;
+};
+
+class ReplayGameRequest
+{
+    [tag="gid"] GameId mGameId;
+};
+
+class ReturnDedicatedServerToPoolRequest
+{
+    [tag="gid"] GameId mGameId;
+};
+
+// PLAYER CAPACITY
+class TeamMemberInfo
+{
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="role"] RoleName mPlayerRole;
+};
+
+typedef list<TeamMemberInfo> TeamMemberInfoList;
+
+class TeamDetails
+{
+    [tag="tid", description="The TeamId to assign to the team at this index.", default=INVALID_TEAM_ID]
+        TeamId mTeamId;
+    [tag="rstr", description="The list of players to assign to this team."]
+        TeamMemberInfoList mTeamRoster;
+};
+
+typedef list<TeamDetails> TeamDetailsList;
+
+class SetPlayerCapacityRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pcap"] SlotCapacitiesVector mSlotCapacities;
+    [tag="tlst", description="A map of FactionIds to lists of players that will be assigned to them. Players in the game session and not in this map will be distributed between the teams in an effort to balance the teams' overall size on a best-effort basis. An empty map will leave the teams unchanged, aside from any balancing required by reduced overall player capacity."]
+        TeamDetailsList mTeamDetailsList;
+    [tag="rnfo", description="The role criteria, capacity, and multirole criteria"] RoleInformation mRoleInformation;
+};
+
+// PRESENCE MODE
+class SetPresenceModeRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pres"] PresenceMode mPresenceMode;
+};
+
+// ENV CAPTURE
+[description="Response from a redis capture request."]
+class GameCaptureResponse
+{
+    // We could also include basic stats about the server at this point (game/player count, etc.)
+    [tag="lst", description = "Last time a save occurred."] uint64_t mLastSaveTime;
+};
+
+[description="Bool response indicating that Redis completed the capture request."]
+class IsGameCaptureDoneResponse
+{
+    [tag="ird", description = "Is Redis done capturing?"] bool mIsRedisDone;
+};
+
+[description="The locations where redis is dumping to, along with the host name of the Redis machines."]
+class RedisDumpLocationsResponse
+{
+    typedef map<string(64), string(512)> DumpLocationsMap;
+    [tag="dmpl", description = "Map of hostname to dump location (with filename)" ] DumpLocationsMap mDumpLocations;
+};
+
+// GAME SETTINGS
+class SetGameSettingsRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="gset"] GameSettings mGameSettings;
+    [tag="gstm", description = "Masks the GameSettings provided. If not set, then no mask is used (default)."] 
+        GameSettings mGameSettingsMask;
+};
+
+
+// GAME ATTRIBS
+
+class SetGameAttributesRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="attr"] Collections::AttributeMap mGameAttributes;
+};
+
+
+class SetDedicatedServerAttributesRequest
+{
+    [tag="gidl"] GameIdList mGameIdList;
+    [tag="attr"] Collections::AttributeMap mDedicatedServerAttributes;
+};
+
+// PLAYER ATTRIBS
+
+class SetPlayerAttributesRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="attr"] Collections::AttributeMap mPlayerAttributes;
+};
+
+// PLAYER CUSTOM DATA
+
+class SetPlayerCustomDataRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="cdat"] blob mCustomData;
+};
+
+// PLAYER TEAM
+class SwapPlayerData
+{
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="slot", default=INVALID_SLOT_TYPE] SlotType mSlotType;
+    [tag="tidx"] TeamIndex mTeamIndex;
+    [tag="role"] RoleName mRoleName;
+};
+
+typedef list< SwapPlayerData > SwapPlayerDataList;
+
+class SwapPlayersRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="lgam"] SwapPlayerDataList mSwapPlayers;
+};
+
+class SwapPlayersErrorInfo
+{
+    [tag="msg", description="a detailed error message about the SwapPlayers failure."]
+    string(256) mErrMessage;
+    [tag="pid", default=INVALID_BLAZE_ID, description="Player Id of the user who failed to swap, if a specific user caused the failure."]
+    PlayerId mPlayerId;
+    [tag="tidx", default=UNSPECIFIED_TEAM_INDEX, description="The team index that failed the swap."]
+    TeamIndex mTeamIndex;
+    [tag="role", description="The role that failed the swap."]
+    RoleName mRoleName;
+    [tag="styp", default=INVALID_SLOT_TYPE, description="The slot type that failed the swap."]
+    SlotType mSlotType;
+};
+
+// GAME TEAMS
+
+class ChangeTeamIdRequest
+{
+    [tag="gid"] GameId mGameId;
+    [tag="ntid"] TeamId mNewTeamId;
+    [tag="tidx"] TeamIndex mTeamIndex;
+};
+
+// GAME MODS
+
+class SetGameModRegisterRequest
+{
+    [tag="gmid"] GameId mGameId;
+    [tag="gmrg"] GameModRegister mGameModRegister;
+};
+
+class SetGameEntryCriteriaRequest
+{
+    [tag="gmid"] GameId mGameId;
+
+    [tag="crit", description="Players must pass these entry criteria to join this game."]
+    EntryCriteriaMap mEntryCriteriaMap;
+
+    [tag="rcrt", description="Map of role names to role-specific entry criteria."]
+    RoleEntryCriteriaMap mRoleEntryCriteriaMap;
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Host Migration TDFs ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+
+class MigrateHostRequest
+{
+    [tag="gid"] GameId mGameId;
+    // Note: setting newHostId to zero means we aren't suggesting a new host player
+    [tag="host"] PlayerId mNewHostPlayer;
+};
+
+// TODO: Proto generation is disabled for ReplicatedGameData
+[ description = "Contains a game's ReplicatedGameData and full roster information.", generateProto = false ]
+class ListGameData
+{
+    [tag="game", allowref=true] ReplicatedGameData mGame;
+    [tag="pros"] ReplicatedGamePlayerList mGameRoster;
+    [tag="qros"] ReplicatedGamePlayerList mQueueRoster;
+    // the game mode duplicates an existing attribute in the replicated game data, but copying it here makes for easier access for HTTP/gRPC and other non-SDK users
+    [tag="mode"] Collections::AttributeValue mGameMode;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Admin only debug TDFs ///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+class MatchmakingDedicatedServerOverrideRequest
+{
+     [tag="gid", description="The game the player will attempt to join. Must exist. Send INVALID_GAME_ID (0) to disable."] 
+        GameId mGameId;
+     [tag="pid", description="The player with the MM override."] 
+        PlayerId mPlayerId;
+};
+
+typedef map<PlayerId, GameId> PlayerToGameMap;
+class GetMatchmakingDedicatedServerOverrideResponse
+{
+     [tag="ptgm", description="Map of players to games overrides."] 
+        PlayerToGameMap mPlayerToGameMap;
+};
+class MatchmakingFillServersOverrideList
+{
+     [tag="gid", description="List of games to force players to attempt to fill. Send an empty list to disable."] 
+        GameIdList mGameIdList;
+};
+
+
+
+////////////////////////////////////////////////////////////////////////
+//////////// GameManager Notifications /////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+
+// TODO: Proto generation is disabled for ReplicatedGameData
+[description="Async notification sent to the player who joined a game.  Triggered by JoinGame Request or a Matchmaking session finding a game.", generateProto=false]
+class NotifyGameSetup
+{
+    [tag="game", allowref=true] ReplicatedGameData mGameData;
+
+    [tag="pros"] ReplicatedGamePlayerList mGameRoster;
+    [tag="queu"] ReplicatedGamePlayerList mGameQueue;
+
+    [tag="mnam"] Collections::AttributeName mGameModeAttributeName;
+
+    [tag="reas"] GameSetupReason gameSetupReason;
+    [tag="qoss"] QosSettings mQosSettings;
+    [tag="qosv", default=false, description="If true, the client will perform QoS validation when initializing the network."]
+        bool mPerformQosValidation;
+    [tag="lfpj"] bool mIsLockableForPreferredJoins;
+    [tag="telm"] TimeValue mQosTelemetryInterval;
+};
+
+
+[description="Async notification sent to existing game members; announces that a new player has joined the game."]
+class NotifyPlayerJoining
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pdat", allowref=true] ReplicatedGamePlayer mJoiningPlayer;
+    [tag="qost", default=false, description="If true, the joining player must go through pre-connection QoS validation."]
+        bool mValidateQosForJoiningPlayer;
+};
+
+// async notification that a player's join is complete (mark as active)
+class NotifyPlayerJoinCompleted
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="time"] TimeValue mJoinedGameTimestamp;
+};
+
+class NotifyPlayerRemoved
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="reas"] PlayerRemovedReason mPlayerRemovedReason;
+
+    [tag="cntx", description="a title-defined context (reason) why the player was removed from the game."]
+        PlayerRemovedTitleContext mPlayerRemovedTitleContext;
+
+    [tag="lfpj"] bool mLockedForPreferredJoins;
+};
+
+class NotifyPlatformHostInitialized
+{
+    [tag="gid"] GameId mGameId;
+    [tag="phst", description="The slot of the first xbox platform host to enter the game."]
+        SlotId mPlatformHostSlotId;
+    [tag="phid", description="The blaze id of the platfrom host."]
+        PlayerId mPlatformHostId;
+};
+
+class NotifyHostMigrationStart
+{
+    [tag="pmig", description="Type of host that is being migrated. Host can be the Toplogy host, the Platform host, or both."]
+        HostMigrationType mMigrationType;
+    [tag="gid"] GameId mGameId;
+    [tag="host"] PlayerId mNewHostId;
+    [tag="slot"] SlotId mNewHostSlotId;
+    [tag="cslt"] SlotId mNewHostConnectionSlotId;
+};
+
+class NotifyHostMigrationFinished
+{
+    [tag="gid"] GameId mGameId;
+};
+
+class NotifySelectedAsHost
+{
+    [tag="gid"] GameId mGameId;
+    // note: might need to send roster/addresses down here.
+};
+
+class NotifyGameAttribChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="attr"] Collections::AttributeMap mGameAttribs;
+};
+
+class NotifyDedicatedServerAttribChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="attr"] Collections::AttributeMap mDedicatedServerAttribs;
+};
+
+class NotifyGameSettingsChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="attr"] GameSettings mGameSettings;
+};
+
+class NotifyGameCapacityChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="cap"]  SlotCapacitiesVector mSlotCapacities;
+    [tag="trst", description="Contains the ids of all the teams and the membership of each team in the game by TeamIndex."]
+        TeamDetailsList mTeamRosters;
+    [tag="rnfo", description="The role criteria, capacity, and multirole criteria"] RoleInformation mRoleInformation;
+    [tag="lfpj", description="Whether the game became locked for preferred joins"] bool mLockedForPreferredJoins;
+};
+
+class NotifyPresenceModeChanged
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pres"] PresenceMode mNewPresenceMode;
+};
+
+class NotifyPlayerAttribChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="attr", allowref=true] Collections::AttributeMap mPlayerAttribs;
+};
+
+class NotifyGameModRegisterChanged
+{
+    [tag="gmid"] GameId mGameId;
+    [tag="gmrg"] GameModRegister mGameModRegister;
+};
+
+class NotifyGameEntryCriteriaChanged
+{
+    [tag="gmid"] GameId mGameId;
+    [tag="crit"] EntryCriteriaMap mEntryCriteriaMap;
+    [tag="rcrt", description="Map of role names to role-specific entry criteria."]
+    RoleEntryCriteriaMap mRoleEntryCriteriaMap;
+};
+
+class NotifyPlayerCustomDataChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="cdat"] blob mCustomData;
+};
+
+class NotifyGameStateChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="gsta"] GameState mNewGameState;
+};
+
+// TODO: Proto generation is disabled for ReplicatedGameData
+[generateProto=false]
+class NotifyGameReset
+{
+    [tag="data", allowref=true] ReplicatedGameData mGameData;
+};
+
+class NotifyGameReportingIdChange
+{
+    [tag="gid"] GameId gameId;
+    [tag="grid"] GameReportingId gameReportingId;
+};
+
+class NotifyGameRemoved
+{
+    [tag="gid"] GameId mGameId;
+    [tag="reas"] GameDestructionReason mDestructionReason;
+};
+
+[description="Notification to clients that Game session has been updated(because of host migration.)"]
+class GameSessionUpdatedNotification
+{
+    [tag="gid"] GameId mGameId;
+    [tag="npsi"] NpSessionId mNpSessionId;
+    [tag="hprs", description="If true, the presence session is currently active."]
+        bool mOwnsFirstPartyPresence;
+};
+
+class NotifyGamePlayerStateChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="stat"] PlayerState mPlayerState;
+};
+
+class NotifyGamePlayerTeamRoleSlotChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mPlayerId;
+    [tag="slot", default=SLOT_PUBLIC_PARTICIPANT] SlotType mSlotType;
+    [tag="tidx"] TeamIndex mTeamIndex;
+    [tag="role"] RoleName mPlayerRole;
+};
+
+class NotifyGameTeamIdChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="otid"] TeamId mOldTeamId;
+    [tag="ntid"] TeamId mNewTeamId;
+    [tag="tidx"] TeamIndex mTeamIndex;
+};
+
+[description="Notification to clients that the server has noticed a space open up for a queued player"]
+class NotifyProcessQueue
+{
+    [tag="gid"] GameId mGameId;
+};
+
+[description="Notification to clients that the game has changed"]
+class NotifyGameNameChange
+{
+    [tag="gid"] GameId mGameId;
+    [tag="gnam"] GameName mGameName;
+};
+
+[description="Notification that the players position in the queue has changed."]
+class NotifyQueueChanged
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pidl"] PlayerIdList mPlayerIdList;
+};
+
+[description="Notification that the local player failed to complete a game join initiated by a remote user."]
+class NotifyRemoteJoinFailed
+{
+    [tag="usid", description="The usersession id of the matchmaking session member."]
+        UserSessionId mUserSessionId;
+    [tag="info"] RemoteInitiatorInformation mRemoteUserInfo;
+    [tag="gid"] GameId mGameId;
+    [tag="jerr"] uint32_t mJoinError; // uint32_t because BlazeError isn't defined in tdf
+};
+
+[description="Async notification sent to a game end point that now has hosted connectivity with respect to player end point."]
+class NotifyHostedConnectivityAvailable
+{
+    [tag="gid"] GameId mGameId;
+    [tag="pid"] PlayerId mRemotePlayerId;
+    [tag="ccsi", allowref=true] HostedConnectivityInfo mHostedConnectivityInfo;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Game Census data TDFs
+//
+typedef string(CENSUS_DATA_STRING_BUFFER) GameAttributeCensusString;
+
+[description="Enumeration of census data provided by game manager, which will be used on server to encode data into a generic map and parse data on client api."]
+enum GameManagerCensusEnum
+{
+  GM_NUM_PLAYER_ONLINE = 0,
+  GM_NUM_ACTIVE_GAME,
+  GM_NUM_PLAYER_IN_GAME,
+  GM_NUM_PLAYER_IN_MATCHMAKING,
+  GM_GAME_ATTRIBUTE_START = 1000,
+  GM_GAME_ATTRIBUTE_END = 2000
+};
+
+[
+    description = "The game manager census data."
+]
+class GameAttributeCensusData
+{
+    [tag="attn", description="game attribute name."]
+        Collections::AttributeName mAttributeName;
+
+    [tag="attv", description="game attribute value."]
+        Collections::AttributeValue mAttributevalue;
+
+    [tag="nofg", description="number of games with specified attribute name and value."]
+        uint32_t mNumOfGames;
+
+    [tag="nofp", description="number of players in games with specified attribute name and value."]
+        uint32_t mNumOfPlayers;
+};
+
+typedef map<DelineationGroupType, TimeValue> EstimatedTimeToMatchPerGroup; 
+typedef map<DelineationGroupType, float> PlayerMatchmakingRatePerGroup;
+typedef map<PingSiteAlias, uint32_t> MatchmakingSessionsByPingSite;
+typedef map<PingSiteAlias, EstimatedTimeToMatchPerGroup> EstimatedTimeToMatchPerPingsiteGroup; 
+typedef map<PingSiteAlias, PlayerMatchmakingRatePerGroup> PlayerMatchmakingRatePerPingsiteGroup;
+
+// DEPRECATED - Non-Grouped Census Data: 
+typedef map<PingSiteAlias, TimeValue> EstimatedTimeToMatchPerPingsite; 
+typedef map<PingSiteAlias, float> PlayerMatchmakingRatePerPingsite;
+
+[
+    description = "The matchmaking census data for a specific scenario."
+]
+class ScenarioMatchmakingCensusData
+{
+    [tag="snam", description="Scenario name."]
+        ScenarioName mScenarioName;
+
+    [tag="gttm", description="Global estimated time to match for this scenario."]
+        TimeValue mGlobalEstimatedTimeToMatch;
+
+    [tag="pttg", description="Estimated time to match for this scenario by ping site and delineation group."]
+        EstimatedTimeToMatchPerPingsiteGroup mEstimatedTimeToMatchPerPingsiteGroup;
+
+    [tag="pttm", description="Estimated time to match for this scenario by ping site. DEPRECATED - Only used if config bool useCensusDelineationGroups = false."]
+        EstimatedTimeToMatchPerPingsite mEstimatedTimeToMatchPerPingsite;
+
+    [tag="gpmr", description="Global estimated time to match for this scenario."]
+        float mGlobalPlayerMatchmakingRate;
+
+    [tag="pmrg", description="Player Matchmaking Rate, mapped to Scenario and Pingsite and DelineationGroup."]
+        PlayerMatchmakingRatePerPingsiteGroup mPlayerMatchmakingRatePerPingsiteGroup;
+
+    [tag="pmr", description="Player Matchmaking Rate, mapped to Scenario and Pingsite. DEPRECATED - Only used if config bool useCensusDelineationGroups = false."]
+        PlayerMatchmakingRatePerPingsite mPlayerMatchmakingRatePerPingsite;
+        
+    [tag="nums", description="Number of Matchmaking sessions currently running per scenario."]
+        uint32_t mNumOfMatchmakingSession;
+        
+    [tag="mspp", description="Number of Matchmaking sessions currently running per scenario per ping site."]
+        MatchmakingSessionsByPingSite mMatchmakingSessionPerPingSite;
+};
+
+typedef map<ScenarioName, ScenarioMatchmakingCensusData> ScenarioMatchmakingCensusDataMap;
+
+[
+    description = "General matchmaking census data."
+]
+class MatchmakingCensusData
+{
+    [tag="pttg", description="Estimated time to match for users for each ping site and delineation group."]
+        EstimatedTimeToMatchPerPingsiteGroup mEstimatedTimeToMatchPerPingsiteGroup;
+
+    [tag="pttm", description="Estimated time to match by ping site. DEPRECATED - Only used if config bool useCensusDelineationGroups = false."]
+        EstimatedTimeToMatchPerPingsite mEstimatedTimeToMatchPerPingsite;
+
+    [tag="sdta", description="Per-scenario census data."]
+        ScenarioMatchmakingCensusDataMap mScenarioMatchmakingData;
+
+    [tag="pmrg", description="Player Matchmaking Rate by ping site and delineation group."]
+        PlayerMatchmakingRatePerPingsiteGroup mPlayerMatchmakingRatePerPingsiteGroup;
+
+    [tag="pmr", description="Player Matchmaking Rate, mapped to Pingsite. DEPRECATED - Only used if config bool useCensusDelineationGroups = false."]
+        PlayerMatchmakingRatePerPingsite mPlayerMatchmakingRatePerPingsite;
+};
+
+[
+    description = "The game manager census data cached on game manager slave.",
+    tdfid = "hash"
+]
+class GameManagerCensusData
+{
+    [tag="lsn", description="number of UserSessions logged into blaze with ClientType CLIENT_TYPE_GAMEPLAY_USER and CLIENT_TYPE_LIMITED_GAMEPLAY_USER.  (excludes Dedicated Server host users and users connected via the web access layer)."]
+        uint32_t mNumOfLoggedSession;
+
+    [tag="agn", description="number of game sessions on the server, not including resettable dedicated server games and inactive virtual games."]
+        uint32_t mNumOfActiveGame;
+
+    typedef map<PingSiteAlias, uint32_t> CountsPerPingSite;
+    [tag="agps", description="number of game sessions on the server per ping site, not including resettable dedicated server games and inactive virtual games."]
+    CountsPerPingSite mNumOfActiveGamePerPingSite;
+
+    [tag="ggn", description="number of game groups."]
+        uint32_t mNumOfGameGroup;
+
+    [tag="jpn", description="number of users ACTIVE_* in game sessions, including ACTIVE_KICK_PENDING, ACTIVE_CONNECTING, and ACTIVE_MIGRATING."]
+        uint32_t mNumOfJoinedPlayer;
+    
+    [tag="jpps", description="number of players ACTIVE_* in the game session, including ACTIVE_KICK_PENDING, ACTIVE_CONNECTING, and ACTIVE_MIGRATING, per ping site."]
+    CountsPerPingSite mNumOfJoinedPlayerPerPingSite;
+
+    [tag="pigg", description="number of players who are in game groups, not including game sessions."]
+        uint32_t mNumOfPlayersInGameGroup;
+
+    [tag="mmsn", description="number of matchmaking sessions currently server started"]
+        uint32_t mNumOfMatchmakingSession;
+
+    [tag="numm", description="Number of users in matchmaking currently."]
+        uint32_t mNumOfMatchmakingUsers;
+
+    [tag="gacd", description="censusdata for game attribute"]
+        list<GameAttributeCensusData> mGameAttributesData;
+
+    [tag="mmcd", description="Matchmaking-specific census data."]
+        MatchmakingCensusData mMatchmakingCensusData;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Game Name Rename TDFs ///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+class UpdateGameNameRequest
+{
+    [tag="gid", description="The Game id that need to update its name."]
+        GameId mGameId;
+
+    [tag="gnam", description="The new name of game session"]
+        GameName mGameName;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Preferred Join Opt Out TDFs /////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[
+    description = "request from client to slave for opting out of a preferred join."
+]
+class PreferredJoinOptOutRequest
+{
+    [tag="gid", description="The Game id that player is opting out of."]
+        GameId mGameId;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Telemetry Reporting TDFs ////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description = "Data tracked in Redis and sent to PIN event."]
+class TelemetryReportStats
+{
+// New streaming event values:
+    [tag="dprt", description="Time spent in dist? processing (averaged)."]
+    float mDistProcTime;
+    [tag="dwtt", description="Time spent in dist? waiting (averaged)."]
+    float mDistWaitTime;
+    [tag="idps", description="Incoming datagrams? processed per second."]
+    uint32_t mIdpps;
+    [tag="odps", description="Outgoing datagrams? processed per second."]
+    uint32_t mOdpps;
+
+    [tag="rpkl", description="Remote packets lost."]
+    float mRpackLost;
+    [tag="lpkl", description="Local packets lost."]
+    float mLpackLost;
+    [tag="jttr", description="Jitter (delay variation) for interval."]
+    uint32_t mJitter;
+    [tag="ipps", description="Incoming packets per second."]
+    uint32_t mIpps;
+    [tag="opps", description="Outgoing packets per second."]
+    uint32_t mOpps;
+    [tag="lnks", description="Local Naks? Sent"]
+    uint32_t mLnakSent;
+    [tag="rnks", description="Remote Naks? Sent"]
+    uint32_t mRnakSent;
+    [tag="lpsv", description="Local Packets? Saved"]
+    uint32_t mLpSaved;
+    [tag="late", description="Latency"]
+    uint32_t mLatency;
+
+// Data Values that have yet to be exposed to from DirtySock: 
+    //[tag="rpsv", description="Remote Packets? Saved"]
+    //uint32_t mRpSaved;
+};
+
+[description = "Peer-to-peer connection telemetry."]
+class TelemetryReport
+{
+    [tag="rcid", description="The remote ConnectionGroupId representing the remote peer."]
+    ConnectionGroupId mRemoteConnGroupId;
+
+    [tag="pktl", description="The packet loss represented as a percentage."]
+    uint8_t mPacketLossPercent;
+
+    [tag="pklf", description="The packet loss represented as a float percentage."]
+    float mPacketLossFloat;
+
+    [tag="latc", description="The measured latency."]
+    uint32_t mLatencyMs;
+
+    [tag="rcvd", description="Local packets received."]
+    uint32_t mLocalPacketsReceived;
+
+    [tag="sent", description="Remote packets sent."]
+    uint32_t mRemotePacketsSent;
+
+// New connection event values: 
+    [tag="ctad", description="Connection Time After Demangle."]
+    uint32_t mConnTimeAfterDemangle;
+    [tag="ctbd", description="Connection Time Before Demangle."]
+    uint32_t mConnTimeBeforeDemangle;
+    [tag="ctdg", description="Connection Time spent Demangling."]
+    uint32_t mConnTimeDemangling;
+    //[tag="csat", description="Connection Time spent acquiring a Secure Association (xone)."]
+    //uint32_t mConnTimeSecureAssociation;
+
+    [tag="rphb", description="Report info that changes every update."]
+    TelemetryReportStats mReportStats;
+
+};
+
+[description = "Report a list of peer-to-peer connection telemetry."]
+class TelemetryReportRequest
+{
+    [tag="gid", description="The GameId associated with this connection."]
+    GameId mGameId;
+
+    [tag="ntop", description="The network topology for the game."]
+    GameNetworkTopology mNetworkTopology;
+
+    [tag="lcid", description="The local ConnectionGroupId representing the local peer."]
+    ConnectionGroupId mLocalConnGroupId;
+
+    [tag="rpts", description="The list of TelemetryReports."]
+    list<TelemetryReport> mTelemetryReports;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Update External Session Presence For User TDFs //////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+[description="Request to update game presence for user."]
+class UpdateExternalSessionPresenceForUserRequest
+{
+    [tag="user", description="the user to update for."]
+    UserIdentification mUserIdentification;
+
+    [tag="gact", description="user's current games it's a member of. Sent to server in order to pick which (if any) will be the user's primary session."]
+    GameActivityList mCurrentGames;
+
+    [tag="cgam", description="the game the user created, joined or left."]
+    GameActivity mChangedGame;
+
+    [tag="cgid", description="(DEPRECATED: use mChangedGame) id of the game the user created, joined or left."]
+    GameId mChangedGameId;
+
+    [tag="ogid", description="id of the user's prior primary game, sent up from client. INVALID_GAME_ID if user had no primary game."]
+    GameId mOldPrimaryGameId;
+
+    [tag="chng", description="whether user created, joined or left the changed game."]
+    UpdatePrimaryExternalSessionReason mChange;
+
+    [tag="remr", description="remove reason. For PS5 Matches.", default=SYS_PLAYER_REMOVE_REASON_INVALID]
+    GameManager::PlayerRemovedReason mRemoveReason;
+
+    [tag="push", description="push context id. For PS5 PlayerSessions"]
+    PsnPushContextId mPsnPushContextId;
+};
+[description="(DEPRECATED: use UpdateExternalSessionPresenceForUserRequest)"]
+typedef UpdateExternalSessionPresenceForUserRequest UpdatePrimaryExternalSessionForUserRequest;
+
+class UpdatedExternalSessionForUserResult
+{
+    [tag="ugid", description="the game id."]
+    GameId mGameId;
+    [tag="usid", description="the game's external session identification updated for the user."]
+    ExternalSessionIdentification mSession;
+    [tag="uact", description="contains entries for each on platform specific activity type(s) successfully updated for the external session (if any were)."]
+    map<ExternalSessionActivityType, bool> mActivity; //a map since TDF doesnt have sets
+    [tag="push", description="push context id. For PS5 PlayerSessions"]
+    PsnPushContextId mPsnPushContextId;
+};
+
+[description="Response for the update."]
+class UpdateExternalSessionPresenceForUserResponse
+{
+    [tag="usei", description="the user updated for. INVALID_BLAZE_ID if Blaze did not update/set/clear any primary session for the user."]
+    BlazeId mBlazeId;
+
+    [tag="gid", description="(DEPRECATED: use mCurrentPrimary) id of the user's current primary game. INVALID_GAME_ID if user has no primary game set."]
+    GameId mCurrentPrimaryGameId;
+
+    [tag="esid", description="(DEPRECATED: use mCurrentPrimary) the external session identification of the user's current primary session. Empty values if user has no primary session set."]
+    ExternalSessionIdentification mCurrentPrimarySession;
+    
+    [tag="pses", description="current primary game info. GameId is INVALID_GAME_ID if user has no primary game set."]
+    UpdatedExternalSessionForUserResult mCurrentPrimary;
+
+    [tag="uses", description="the changed game's external session info, updated as part of the user's presence update. GameId is INVALID_GAME_ID if user had no update."]
+    UpdatedExternalSessionForUserResult mUpdated;
+};
+[description="(DEPRECATED: use UpdateExternalSessionPresenceForUserResponse)"]
+typedef UpdateExternalSessionPresenceForUserResponse UpdatePrimaryExternalSessionForUserResponse;
+
+[description="Error response for the update."]
+class UpdateExternalSessionPresenceForUserErrorInfo
+{
+    [tag="gid", description="(DEPRECATED: use mCurrentPrimary)id of the user's current primary game. INVALID_GAME_ID if user has no primary game set."]
+    GameId mCurrentPrimaryGameId;
+
+    [tag="erri"]
+    ExternalSessionErrorInfo mErrorInfo;
+
+    [tag="pses", description="current primary game info. GameId is INVALID_GAME_ID if user has no primary game set."]
+    UpdatedExternalSessionForUserResult mCurrentPrimary;
+    
+    [tag="uses", description="the changed game's external session info, updated as part of the user's presence update. GameId is INVALID_GAME_ID if user had no update."]
+    UpdatedExternalSessionForUserResult mUpdated;
+};
+[description="(DEPRECATED: use UpdateExternalSessionPresenceForUserErrorInfo)"]
+typedef UpdateExternalSessionPresenceForUserErrorInfo UpdatePrimaryExternalSessionForUserErrorInfo;
+
+[description="Request to update the game's external session image."]
+class UpdateExternalSessionImageRequest
+{
+    [tag="gid", description="id of the game to update the external session image for."]
+    GameId mGameId;
+
+    [tag="uimg", description="Dynamically generated non-server configured External Session image displayed for the session in the shell UX. If empty, the server configured default image is used instead."]
+    Ps4NpSessionImage mCustomImage;
+};
+
+[description="Request to update the game's external session status."]
+class UpdateExternalSessionStatusRequest
+{
+    [tag="gid", description="id of the game to update the external session status for."]
+    GameId mGameId;
+    
+    [tag="ssta", description="the status."]
+    ExternalSessionStatus mExternalSessionStatus;
+};
+
+[description="Error response for the request to create a given tournament game."]
+class CreateTournamentGameErrorResponse
+{
+    [tag="fenc", description="List of the request's encryptedBlazeIds that failed to be decrypted."]
+    EncryptedBlazeIdList mFailedEncryptedBlazeIds;
+};
+
+[description="Request to cancel a given tournament game."]
+class CancelTournamentGameRequest
+{
+    [tag="gid"] GameId mGameId;
+};
+
+[description="Get (player/game state) status for a given tournament game."]
+class GetTournamentGameStatusRequest
+{
+    [tag="gid"] GameId mGameId;
+};
+
+[description="Request to set a user to a particualr scenario variant."]
+class SetUserScenarioVariantRequest
+{
+    [tag="scen", description="Scenario Name"]
+    ScenarioName mScenarioName;
+
+    [tag="scva", description="Scenario's Variant"]
+    ScenarioVariantName mScenarioVariant;
+
+    [tag="bid", default=INVALID_BLAZE_ID, description="User to update"]
+    BlazeId mBlazeId;
+};
+
+[description="Request to get secnario variant detail."]
+class GetScenarioVariantsRequest
+{
+    [tag="scen", description="Scenario Name"]
+    ScenarioName mScenarioName;
+};
+
+[description="Response to get secnario variant detail."]
+class GetScenarioVariantsResponse
+{
+    [tag="vari", description="The list of subsessions held by variant."]
+    VariantsMap mVariants;
+
+    [tag="vart", description="The default variant."]
+    ScenarioVariantName mDefaultVariant;
+
+    [tag="usrv", description="The users who map to particular variant."]
+    UserVariantsMap mUserVariants;
+};
+
+[description="Request to clear users for a particualr scenario variant."]
+class ClearUserScenarioVariantRequest
+{
+    [tag="scen", description="Scenario Name"]
+    ScenarioName mScenarioName;
+
+    [tag="bid", default=INVALID_BLAZE_ID, description="User to clear. If not provided, all users for this scenario will be cleared."]
+    BlazeId mBlazeId;
+};
+
+[description="Response to create a tournament game."]
+class CreateTournamentGameResponse
+{
+    [tag="gid"] GameId mGameId;
+    [tag="jgs", default=JOINED_GAME] JoinState mJoinState;
+
+    [tag="esid", description="If game has an external session, its identification."]
+    ExternalSessionIdentification mExternalSessionIdentification;
+
+    [tag="scid", description="If platform uses scids, the title's scid."]
+    XblScid mScid;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Matchmaking Filter TDFs /////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+class GetTemplatesAndAttributesResponse
+{
+    [tag="msid", description="The matchmaking template attributes used per-template."]
+        map<TemplateName, TemplateAttributeDescriptionMapping> mTemplateAttributeDescriptions;
+};
+ 
+  
+class GetScenariosAndAttributesResponse
+{
+    [tag="msid", description="The matchmaking template attributes used per-template."]
+        map<TemplateName, TemplateAttributeDescriptionMapping> mScenarioAttributeDescriptions;
+};
+
+} // namespace GameManager
+} // namespace Blaze

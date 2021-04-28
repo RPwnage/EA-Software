@@ -1,0 +1,73 @@
+<project name="originwebminispa">
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.originwebminispa.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.originwebminispa.version"  value="@{PathGetFileName('${package.originwebminispa.dir}')}"/>
+    <package name="originwebminispa" targetversion="${package.originwebminispa.version}"/>
+
+    <property name="package.originwebminispa.builddir" value="${package.originwebminispa.dir}/build"/>
+    <property name="version.file" value="${package.dir}/version.txt"/>
+
+    <mkdir dir="${package.originwebminispa.builddir}" unless="@{DirectoryExists(${package.originwebminispa.builddir})}"/>
+    
+    <target name="update-version-file">      
+      <fail message="p4.changelist not defined. Use -D:p4.changelist=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('p4.changelist')}" />
+
+      <property name="version" fromfile="${version.file}"/>
+      <property name="count" value="1" />
+
+      <property name="incrementBy" value="0" unless="@{PropertyExists('incrementBy')}" />
+
+      <foreach property="version.part" item="String" delim="." in="${version}" >
+        <property name="version.part.${count}" value="${version.part}" />
+        <property name="count" value="@{MathAdd(${property.value},1)}" />
+      </foreach>
+      
+      <property name="nextBuildNum" value="@{MathAdd('${p4.changelist}',${incrementBy})}" />
+
+      <property name="major" value="${version.part.1}" />
+      <property name="minor" value="${version.part.2}" />
+      <property name="patch" value="${version.part.3}" />
+      <property name="revision" value="${nextBuildNum}" />
+
+      <echo message="Updating version.txt counter to ${major}.${minor}.${patch}.${revision}" />
+      <attrib file="${version.file}" readonly="false"/>
+      <trycatch>
+        <try>
+          <echo message="${major}.${minor}.${patch}.${revision}" file="${version.file}"/>
+        </try>
+        <catch>
+          <fail message="Error:${trycatch.error}"/>
+        </catch>
+        <finally>
+          <attrib file="${version.file}" readonly="true"/>
+        </finally>
+      </trycatch>
+    </target>
+
+    <!--  This is used for versioning. The Maven pom.xml file will only use the version string in the pom file to determine what it will call the
+          uploaded file in the repository. We must edir the pom-temp.xmp file to embed the correct version number before deploying. -->
+    <target name="create-pom-file">
+      <fail message="Property 'originx.maven.branch' not defined. Use -D:originx.maven.branch=&quot;YOUR_CLIENTSPEC&quot; to define" unless="@{PropertyExists('originx.maven.branch')}" />
+      <property name="dollar" value="$"/>
+      <property name="propstart" value="{"/>
+      <property name="propend" value="}"/>
+      <property name="version" fromfile="${version.file}"/>
+      <property name="pom-temp.contents" fromfile="${package.originwebminispa.dir}/pom-temp.xml" />
+      <property name="pom.file" value="${package.originwebminispa.dir}/pom.xml" />
+      <property name="pom-temp.contents" value="@{StrReplace(${property.value},'__ORIGIN_VERSION__',${version})}" />
+      <property name="pom-temp.contents" value="@{StrReplace(${property.value},'__ORIGINX_MAVEN_BRANCH__',${originx.maven.branch})}" />
+      <echo message="${pom-temp.contents}" file="${pom.file}"/>
+    </target>
+    
+    <target name="originwebminispa-deploy">
+      <dependent name="maven"/>
+      <task name="maven-deploy"/>
+    </target>
+</project>
+
+
+
+

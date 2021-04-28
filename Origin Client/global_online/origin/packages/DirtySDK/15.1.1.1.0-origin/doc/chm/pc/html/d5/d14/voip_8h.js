@@ -1,0 +1,26 @@
+var voip_8h =
+[
+    [ "VoipActivateLocalUser", "d5/d14/voip_8h.html#ga8d91492cb8b48fdc4fc4fe3ee6670db6", null ],
+    [ "VoipConnect", "d5/d14/voip_8h.html#ga0e8a6abbec7e6cd9ae2d2063eff661d5", null ],
+    [ "VoipConnStatus", "d5/d14/voip_8h.html#ga6ff0f4221176b4aed24d5b38951fd5d2", null ],
+    [ "VoipControl", "d5/d14/voip_8h.html#ga8dcb7ad2a4f4610038b04f2af209821e", null ],
+    [ "VoipDisconnect", "d5/d14/voip_8h.html#gab4ca990441877f3648c640a585b687f0", null ],
+    [ "VoipDisconnect2", "d5/d14/voip_8h.html#ga90d3e08545f63c07c7d0f693c2e3e70a", null ],
+    [ "VoipGetProfileStat", "d5/d14/voip_8h.html#ga13d987ee565e9881dc7dad48a390b0fa", null ],
+    [ "VoipGetProfileTime", "d5/d14/voip_8h.html#ga82140e93365565fccf44572bd2c147f4", null ],
+    [ "VoipGetRef", "d5/d14/voip_8h.html#ga43f277cf4a42242f1c54d78aeac0d067", null ],
+    [ "VoipLocalUserStatus", "d5/d14/voip_8h.html#gab1fc4343e780b87ac19326669d168528", null ],
+    [ "VoipMicrophone", "d5/d14/voip_8h.html#ga7bc8e093b208c409147819ffe434ff6c", null ],
+    [ "VoipRemoteUserStatus", "d5/d14/voip_8h.html#ga6a2d1d59d06102d7a0113b3d70f99fae", null ],
+    [ "VoipRemove", "d5/d14/voip_8h.html#ga09230e77ce77e117e613097edc8aa2a1", null ],
+    [ "VoipResetChannels", "d5/d14/voip_8h.html#gab96ea08c7372501c8ea3d88e92766a56", null ],
+    [ "VoipSelectChannel", "d5/d14/voip_8h.html#gafa59eb03ee179ce6d5015f155afef499", null ],
+    [ "VoipSetEventCallback", "d5/d14/voip_8h.html#ga154d666ef8bad5100c9715a6ae2a9242", null ],
+    [ "VoipSetLocalUser", "d5/d14/voip_8h.html#gaba2a68d6bcee52278b4c57688aab0435", null ],
+    [ "VoipShutdown", "d5/d14/voip_8h.html#ga54acceae6e1ff3384fa165d9ba9ea9f0", null ],
+    [ "VoipSpeaker", "d5/d14/voip_8h.html#ga51e65db2c5654af14cfa9ee49252eac9", null ],
+    [ "VoipSpkrCallback", "d5/d14/voip_8h.html#ga75fee72ea41a4074969f4cf22735a919", null ],
+    [ "VoipStartup", "d5/d14/voip_8h.html#gaa47d8e238380356a0072a06bd2648bd6", null ],
+    [ "VoipStatus", "d5/d14/voip_8h.html#gaedd2de24800d3b3839e76fd28970ed82", null ],
+    [ "VoipUpdate", "d5/d14/voip_8h.html#gaf73af8df2d326fc0f8814b5e8ee9cc99", null ]
+];

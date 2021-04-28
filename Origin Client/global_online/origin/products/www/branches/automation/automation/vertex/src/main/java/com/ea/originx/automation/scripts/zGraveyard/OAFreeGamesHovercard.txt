@@ -1,0 +1,198 @@
+package com.ea.originx.automation.scripts.freegames;
+
+import com.ea.originx.automation.lib.pageobjects.common.GlobalSearch;
+import com.ea.originx.automation.lib.pageobjects.store.FreeGamesPage;
+import com.ea.originx.automation.lib.pageobjects.store.FreeGamesTrialsPage;
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHousePage;
+import com.ea.originx.automation.lib.pageobjects.store.OnTheHouseTile;
+import com.ea.originx.automation.lib.pageobjects.store.FreeGamePosterTile;
+import com.ea.originx.automation.lib.pageobjects.store.TrialTile;
+import com.ea.originx.automation.lib.pageobjects.store.StoreGameTile;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.InfoBubble;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Tests the 'Free Games','Trials' and 'On The House' pages hover cards on hovering on to 'Get It Now'/'Add to Game Library' CTA
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeGamesHovercard extends EAXVxTestTemplate {
+
+    public enum FREE_GAMES_PAGE_TYPE {
+        FREE_GAMES_BASE_PAGE,
+        TRIALS,
+        ON_THE_HOUSE
+    }
+
+    public void testFreeGamesHovercard(ITestContext context, OAFreeGamesHovercard.FREE_GAMES_PAGE_TYPE type) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        String extraText_1;
+        String extraText_2;
+        String extraText_3;
+        String extraText_4;
+
+        switch (type) {
+            case FREE_GAMES_BASE_PAGE:
+                extraText_1 = "'Free Games' page";
+                extraText_2 = "'Add To Game Library'";
+                extraText_3 = "";
+                extraText_4 = "";
+                break;
+            case TRIALS:
+                extraText_1 = "'Free Games' Page -> 'Trials' page";
+                extraText_2 = "'Get It Now'";
+                extraText_3 = "there is a message about the length of the trial";
+                extraText_4 = "There is no message about the length of the trial";
+                break;
+            case ON_THE_HOUSE:
+                extraText_1 = "'Free Games' page -> 'On the House' page";
+                extraText_2 = "'Get It Now'";
+                extraText_3 = "there is a limited availability message";
+                extraText_4 = "there is no limited availability message";
+                break;
+            default:
+                throw new RuntimeException("Unexpected test type " + type);
+        }
+
+
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+
+        logFlowPoint("Launch Origin and login as any user"); // 1
+        logFlowPoint("Navigate to " + extraText_1); // 2
+        logFlowPoint("Hover over " + extraText_2 + " CTA and verify the 'Info Bubble' is visible"); // 3
+        logFlowPoint("Verify the 'Game Rating' icon is visible"); // 4
+        logFlowPoint("Verify the 'Game Rating' icon matches the locale"); // 5
+        logFlowPoint("Verify that there is a rating descriptor for the product"); // 6
+        if (type == FREE_GAMES_PAGE_TYPE.ON_THE_HOUSE || type == FREE_GAMES_PAGE_TYPE.TRIALS) {
+            logFlowPoint("Verify that " + extraText_3); // 7
+        }
+        logFlowPoint("Verify that there is a link to product's 'EULA' and/or 'Terms and Conditions'"); // 8
+        if (type == FREE_GAMES_PAGE_TYPE.ON_THE_HOUSE) {
+            logFlowPoint("Search for the 'OTH' Entitlement and verify there is a 'OTH' violator on the store tile");//9
+        }
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Verified login successful to user account: " + userAccount.getUsername());
+        } else {
+            logFailExit("Failed: Cannot login to user account: " + userAccount.getUsername());
+        }
+
+        //2
+        boolean isPageReached;
+        FreeGamesPage freeGamesPage = new FreeGamesPage(driver);
+        OnTheHousePage onTheHousePage = new OnTheHousePage(driver);
+        FreeGamesTrialsPage freeGamesTrialsPage = new FreeGamesTrialsPage(driver);
+        NavigationSidebar navigationSidebar = new NavigationSidebar(driver);
+        if (type == FREE_GAMES_PAGE_TYPE.FREE_GAMES_BASE_PAGE) {
+            navigationSidebar.gotoFreeGamesPage();
+            isPageReached = freeGamesPage.verifyFreeGamesPageReached();
+        } else if (type == FREE_GAMES_PAGE_TYPE.ON_THE_HOUSE) {
+            navigationSidebar.gotoOnHousePage();
+            isPageReached = onTheHousePage.verifyOnTheHousePageReached();
+        } else {
+            navigationSidebar.gotoFreeGamesTrialsPage();
+            isPageReached = freeGamesTrialsPage.verifyFreeGamesTrialPageReached();
+        }
+        if (isPageReached) {
+            logPass("Verified " + extraText_1 + " has been reached");
+        } else {
+            logFailExit("Failed to reach  " + extraText_1);
+        }
+
+        //3
+        OnTheHouseTile onTheHouseTile;
+        // get first non-third party tile because game rating only shown for non-third party entitlements
+        if (type == FREE_GAMES_PAGE_TYPE.FREE_GAMES_BASE_PAGE) {
+            FreeGamePosterTile freeGamePosterTile = freeGamesPage.getFirstNonThirdPartyPosterTile();
+            freeGamePosterTile.hoverOnPrimaryCTA();
+        } else if (type == FREE_GAMES_PAGE_TYPE.ON_THE_HOUSE) {
+            onTheHouseTile = onTheHousePage.getFirstNonThirdPartyOTHTile();
+            Waits.sleep(2000); // sleep for a 2 seconds because the tiles takes a while to load up in chrome
+            onTheHouseTile.hoverOnGetItNowButton();
+        } else {
+            TrialTile trialTile = freeGamesTrialsPage.getFirstNonThirdPartyTrialTile(); //freeGamesTrialsPage.getAllFreeGamesTrialTiles().get(0);
+            Waits.sleep(2000); // sleep for a 2 seconds because the tiles takes a while to load up in chrome
+            trialTile.hoverOnGetItNowButton();
+        }
+        InfoBubble infoBubble = new InfoBubble(driver);
+        if (Waits.pollingWait(infoBubble::isInfoBubbleVisible)) {
+            logPass("On hovering over the " + extraText_3 + " CTA, the 'Info Bubble' is visible");
+        } else {
+            logFailExit("On hovering over the " + extraText_3 + " CTA, the 'Info Bubble' is  not visible");
+        }
+
+        // 4
+        if (infoBubble.isGameRatingLogoVisible()) {
+            logPass("The 'Game Rating' system icon is visible");
+        } else {
+            logFail("The 'Game Rating' system icon is not visible");
+        }
+
+        // 5
+        if (infoBubble.verifyGameRatingDescriptorMatchesLocale()) {
+            logPass("The 'Game Rating' icon matches the locale");
+        } else {
+            logFail("The 'Game Rating' icon matches the locale");
+        }
+
+        // 6
+        if (infoBubble.isRatingDescriptorsVisible()) {
+            logPass("The Game rating descriptors are displayed");
+        } else {
+            logFail("The Game rating descriptors are not displayed");
+        }
+
+        // 7
+        if (type != FREE_GAMES_PAGE_TYPE.FREE_GAMES_BASE_PAGE) {
+            boolean isAvailabilityTime;
+            if (type == FREE_GAMES_PAGE_TYPE.ON_THE_HOUSE) {
+                isAvailabilityTime = infoBubble.isAvailabilityDateLimitedTime();
+            } else {
+                isAvailabilityTime = infoBubble.isAvailabilityDateLength();
+            }
+            if (isAvailabilityTime) {
+                logPass("Verified that " + extraText_4 + " is displayed");
+            } else {
+                logFail("Failed: " + extraText_4 + " displayed");
+            }
+        }
+
+        // 8
+        if (infoBubble.isEULAVisible() || infoBubble.isTermsAndConditionsVisible()) {
+            logPass("The 'EULA' and/or 'Terms and Conditions' link is displayed");
+        } else {
+            logFail("The 'EULA' and/or 'Terms and Conditions' link is displayed");
+        }
+
+        //9
+        if (type == FREE_GAMES_PAGE_TYPE.ON_THE_HOUSE) {
+            onTheHouseTile = onTheHousePage.getAllOnTheHouseTiles().get(0);
+            String titleName = onTheHouseTile.getTrialEntitlementName();
+            String offerId = onTheHouseTile.getOfferId();
+            new GlobalSearch(driver).enterSearchText(titleName);
+            boolean isViolator = new StoreGameTile(driver, offerId).isOnTheHouse();
+            if (isViolator) {
+                logPass("The 'OTH' violator is displayed on the store tile");
+            } else {
+                logFail("The 'OTH' violator is not displayed on the store tile");
+            }
+        }
+
+        client.stop();
+        softAssertAll();
+    }
+
+}

@@ -1,0 +1,123 @@
+//--------------------------------------------------------------------------------------
+// Entry point to the program. Initializes everything and goes into a message processing 
+// loop. Idle time is used to render the scene.
+//--------------------------------------------------------------------------------------
+INT WINAPI wWinMain( HINSTANCE, HINSTANCE, LPWSTR, int )
+{
+    // Enable run-time memory check for debug builds.
+#if defined(DEBUG) | defined(_DEBUG)
+    _CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
+#endif
+
+    // ////////////////////////////////////////////////////////////////////
+    // ORIGIN SDK SETUP
+    // //////////////////////////////////////////////////////////////////// 
+    // initialize the Origin SDK
+    OriginStartupInputT input = { 0 };
+
+    input.ContentId = "App007";
+    input.MultiplayerId = "App007_MP";
+    input.Title = "IGO API Test App";
+    input.Language = "en_US";   // Currently not used in Origin.  
+    OriginStartupOutputT output = { 0 };
+    
+    OriginErrorT m_error = OriginStartup(ORIGIN_FLAG_ENABLE_IGO_API, 0, &input, &output);
+    if (m_error == ORIGIN_SUCCESS)
+    {
+        // setup OriginSDK error callbacks and debug level
+        OriginRegisterErrorCallback(OriginSDKErrorCallback, NULL);
+        OriginEnableDebug(ORIGIN_LEVEL_MINOR);
+
+		...
+		
+        InitApp();
+
+        // Initialize DXUT and create the desired Win32 window and Direct3D 
+        // device for the application. Calling each of these functions is optional, but they
+        // allow you to set several options which control the behavior of the framework.
+        DXUTInit(true, true); // Parse the command line and show msgboxes
+        DXUTSetHotkeyHandling(true, true, true);
+        DXUTCreateWindow(L"BasicHLSL");
+        DXUTCreateDevice(true, 1280, 720);
+
+        // Pass control to DXUT for handling the message pump and 
+        // dispatching render calls. DXUT will call your FrameMove 
+        // and FrameRender callback when there is idle time between handling window messages.
+        DXUTMainLoop();
+
+        // Perform any application-level cleanup here. Direct3D device resources are released within the
+        // appropriate callback functions and therefore don't require any cleanup code here.
+
+
+        //////////////////////////////////////////////////////////////////////
+        // ORIGIN SDK SUPPORT
+        ////////////////////////////////////////////////////////////////////// 
+        // destruct the Origin SDK
+        OriginShutdown();
+    }
+
+    return DXUTGetExitCode();
+}
+
+...
+
+//--------------------------------------------------------------------------------------
+// This callback function will be called immediately after the Direct3D device has been 
+// created, which will happen during application initialization and windowed/full screen 
+// toggles. This is the best location to create D3DPOOL_MANAGED resources since these 
+// resources need to be reloaded whenever the device is destroyed. Resources created  
+// here should be released in the OnDestroyDevice callback. 
+//--------------------------------------------------------------------------------------
+HRESULT CALLBACK OnCreateDevice( IDirect3DDevice9* pd3dDevice, const D3DSURFACE_DESC* pBackBufferSurfaceDesc,
+                                 void* pUserContext )
+{
+	...
+    
+
+    // ////////////////////////////////////////////////////////////////////
+    // ORIGIN IGO API SUPPORT
+    // //////////////////////////////////////////////////////////////////// 
+    // init IGO API
+    
+    OriginIGOContextInitT initialize;
+    ZeroMemory(&initialize, sizeof(initialize));
+    initialize.size = sizeof(initialize);
+    initialize.apiVersion = ORIGIN_MAKE_VERSION(OIG_API_MAJOR, OIG_API_MINOR, OIG_API_PATCH);   // linked IGO API vesion
+
+    initialize.callbacks.size = sizeof(OriginIGONotificationCallbacksT);
+    initialize.callbacks.visibilityStateCallback = reinterpret_cast<OriginIGOVisibilityCallbackFunc>(&OriginIGOVisibilityCallback);
+
+    initialize.dimensions.size = sizeof(initialize.dimensions);
+    // dimensions of the output screen in pixels
+    initialize.dimensions.screenBottom = pBackBufferSurfaceDesc->Height;
+    initialize.dimensions.screenTop = 0;
+    initialize.dimensions.screenRight = pBackBufferSurfaceDesc->Width;
+    initialize.dimensions.screenLeft = 0;
+
+    // you can copy the screen parameters if IGO's dimensions match (which should be the case 99%, unless you do back buffer stretching/shrinking while blitting!)
+    initialize.dimensions.igoBottom = pBackBufferSurfaceDesc->Height;
+    initialize.dimensions.igoTop = 0;
+    initialize.dimensions.igoRight = pBackBufferSurfaceDesc->Width;
+    initialize.dimensions.igoLeft = 0;
+
+    initialize.mode.size = sizeof(initialize.mode);
+    initialize.mode.inputWindow = GetForegroundWindow();
+    initialize.mode.renderingWindow = GetForegroundWindow();
+#ifdef _DEBUG
+    initialize.mode.usage = ORIGIN_IGO_MODE_VALIDATION; // use ORIGIN_IGO_MODE_DEFAULT for release code !
+#else
+    initialize.mode.usage = ORIGIN_IGO_MODE_DEFAULT;    // no validation
+#endif
+    initialize.mode.errorDebugCallback = reinterpret_cast<OriginIGOErrorDebugCallbackFunc>(&OriginSDKErrorCallback);
+    OriginErrorT error = OriginIGOInit(&initialize);
+    if (error != ORIGIN_SUCCESS_IGOAPI)
+    {
+        if (error != ORIGIN_ERROR_IGO_NOT_AVAILABLE)    // IGO is probably disabled for that game or the game is not in the catalog nor added as a NOG (Non-Origin-Game)!
+            _ASSERTE(0);
+    }
+
+
+    return S_OK;
+}
+
+

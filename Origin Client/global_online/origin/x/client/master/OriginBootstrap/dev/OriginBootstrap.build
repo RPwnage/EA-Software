@@ -1,0 +1,205 @@
+<project name="OriginBootstrap" default="build">
+  
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+  <package name="OriginBootstrap"/>
+  <property name="branch.name" value="@{PathGetFileName(@{PathGetFullPath('${package.OriginBootstrap.dir}/../../')})}"/>
+  <!-- Branch name will equal client if it's in the OriginX sandbox, which has a client subdir. This will change when we merge back into the real DL -->
+  <property name="branch.name" value="@{PathGetFileName(@{PathGetFullPath('${package.OriginBootstrap.dir}/../../../')})}" if="${branch.name} eq 'client'"/>
+  <property name="runtime.gen.slnname.template" value="${branch.name}-OriginBootstrap"/>
+  <property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+    
+  <!-- ******************** -->
+  <!-- Package dependencies -->
+  <!-- ******************** -->
+  <dependent name="OriginBootstrapShared" />
+  <dependent name="OriginConfig" />
+  <dependent name="OriginVersion" />
+  <dependent name="VisualStudio" />
+  <dependent name="originClient" />
+  <dependent name="IGOProxy" />
+  <dependent name="OriginCrashReporter" />
+  <dependent name="TelemetryBreakpointHandler" />
+  <dependent name="OriginER" />
+  <dependent name="ShiftDirectDownload" />
+  <dependent name="OriginDeveloperTool" />
+  <property name="package.VisualStudio.platformtoolset" value="v120_xp"/>
+  <include file="${package.OriginBootstrap.dir}/scripts/targets.xml"/>
+  <!-- ***************************** -->
+  <!-- Build Configuration properties-->
+  <!-- ***************************** -->
+  <BuildType name="OriginBootstrap.buildtype" from="OriginProgram">
+    <remove>
+      <cc.options>
+        /Zc:wchar_t-
+      </cc.options>
+    </remove>
+    <option name="buildset.cc.options">
+      ${option.value}
+      /Zc:wchar_t
+    </option>
+    <option name="buildset.cc.options" if="${config-system} == pc">
+      ${option.value}
+      /FI ${package.OriginBootstrap.dir}/source/OriginCommon.h
+    </option>
+  </BuildType>
+  
+  <property name="runtime.buildmodules" value="OriginBootstrap" />
+  <property name="runtime.OriginBootstrap.buildtype" value="OriginBootstrap.buildtype" />
+  <property name="runtime.OriginBootstrap.outputdir" value="${package.originClient.dir}/runtime"/>
+  <property name="runtime.OriginBootstrap.outputname" value="Origin"/>
+  <property name="dirtysdk-samples" value="false" />
+  
+  <!-- ************************* -->
+  <!-- Prebuild property targets -->
+  <!-- ************************* -->
+  
+  <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+  <target name="generate-code" />
+  <property name="runtime.OriginBootstrap.prebuildtarget" value="generate-code" />
+  
+  <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+  <property name="runtime.OriginBootstrap.vcproj.pre-build-step">
+    ${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.OriginBootstrap.prebuildtarget}
+  </property>
+
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+  
+  <property name="postbuild.OriginBootStrap.target.list">
+    embed-manifest-bootstrap
+  </property>
+  
+  <target name="embed-manifest-bootstrap">
+    <exec program="${package.WindowsSDK.kitbin.dir}\mt.exe">
+      <args>
+        <arg value="/manifest ${package.OriginBootstrap.dir}\source\Resources\Origin.manifest /outputresource:${runtime.OriginBootstrap.outputdir}\Origin.exe;1" /> 
+      </args>
+    </exec>
+        <sleep seconds="3" />
+  </target>
+  
+  <property name="postbuild.OriginBootStrap.target.list" if="${config-type} eq 'opt'">
+    ${property.value}
+    sign-bootstrap-exe
+  </property>
+  
+  <property name="postbuild.OriginBootStrap.target.list" >
+    ${property.value}
+    copy-to-runtime
+  </property>
+  
+  <target name="OriginBootstrap-post-build-tasks">
+    <foreach property="runtarget" item="String" in="${postbuild.OriginBootStrap.target.list}">
+      <call target="${runtarget}" />
+    </foreach>
+  </target>
+  
+  <!-- NANT Postbuild target. Will execute this after compiling happens. -->
+  <property name="runtime.OriginBootstrap.postbuildtarget" value="OriginBootstrap-post-build-tasks" />
+
+  <!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+  <property name="runtime.OriginBootstrap.vcproj.post-build-step">
+      ${nant.location}/nant.exe -buildfile:${nant.project.buildfile} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:codesign.timestamp=${codesign.timestamp} ${runtime.OriginBootstrap.postbuildtarget}
+  </property>
+    
+  
+  <!-- ********************************************************** -->
+  <!-- Package USE dependencies                                   -->
+  <!-- inclusion into the project but does not affect build order -->
+  <!-- ********************************************************** -->
+  <property name="runtime.OriginBootstrap.usedependencies">
+    OriginVersion
+  </property>
+  
+  <!-- ********************************************************** -->
+  <!-- Package BUILD dependencies                                 -->
+  <!-- inclusion into the project, affects build order             -->
+  <!-- ********************************************************** -->
+  <property name="runtime.OriginBootstrap.builddependencies">
+    EABase
+    EAStdC
+    zlib
+  </property>
+  
+  <property name="runtime.OriginBootstrap.buildonlydependencies">
+    originClient
+    IGOProxy
+    OriginCrashReporter
+    TelemetryBreakpointHandler
+    OriginER
+    ShiftDirectDownload
+    OriginDeveloperTool
+	</property>
+	
+	<!-- ************ -->
+    <!-- Include path -->
+    <!-- ************ -->
+  <property name="runtime.OriginBootstrap.includedirs" >
+    ${package.VisualStudio.appdir}\VC\INCLUDE
+    ${package.OriginBootstrap.dir}/source
+    ${package.OriginBootstrap.dir}/source/wtl
+    ${package.OriginBootstrapShared.includedirs}
+  </property>
+
+  <!-- ************ -->
+    <!-- Source path  -->
+    <!-- ************ -->
+  <fileset name="runtime.OriginBootstrap.sourcefiles" basedir="${package.dir}">
+    <includes name="${package.OriginBootstrap.dir}\source\*.cpp" />
+  </fileset>
+
+  <fileset name="runtime.OriginBootstrap.libs" >
+    <includes name="${package.VisualStudio.appdir}/VC/lib/comsuppw.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/winhttp.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/version.lib" />
+    <includes name="${package.OriginBootstrap.dir}/source/LibArchive/archive_static.lib" />
+  </fileset>
+  
+  <target name="dumpsources">
+    <foreach property="fname" item="FileSet" in="runtime.OriginBootstrap.libs">
+      <echo message="source ${fname}" />
+    </foreach>
+  </target>
+  
+  <fileset name="runtime.OriginBootstrap.headerfiles" basedir="${package.dir}">
+    <includes name="${package.OriginBootstrap.dir}/source/**/*.h" />
+  </fileset>
+    
+  <fileset name="runtime.OriginBootstrap.resourcefiles">
+    <includes name="${package.OriginBootstrap.dir}/source/OriginBootstrap.rc" />
+  </fileset>
+  
+  <property name="runtime.OriginBootstrap.res.includedirs">
+    ${package.OriginVersion.dir}/include
+    ${package.OriginBootstrapShared.dir}
+  </property>
+  
+  <target name="create-folders">
+    <mkdir dir="${runtime.OriginBootstrap.outputdir}" unless="@{DirectoryExists(${runtime.OriginBootstrap.outputdir})}" />
+  </target>
+    
+  <target name="sign-bootstrap-exe">
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="&quot;@{PathGetFileNameWithoutExtension('${runtime.OriginBootstrap.outputdir}\${runtime.OriginBootstrap.outputname}.exe')}&quot;" in="${runtime.OriginBootstrap.outputdir}\${runtime.OriginBootstrap.outputname}.exe" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+  </target>
+  
+    <!-- Build installer from OriginClient project -->
+    <target name="installer">
+        <exec program="${nant.location}/nant.exe" workingdir="${package.originClient.dir}" >
+          <args>
+            <arg value="-D:config=${config}" />
+            <arg value="-D:jenkins=true" if="@{PropertyExists('jenkins')}"/>
+            <arg value="-D:s3.upload=${s3.upload??false}"/>
+            <arg value="-D:codesign.timestamp=${codesign.timestamp}"/>
+            <arg value="-masterconfigfile:${nant.project.masterconfigfile}"/>
+            <arg value="installer" />
+          </args>
+        </exec>
+  </target>
+</project>
+
+
+
+

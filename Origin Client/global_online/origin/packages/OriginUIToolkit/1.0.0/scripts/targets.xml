@@ -1,0 +1,68 @@
+<project>
+    <target name="update-web" >
+        <dependent name="s3" />
+        <dependent name="ActivePython" />
+        
+        <fileset name="OriginUIToolkit.web.files" basedir="${package.OriginUIToolkit.dir}" >
+            <includes name="website/**" />
+        </fileset>
+        
+        <foreach property="file" item="FileSet" in="OriginUIToolkit.web.files" >
+            <echo message="FILE is ${file}" />
+            <property name="copy.file" value="${file}" />
+            <property name="copy.dest" value="@{StrReplace('${file}','${package.OriginUIToolkit.dir}\website\\','')}" />
+            <exec program="${package.ActivePython.exe}" workingdir="${package.s3.bindir}">
+                <args>
+                    <arg value="${package.s3.bindir}/s3.py" />
+                    <arg value="-b otk.dm.origin.com" />
+                    <arg value="put" />
+                    <arg value="@{PathToUnix(${copy.dest})}" />
+                    <arg value="${copy.file}" />
+                </args>
+            </exec>
+        </foreach>
+    </target>
+    
+    <createtask name="buildtk">
+        <parameters>
+            <option name="components.dir" value="Required"/>
+            <option name="output.dir" value="Required"/>
+        </parameters>
+        
+        <code>
+            <dependent name="ActivePython"/>
+            <eval type="Function" code="@{PropertyUndefine('output.absdir')}"/>
+            <eval type="Function" code="@{PropertyUndefine('component.absdir')}"/>
+            
+            <property name="python.exe" value="${package.ActivePython.exe}" if="${config-system} == 'pc'"/>
+            <property name="python.exe" value="python" if="${config-system} == 'osx'"/>
+            
+            <do unless="@{PathIsPathRooted(${buildtk.components.dir})}">
+                <property name="components.absdir" value="@{PathGetFullPath(${buildtk.components.dir})}"/>
+            </do>
+            <property name="components.absdir" value="${buildtk.components.dir}" unless="@{PropertyExists(components.absdir)}"/>
+            
+            <do unless="@{PathIsPathRooted(${buildtk.output.dir})}">
+                <property name="output.absdir" value="@{PathGetFullPath(${buildtk.output.dir})}"/>
+            </do>
+            <property name="output.absdir" value="${buildtk.output.dir}" unless="@{PropertyExists(output.absdir)}"/>
+        
+            <delete dir="${output.absdir}/uitoolkit"/>
+            
+            <exec program="${python.exe}" workingdir="${package.OriginUIToolkit.dir}/builder">
+                <args>
+                    <arg value="build-toolkit.py"/>
+                    <arg value="--components-dir ${components.absdir}"/>
+                    <arg value="--output-dir ${output.absdir}"/>
+                </args>
+            </exec>
+        </code>
+    </createtask>
+    
+    <target name="buildtk">
+        <fail unless="@{PropertyExists('components.dir')}" message="You must specify a components dir."/>
+        <fail unless="@{PropertyExists('output.dir')}" message="You must specify an output dir."/>
+        
+        <task name="buildtk" components.dir="${components.dir}" output.dir="${output.dir}"/>
+    </target>
+</project>

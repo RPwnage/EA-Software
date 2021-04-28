@@ -1,0 +1,284 @@
+<project>
+
+   <do unless="@{PropertyTrue('DirtySDK-skip-lib-generation')}">
+        <property name="runtime.buildmodules">
+            ${property.value}
+            ${dirtysock_modulename}
+        </property>
+    </do>
+
+    <!-- set the final output type to a library which other apps will include -->
+    <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+        <property name="runtime.${dirtysock_modulename}.buildtype" value="UnixCLibrary" />
+    </do>
+    <do if="${config-system} != 'unix' and ${config-system} != 'unix64'">
+        <property name="runtime.${dirtysock_modulename}.buildtype" value="DSLibrary" />
+    </do>
+
+    <!-- include usedependencies -->
+    <do if="${config-platform} == 'ps3-gcc'">
+        <property name="runtime.${dirtysock_modulename}.usedependencies.ps3">
+            PlayStation3NPEx
+        </property>
+    </do>
+    <do if="${config-platform} == 'ps3-sn'">
+        <property name="runtime.${dirtysock_modulename}.usedependencies.ps3">
+            ps3sdk
+            PlayStation3NPEx
+        </property>
+    </do>
+
+    <property name="runtime.${dirtysock_modulename}.usedependencies.psp2">
+        psp2npex
+    </property>
+
+    <property name="runtime.${dirtysock_modulename}.usedependencies.rev">
+        RevolutionEX
+        RevolutionDWC_DL
+    </property>
+
+    <!-- Define platform source location: we can't use config-system directly because of pc64 and unix64 buildes -->
+    <do if="${config-system} != 'pc64' and ${config-system} != 'unix64'">
+        <property name="dirtyplat-source" value="${config-system}"/>
+    </do>
+    <do if="${config-system} == 'pc64'">
+        <property name="dirtyplat-source" value="pc"/>
+    </do>
+    <do if="${config-system} == 'unix64'">
+        <property name="dirtyplat-source" value="unix"/>
+    </do>
+
+    <!-- Bring in the set of files used to build -->
+    <fileset basedir="${package.DirtySDK.dir}" name="runtime.${dirtysock_modulename}.sourcefiles">
+        <includes fromfile="${package.DirtySDK.dir}/core/project/${dirtyplat-source}/source.txt" if="@{FileExists('${package.DirtySDK.dir}/core/project/${dirtyplat-source}/source.txt')}"/>
+        <includes fromfile="${package.DirtySDK.dir}/core/project/source.txt" if="@{FileExists('${package.DirtySDK.dir}/core/project/source.txt')}"/>
+    </fileset>
+
+    <!-- set some basic include directories -->
+    <property name="runtime.${dirtysock_modulename}.includedirs">
+        ${package.DirtySDK.dir}/platform
+        ${package.DirtySDK.dir}/core/include
+        ${package.DirtySDK.dir}/core/include/${dirtyplat-source}
+        ${package.DirtySDK.dir}/core/source/friend
+        ${package.DirtySDK.dir}/core/source/misc
+        ${package.DirtySDK.dir}/core/source/voip
+    </property>
+
+    <!-- all platforms must have these defines -->
+    <property name="runtime.${dirtysock_modulename}.defines">
+        ${property.value}
+        DS_PLATFORM
+    </property>
+
+    <property name="runtime.${dirtysock_modulename}.defines" if="@{PropertyExists('dirtysdk_debug_enable')}">
+        ${property.value}
+        DIRTYCODE_LOGGING=1
+    </property>
+
+    <property name="runtime.${dirtysock_modulename}.defines" if="@{PropertyExists('dirtysdk_debug_disable')}">
+        ${property.value}
+        DIRTYCODE_LOGGING=0
+    </property>
+
+    <property name="runtime.${dirtysock_modulename}.defines" if="@{PropertyExists('dirtysdk-distpktwindow-size')}">
+        ${property.value}
+        PACKET_WINDOW=${dirtysdk-distpktwindow-size}
+    </property>
+
+    <!-- =================  Android  =================== -->
+    <do if="${config-system} == 'android'">
+        <property name="runtime.${dirtysock_modulename}.defines">
+            ${property.value}
+            _GNU_SOURCE
+            _WINSOCKAPI_          <!-- $$todo: [v9] clean this up! should no longer be needed when dirtynet.h is refactored -->
+            LINUX
+            DIRTYSOCK_CORE_ONLY
+        </property>
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            -Wno-multichar
+            -Wsign-compare
+            -Wmissing-field-initializers
+            -Wstrict-prototypes
+            -Wmissing-prototypes
+        </property>
+    </do>
+
+    <!-- =================  iPhone/OSX  =============== -->
+    <do if="${config-system} == 'iphone' or ${config-system} == 'osx'">
+        <property name="runtime.${dirtysock_modulename}.defines">
+            ${property.value}
+            _WINSOCKAPI_          <!-- $$todo: [v9] clean this up! should no longer be needed when dirtynet.h is refactored -->
+        </property>
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            -Wsign-compare
+            -Wmissing-field-initializers
+            -Wstrict-prototypes
+            -Wmissing-prototypes
+            -Wno-multichar
+            -Wno-pointer-sign
+        </property>
+    </do>
+
+    <!-- set the visual studio path for build.xml files -->
+    <do if="${config-system} == 'pc'">
+        <do if="'${package.VisualStudio.version}' gte '8.0.0'">
+            <property name="vsxmlpath" value="VC"/>
+        </do>
+        <do if="'${package.VisualStudio.version}' lt '8.0.0'">
+            <property name="vsxmlpath" value="Vc7"/>
+        </do>
+    </do>
+
+    <!-- =================  PC & PC64 =================== -->
+    <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+        <property name="runtime.${dirtysock_modulename}.defines">
+            ${property.value}
+            WINSOCK_API_LINKAGE=
+        </property>
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            -wd4054     <!-- type cast from function pointer to void pointer -->
+            -wd4055     <!-- data/void pointer cast to function pointer (type casting does *not* suppress this warning) -->
+            -wd4127     <!-- conditional expression is constant -->
+            -wd4201     <!-- nonstandard extension used : nameless struct/union (some windows headers generate this warning) -->
+            -wd4242     <!-- conversion from type1 to type2; possible loss of data -->
+            -wd4244     <!-- conversion from type1 to type2; possible loss of data -->
+            -wd4255     <!-- no function prototype given: converting () to (void) [disabled for VC++ headers] -->
+            -wd4295     <!-- array is too small to include terminating null character -->
+            -wd4310     <!-- cast truncates constant value -->
+            -wd4548     <!-- expression before comma has no effect; expected expression with side-effect (required starting with VS2011) -->
+        </property>
+    </do>
+
+  <!-- =================  Playbook  =================== -->
+    <do if="@{StrStartsWith('${config-system}', 'playbook')}">
+      <property name="runtime.${dirtysock_modulename}.defines">
+        ${property.value}
+        _GNU_SOURCE
+        _WINSOCKAPI_          <!-- $$todo: [v9] clean this up! should no longer be needed when dirtynet.h is refactored -->
+        LINUX
+        DIRTYSOCK_CORE_ONLY
+      </property>
+      <property name="runtime.${dirtysock_modulename}.warningsuppression">
+        -Wno-multichar
+        -Wsign-compare
+        -Wmissing-field-initializers
+        -Wstrict-prototypes
+        -Wmissing-prototypes
+    </property>
+    </do>
+
+  <!-- =================  PS3  =================== -->
+    <do if="${config-system} == 'ps3'">
+        <property name="runtime.${dirtysock_modulename}.includedirs">
+            ${property.value}
+        </property>
+        <property name="runtime.${dirtysock_modulename}.defines">
+            ${property.value}
+        </property>
+    </do>
+    <do if="${config-platform} == 'ps3-gcc'">
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            ${property.value}
+            -Wall
+            -Wno-multichar
+            -Wformat
+            -Wimplicit-int
+            -Wsign-compare
+            -Wshadow
+            -Wstrict-prototypes
+            -Wmissing-prototypes
+        </property>
+    </do>
+    <do if="${config-platform} == 'ps3-sn'">
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            ${property.value}
+            --diag_suppress=189     <!-- enumerated type mixed with another type -->
+            --diag_suppress=552     <!-- variable was set but never used -->
+            --diag_suppress=1421    <!-- trigraph support is disabled -->
+            --diag_suppress=1437    <!-- multi-character character literal -->
+        </property>
+    </do>
+
+    <!-- =================  PSP2  =================== -->
+    <do if="${config-system} == 'psp2'">
+        <property name="runtime.${dirtysock_modulename}.includedirs">
+            ${property.value}
+        </property>
+        <property name="runtime.${dirtysock_modulename}.defines">
+            ${property.value}
+        </property>
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            ${property.value}
+            --diag_suppress=68      <!-- integer conversion resulted in a change of sign -->
+            --diag_suppress=145     <!-- signed/unsigned parameter mismatch -->
+            --diag_suppress=189     <!-- enumerated type mixed with another type -->
+            --diag_suppress=515     <!-- signed/unsigned assignment -->
+            --diag_suppress=552     <!-- variable was set but never used -->
+            --diag_suppress=1421    <!-- trigraph support is disabled -->
+            --diag_suppress=1437    <!-- multi-character character literal -->
+            --diag_suppress=1786    <!-- strict-aliasing rule violation (commudp, ...?) -->
+        </property>
+    </do>
+    
+    
+    
+    <!-- =================  Revolution ============== -->
+    <do if="${config-system} == 'rev'">
+        <property name="runtime.${dirtysock_modulename}.includedirs">
+            ${property.value}
+        </property>
+        <property name="runtime.${dirtysock_modulename}.defines">
+            ${property.value}
+            _RVL
+        </property>
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            -w nopedantic
+            -w nounusedarg
+            -w nounusedexpr
+            -w noextracomma
+            -w noimplicitconv
+        </property>
+    </do>
+
+    <!-- =================  UNIX  =================== -->
+    <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+        <property name="runtime.${dirtysock_modulename}.defines">
+            ${property.value}
+            _GNU_SOURCE
+            _WINSOCKAPI_          <!-- $$todo: [v9] clean this up! should no longer be needed when dirtynet.h is refactored -->
+            LINUX
+            DIRTYSOCK_CORE_ONLY
+        </property>
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            <!-- in the unix build this setting is ignored as we use a custom build type -->
+        </property>
+    </do>
+
+    <!-- =================  XENON  =================== -->
+    <do if="${config-system} == 'xenon'">
+        <property name="runtime.${dirtysock_modulename}.includedirs">
+            ${property.value}
+            ${package.DirtySDK.dir}/core/source/proto/xenon
+        </property>
+        <!-- add xhttp define if enabled -->
+        <property name="runtime.${dirtysock_modulename}.defines" if="@{PropertyExists('dirtysdk-xhttp')}">
+            ${property.value}
+            DIRTYSDK_XHTTP_ENABLED
+        </property>
+        <property name="runtime.${dirtysock_modulename}.defines">
+            ${property.value}
+        </property>
+        <property name="runtime.${dirtysock_modulename}.warningsuppression">
+            -wd4054     <!-- type cast from function pointer to void pointer -->
+            -wd4055     <!-- data/void pointer cast to function pointer (type casting does *not* suppress this warning) -->
+            -wd4127     <!-- conditional expression is constant -->
+            -wd4214     <!-- nonstandard extension used; bitfield types other than int [disabled for xhv2.h header] -->
+            -wd4242     <!-- conversion from type1 to type2; possible loss of data -->
+            -wd4244     <!-- conversion from type1 to type2; possible loss of data -->
+            -wd4255     <!-- no function prototype given: converting () to (void) [disabled for VC++ headers] -->
+            -wd4295     <!-- array is too small to include terminating null character -->
+            -wd4310     <!-- cast truncates constant value -->
+        </property>
+    </do>
+
+</project>

@@ -1,0 +1,199 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+  <property name="config-system"        value="palm"/>
+  <property name="config-compiler"      value="gcc"/>
+  <property name="config-platform"      value="palm-gcc"/>
+
+  <property name="platform-ptrsize"     value="32bit"/>
+  <property name="platform-wordsize"    value="32bit"/>
+
+  <property name="config.palm-pixi"     value="false"   unless="@{PropertyExists('config.palm-pixi')}"/>
+
+  <dependent name="palmpdk" />
+
+  <property name="lib-prefix"           value="lib"/>
+  <property name="lib-suffix"           value=".a"/>
+  <property name="dll-suffix"           value=".so"/>
+  <property name="exe-suffix"           value=""/>
+  <property name="secured-exe-suffix"   value=""/>
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle"      value="Windows"/>
+  <!-- Compile in parallel on multiple CPUs         -->
+  <property name="cc.parallelcompiler"    value="true"/>
+  <property name="as.parallelcompiler"    value="true"/>
+
+  <property name="link.useresponsefile" value="true"/>
+  <property name="link.usealtsepinresponsefile" value="true"/>
+
+  <fail unless="@{PropertyExists('cc.includedirs')}" message="Property cc.includedirs is required by this release of eaconfig. Please use a release of palmpdk that defines this property."/>
+  <optionset name="config-options-common">
+    <option name="buildset.cc.includedirs">
+      @{OptionSetGetValue('config-options-common', 'buildset.cc.includedirs')}
+      ${cc.includedirs}
+    </option>
+    <option name="buildset.lib.options">
+      -rs "%outputdir%/${lib-prefix}%outputname%${lib-suffix}"
+    </option>
+  </optionset>
+
+  <!-- Copy link.librarydirs from gcc proxy/non-proxy, so that GeneateBuildOptionSet will copy it to created build optionset -->
+  <optionset name="config-options-program">
+    <option name="buildset.link.librarydirs">
+      ${link.librarydirs}
+    </option>
+  </optionset>
+
+  <optionset name="config-options-dynamiclibrary" >
+    <option name="buildset.name"                        value="DynamicLibrary" />
+    <option name="buildset.tasks"                       value="asm cc link" />
+    <option name="buildset.cc.defines"                  value="EA_DLL" />
+    <option name="buildset.link.librarydirs">
+      ${link.librarydirs}
+    </option>
+    <option name="buildset.link.libraries">
+      <!-- This needs to be properly filled out -->
+    </option>
+  </optionset>
+
+  <property name="cc.options">
+    <!-- clear the default options and start fresh with config supplied options -->
+  </property>
+
+  <!-- To do: Move the cc.defines from the bottom of codegeneration.xml to here. -->
+
+  <!-- Swapped options and includedirs so that -nostdinc can be specified in cc.options in general.xml -->
+  <property name="cc.template.commandline">
+    %defines%
+    %options%
+    %includedirs%
+    -o "%objectfile%"           <!-- object file -->
+    -c "%sourcefile%"           <!-- source file -->
+  </property>
+
+  <property name="cc.template.includedir"    value='-I "%includedir%"'/>
+  <property name="cc.template.define"        value='-D %define%'/>
+
+  <!-- <link> task properties -->
+  <property name="link.options">
+    ${property.value}
+  </property>
+
+  <property name="link.libraries">
+  </property>
+
+  <property name='link.template.librarydir'  value='-L "%librarydir%"'/>
+  <property name='link.template.libraryfile' value='"%libraryfile%"'/>
+  <property name='link.template.objectfile'  value='"%objectfile%"'/>
+
+  <property name="link.template.commandline">
+    ${package.palmpdk.link.options}
+    %options%
+    %objectfiles%
+    %librarydirs%
+    -Xlinker --start-group
+    %libraryfiles%
+    -Xlinker --end-group
+  </property>
+
+  <!-- 
+    Set version specific libraries
+  If you need to use the dpm libs of TypeB/TypeC, do these if you're using FW2/eaconfig:
+  1. Derive your build type (optionset) from appropriate optionset, says config-options-library.
+  2. Set standardsdklibs to custom in your optionset
+  3. In its standardsdklibs.custom.link option, include those dpm libs
+  -->
+  <fail unless="@{PropertyExists('package.palmpdk.regularlib')}"
+    message="Property package.palmpdk.regularlib is required by this release of eaconfig. Please use a release of palmpdk that defines this property."/>
+  <property name="platform.sdklibs.regular">
+    ${package.palmpdk.regularlib}
+  </property>
+  <property name="platform.sdklibs.debug">
+    ${package.palmpdk.debuglib}
+  </property>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  Task to store the 'cc.options', 'cc.includedirs' and 'build.includedirs.all'
+  properties which get overridden for GCC to implement the -isystem support
+  and GCC include directory ordering workaround.  We need to cache these
+  values so they can be restored later.
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <createtask name="__private_SaveIncludesPathsAndCCOptions">
+    <parameters>
+      <option name="buildtype" value="Required"/>
+    </parameters>
+    <code>
+      <property name="__private_temp_ccoptions"             value="@{OptionSetGetValue('${__private_SaveIncludesPathsAndCCOptions.buildtype}', 'cc.options')}"/>
+      <property name="__private_temp_ccincludedirs"         value="@{OptionSetGetValue('${__private_SaveIncludesPathsAndCCOptions.buildtype}', 'cc.includedirs')}"/>
+      <property name="__private_temp_build_includedirs_all" value="${build.includedirs.all}"/>
+    </code>
+  </createtask>
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  Task to restore include paths and 'cc.options' back to their original
+  setting following calls to either '__private_ConvertSystemIncludesToCCOptions'.  The
+  previous values were stored in 'private' global properties.
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <createtask name="__private_RestoreIncludesPathsAndCCOptions">
+    <parameters>
+      <option name="buildtype" value="Required"/>
+    </parameters>
+    <code>
+      <!-- We should really throw an exception if the OptionSet doesn't exist, but that would
+               break existing 'Utility' behaviour, so we just silently ignore that case. -->
+      <do if="@{OptionSetExists('${__private_RestoreIncludesPathsAndCCOptions.buildtype}')}">
+        <optionset name="${__private_RestoreIncludesPathsAndCCOptions.buildtype}">
+          <option name="cc.options"     value="${__private_temp_ccoptions}"/>
+          <option name="cc.includedirs" value="${__private_temp_ccincludedirs}"/>
+        </optionset>
+        <property name="build.includedirs.all" value="${__private_temp_build_includedirs_all}"/>
+        <eval code="@{PropertyUndefine('__private_temp_ccoptions')}" type="Function"/>
+        <eval code="@{PropertyUndefine('__private_temp_ccincludedirs')}" type="Function"/>
+        <eval code="@{PropertyUndefine('__private_temp_build_includedirs_all')}" type="Function"/>
+      </do>
+    </code>
+  </createtask>
+
+
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  Task to convert system include paths from -I to -isystem.  This
+  tells the compiler that they are system headers (and to ignore warnings
+  in them).
+  
+  When using -isystem we have to move them from cc.includedirs to
+  cc.options. 
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+  <createtask name="__private_ConvertSystemIncludesToCCOptions">
+    <parameters>
+      <option name="buildtype" value="Required"/>
+    </parameters>
+    <code>
+      <!-- We should really throw an exception if the OptionSet doesn't exist, but that would
+               break existing 'Utility' behaviour, so we just silently ignore that case. -->
+      <do if="@{OptionSetExists('${__private_ConvertSystemIncludesToCCOptions.buildtype}')}">
+        <task name="__private_SaveIncludesPathsAndCCOptions" buildtype="${__private_ConvertSystemIncludesToCCOptions.buildtype}"/>
+
+        <foreach item="String" in="@{OptionSetGetValue('${__private_ConvertSystemIncludesToCCOptions.buildtype}', 'cc.includedirs')}" property="includedir">
+          <optionset name="${__private_ConvertSystemIncludesToCCOptions.buildtype}">
+            <option name="cc.options">
+              @{OptionSetGetValue('${__private_ConvertSystemIncludesToCCOptions.buildtype}', 'cc.options')}
+              -isystem "${includedir}"
+            </option>
+          </optionset>
+        </foreach>
+        <eval code="@{PropertyUndefine('includedir')}" type="Function"/>
+
+        <!-- Clear out the cc.includedirs.  The -isystem calls are all we need. -->
+        <optionset name="${__private_ConvertSystemIncludesToCCOptions.buildtype}">
+          <option name="cc.includedirs" value=""/>
+        </optionset>
+      </do>
+    </code>
+  </createtask>
+
+</project>

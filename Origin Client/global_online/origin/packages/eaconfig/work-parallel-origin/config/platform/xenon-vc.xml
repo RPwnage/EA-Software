@@ -1,0 +1,230 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+
+  <dependent name="xenonsdk" />
+
+  <property name="config-system"      value="xenon"/>
+  <property name="config-compiler"    value="vc"/>
+  <property name="config-platform"    value="xenon-vc"/>
+  <property name="config-processor"   value="xbox360" />
+
+  <!-- pointer size -->
+  <property name="platform-ptrsize" value="32bit"/>
+  <!-- registers size -->
+  <property name="platform-wordsize" value="64bit"/>
+
+  <!-- IM - I think I don't need this anymore -->
+  <property name="package.VisualStudio.exportbuildsettings" value="false"/>
+  <dependent name="VisualStudio"/>
+
+  <property name="default-exe-suffix"       value=".xex"/>
+  <property name="default-lib-prefix"       value=""/>
+  <property name="default-lib-suffix"       value=".lib"/>
+  <property name="default-dll-suffix"        value=".xex.dll"/>
+
+  <property name="exe-suffix"       value="${exe-suffix.${config-system}??${exe-suffix??${default-exe-suffix}}}"/>
+  <property name="lib-prefix"       value="${lib-prefix.${config-system}??${lib-prefix??${default-lib-prefix}}}"/>
+  <property name="lib-suffix"       value="${lib-suffix.${config-system}??${lib-suffix??${default-lib-suffix}}}"/>
+  <property name="dll-suffix"       value="${dll-suffix.${config-system}??${dll-suffix??${default-dll-suffix}}}"/>
+  <property name="temp-dll-suffix"  value="${temp-dll-suffix.${config-system}??${temp-dll-suffix??.dll}}"/>
+
+
+  <!-- <build> task properties -->
+  <property name="build.pathstyle"    value="Windows"/>
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="link.useresponsefile" value="true"/>
+  <!-- Always use response files, to avoid overflowing the command-line. -->
+  <property name="lib.useresponsefile" value="true"/>
+
+  <!-- clear options exported by XenonSdk package - they are wrong -->
+  <property name="cc.options"/>
+  <property name="cc.defines"/>
+  <property name="cc.gccdefines"/>
+  <property name="cc.includedirs"/>
+  <property name="link.options"/>
+  <property name="link.libraries"/>
+
+  <property name="cc.template.includedir"    value='-I "%includedir%"'/>
+  <property name="cc.template.define"        value='-D %define%'/>
+  <property name="cc.template.commandline">
+    %defines%
+    %includedirs%
+    %options%
+    -Fo"%objectfile%"                  <!-- object file name -->
+    "%sourcefile%"
+  </property>
+
+  <property name='link.template.librarydir'  value='-libpath:"%librarydir%"'/>
+  <property name='link.template.libraryfile' value='"%libraryfile%"'/>
+  <property name='link.template.objectfile'  value='"%objectfile%"'/>
+  <property name="link.template.commandline">
+    %options%
+    %librarydirs%
+    %objectfiles%
+    %libraryfiles%
+  </property>
+
+  <optionset name="config-options-common">
+    <option name="cc"   value="${cc}"/>
+    <option name="as"   value="${as}"/>
+    <option name="link" value="${link}"/>
+    <option name="lib"  value="${lib}"/>
+    <option name="preprocess"/>
+    <option name="postprocess">
+      xenon-vc-postprocess
+      all-platforms-postprocess
+    </option>
+    <!--- cc -->
+    <!--- cc -->
+    <option name="buildset.cc.options">
+      ${option.value}
+      ${cc.options??}
+
+      <!--Specify a .pdb file name to avoid generic vs name.
+                Regardless of whether we're building with debug symbols or not,
+                this is necessary for vsbuilds during generation of .idb dependency files as well.
+             -->
+      -Fd"%outputdir%\%outputname%.pdb"
+    </option>
+    <option name="buildset.cc.defines">
+      ${option.value}
+      ${cc.defines??}
+      _XBOX
+      ${package.xenonsdk.defines??}
+    </option>
+    <option name="buildset.cc.gccdefines">
+      ${option.value}
+      ${cc.gccdefines??}
+      _M_PPC
+    </option>
+    <option name="buildset.cc.includedirs">
+      ${option.value}
+      ${package.xenonsdk.includedirs ?? ${package.xenonsdk.appdir}\include\xbox}
+    </option>
+    <option name="buildset.link.options">
+      -xex:no
+      ${option.value}
+      ${link.options??}
+      -subsystem:xbox       <!-- specify subsystem to xbox -->
+      -stack:262144,262144  <!-- Set a default stack size -->
+    </option>
+    <option name="buildset.link.librarydirs">
+      ${option.value}
+      ${link.librarydirs??}
+      ${package.xenonsdk.appdir}\lib\xbox
+    </option>
+    <option name="link.postlink.program" value="${package.xenonsdk.appdir}\bin\win32\imagexex.exe" />
+    <!-- options for LTCG optimizations, will take effect only if global setting for optimization is 'on' -->
+    <option name="optimization.ltcg"        value="on" />
+    <option name="optimization.ltcg.mode"   value="normal"/>
+  </optionset>
+
+  <!-- Clear properties that are already appended to the optionset-->
+  <property name="cc.options" />
+  <property name="cc.defines" />
+  <property name="cc.gccdefines" />
+  <property name="cc.includedirs"/>
+  <property name="link.options"/>
+  <property name="link.libraries"/>
+  <property name="link.librarydirs"/>
+  <property name="lib.options"/>
+
+  <optionset name="config-options-library">
+    <option name="liboutputname" value="%outputdir%/${lib-prefix}%outputname%${lib-suffix}" />
+  </optionset>
+
+  <optionset name="config-options-program">
+    <option name="linkoutputname" value="%outputdir%\%outputname%.exe" />
+    <option name="link.postlink.commandline" >
+      -nologo
+      "-out:%outputdir%\%outputname%${exe-suffix}"
+      "%outputdir%\%outputname%.exe"
+    </option>
+  </optionset>
+
+  <optionset name="config-options-dynamiclibrary" >
+    <option name="generatedll"          value="on" />
+    <option name="buildset.cc.defines"  value="EA_DLL" />
+    <option name="linkoutputname" value="%intermediatedir%\%outputname%${temp-dll-suffix}" />
+    <option name="impliboutputname"     value="%outputlibdir%\%outputname%${lib-suffix}"/>
+    <option name="buildset.link.options">
+      -ENTRY:"_DllMainCRTStartup"
+    </option>
+    <option name="link.postlink.commandline" >
+      -nologo
+      "-out:%outputdir%\%outputname%${dll-suffix}"
+      "%intermediatedir%\%outputname%${temp-dll-suffix}"
+    </option>
+  </optionset>
+
+  <property name="platform.sdklibs.regular">
+    ${package.xenonsdk.appdir}/lib/xbox/xgraphics.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3d9.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3dx9.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xapilib.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xboxkrnl.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xaudio2.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xmcore.lib
+    ${package.xenonsdk.appdir}/lib/xbox/libpmcpb.lib
+  </property>
+
+  <property name="platform.sdklibs.profile">
+    ${package.xenonsdk.appdir}/lib/xbox/xgraphics.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3d9i.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3dx9i.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xapilibi.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xboxkrnl.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xaudio2.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xmcorei.lib
+    ${package.xenonsdk.appdir}/lib/xbox/libpmcpb.lib
+  </property>
+
+
+  <property name="platform.sdklibs.debug">
+    ${package.xenonsdk.appdir}/lib/xbox/xgraphicsd.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3d9d.lib
+    ${package.xenonsdk.appdir}/lib/xbox/d3dx9d.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xboxkrnl.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xbdm.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xapilibd.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xaudiod2.lib
+    ${package.xenonsdk.appdir}/lib/xbox/xmcored.lib
+    ${package.xenonsdk.appdir}/lib/xbox/libpmcpbd.lib
+  </property>
+
+
+  <createtask name="AddNetworkLibsToModule" overload="true">
+    <parameters>
+      <option name="module" value="Required"/>
+    </parameters>
+    <code>
+      <property name="debugcode.enabled" value="false"/>
+      <property name="debugcode.enabled" value="true" if="@{OptionSetGetValue('config-options-common', 'usedebuglibs')} == 'on'"/>
+
+      <property name="libsuffix" value=""/>
+      <property name="libsuffix" value="d" if="${debugcode.enabled}==true"/>
+
+      <fileset name="${AddNetworkLibsToModule.module}.libs" append="true">
+        <includes name="${package.xenonsdk.appdir}/lib/xbox/xnet${lib-suffix}"/>
+      </fileset>
+    </code>
+  </createtask>
+
+  <include file="options/load-vc-options.xml"/>
+
+  <taskdef assembly="${nant.project.temproot}/eaconfig/structured-extension-xenon.dll">
+    <sources>
+      <includes name="structured_xml_extensions/structured-extension-xenon.cs"/>
+    </sources>
+  </taskdef>
+
+
+  <!-- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <!-- +-+-  Visual Studio solution generation related data       -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <!-- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- -->
+  <property name="visualstudio.platform.name" value="Xbox 360"/>
+  <property name="visualstudio.platform-toolset" value="${visualstudio.platform-toolset??2010-01}"/>
+  <property name="visualstudio.platform-supports-deploy" value="true"/>
+</project>

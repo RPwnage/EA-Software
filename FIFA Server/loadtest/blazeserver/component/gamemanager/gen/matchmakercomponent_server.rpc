@@ -1,0 +1,316 @@
+/*****************************************************************************************
+
+
+    (c) Electronic Arts. All Rights Reserved.
+*****************************************************************************************/
+
+[
+  client_include = false,
+  headername="gamemanager/tdf/matchmaker_server.h" 
+]
+#include "gamemanager/gen/matchmaker_server.tdf"
+
+[
+  client_include = false,
+  headername="gamemanager/tdf/matchmaker_component_config_server.h" 
+]
+#include "gamemanager/gen/matchmaker_component_config_server.tdf"
+
+[
+  client_include = false, 
+  headername="gamemanager/tdf/matchmaker.h" 
+]
+#include "gamemanager/gen/matchmaker.tdf"
+
+[
+  client_include = false,
+  headername="gamemanager/tdf/matchmakingmetrics_server.h" 
+]
+#include "gamemanager/gen/matchmakingmetrics_server.tdf"
+
+namespace Blaze
+{
+namespace Matchmaker
+{
+
+[ 
+  id = core/30,
+  preconfigurationType = MatchmakerSlavePreconfig,
+  configurationType = MatchmakerConfig
+]
+component Matchmaker
+{
+    
+    
+    errors 
+    {
+    // matchmaking error block
+        [ description = "Problem parsing your matchmaking criteria.  See StartMatchmakingError's err msg for details." ]
+        MATCHMAKER_ERR_INVALID_MATCHMAKING_CRITERIA         = 200;
+        [ description = "No matchmaking sessions exist with the id you specified." ]
+        MATCHMAKER_ERR_UNKNOWN_MATCHMAKING_SESSION_ID       = 201;
+        [ description = "You can only cancel matchmaking sessions that you are the owner of." ]
+        MATCHMAKER_ERR_NOT_MATCHMAKING_SESSION_OWNER        = 202;
+        [ description = "None of the games provided from find game matchmaking were joinable." ]
+        MATCHMAKER_ERR_MATCHMAKING_NO_JOINABLE_GAMES        = 203;
+        [ description = "The owning user session for the session was not found." ]
+        MATCHMAKER_ERR_MATCHMAKING_USERSESSION_NOT_FOUND    = 205;
+        [ description = "The number of concurrent active matchmaking sessions exceeded configured maximum." ]
+        MATCHMAKER_ERR_MATCHMAKING_EXCEEDED_MAX_REQUESTS    = 206;
+        [description = "The type of entry requested is not valid for the join method.  Matchmaking does not allow claiming reservations."]
+        MATCHMAKER_ERR_INVALID_GAME_ENTRY_TYPE              = 222;
+        [ description = "Matchmaking request was missing joining role information." ] 
+        MATCHMAKER_ERR_ROLE_NOT_ALLOWED                     = 273;
+        [ description = "The requested external session template name is not supported by the server." ]
+        MATCHMAKER_ERR_SESSION_TEMPLATE_NOT_SUPPORTED       = 274;
+        [ description = "General error returned when the external session service returns an unhandled error."]
+        MATCHMAKER_ERR_EXTERNAL_SESSION_ERROR               = 275;
+        [ description = "Failed to convert attribute or caller property to from value for filter."]
+        MATCHMAKER_ERR_FILTER_FROMVALUE_CONVERSION_FAILED   = 276;
+        [ description = "Invalid value specified in the filter."]
+        MATCHMAKER_ERR_FILTER_INVALID_VALUE                 = 277;
+        // group match errors
+        [ description = "The blazeServer wasn't able to find a user group with the supplied id." ]
+        MATCHMAKER_ERR_INVALID_GROUP_ID                     = 501;
+        [ description = "The player is not a member of the specified group." ]
+        MATCHMAKER_ERR_PLAYER_NOT_IN_GROUP                  = 502;
+        [ description = "In valid game capacity settings, the desired capacity of the game to be created is less than the number of people that need to join the game." ]
+        MATCHMAKER_ERR_GAME_CAPACITY_TOO_SMALL = 503;
+
+        
+        [ description = "The game failed to parse the game entry criteria." ]
+        MATCHMAKER_ERR_INVALID_GAME_ENTRY_CRITERIA          = 603;
+        
+    }
+    
+    [ clientname = "Matchmaker", isSharded=true, shardingKey="matchmakingSessionId", setCurrentUserSession=false]
+    slave
+    {
+        methods
+            {
+                [
+                  id = 1,
+                  description = "Start a new matchmaking session.  You may have multiple sessions active at once.",                  
+                  errortype = Blaze::GameManager::MatchmakingCriteriaError,
+                  errors = {
+                        MATCHMAKER_ERR_INVALID_MATCHMAKING_CRITERIA,
+                        MATCHMAKER_ERR_GAME_CAPACITY_TOO_SMALL,
+                        MATCHMAKER_ERR_INVALID_GAME_ENTRY_CRITERIA,
+                        MATCHMAKER_ERR_INVALID_GROUP_ID,
+                        MATCHMAKER_ERR_PLAYER_NOT_IN_GROUP,
+                        MATCHMAKER_ERR_MATCHMAKING_USERSESSION_NOT_FOUND,
+                        MATCHMAKER_ERR_INVALID_GAME_ENTRY_TYPE,
+                        MATCHMAKER_ERR_MATCHMAKING_EXCEEDED_MAX_REQUESTS,
+                        MATCHMAKER_ERR_ROLE_NOT_ALLOWED,
+                        MATCHMAKER_ERR_SESSION_TEMPLATE_NOT_SUPPORTED,
+                        MATCHMAKER_ERR_EXTERNAL_SESSION_ERROR,
+                        MATCHMAKER_ERR_FILTER_FROMVALUE_CONVERSION_FAILED,
+                        MATCHMAKER_ERR_FILTER_INVALID_VALUE
+                    },
+                    client_export = false,
+                    internal = true,
+                    requires_authentication = false
+                ]
+                Blaze::GameManager::StartMatchmakingInternalResponse startMatchmakingInternal(Blaze::GameManager::StartMatchmakingInternalRequest);
+                
+                [
+                    id = 2,
+                    errors = {
+                        MATCHMAKER_ERR_UNKNOWN_MATCHMAKING_SESSION_ID,
+                        MATCHMAKER_ERR_NOT_MATCHMAKING_SESSION_OWNER
+                    },
+                    description = "Cancel one of your existing matchmaking sessions.",
+                    client_export = false,
+                    internal = true,
+                    requires_authentication = false
+                ]
+                void cancelMatchmakingInternal(Blaze::GameManager::CancelMatchmakingInternalRequest);
+                
+                [
+                 id = 10,
+                 errors = { },
+                 description = "Get matchmaking configuration data from the server.",
+                 generate_command_class = false,
+                 client_export = false,
+                 internal = true,
+                 requires_authentication = false,
+                 ignoreShardingKey = true
+               ]
+               Blaze::GameManager::GetMatchmakingConfigResponse getMatchmakingConfig();
+               
+               [
+                 id = 11,
+                 description = "Slave to master rpc only, used by slave censusdata retrieve number of matchmaking sessions, and TTM estimates on the mm slave.",
+                 generate_command_class = false,
+                 client_export = false,
+                 internal = true,
+                 requires_authentication = false,
+                 ignoreShardingKey = true
+               ]
+               Blaze::GameManager::MatchmakingInstanceStatusResponse getMatchmakingInstanceStatus();
+
+               [
+                 id = 33,
+                 description = "Allows the current player to override matchmaking and always attempt to match into the provided game." ,
+                 client_export = false,
+                 generate_command_class = false,
+                 internal = true,
+                 requires_authentication = false,
+                 ignoreShardingKey = true
+               ]
+               void matchmakingDedicatedServerOverride(Blaze::GameManager::MatchmakingDedicatedServerOverrideRequest);
+
+               [
+                 id = 34,
+                 description = "Get the list of matchmaking server overrides that currently exist for all players.",
+                 client_export = false,
+                 generate_command_class = false,
+                 internal = true,
+                 requires_authentication = false,
+                 ignoreShardingKey = true
+               ]
+               Blaze::GameManager::GetMatchmakingDedicatedServerOverrideResponse getMatchmakingDedicatedServerOverrides();
+
+               [
+                 id = 35,
+                 description = "Allows GOSCC to override matchmaking for all players and always attempt to match into the provided games first.",
+                 client_export = false,
+                 generate_command_class = false,
+                 internal = true,
+                 requires_authentication = false,
+                 ignoreShardingKey = true 
+               ]
+               void matchmakingFillServersOverride(Blaze::GameManager::MatchmakingFillServersOverrideList);
+
+               [
+                 id = 36,
+                 description = "Get the list of matchmaking server fill overrides that currently exist.",
+                 client_export = false,
+                 generate_command_class = false,
+                 internal = true,
+                 requires_authentication = false,
+                 ignoreShardingKey = true 
+               ]
+               Blaze::GameManager::MatchmakingFillServersOverrideList getMatchmakingFillServersOverride();
+
+               [
+                 id = 41,
+                 errors = {
+                    MATCHMAKER_ERR_UNKNOWN_MATCHMAKING_SESSION_ID
+                 },
+                 description = "Called to report QoS data collected after joining/creating a matched game for evaluation." ,
+                 client_export = false,
+                 generate_command_class = false,
+                 internal = true,
+                 requires_authentication = false
+               ]
+               Blaze::GameManager::QosEvaluationResult gameSessionConnectionComplete(Blaze::GameManager::GameSessionConnectionComplete);
+
+               [
+                 id = 42,
+                 description = "Get Matchmaking Metrics for matchmaking session",
+                 ignoreShardingKey = true,
+                 client_export = false,
+                 generate_command_class = false,
+                 internal = true,
+                 requires_authentication = false,
+                 http = {
+                    resource = "getMatchmakingMetrics",
+                    method = "GET",
+                    encodeEnumsAsStrings = true
+                 }
+               ]
+               Blaze::GameManager::GetMatchmakingMetricsResponse getMatchmakingMetrics();
+            }
+               
+       // notifications
+        notifications
+        { 
+        
+            [
+              id = 1,
+              description = "Sent when a matchmaking session ends (either successfully or due to cancel/timeout/error).",
+              details = "Note: if startMatchmaking failed, no session was created, so there's no finished notification.",
+              client_export = false
+            ]
+            NotifyMatchmakingFailed (Blaze::GameManager::NotifyMatchmakingFinished);
+            
+            [
+              id = 2,
+              description = "Sent when a matchmaking session status changed or time due( when session started/rule decay/timeout/period set in config.)",
+              details = "Player who start matchmaking session should listen to the notification and update it's local cached satus data.",
+              client_export = false
+            ]
+            NotifyMatchmakingAsyncStatus (Blaze::GameManager::NotifyMatchmakingAsyncStatus);
+
+            [
+              id = 3,
+              description = "Sent when a matchmaking session ends successfully.",
+              details = "Note: we always send this, even if the matchmaking failed.",
+              client_export = false
+            ]
+            NotifyMatchmakingFinished (Blaze::GameManager::NotifyMatchmakingFinished);
+            
+            [
+              id = 4,
+              description = "Sent when a matchmaking session has completed connection validation (either success or failure).",
+              details = "This notification goes to the GameManager slave, which forwards it on as a GameManager notification",
+              client_export = false
+            ]
+            NotifyMatchmakingSessionConnectionValidated (Blaze::GameManager::NotifyMatchmakingSessionConnectionValidated);
+
+            [
+              id = 5,
+              description = "Sent when a matchmaking sessions ends with only deubgging information provided.",
+              details = "If a matchmaking session finalizes as debugged, no game was joined or created.",
+              client_export = false
+            ]
+            NotifyMatchmakingPseudoSuccess (Blaze::GameManager::NotifyMatchmakingPseudoSuccess);
+            
+            [
+              id = 10,
+              description = "Sent to the members of a matchmaking session who were pulled in by another user.",
+              details = "Note: if startMatchmaking failed, no session was created, so there's no notification.",
+              client_export = false
+            ]
+            NotifyRemoteMatchmakingStarted (Blaze::GameManager::NotifyRemoteMatchmakingStarted);
+            
+            [
+              id = 11,
+              description = "Sent to members of a matchmaking session (other than the session owner when a matchmaking session ends (either successfully or due to cancel/timeout/error).",
+              details = "Note: if startMatchmaking failed, no session was created, so there's no ended notification.",
+              client_export = false
+            ]
+            NotifyRemoteMatchmakingEnded (Blaze::GameManager::NotifyRemoteMatchmakingEnded);
+
+            [
+              id = 50,
+              description = "notification that we've udpated the user's privileged matchmaking dedicated server GameId",
+              details = "MatchmakingDedicatedServerOverride triggered notification to update slaves for find game.",
+              client_export = false
+            ]
+            NotifyMatchmakingDedicatedServerOverride(Blaze::GameManager::NotifyMatchmakingDedicatedServerOverride);
+
+            [
+              id = 60,
+              description = "Notification to update GM slaves as to matchmaking instance status",
+              details = "Used to load balance create game matchmaking sessions across matchmaking slaves.",
+              client_export = false
+            ]
+            NotifyMatchmakingStatusUpdate(Blaze::GameManager::MatchmakingStatus);
+
+            [
+              id = 61,
+              description = "Sent after gamemanager has added a matchmaking session's reserved external players to the matched game.",
+              details = "This notification is sent by matchmaking slaves to gamemanager slaves. Sends the list of players from the original matchmaking request's reserved external players list, who were reserved into the game. This notification is received after all players in the matchmup have issued their join to the external session.",
+              client_export = false
+            ]
+            NotifyServerMatchmakingReservedExternalPlayers(Blaze::GameManager::NotifyServerMatchmakingReservedExternalPlayers);
+            
+        }
+
+    }
+}
+
+}
+}

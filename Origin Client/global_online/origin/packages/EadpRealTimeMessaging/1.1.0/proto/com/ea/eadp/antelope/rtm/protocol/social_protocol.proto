@@ -1,0 +1,236 @@
+package com.ea.eadp.antelope.protocol;
+
+import "common_protocol.proto";
+import "chat_protocol.proto";
+import "point_to_point.proto";
+
+option java_outer_classname = "SocialProtocol";
+
+message Communication {
+	optional Header header = 1;
+	oneof body {
+		LoginRequest loginRequest = 2;
+		LoginResponse loginResponse = 3;
+		PublishTextRequest publishTextRequest = 4;
+		PublishBinaryRequest publishBinaryRequest = 5;
+		PublishResponse publishResponse = 6;
+		ChannelMessage channelMessage = 7;
+		SubscribeRequest subscribeRequest = 8;
+		SubscribeResponse subscribeResponse = 9;
+		UnsubscribeRequest unsubscribeRequest = 10;
+		UnsubscribeResponse unsubscribeResponse = 11;
+		HistoryRequest historyRequest = 12;
+		HistoryResponse historyResponse = 13;
+		LogoutRequest logoutRequest = 14;
+	}
+}
+
+message Header {
+	optional CommunicationType type = 1;
+	optional string requestId = 2;
+}
+
+message Player {
+	optional string playerId = 1;
+	optional string productId = 4;
+}
+
+enum CommunicationType {
+	LOGIN_REQUEST = 1;
+	LOGIN_RESPONSE = 2;
+	PUBLISH_TEXT_REQUEST = 3;
+	PUBLISH_BINARY_REQUEST = 4;
+	PUBLISH_RESPONSE = 5;
+	CHANNEL_MESSAGE = 6;
+	SUBSCRIBE_REQUEST = 7;
+	SUBSCRIBE_RESPONSE = 8;
+	UNSUBSCRIBE_REQUEST = 9;
+	UNSUBSCRIBE_RESPONSE = 10;
+	HISTORY_REQUEST = 11;
+	HISTORY_RESPONSE = 12;
+	LOGOUT_REQUEST = 13;
+}
+
+message Channel {
+	optional string channelId = 1;
+	optional string channelName = 2;
+	optional com.ea.eadp.antelope.rtm.protocol.ChannelType type = 3 [default = EADP_GROUP_SERVICE];
+}
+
+//Channel messages
+// This enum is a duplicate of EnumProtocol.ChannelMessageType.
+// Cannot remove this enum because of backward compatibility.
+// Need to keep them in sync.
+
+enum ChannelMessageType {
+	TEXT_MESSAGE = 1;
+	BINARY_MESSAGE = 2;
+	GROUP_MEMBERSHIP_CHANGE = 3;
+	CHAT_CONNECTED = 4;
+	CHAT_DISCONNECTED = 5;
+	CHAT_LEFT = 6;
+	CUSTOM_MESSAGE = 7;
+	CHAT_USER_MUTED = 8;
+	CHAT_USER_UNMUTED = 9;
+	CHANNEL_MEMBERSHIP_CHANGE = 10;
+	STICKY_MESSAGE_CHANGED = 11;
+	CHAT_TYPING_EVENT = 12;
+}
+
+message ChannelMessage {
+	optional string messageId = 1;
+	optional string channelId = 2;
+	optional string timestamp = 3;
+	optional ChannelMessageType type = 4;
+	oneof content {
+		TextMessage textMessage = 5;
+		BinaryMessage binaryMessage = 6;
+		GroupMembershipChange membershipChange = 7;
+		com.ea.eadp.antelope.rtm.protocol.ChatConnectedV1 chatConnected = 8;
+		com.ea.eadp.antelope.rtm.protocol.ChatDisconnectedV1 chatDisconnected = 9;
+		com.ea.eadp.antelope.rtm.protocol.ChatLeftV1 chatLeft = 10;
+		com.ea.eadp.antelope.rtm.protocol.CustomMessage customMessage = 11;
+		com.ea.eadp.antelope.rtm.protocol.ChatUserMutedV1 chatUserMuted = 12;
+		com.ea.eadp.antelope.rtm.protocol.ChatUserUnmutedV1 chatUserUnmuted = 13;
+		com.ea.eadp.antelope.rtm.protocol.ChannelMembershipChangeV1 channelMembershipChange = 14;
+		com.ea.eadp.antelope.rtm.protocol.StickyMessageChangedV1 stickyMessageChanged = 15;
+		com.ea.eadp.antelope.rtm.protocol.ChatTypingEventV1 chatTypingEvent = 16;
+	}
+}
+
+message TextMessage {
+	optional string fromPersonaId = 1 [deprecated=true];
+	optional string fromDisplayName = 2;
+	optional string text = 3;
+	optional string originalText = 4;
+	optional Player fromPlayer = 5;
+	optional string fromNickName = 6;
+}
+
+message BinaryMessage {
+	optional string fromPersonaId = 1 [deprecated=true];
+	optional string fromDisplayName = 2;
+	optional bytes blob = 3;
+	optional Player fromPlayer = 4;
+	optional string fromNickName = 5;
+}
+
+enum GroupMembershipChangeType{
+	LEAVE = 1;
+	JOIN = 2;
+	KICKED = 3;
+}
+
+message GroupMembershipChange{
+	optional string targetPersonaId = 1 [deprecated=true];
+	optional string targetDisplayName = 2;
+	optional string initiatorPersonaId = 3 [deprecated=true];
+	optional string initiatorDisplayName = 4;
+	optional GroupMembershipChangeType type = 5;
+	optional Player targetPlayer = 6;
+	optional Player initiatingPLayer = 7;
+	optional string targetNickName = 8;
+	optional string initiatorNickName = 9;
+}
+
+//Mute List V0
+enum MutedBy{
+	ADMIN = 1;
+	USER = 2;
+}
+
+message MutedUser {
+	optional string personaId = 1; //Having persona is sufficient here as this is only used in LoginV0
+	repeated MutedBy mutedBy = 2;
+}
+
+message ChannelMuteList{
+	optional string channelId = 1;
+	repeated MutedUser mutedUsers = 2;
+}
+
+//Mute List V1
+message MutedUserV1 {
+	optional string personaId = 1 [deprecated=true];
+	repeated com.ea.eadp.antelope.rtm.protocol.MutedByV1 mutedBy = 2;
+	optional Player player = 3;
+}
+
+//Requests
+message LoginRequest {
+	optional string token = 1;
+	optional bool reconnect = 2 [default = false];
+	optional bool heartbeat = 3 [default = false];
+}
+
+message LogoutRequest {
+}
+
+message PublishTextRequest {
+	optional string channelId = 1;
+	optional string text = 2;
+
+	optional com.ea.eadp.antelope.rtm.protocol.MessageType messageType = 3 [default = REGULAR_MESSAGE];
+	optional int32 index = 4 [default = 0];
+}
+
+message PublishBinaryRequest {
+	optional string channelId = 1;
+	optional bytes blob = 2;
+}
+
+message SubscribeRequest {
+	optional string channelId = 1;
+}
+
+message UnsubscribeRequest {
+	optional string channelId = 1;
+}
+
+message HistoryRequest {
+	optional string channelId = 1;
+	optional string timestamp = 2;
+	optional int32 recordCount = 3;
+
+	// The filter types will only accept ChannelMessageType values in it
+	optional string primaryFilterType = 4;
+	optional string secondaryFilterType = 5;
+}
+
+//Responses
+message LoginResponse {
+	optional bool success = 1;
+	repeated Channel channels = 2;
+	repeated ChannelMuteList muteList = 3;
+	optional string errorCode = 4;
+	optional string errorMessage = 5;
+}
+
+message PublishResponse {
+	optional bool success = 1;
+	optional string errorCode = 2;
+	optional string errorMessage = 3;
+}
+
+message SubscribeResponse {
+	optional string channelId = 1;
+	optional bool success = 2;
+	optional string errorCode = 3;
+	optional string errorMessage = 4;
+	repeated MutedUserV1 mutedUsers = 5;
+}
+
+message UnsubscribeResponse {
+	optional string channelId = 1;
+	optional bool success = 2;
+	optional string errorCode = 3;
+	optional string errorMessage = 4;
+}
+
+message HistoryResponse {
+	optional string channelId = 1;
+	optional bool success = 2;
+	repeated ChannelMessage messages = 3;
+	optional string errorCode = 4;
+	optional string errorMessage = 5;
+}

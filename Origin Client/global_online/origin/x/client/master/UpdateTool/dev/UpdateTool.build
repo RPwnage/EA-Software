@@ -1,0 +1,152 @@
+<project name="UpdateTool" default="build">
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+  <property name="package.UpdateTool.dir"  value="@{PathGetFullPath('.')}"/>
+  <property name="package.UpdateTool.version"  value="@{PathGetFileName('${package.UpdateTool.dir}')}"/>
+  <package name="UpdateTool" targetversion="${package.UpdateTool.version}"/>
+  <property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+    
+  <dependent name="OriginVersion" />
+  <dependent name="OriginConfig" />
+  
+  <!-- Turn on signature checking for Jenkins builds -->
+  <property name="checksignatures" value="false" />
+  <property name="checksignatures" value="true" if="@{PropertyExists('jenkins')}" />
+  
+	<BuildType name="UpdateTool.buildtype" from="Program">
+		<option name="buildset.cc.options" >
+			${option.value}
+      /Zc:wchar_t
+		</option>
+    <option name="buildset.cc.defines">
+      _UNICODE
+      UNICODE
+      PSAPI_VERSION=1
+    </option>
+	<option name="buildset.cc.defines" if="${checksignatures} == false">
+      ${option.value}
+	  NO_SIGNATURE_CHECKS
+    </option>
+    <option name="buildset.cc.defines" if="${checksignatures} == true">
+	  ${option.value}
+	  CHECK_SIGNATURES
+    </option>
+    <option name="multithreadeddynamiclib" value="off"/>
+    <remove>
+      <cc.options>
+        WX
+        /Zc:wchar_t-
+      </cc.options>
+    </remove>
+    <!-- We have to do this to fix the incorrect Windows 10 SDK defines - ${eaconfig.PlatformSDK.dir.lib} missing intermediate version number because of it-->
+    <option name="buildset.link.libraries" if="${config-system} == 'pc'">
+        ${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/WinMM.lib
+        ${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Gdi32.lib
+        ${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/User32.lib
+        ${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/advapi32.lib    
+    </option>
+    <option name="buildset.link.libraries" if="${config-system} == 'pc64'">
+        ${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64/WinMM.lib
+        ${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64/Gdi32.lib
+        ${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64/User32.lib
+        ${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64/advapi32.lib    
+    </option>
+	</BuildType>
+
+  <property name="runtime.buildtype" value="UpdateTool.buildtype" />
+  <property name="runtime.outputdir" value="${package.UpdateTool.dir}/bin" />
+  <property name="runtime.outputname" value="UpdateTool" />
+  
+  <property name="runtime.UpdateTool.outputdir" value="${runtime.outputdir}" />
+  <property name="runtime.UpdateTool.outputname" value="${runtime.outputname}" />
+  
+  <fileset name="runtime.sourcefiles" basedir="${package.dir}/source">
+    <includes name="main.cpp" />
+  </fileset>
+  <fileset name="runtime.headerfiles" basedir="${package.dir}/source">
+    <includes name="*.h" />
+  </fileset>
+  
+  <property name="runtime.includedirs">
+    ${property.value}
+    ${package.OriginVersion.dir}/include
+  </property>
+  
+  <fileset name="runtime.libs">
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Psapi.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/kernel32.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/gdi32.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/winspool.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/comdlg32.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/shell32.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/ole32.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/oleaut32.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/uuid.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/odbc32.lib"/>
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/odbccp32.lib"/>
+  </fileset>
+
+	<target name="sign-exe">
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="${runtime.outputname}" in="${runtime.outputdir}/${runtime.outputname}.exe" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+	</target>	
+
+  <target name="create-folders">
+    <mkdir dir="${runtime.outputdir}" unless="@{DirectoryExists(${runtime.outputdir})}" />
+  </target>
+  
+	<!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<property name="runtime.prebuildtarget" value="create-folders" />
+	
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.vcproj.pre-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.prebuildtarget}
+	</property>
+
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+	<property name="postbuild.target.list" value="" />
+
+	<property name="postbuild.target.list" if="${config-type} == 'opt'" >
+    ${property.value}
+		sign-exe
+	</property>
+	
+	<target name="post-build-tasks">
+		<foreach property="runtarget" item="String" in="${postbuild.target.list}">
+			<call target="${runtarget}" />
+		</foreach>
+	</target>
+	
+	<!-- NANT Postbuild target. Will execute this after compiling happens. -->
+	<property name="runtime.postbuildtarget" value="post-build-tasks" />
+  
+	<!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+	<property name="runtime.vcproj.post-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:codesign.timestamp=${codesign.timestamp} ${runtime.postbuildtarget}
+	</property>	
+
+	<target name="clean-custom">
+    <delete>
+			<fileset basedir="${runtime.UpdateTool.outputdir}">
+				<includes name="${runtime.UpdateTool.outputname}.*"/>
+			</fileset>
+		</delete>
+	</target>
+</project>
+
+
+
+

@@ -1,0 +1,161 @@
+package com.ea.originx.automation.scripts.checkout;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageHeader;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageLeftHeader;
+import com.ea.originx.automation.lib.pageobjects.store.*;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.helpers.ContextHelper;
+import com.ea.vx.originclient.resources.OSInfo;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Tests the left header of the 'Join and Save' page
+ *
+ * @author caleung
+ */
+public class OAJoinAndSaveLeftHeader extends EAXVxTestTemplate {
+
+    public enum TEST_TYPE {
+        NON_SUBSCRIBER,
+        ANONYMOUS_USER
+    }
+
+    public void testJoinAndSaveLeftHeader(ITestContext context, OAJoinAndSaveLeftHeader.TEST_TYPE type) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        final UserAccount userAccount = AccountManager.getRandomAccount();
+        final boolean isClient = ContextHelper.isOriginClientTesing(context);
+
+        // update to a subscribe and save entitlement once the feature is live
+        EntitlementInfo vaultEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.FIFA_18);
+        String vaultEntitlementName = vaultEntitlement.getName();
+
+        if (type == TEST_TYPE.NON_SUBSCRIBER) {
+            logFlowPoint("Log into Origin with a non-subscriber account."); // 1
+        } else {
+            logFlowPoint("Navigate to the store as an anonymous user."); // 1
+        }
+        logFlowPoint("Navigate to PDP of a game in pre-order state."); // 2
+        logFlowPoint("Click on 'Learn More' and verify that it navigates to the product landing page."); // 3
+        logFlowPoint("Observe the header and verify the header text is correct."); // 4
+        logFlowPoint("Observe the left comparison box and verify the game logo is shown."); // 5
+        logFlowPoint("Verify the CTA text is 'Pre-order' and the price of the game and click on the CTA."); // 6
+        if (type == TEST_TYPE.ANONYMOUS_USER) {
+            logFlowPoint("Verify clicking on CTA prompts the user to log in and log into a non-subscriber account."); // 7a
+        }
+        logFlowPoint("Verify the standard checkout flow is initiated."); // 7b
+        logFlowPoint("Verify the pre-order game name is displayed."); // 8
+        logFlowPoint("Verify there is strike-off text which indicates the benefits being bypassed."); // 9
+
+        // 1
+        final WebDriver driver = startClientObject(context, client);
+        if (!isClient) {
+            driver.get(OSInfo.getXURL("SANDBOX_ADDRESS", "/can/en-us", null));
+        }
+        if (type == TEST_TYPE.NON_SUBSCRIBER) {
+            if (MacroLogin.startLogin(driver, userAccount)) {
+                logPass("Successfully logged into Origin with " + userAccount.getUsername() + ".");
+            } else {
+                logFailExit("Could not log into Origin with " + userAccount.getUsername() + ".");
+            }
+        } else {
+            StorePage storePage = new StorePage(driver);
+            storePage.waitForStorePageToLoad();
+            if (storePage.verifyStorePageReached()) {
+                logPass("Successfully navigated to Origin X store as an anonymous user.");
+            } else {
+                logFailExit("Could not navigate to Origin X store as an anonymous user.");
+            }
+        }
+
+        // 2 navigate to star wars battlefront ii for now
+        MacroPDP.loadPdpPage(driver, vaultEntitlement);
+        PDPHeroActionCTA pdpHeroCTA = new PDPHeroActionCTA(driver);
+        String price = pdpHeroCTA.getPrice();
+        pdpHeroCTA.waitForPdpHeroToLoad();
+        if (pdpHeroCTA.verifyPDPHeroReached()) {
+            logPass("Successfully navigated to " + vaultEntitlementName + "'s PDP page.");
+        } else {
+            logFailExit("Failed to navigate to " + vaultEntitlementName + "'s PDP page.");
+        }
+
+        // 3
+        new PDPHeroActionDescriptors(driver).clickOriginAccessLearnMoreLink();
+        ProductLandingPageHeader productLandingPageHeader = new ProductLandingPageHeader(driver);
+        productLandingPageHeader.waitForProductLandingPageHeaderToLoad();
+        if (productLandingPageHeader.verifyProductLandingPageReached()) {
+            logPass("Successfully navigated to product landing page.");
+        } else {
+            logFailExit("Failed to navigate to the product landing page.");
+        }
+
+        // 4
+        if (productLandingPageHeader.verifyProductLandingPageHeaderTitle(vaultEntitlementName)) {
+            logPass("Verified the header text is correct.");
+        } else {
+            logFail("Failed to verify the header text is correct.");
+        }
+
+        // 5
+        ProductLandingPageLeftHeader productLandingPageLeftHeader = new ProductLandingPageLeftHeader(driver);
+        if (productLandingPageLeftHeader.verifyLeftComparisonBoxLogoVisible()) {
+            logPass("Verified the pre-order game logo is displayed in the left comparison box.");
+        } else {
+            logFail("Failed to verify the game logo is displayed in the left comparison box.");
+        }
+
+        // 6
+        String expectedText = "Pre-order $" + price;
+        if (productLandingPageLeftHeader.verifyLeftComparisonBoxCTATextIsCorrect(expectedText)) {
+            logPass("Verified the left comparison box CTA text is correct.");
+        } else {
+            logFail("Failed to verify the left comparison box CTA text is correct.");
+        }
+        productLandingPageLeftHeader.clickLeftComparisonBoxCTA();
+
+        PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+        if (type == TEST_TYPE.ANONYMOUS_USER) {
+            // 7a
+            if (MacroLogin.startLogin(driver, userAccount)) {
+                logPass("Verified that clicking on the CTA prompts the user to log in.");
+            } else {
+                logFailExit("Failed to verify that clicking on the CTA prompts the user to log in.");
+            }
+        }
+        // 7b if payment dialog pops up, pass
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        if (paymentInformationPage.verifyPaymentInformationReached()) {
+            logPass("Verified the standard checkout flow is initiated.");
+        } else {
+            logFail("Failed to verify that the standard checkout flow is initiated.");
+        }
+        paymentInformationPage.clickCloseButton();
+
+        // 8
+        productLandingPageLeftHeader.waitForPageToLoad();
+        if (productLandingPageLeftHeader.verifyLeftComparisonBoxGameNameIsCorrect(vaultEntitlementName)) {
+            logPass("Verified that the game name is displayed and is correct.");
+        } else {
+            logFail("Failed to verify that the game name is displayed or is correct.");
+        }
+
+        // 9
+        if (productLandingPageLeftHeader.verifyOriginAccessBenefitIsCorrect()) {
+            logPass("Verified that there is strike-off text that indicates the benefits being bypassed.");
+        } else {
+            logFail("Failed to verify that there is strike-off text that indicates the benefits being bypassed.");
+        }
+
+        softAssertAll();
+    }
+}

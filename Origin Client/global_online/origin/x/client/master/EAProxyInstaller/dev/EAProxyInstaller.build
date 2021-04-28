@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build"> 
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="clean" value="exclude"/>
+    </optionset>
+    
+
+	<property name="EAProxyInstaller.module.name" value="EAProxyInstaller" />
+	
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="package.EAProxyInstaller.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.EAProxyInstaller.version"  value="@{PathGetFileName('${package.EAProxyInstaller.dir}')}"/>
+    <package name="EAProxyInstaller" targetversion="${package.EAProxyInstaller.version}"/>
+	
+  <dependent name="OriginConfig" />
+  <dependent name="OriginVersion" />
+
+  <property name="runtime.buildmodules" value="${property.value} EAProxyInstaller" />
+
+  <property name="runtime.EAProxyInstaller.outputdir" value="${package.dir}/bin" />
+  <property name="runtime.EAProxyInstaller.outputname" value="EAProxyInstaller${debug-suffix}" />
+
+  <property name="runtime.EAProxyInstaller.usedependencies">
+    EABase
+  </property>
+
+	<!-- Add special compiler options and create new buidtype -->
+	<BuildType name="EAProxyInstaller" from="OriginProgram">
+		<option name="buildset.link.options">
+			${option.value}
+			/ENTRY:"wWinMainCRTStartup"
+		</option>
+    <option name="multithreadeddynamiclib"        value="off" />
+    <remove>
+      <defines>
+        _WINSOCKAPI_
+      </defines>
+    </remove>
+	</BuildType>
+	
+  <!-- EAProxyInstaller build properties -->
+	<property name="runtime.EAProxyInstaller.buildtype" value="EAProxyInstaller" />
+
+	<!-- POSTBUILD TARGETS -->
+		<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+		<property name="runtime.EAProxyInstaller.postbuildtarget" value="EAProxyInstaller-postbuild-steps" />
+		<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+		<property name="runtime.EAProxyInstaller.vcproj.post-build-step">
+			${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} EAProxyInstaller-postbuild-steps
+		</property>
+
+
+	<property name="runtime.EAProxyInstaller.includedirs" >
+    ${property.value}
+	</property>
+
+  <fileset name="runtime.EAProxyInstaller.libs" >
+  </fileset>
+  
+  <fileset name="runtime.EAProxyInstaller.sourcefiles" basedir="${package.dir}/source">
+		<includes name="CWinMain.cpp" />
+  </fileset>
+
+  <fileset name="runtime.EAProxyInstaller.headerfiles" basedir="${package.dir}/source">
+    <includes name="*.h" />
+  </fileset>
+
+	<property name="runtime.EAProxyInstaller.res.includedirs">
+		${package.OriginVersion.dir}/include
+	</property>
+  
+  <fileset name="runtime.EAProxyInstaller.resourcefiles">
+          <includes name="${package.dir}\resource\ProxyInstaller.rc" />
+  </fileset>
+	
+	<property name="manifest.file" value="${package.configbuilddir}/EAProxyInstaller.exe.intermediate.manifest"/>
+
+	<target name="EAProxyInstaller.embed-manifest">
+		<exec program="${package.WindowsSDK.kitbin.dir}\mt.exe">
+			<args>
+				<arg value="/manifest ${package.dir}\resource\ProxyInstaller.manifest /outputresource:${runtime.EAProxyInstaller.outputdir}\${runtime.EAProxyInstaller.outputname}.exe;1" /> 
+			</args>
+			</exec>
+	</target>		
+	
+  <target name="EAProxyInstaller-postbuild-steps" depends="EAProxyInstaller.embed-manifest" />
+ 
+	<target name="cleanproxyinstaller">
+		<delete dir="${package.configbuilddir}" />
+	</target>
+
+	<target name="clean-custom">
+		<delete dir="${package.configbuilddir}" />
+    <delete>
+			<fileset basedir="${runtime.EAProxyInstaller.outputdir}">
+				<includes name="${runtime.EAProxyInstaller.outputname}.*"/>
+			</fileset>
+		</delete>
+	</target>
+	
+	
+</project>

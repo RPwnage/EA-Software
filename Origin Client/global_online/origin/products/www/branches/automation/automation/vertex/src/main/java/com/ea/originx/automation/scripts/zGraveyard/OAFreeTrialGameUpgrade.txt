@@ -1,0 +1,96 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the a user can upgrade to a vault entitlement during free trial when
+ * the user already owns a non-vault edition
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeTrialGameUpgrade extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 14210)
+    @Test(groups = {"originaccess", "client_only", "full_regression", "int_only"})
+    public void testFreeTrialGameUpgrade(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.SIM_CITY_STANDARD);
+        String entitlementName = entitlement.getName();
+        EntitlementInfo vaultEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.SIM_CITY_COMPLETE);
+        String vaultEntitlementName = vaultEntitlement.getName();
+
+        logFlowPoint("Login as a newly registered user"); //1
+        logFlowPoint("Purchase a non-vault entitlement which has a higher edition as a vault entitlement"); //2
+        logFlowPoint("Purchase 'Origin Access free Trial'"); //3
+        logFlowPoint("Navigate to the 'Game Library' and upgrade the entitlement to vault edition and verify the user can upgrade"); //4
+        logFlowPoint("Remove the upgraded version to non-vault edition and verify the non-vault edition which re-appears is playable"); //5
+
+        //1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully registered and logged in with: " + username);
+        } else {
+            logFailExit("Could not register/log in a new user " + username);
+        }
+
+        //2
+        if (MacroPurchase.purchaseEntitlement(driver, entitlement)) {
+            logPass("Successfully Purchased a non vault-entitlement " + entitlementName);
+        } else {
+            logFailExit("Could not Purchase a non vault-entitlement " + entitlementName);
+        }
+
+        //3
+        if (MacroOriginAccess.purchaseOriginAccess(driver)) {
+            logPass("Successfully Purchased Origin Access.");
+        } else {
+            logFailExit("Could not Purchase Origin Access.");
+        }
+
+        //4
+        if (MacroGameLibrary.upgradeEntitlement(driver, entitlement.getOfferId(), vaultEntitlement.getOfferId())) {
+            logPass("Successfully upgraded from a non vault entitlement to vault entitlement" + vaultEntitlementName);
+        } else {
+            logFailExit("Could not upgrade from a non vault entitlement to vault entitlement" + vaultEntitlementName);
+        }
+
+        //5
+        MacroGameLibrary.removeFromLibrary(driver, vaultEntitlement.getOfferId());
+        boolean isBaseEdition = new GameLibrary(driver).isGameTileVisibleByName(entitlementName);
+        GameTile gameTile = new GameTile(driver, entitlement.getOfferId());
+        MacroGameLibrary.downloadFullEntitlement(driver, entitlement.getOfferId());
+        gameTile.waitForReadyToPlay();
+        gameTile.play();
+        boolean isLaunched = Waits.pollingWaitEx(() -> entitlement.isLaunched(client));
+        if (isBaseEdition && isLaunched) {
+            logPass(String.format("Verified '%s' launches successfully", entitlementName));
+        } else {
+            logFailExit(String.format("Failed: Cannot launch '%s'", entitlementName));
+        }
+        entitlement.killLaunchedProcess(client);
+
+        softAssertAll();
+    }
+}

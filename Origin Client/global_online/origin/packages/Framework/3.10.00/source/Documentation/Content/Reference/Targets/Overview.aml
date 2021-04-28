@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="cdfbe5e1-f530-4559-86ee-79a0fdcea133" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+    <introduction>
+      <para>
+        This topic describes NAnt's <literal>&lt;target&gt;</literal> task and its usage.
+      </para>
+      <para>
+      NAnt's <literal>&lt;target&gt;</literal> task stores XML script fragments associated with a name and other target attrubutes.
+      Target scripts can be executed after a target is defined by specifying the targets name on the NAnt command line or by using the <literal>&lt;call&gt;</literal> task.
+      </para>
+    </introduction>
+
+    <section address="TargetUsage">
+      <title>Usage</title>
+      <content>
+        
+        <para>
+          <legacyBold>Targets can be specified on the NAnt command line:</legacyBold>
+        </para>
+        <para>
+          <command>nant <system>-buildfile:example.build target1 target2</system></command>
+        </para>
+        <para>
+          NAnt loads and executes build script (example.build) and then executes targets in the order they are listed on the command line.
+        </para>
+        <para>
+        </para>
+        <code language="xml" title="Targets can be also invoked from the NAnt script file using &lt;call&gt; task:">
+          &lt;project&gt;
+            
+            &lt;target name="helloworld"&gt;
+              &lt;echo message="Hello, World!"/&gt;
+            &lt;/target&gt;
+
+            &lt;call target="helloworld"/&gt;
+            
+          &lt;/project&gt;
+        </code>
+        <para>
+        </para>
+        <code language="xml" title="Targets can be also invoked from another target or from NAnt task:">
+          &lt;project&gt;
+
+          &lt;target name="helloworld"&gt;
+          &lt;echo message="Hello, World!"/&gt;
+          &lt;/target&gt;
+
+          &lt;target name="run"&gt;
+            &lt;call target="helloworld"/&gt;
+          &lt;/target&gt;
+
+          &lt;/project&gt;
+        </code>
+        <para>
+        </para>
+        <code language="c#" title="NAnt provides extension method to invoke targets from C# code:">
+          project.Execute(targetName, force:true, failIfTargetDoesNotExist:false);
+        </code>
+      </content>
+      </section>
+
+      <section address="TargetDefinition">
+      <title>Definition</title>
+      <content>
+        <para>
+          A <literal>&lt;target&gt;</literal> task has following attributes:
+        </para>
+        <table>
+          <tableHeader>
+            <row>
+              <entry>
+                <para>Attribute</para>
+              </entry>
+              <entry>
+                <para>Description</para>
+              </entry>
+              <entry>
+                <para>Required</para>
+              </entry>
+            </row>
+          </tableHeader>
+          <row>
+            <entry>
+              <para>name</para>
+            </entry>
+            <entry>
+              <para>
+                The name of the target. The name used to refer to the target to invoke it or to reference it in a dependency list.
+              </para>
+              <para>
+                property <legacyBold>${target.name}</legacyBold> which contains the name of the target is set and available in the context of the target script when target is executed.
+              </para>
+            </entry>
+            <entry>
+              <para>
+                <mediaLinkInline>
+                  <image xlink:href="requirements1a"/>
+                </mediaLinkInline>
+              </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>depends</para>
+            </entry>
+            <entry>
+              <para>A comma or space separated list of names of targets on which this target depends.</para>
+              <para>
+                A target can depend on other targets. For example, You might have a target for compiling and another target for creating a distributable. 
+                You can only build a distributable when you have compiled first, so the distribute target depends on the compile target. 
+                NAnt resolves these dependencies.
+              </para>
+              <para>
+                NAnt tries to execute the targets in the depends attribute in the order they appear from left to right.
+                It is possible that a target can get executed earlier when an earlier target depends on it:
+              </para>
+              <code language="xml" title="&#160;">
+                &lt;target name="A"/&gt;
+
+                &lt;target name="B" depends="A"/&gt;
+
+                &lt;target name="C" depends="B"/&gt;
+
+                &lt;target name="D" depends="C B A"/&gt;
+
+                &lt;target name="D-alternate" depends="C,B,A"/&gt;
+              </code>
+              <para>
+                Suppose we want to execute target D. From its depends attribute, you might think that first 
+                target C, then B and then A is executed. Wrong! C depends on B, and B depends on A, so first A is executed, then B, then C, and finally D.
+              </para>
+              <para>
+                A target gets executed only once, even when more than one target depends on it (see the previous example).
+              </para>
+            </entry>
+            <entry>
+              <para>
+              </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>if, unless</para>
+            </entry>
+            <entry>
+              <para>Target executes when the expression evaluates to true (if) or to false (unless)</para>
+              <para>A target may be defined so that its execution is conditional.</para>
+              <para>Conditional targets allow the build process to take different actions based on external state (platform, command-line property defines, etc.).</para>
+              <para>To make a target conditional on a specific property, you should add the if or unless attribute with the name of the property on which the 
+                    condition is based. For example:
+              </para>
+              <code language="xml" title="&#160;">
+                &lt;target name="build-module-A" if="missing-module-A"/&gt;
+
+                &lt;target name="build-own-fake-module-A" unless="module-A-present"/&gt;
+              </code>
+              <alert class="note">
+                <para>A single target may have one if and one unless attribute.</para>
+              </alert>
+              <para>When no if and no unless attributes are present, the target will always be executed.</para>
+            </entry>
+            <entry>
+              <para>
+              </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>description</para>
+            </entry>
+            <entry>
+              <para>
+                A short description of this target's function.
+              </para>
+            </entry>
+            <entry>
+              <para>
+              </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>hidden</para>
+            </entry>
+            <entry>
+              <para>
+                Prevents the target from being listed in the projecthelp. Default is false.
+              </para>
+            </entry>
+            <entry>
+              <para>
+              </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>style</para>
+            </entry>
+            <entry>
+              <para>
+                Framework 2 packages only: Style can be 'use', 'build', or 'clean'. See Auto Build Clean for details.
+              </para>
+            </entry>
+            <entry>
+              <para>
+              </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>override</para>
+            </entry>
+            <entry>
+              <para>
+                Target definition will replace previous definition instead of raising error in case if previous definition contained attribute <codeInline>'allowoverride'=true</codeInline>. Default value is false.
+              </para>
+            </entry>
+            <entry>
+              <para>
+              </para>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <para>allowoverride</para>
+            </entry>
+            <entry>
+              <para>
+                If set to true this target definition can be replaced by another target definition. Default value is false.
+              </para>
+            </entry>
+            <entry>
+              <para>
+              </para>
+            </entry>
+          </row>
+
+        </table>
+      </content>
+    </section>
+
+    <relatedTopics/>
+  </developerConceptualDocument>
+</topic>

@@ -1,0 +1,36 @@
+var group__ProtoHttpManager =
+[
+    [ "HttpManagerStatT", "db/d8c/structHttpManagerStatT.html", [
+      [ "uMaxActiveTransactions", "db/d8c/structHttpManagerStatT.html#a54cf0e02a77a15d7c1309d733fc73552", null ],
+      [ "uMaxQueuedTransactions", "db/d8c/structHttpManagerStatT.html#a67737795f5bb68cfcc64b6152d59f09c", null ],
+      [ "uMaxQueueFreeLatency", "db/d8c/structHttpManagerStatT.html#aab978c71d5bcdda3bf0cbd7a38ff73c4", null ],
+      [ "uMaxQueueWaitLatency", "db/d8c/structHttpManagerStatT.html#a28c72f7dcd926a917d99ca0a6b0a4b24", null ],
+      [ "uNumActiveTransactions", "db/d8c/structHttpManagerStatT.html#a0b660f45c204c7cbc3ad96dbfa119df5", null ],
+      [ "uNumKeepAliveTransactions", "db/d8c/structHttpManagerStatT.html#af87cc418118ebd42b6a241de38b6a8ba", null ],
+      [ "uNumPipelinedTransactions", "db/d8c/structHttpManagerStatT.html#afaf391d3d0a01df9aa7c2555a865753e", null ],
+      [ "uNumQueuedTransactions", "db/d8c/structHttpManagerStatT.html#a426e1c9760aeea44c06a7728b891343f", null ],
+      [ "uNumTransactions", "db/d8c/structHttpManagerStatT.html#a7cdd3f2bcbcb9cb0fe9421b7ccee3e77", null ],
+      [ "uSumQueueFreeLatency", "db/d8c/structHttpManagerStatT.html#a14d3b4acadade54e0b9ffb6b964d5008", null ],
+      [ "uSumQueueWaitLatency", "db/d8c/structHttpManagerStatT.html#a57b3d6d99cc209fc8e4d9d6c22fcfb0e", null ],
+      [ "uTransactionBytes", "db/d8c/structHttpManagerStatT.html#afd69388f2cad55f1e31b1f80d9abad36", null ],
+      [ "uTransactionTime", "db/d8c/structHttpManagerStatT.html#a1cd1f551b94123c3e93af77125b05c0e", null ]
+    ] ],
+    [ "HttpManagerRequest", "df/d05/group__ProtoHttpManager.html#gaab8e364a92cc00c134eba44c255457b5", null ],
+    [ "HttpManagerRefT", "df/d05/group__ProtoHttpManager.html#ga712a036e6e8b6943a52beeafc128ad0a", null ],
+    [ "HttpManagerStatT", "df/d05/group__ProtoHttpManager.html#ga927bdfd8d7b4cd75a8490a6ac92a96a4", null ],
+    [ "HttpManagerAlloc", "df/d05/group__ProtoHttpManager.html#gaa6be3eafc4fffa98800a8651d210f923", null ],
+    [ "HttpManagerCallback", "df/d05/group__ProtoHttpManager.html#ga0518155e8ddcd6e238bfd67b90c7d89a", null ],
+    [ "HttpManagerControl", "df/d05/group__ProtoHttpManager.html#ga53129b6a34eeac87165d320c268ed792", null ],
+    [ "HttpManagerCreate", "df/d05/group__ProtoHttpManager.html#gac50787414333b3985466b38c269e8727", null ],
+    [ "HttpManagerDestroy", "df/d05/group__ProtoHttpManager.html#gaeff81eff400cb55d0ce89d1feb66cbcc", null ],
+    [ "HttpManagerFree", "df/d05/group__ProtoHttpManager.html#gad85c91f7e50175b3be7c0ff68585861d", null ],
+    [ "HttpManagerGet", "df/d05/group__ProtoHttpManager.html#gad4cb763ffb3036aca729cbc2bcd788d3", null ],
+    [ "HttpManagerPost", "df/d05/group__ProtoHttpManager.html#ga89a1f9bb400c19e0c78a9d2002b95ad0", null ],
+    [ "HttpManagerRecv", "df/d05/group__ProtoHttpManager.html#ga3a02876500395eb58e2f48ababa1cfb7", null ],
+    [ "HttpManagerRecvAll", "df/d05/group__ProtoHttpManager.html#gab826bbca521d86992073f216fcaac79f", null ],
+    [ "HttpManagerRequestCb", "df/d05/group__ProtoHttpManager.html#gabe7d43045257418d04b62fbd32bc523c", null ],
+    [ "HttpManagerSend", "df/d05/group__ProtoHttpManager.html#ga1013932ee4b124836ad8d0780898c82d", null ],
+    [ "HttpManagerSetBaseUrl", "df/d05/group__ProtoHttpManager.html#ga1ac41fac4f41eeae703ab92156b2f4ed", null ],
+    [ "HttpManagerStatus", "df/d05/group__ProtoHttpManager.html#ga11b8338a9efe4fafe2f4ca4b7e9ffef2", null ],
+    [ "HttpManagerUpdate", "df/d05/group__ProtoHttpManager.html#gaa982abaac037781fa0147eba541c9e61", null ]
+];

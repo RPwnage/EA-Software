@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+================================================================================
+OriginSDK.build
+
+Framework2 build file for the OriginSDK package.
+
+(c) 2010-2015 Electronic Arts Inc.
+================================================================================
+-->
+
+<project default="build" xmlns="schemas/ea/framework3.xsd">
+  <!-- ******************* -->
+  <!-- Package declaration -->
+  <!-- ******************* -->
+
+  <property name="currDir" value="@{PathGetFullPath('.')}" local="true"/>
+  <property name="currVer" value="@{PathGetFileName('${currDir}')}" local="true"/>
+  <package name="OriginSDK" targetversion="${currVer}"/>
+
+  <property name="cc.cpp" value="false"/>
+  <property name="ConfigIsDebug"  value="@{StrIndexOf('${config-name}', '-debug')}  != -1"/>
+  <property name="OsIsWin"      value="${config-system} == pc or ${config-system} == pc64"/>
+  <property name="OsIsOSX"      value="${config-system} == osx"/>
+  
+  <property name="package.OriginSDK.generatecode" value="${package.OriginSDK.generatecode??false}"/>
+
+  <property name="runtime.generatedfiles" value="${package.OriginSDK.dir}/src/generated" />
+
+  <property name="osx-base-sdk-version" value="10.7" />
+
+  <property name="Dll" value="${Dll??false}"/><!--Check if property exists-->
+  <property name="package.OriginSDK.Dll" value="${package.OriginSDK.Dll??${Dll}}"/><!-- package property overrides global Dll property-->
+
+  <include file="${package.OriginSDK.dir}/scripts/initialize.xml"/>
+  <include file="${package.OriginSDK.dir}/scripts/generate-code.xml"/>
+  <property name="runtime.OriginSDK.xcode-extra-buildsettings" if="@{PropertyExists('package.OriginSDK.std')} and @{PropertyExists('package.OriginSDK.stdlib')}">
+    CLANG_CXX_LANGUAGE_STANDARD = "${package.OriginSDK.std??c++11}"
+    CLANG_CXX_LIBRARY = "${package.OriginSDK.stdlib??libc++}"
+  </property>
+
+  <property name="target-generate-code-all" value="generate-code-all"/>
+  <property name="target-generate-code-all" value="" unless="${package.OriginSDK.generatecode}" />
+  <property name="target-pregenerate-code" value="pregenerate-code"/>
+  <property name="target-pregenerate-code" value="" unless="${package.OriginSDK.generatecode}" />
+
+  <property name="no-external-vc-dependencies" value="${no-external-vc-dependencies??false}"/>
+  <property name="eaconfig.multithreadeddynamiclib" value="off" if="${no-external-vc-dependencies}"/>
+
+  <Library name="OriginSDK" outputname="OriginSDK${package.OriginSDK.suffix}">
+    <buildtype name="DynamicLibrary" if="${package.OriginSDK.Dll}"/>
+    <config>
+      <defines>
+        _WINDOWS
+        UNICODE
+        _UNICODE
+        ${package.OriginSDK.extradefines??}
+        <do if="${drmbuild??false}">
+            ORIGIN_PLATFORM_INTERFACE
+        </do>
+        <do if="${OsIsWin}">
+          ORIGIN_PC
+        </do>
+        <do if="${OsIsOSX}">
+          ORIGIN_MAC
+        </do>
+        <do if="${ConfigIsDebug}">
+          EAT_ASSERT_ENABLED
+        </do>
+        <do if="${config-system} == pc64">
+          WIN64
+        </do>
+        <do if="${OsIsWin}">
+          <do if="${package.OriginSDK.Dll}">
+            _USRDLL
+            ORIGIN_SDK_EXPORTS
+          </do>
+        </do>
+      </defines>
+      <warningsuppression>
+        <do if="${OsIsWin}">
+          -wd4005<!-- macro redefinition-->
+          -wd4275<!--non dllinterface class used as base for dllinterface class-->
+          -wd4456<!--declaration of .. hides previous local declaration-->
+          -wd4464<!--Using .. in includes-->
+          -wd4548<!--expression before comma has no effect-->
+          -wd4625<!--copy constructor could not be generated because a base class copy constructor is inaccessible or deleted-->
+          -wd4626<!--assignment operator could not be generated because a base class assignment operator is inaccessible or deleted-->
+          -wd4265<!--warning C4265: 'std::_Pad' : class has virtual functions, but destructor is not virtual-->
+        </do>
+        <do if="${OsIsWin}">
+          <do if="${config-vs-version} >= '14.0'" >
+            -wd5039<!--pointer or reference to potentially throwing function passed to extern C function under -EHc. Undefined behavior may occur if this function throws an exception.-->
+          </do>
+        </do>
+        <do if="${OsIsOSX}">
+          -Wno-missing-braces
+          -Wno-bitwise-op-parentheses
+        </do>
+      </warningsuppression>
+      <buildoptions>
+        <option name="buildset.cc.options" if="${OsIsWin}">
+          ${option.value}
+          /EHsc
+        </option>
+        <option name="buildset.lib.options" if="${config-system} == pc64">
+          -machine:x64
+        </option>
+        <option name="buildset.link.libraries" if="${OsIsWin}">
+          ws2_32.lib
+          psapi.lib
+          advapi32.lib
+        </option>
+        <option name="exceptions" value="on"/>
+      </buildoptions>
+      <remove>
+        <defines>
+          <do if="!${Dll}">
+            _USRDLL
+          </do>
+        </defines>
+        <cc.options>
+          std
+          stdlib
+        </cc.options>
+      </remove>
+    </config>
+    <dependencies>
+      <use>
+        EABase
+        <do if="${package.OriginSDK.generatecode}">
+          xsd2cpp
+          ErrorFileCompiler
+        </do>
+      </use>
+      <build>
+      </build>
+    </dependencies>
+    <headerfiles>
+      <includes name="src/**/*.h"/>
+      <includes name="src/*.h"/>
+      <includes name="src/impl/Windows/*.h" if="${OsIsWin}"/>
+      <includes name="src/impl/Mac/*.h" if="${OsIsOSX}"/>
+      <includes name="src/generated/xsd2cpp/*.h"/>
+      <includes name="src/generated/xsd2cpp/*.cpp"/>
+      <includes name="include/OriginSDK/*.h"/>
+      <includes name="include/OriginSDK/OriginVersion.h"/>
+      <includes name="src/rapidXml/*.hpp"/>
+      <includes name="OriginSDK.build"/>
+      <includes name="scripts/initialize.xml"/>
+    </headerfiles>
+    <sourcefiles>
+	  <includes name="src/encryption/rijndael.cpp" />
+      <includes name="src/encryption/md5.cpp" />
+      <includes name="src/encryption/*.cpp" />
+      <includes name="src/impl/*.cpp" />
+      <includes name="src/impl/Windows/*.cpp" if="${OsIsWin}"/>
+      <includes name="src/impl/Mac/*.cpp" if="${OsIsOSX}"/>
+      <includes name="src/*.cpp" />
+      <includes name="src/messages/*.cpp" />
+      <includes name="src/rapidXml/*.cpp" />
+      <includes name="${runtime.generatedfiles}/xsd2cpp/zGenerated.cpp" asis="true" />
+      <includes name="${runtime.generatedfiles}/OriginError.cpp" asis="true" />
+    </sourcefiles>
+    <buildsteps>
+      <prebuild-step targetname="${target-generate-code-all}"/>
+    </buildsteps>
+    <includedirs>
+      ${package.dir}/include/
+      ${package.dir}/src/
+      ${package.dir}/src/impl/
+      ${runtime.generatedfiles}/xsd2cpp/
+      ${package.OriginSDK.dir}/src/rapidxml
+    </includedirs>
+    <resourcefiles if="${OsIsWin}">
+      <includes name="OriginSDK.rc" />
+    </resourcefiles>
+    <visualstudio>
+      <pregenerate-target targetname="${target-pregenerate-code}" nant-build-only="false"/>
+      <excludedbuildfiles>
+        <includes name="src/messages/lsx.xsd" />
+      </excludedbuildfiles>
+    </visualstudio>
+    <bulkbuild enable="${originsdk_bulkbuild_enable??false}"/>
+  </Library>
+</project>

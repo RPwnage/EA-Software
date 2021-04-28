@@ -1,0 +1,155 @@
+<!doctype html>
+<html ng-app="InviteFriendsModule">
+	<head>
+		<title>Origin</title>
+		<meta charset="UTF-8">
+
+		<link rel="stylesheet" type="text/css" href="uitoolkit/styles/uitoolkit.css">
+		<link rel="stylesheet" type="text/css" href="chat/stylesheets/base.css">
+		<link rel="stylesheet" type="text/css" href="chat/stylesheets/context-menu.css" data-devel-only="true">
+		<link rel="stylesheet" type="text/css" href="chat/stylesheets/invite-friends-window.css">
+
+		<script src="chat/scripts/vendor/angular/angular.min.js"></script>
+
+	</head>
+	<body>
+		<script src="uitoolkit/scripts/uitoolkit.js"></script>
+		<script src="chat/scripts/vendor/innov8.querystring.js"></script>
+		<script src="chat/scripts/devel/innov8.dateformat.js" data-devel-only="true"></script>
+		<script src="chat/scripts/devel/localization.js" data-devel-only="true"></script>
+		<script src="chat/scripts/devel/normalize-dev.js" data-devel-only="true"></script>
+
+		<script src="chat/scripts/views/remote-user.js"></script>
+		<script src="chat/scripts/controllers/async-real-name-load.js"></script>
+		<script src="chat/scripts/utilities/presence-string.js"></script>
+		<script src="chat/scripts/utilities/throttle.js"></script> 
+		<script src="chat/scripts/utilities/group-index.js"></script>
+		<script src="chat/scripts/utilities/user-names.js"></script>
+        <script src="chat/scripts/controllers/invite-friends-window.js"></script>
+
+        <div id="invite-friends-page">
+	        <section id="invite-friends-content">
+				<h2 id="invite-friends-header" data-string-id="ebisu_client_group_chat_invite_friends_header"></h2>
+				<p id="invite-friends-description" data-string-id="ebisu_client_group_chat_invite_friends_text"></p>
+				<h2 id="all-friends-in-group-header" data-string-id="ebisu_client_all_of_your_friends_are_in_this_group"></h2>
+				<p id="all-friends-in-group-description" data-string-id="ebisu_client_you_can_only_invite_your_friends_who_are_not_already"></p>
+                <h4 id="offline-warning" data-string-id="ebisu_client_cant_invite_friends_when_offline">You cannot invite friends to a group when offline.</h4>
+                <!-- spinner -->
+                <div class="invite-friends-window-spinner-container">
+                    <div class="otk-spinner-large animated invite-friends-window-spinner-centered"></div>
+                </div>
+            
+                <div id="invite-friends-remote-users" ng-controller="RemoteUserCtrl">
+
+                    <!-- in game: can invite-->
+                    <div ng-show="(inGameCount > 0)" class="invite-friends-subtitle">
+                        <span class="otk-count-bubble">{{inGameCount}}</span>
+                        <label class="invite-friends-subtitle-label" data-string-id="ebisu_client_friends_list_in_game">IN GAME</label>
+                    </div>
+                    
+                    <span class="repeat-contact" ng-repeat="contact in inGameContacts =( inGameUserArray | orderBy:'nickname' | limitTo: inGameLimit) track by $index">
+                        <div ng-click="click($event, contact)" ng-class="(hasRealName(contact) ? 'has-real-name' : '')"  class="otk-contact invite-friends-contact" data-user-id="{{contact.id}}">
+                            <div class="otk-presence-indicator" data-presence="{{getPresence(contact)}}"></div>
+                            <img class="otk-user-avatar" ng-src="{{contact.avatarUrl}}"/>
+                            <div class="name">
+                                <span class="nickname">{{contact.nickname}}</span>
+                                <span class="realname">{{getRealName(contact)}}</span>
+                            </div>
+                            <span class="presence">{{getStatusText(contact)}}</span>
+                        </div>
+                    </span>
+                    
+                    <!-- can invite-->
+                    <div ng-show="(canInviteCount > 0)" class="invite-friends-subtitle">
+                        <span class="otk-count-bubble">{{canInviteCount}}</span>
+                        <label id="select-friends-subtitle-label" class="invite-friends-subtitle-label" data-string-id="ebisu_client_select_friends_to_invite">SELECT FRIENDS TO INVITE</label>
+                        <label id="online-subtitle-label" class="invite-friends-subtitle-label" data-string-id="ebisu_client_friends_list_online">ONLINE</label>                            
+                    </div>
+                    
+                    <span class="repeat-contact" ng-repeat="contact in onlineContacts =( canInviteUserArray | limitTo: canInviteLimit) track by $index">
+                        <div ng-click="click($event, contact)" ng-class="(hasRealName(contact) ? 'has-real-name' : '')"  class="otk-contact invite-friends-contact" data-user-id="{{contact.id}}">
+                            <div class="otk-presence-indicator" data-presence="{{getPresence(contact)}}"></div>
+                            <img class="otk-user-avatar" ng-src="{{contact.avatarUrl}}"/>
+                            <div class="name">
+                                <span class="nickname">{{contact.nickname}}</span>
+                                <span class="realname">{{getRealName(contact)}}</span>
+                            </div>
+                            <span class="presence">{{getStatusText(contact)}}</span>
+                        </div>
+                    </span>
+                                        
+                    <!-- in current group, online or offline: cannot invite -->
+                    <div ng-show="(inGroupCount > 0)" class="invite-friends-subtitle">
+                        <span class="otk-count-bubble">{{inGroupCount}}</span>
+                        <label class="invite-friends-subtitle-label" data-string-id="ebisu_client_already_in_group">ALREADY IN GROUP</label>
+                    </div>
+                    
+                    <span class="repeat-contact" ng-repeat="contact in onlineContactsInGroup =( inGroupUserArray | limitTo: inGroupLimit) track by $index">
+
+                        <div ng-class="(hasRealName(contact) ? 'has-real-name' : '')"  class="otk-contact invite-friends-contact cannotInviteInGroup" data-user-id="{{contact.id}}">
+                            <div class="otk-presence-indicator" data-presence="{{getPresence(contact)}}"></div>
+                            <img class="otk-user-avatar" ng-src="{{contact.avatarUrl}}"/>
+                            <div class="name">
+                                <span class="nickname">{{contact.nickname}}</span>
+                                <span class="realname">{{getRealName(contact)}}</span>
+                            </div>
+                            <span class="presence">{{getStatusText(contact)}}</span>
+                        </div>
+
+                    </span>
+                    
+                    <!-- in current room: cannot invite -->
+                    <div class="invite-friends-subtitle" ng-show="(inRoomCount > 0)">
+                        <span class="otk-count-bubble">{{inRoomCount}}</span>
+                        <label class="invite-friends-subtitle-label" data-string-id="ebisu_client_already_in_room_caps">ALREADY IN ROOM</label>
+                    </div>
+                    
+                    <span class="repeat-contact" ng-repeat="contact in usersInRoom =( inRoomUserArray | limitTo: inRoomLimit) track by $index">
+
+                        <div class="otk-contact invite-friends-contact cannotInviteInGroup" data-user-id="{{contact.id}}" ng-class="(hasRealName(contact) ? 'has-real-name' : '')">
+                            <div class="otk-presence-indicator" data-presence="{{getPresence(contact)}}"></div>
+                            <img class="otk-user-avatar" ng-src="{{contact.avatarUrl}}">
+                            <div class="name">
+                                <span class="nickname">{{contact.nickname}}</span>
+                                <span class="realname">{{getRealName(contact)}}</span>
+                            </div>
+                            <span class="presence">{{getStatusText(contact)}}</span>
+                        </div>
+
+                    </span>
+                    
+                    
+                    <!-- offline, not in group: cannot invite -->
+                    <div ng-show="(offlineCount > 0)" class="invite-friends-subtitle">
+                        <span class="otk-count-bubble">{{offlineCount}}</span>
+                        <label class="invite-friends-subtitle-label" data-string-id="ebisu_client_friends_list_offline">OFFLINE</label>
+                    </div>
+                    
+                    <span class="repeat-contact" ng-repeat="contact in offlineContactsNotInGroup =( offlineUserArray | orderBy:'nickname' | limitTo: offlineLimit) track by $index">
+                        <div ng-class="(hasRealName(contact) ? 'has-real-name' : '')"  class="otk-contact invite-friends-contact cannotInviteOffline" data-user-id="{{contact.id}}">
+                            <div class="otk-presence-indicator" data-presence="{{getPresence(contact)}}"></div>
+                            <img class="otk-user-avatar" ng-src="{{contact.avatarUrl}}"/>
+                            <div class="name">
+                                <span class="nickname">{{contact.nickname}}</span>
+                                <span class="realname">{{getRealName(contact)}}</span>
+                            </div>
+                            <span class="presence">{{getStatusText(contact)}}</span>
+                        </div>
+                    </span>         
+                    
+                </div>
+            </section><!-- end invite-friends-content -->
+            
+            <footer id="button-footer">
+                <div class="beveled-separator"></div>
+                <span id="buttons">
+                    <button id="addFriendButton" class="otk-button primary" data-string-id="ebisu_client_add_friend_title">Add a Friend</button>
+
+                    <button id="inviteButton" class="otk-button primary disabled" data-string-id="ebisu_client_invite">Invite</button>
+                    <button id="cancelButton" class="otk-button secondary" data-string-id="ebisu_client_cancel" onclick="window.close();">Cancel</button>
+                    <button id="closeButton" class="otk-button secondary" data-string-id="ebisu_client_close" onclick="window.close();">Close</button>                    
+                </span>
+            </footer>
+        </div><!-- end invite-friends-page -->
+    </body>
+</html>

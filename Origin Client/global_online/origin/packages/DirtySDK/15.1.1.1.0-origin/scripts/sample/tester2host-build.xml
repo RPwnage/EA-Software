@@ -1,0 +1,283 @@
+<project>
+    <!-- Define platform source location: use dirtyplat is a base and just override for the special cases -->
+    <property name="tester2-source" value="${dirtyplat}"/>
+    <property name="tester2-source" value="unix" if="${config-system} == 'iphone' or ${config-system} == 'osx'"/>
+    <property name="tester2-source" value="xboxoneadk" if="${config-system} == 'capilano' and ${config-platform} == 'capilano-vc-adk'"/>
+
+    <property name="package.T2Host.titleid" value="4E2A4DAD"/>
+    <property name="package.T2Host.PrimaryServiceConfigId" value="609a0100-276a-4f4a-b180-8aa04e2a4dad"/>
+
+    <Program name="T2Host">
+        <frompartial value="DSProgram" unless="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+        <frompartial value="WinDSProgram" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+
+        <includedirs>
+            ${package.dir}/sample/common/include
+            ${package.dir}/sample/common/source/mp3
+            ${package.dir}/sample/tester2/source
+
+            <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                ${package.dir}/sample/tester2/source/pc/resource
+            </do>
+        </includedirs>
+
+        <sourcefiles basedir="${package.dir}">
+            <includes fromfile="${package.dir}/sample/tester2/project/${tester2-source}/source.txt" if="@{FileExists('${package.dir}/sample/tester2/project/${tester2-source}/source.txt')}"/>
+            <includes fromfile="${package.dir}/sample/tester2/project/source.txt"/>
+
+            <!-- Add a special optionset only in the case that it is needed -->
+            <includes fromfile="${package.dir}/sample/tester2/project/${tester2-source}/sourcecpp.txt" if="@{FileExists('${package.dir}/sample/tester2/project/${tester2-source}/sourcecpp.txt')} and (${config-system} == 'capilano' or ${config-system} == 'winrt' or ${config-system} == 'winprt')" optionset="Program"/>
+            <includes fromfile="${package.dir}/sample/tester2/project/${tester2-source}/sourcecpp.txt" if="@{FileExists('${package.dir}/sample/tester2/project/${tester2-source}/sourcecpp.txt')} and not (${config-system} == 'capilano' or ${config-system} == 'winrt' or ${config-system} == 'winprt')"/>
+        </sourcefiles>
+
+        <resourcefiles>
+            <includes name="${package.dir}/sample/tester2/source/pc/resource/T2Host.rc" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+        </resourcefiles>
+
+        <dependencies>
+            <auto>
+                DirtySDK/dirtysock
+
+                <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                    DirtySDK/voipaux
+                </do>
+
+                <do if="${config-system} == 'xenon'">
+                    DirtySDK/atgframework
+                </do>
+
+                <do if="${config-system} == 'ps3'">
+                    PlayStation3NPEx
+                </do>
+
+                <do if="${config-system} == 'capilano' and not ${dirtysdk-noieauser??false}">
+                    coreallocator
+                    EAAssert
+                    EABase
+                    EAMessage
+                    EASTL
+                    EASystemEventMessageDispatcher
+                    EAThread
+                    IEAController
+                    IEASystemEventMessageDispatcher
+                    IEAUser
+                    EAControllerUserPairing
+                    PPMalloc
+                </do>
+
+                <do if="${config-system} == 'kettle'">
+                    EABase
+                    EAAssert
+                    EAMessage
+                    EASTL
+                    coreallocator
+                    EAThread
+                    PPMalloc
+                    EASystemEventMessageDispatcher
+                    IEASystemEventMessageDispatcher
+
+                    <do unless="${dirtysdk-noieauser??false}">
+                        IEAUser
+                        IEAController
+                        EAControllerUserPairing
+                    </do>
+                </do>
+            </auto>
+        </dependencies>
+
+        <config>
+            <buildoptions>
+                <option name="buildset.link.options" if="${config-system} == 'xenon'">
+                    ${option.value}
+                    <!-- add XEXSECTION to link step for Xenon - this is required for matchmaking to work correctly -->
+                    /XEXCONFIG:${package.dir}\sample\tester2\scripts\xexconfig.xml
+                    /XEXSECTION:454107D5=${package.dir}\sample\tester2\source\xenon\spa.bin
+                </option>
+            </buildoptions>
+
+            <defines>
+                <do if="${config-system} == capilano">
+                    _XM_AVX_INTRINSICS_
+                    MIN_EXPECTED_XDK_VER=9386
+                    MAX_EXPECTED_XDK_VER=9386
+                </do>
+
+                <do if ="(${config-system} == 'capilano' or ${config-system} == 'kettle') and not @{PropertyExists('dirtysdk-noieauser')}">
+                    DIRTYSDK_IEAUSER_ENABLED
+                </do>
+            </defines>
+
+            <warningsuppression>
+                <do if="${config-compiler} == 'vc'">
+                    -wd4054 <!-- 'type cast' : from function pointer 'int32_t (__cdecl *)(void *)' to data pointer 'void *' -->
+                    -wd4310 <!-- cast truncates constant value -->
+                </do>
+
+                <do if="${config-system} == 'winrt' or ${config-system} == 'winprt'">
+                    -wd4574 <!-- 'NULL' is defined to be '0': did you mean to use #if NULL' -->
+                </do>
+
+                <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+                    -Wno-unused-but-set-variable
+                    -Wno-missing-braces
+                </do>
+
+                <do if="${config-compiler} == 'sn'">
+                    --diag_suppress=112     <!-- statement is unreachable -->
+                    --diag_suppress=129     <!-- loop is not reachable -->
+                    --diag_suppress=189     <!-- enumerated type mixed with another type -->
+                    --diag_suppress=552     <!-- variable was set but never used -->
+                    --diag_suppress=1628    <!-- argument of type 'x' is incompatible with parameter of type 'y' -->
+                </do>
+            </warningsuppression>
+        </config>
+
+        <libraries append="true">
+            <includes name="${package.dir}/sample/tester2/lib/ps3/vpshader.ppu.o" asis="true" if="${config-system} == 'ps3'"/>
+            <includes name="${package.dir}/sample/tester2/lib/ps3/fpshader.ppu.o" asis="true" if="${config-system} == 'ps3'"/>
+        </libraries>
+
+        <sdkreferences if="${config-system} == 'capilano'">
+            Xbox Services API, Version=8.0
+        </sdkreferences>
+
+        <script order="before" if="${config-system} == 'capilano'">
+            <optionset name="config-options-appxmanifestoptions">
+                <option name="Xbox_Live_Config">
+                    <![CDATA[
+                    <mx:Extension Category="xbox.live">
+                        <mx:XboxLive TitleId="${package.T2Host.titleid}" PrimaryServiceConfigId="${package.T2Host.PrimaryServiceConfigId}"/>
+                    </mx:Extension>
+
+                    <mx:Extension Category="xbox.multiplayer">
+                        <mx:XboxMultiplayer CanSuppressPartyChat="true" />
+                    </mx:Extension>
+                    ]]>
+                </option>
+                <option name="extension_options">
+                    ${option.value}
+                    Xbox_Live_Config
+                </option>
+                <option name="capabilities">
+                    ${option.value}
+                    kinectAudio
+                    kinectGamechat
+                </option>
+            </optionset>
+        </script>
+
+        <copylocal value="true" if="${Dll??false} and ${config-compiler} == 'vc'"/>
+
+        <buildsteps>
+            <prebuild-step>
+                <target hidden="true" if="${config-system} == 'xenon'">
+                    <!-- define the builddir -->
+                    <property name="T2HostSpaBinDir" value="${package.dir}\sample\tester2\source\xenon" />
+
+                    <choose>
+                        <!-- For framework3, ensure task runs at most once to avoid parallel builds stepping on the same files -->
+                        <do if="@{PropertyExists('nant.framework3')}">
+                          <!-- mutex locked because only one process can access the files at a time -->
+                          <namedlock name="runtime.T2Host.spac.lock-key">
+                              <!-- create the spa.bin file (same as below)-->
+                              <exec program="${package.xenonsdk.appdir}\bin\win32\spac.exe" workingdir="${T2HostSpaBinDir}">
+                                  <arg value="-o ${T2HostSpaBinDir}\spa.bin" />
+                                  <arg value="-h .\T2.spa.h" />
+                                  <arg value="${T2HostSpaBinDir}\T2.xlast" />
+                              </exec>
+                          </namedlock>
+                        </do>
+                        <do>
+                          <!-- create the spa.bin file (same as above)-->
+                          <exec program="${package.xenonsdk.appdir}\bin\win32\spac.exe" workingdir="${T2HostSpaBinDir}">
+                            <arg value="-o ${T2HostSpaBinDir}\spa.bin" />
+                            <arg value="-h .\T2.spa.h" />
+                            <arg value="${T2HostSpaBinDir}\T2.xlast" />
+                          </exec>
+                        </do>
+                      </choose>
+                </target>
+            </prebuild-step>
+
+            <postbuild-step>
+                <target hidden="true" if="${config-system} == 'xenon'">
+                    <echo message="RUNNING T2Host Xbox 360 postbuild target" />
+                    <!-- copy the xex file to the xbox 360 -->
+                    <!-- It's important to use back-slashes ("\") instead of forward slashes when calling xbcp. -->
+                    <!-- setting "failonerror" to false means the build will continue with the target xbox 360 off -->
+                    <choose>
+                        <!-- Deploy to the targets -->
+                        <do if="@{PropertyExists('TargetXenon')}">
+                            <foreach item="String" in="${TargetXenon}" property="DeployTarg">
+                                <exec program="${package.xenonsdk.appdir}\bin\win32\xbcp.exe" failonerror="false">
+                                    <arg value="/y /t /f /r /s /X:${DeployTarg}"/>
+                                    <arg value="${package.builddir}\${config}\bin\T2Host.xex"/>
+                                    <arg value="xe:\${Xenon-Dest-Dir}"/>
+                                </exec>
+                            </foreach>
+                        </do>
+                        <!-- This is a build, or the Target List was empty. Only deploy to default. -->
+                        <do>
+                            <choose>
+                                <!-- BuildStudio -->
+                                <do if="@{PropertyExists('Xenon-Dest-Dir')}">
+                                    <exec program="${package.xenonsdk.appdir}\bin\win32\xbcp.exe" failonerror="false">
+                                        <arg value="/y /t /f /r /s "/>
+                                        <arg value="${package.builddir}\${config}\bin\T2Host.xex"/>
+                                        <arg value="xe:\${Xenon-Dest-Dir}"/>
+                                    </exec>
+                                </do>
+                                <!-- Continuous build -->
+                                <do>
+                                    <exec program="${package.xenonsdk.appdir}\bin\win32\xbcp.exe" failonerror="false">
+                                        <arg value="/y /t /f /r /s "/>
+                                        <arg value="${package.builddir}\${config}\bin\T2Host.xex"/>
+                                        <arg value="xe:\${package.name}"/>
+                                    </exec>
+                                </do>
+                            </choose>
+                        </do>
+                    </choose>
+                </target>
+            </postbuild-step>
+        </buildsteps>
+
+        <visualstudio>
+            <post-build-step if="${config-system} == 'xenon'">
+                ${nant.location}/nant.exe runtime.T2Host.postbuildtarget -buildfile:${nant.project.buildfile} -buildroot:${nant.project.buildroot} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:dirtysdk-samples=${dirtysdk-samples} 
+
+                <do if="@{PropertyExists('Xenon-Dest-Dir')}">
+                    -D:Xenon-Dest-Dir=${Xenon-Dest-Dir} 
+                </do>
+
+                <do if="@{PropertyExists('TargetXenon')}">
+                    -D:TargetXenon=${TargetXenon}
+                </do>
+            </post-build-step>
+        </visualstudio>
+    </Program>
+
+    <do if="${config-system} == 'capilano'">
+        <!-- pull in dirtysdk networkmanifest and add our own -->
+        <echo message="setting T2Host network manifest files"/>
+        <property name="runtime.T2Host.networking-manifest-files">
+            ${package.DirtySDK.networking-manifest-files}
+            ${package.dir}/scripts/sample/t2host-networkmanifest.xml
+        </property>
+
+        <!-- Copy over Shaders for Rendering -->
+        <copy file="${package.dir}\sample\tester2\source\xboxone\Tutorial05_PS.hlsl"
+              tofile="${package.configbindir}\T2Host\Tutorial05_PS.hlsl"/>
+        <copy file="${package.dir}\sample\tester2\source\xboxone\Tutorial05_VS.hlsl"
+              tofile="${package.configbindir}\T2Host\Tutorial05_VS.hlsl"/>
+    </do>
+
+    <!-- add xenon-only includes -->
+    <property name="runtime.T2Host.imgbld.options" if="${config-system} == 'xenon'">
+        ${property.value}
+        -titleid:&quot;0x454107D5&quot;
+        -config:&quot;${package.dir}\sample\tester2\scripts\xexconfig.xml&quot;
+        -section:"454107D5=${package.dir}\sample\tester2\source\xenon\spa.bin,RW"
+    </property>
+
+</project>

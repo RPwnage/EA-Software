@@ -1,0 +1,95 @@
+package com.ea.originx.automation.lib.pageobjects.store;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+import com.ea.originx.automation.lib.pageobjects.template.EAXVxSiteTemplate;
+import java.util.List;
+import java.util.stream.Collectors;
+import com.ea.vx.originclient.utils.Waits;
+import com.google.gson.Gson;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+
+/**
+ * A page object that represents the 'Free Games' page.
+ *
+ * @author tharan
+ * @author jmittertreiner
+ */
+public class FreeGamesPage extends EAXVxSiteTemplate {
+
+    private By OFFER_MODULE_LOCATOR = By.cssSelector("origin-store-freegames-offermodule");
+    private By OFFER_MODULE_DIV_LOCATOR = By.cssSelector("origin-store-freegames-offermodule div.origin-store-freegames-offermodule");
+    private static final By FREE_GAMES_PAGE_LOCATOR = By.cssSelector(".origin-store-promo-banner-title");
+
+    /**
+     * Constructor
+     *
+     * @param driver Selenium WebDriver
+     */
+    public FreeGamesPage(WebDriver driver) {
+        super(driver);
+    }
+
+    /**
+     * Verify the 'Free Games' page has been reached.
+     *
+     * @return true if page reached, false otherwise
+     */
+    public boolean verifyFreeGamesPageReached() {
+        return waitIsElementVisible(FREE_GAMES_PAGE_LOCATOR);
+    }
+
+    /**
+     * Get the 'Free Games on Origin' header text.
+     *
+     * @return The 'Free Games on Origin' header text
+     */
+    public String getFreeGamesHeaderText() {
+        return waitForElementVisible(FREE_GAMES_PAGE_LOCATOR).getText();
+    }
+
+    /**
+     * Get all the 'Free Game' posters on the page.
+     *
+     * @return A list of all the 'Free Game' posters on the page
+     */
+    public List<FreeGamePosterTile> getAllFreeGamesPosterTiles() {
+        return waitForAllElementsVisible(OFFER_MODULE_LOCATOR).stream()
+                .map(webElement -> new FreeGamePosterTile(driver, webElement)).collect(Collectors.toList());
+    }
+
+    /**
+     * Get the first 'Free Game' posters on the page that is not a 'Third Party' entitlement.
+     *
+     * @return The first 'Free Game' posters on the page that is not 'Third Party' entitlements.
+     */
+    public FreeGamePosterTile getFirstNonThirdPartyPosterTile() throws JSONException {
+        jsExec.executeScript("return angular.reloadWithDebugInfo()"); // reloads page with angular debug info
+        Waits.pollingWait(() -> verifyFreeGamesPageReached());
+        Waits.pollingWait(() -> waitForFreeGamesTilesToLoad());
+
+        List<WebElement> freeGamePosterTiles = driver.findElements(OFFER_MODULE_DIV_LOCATOR);
+
+        for (int i = 0; i < freeGamePosterTiles.size(); i++) {
+            WebElement element = freeGamePosterTiles.get(i);
+            Object obj = jsExec.executeScript("return angular.element(arguments[0]).scope().model", element);
+            String json = new Gson().toJson(obj); // convert 'json look-a-like string' into an actual json string
+            if (new JSONObject(json).getString("isThirdPartyTitle") == "false") {
+                return new FreeGamePosterTile(driver, element);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Wait for all the tiles to load.
+     *
+     * @return true if the tiles are stabilized, false otherwise
+     */
+    public boolean waitForFreeGamesTilesToLoad(){
+        return waitForAnimationComplete(OFFER_MODULE_DIV_LOCATOR);
+    }
+}

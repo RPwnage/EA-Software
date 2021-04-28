@@ -1,0 +1,213 @@
+package com.ea.eadp.antelope.rtm.protocol;
+
+import "common_protocol.proto";
+import "player_protocol.proto";
+
+option java_outer_classname = "ChatProtocol";
+
+//Requests
+message ChatInitiateV1 {
+	repeated string personaIds = 1 [deprecated=true];
+	repeated Player players = 2;
+}
+
+message ChatLeaveV1 {
+	optional string channelId = 1;
+}
+
+message ChatMembersRequestV1 {
+	repeated string channelId = 1;
+
+	// ChannelType for world chat pagination. All channels as a part of this request will be interpreted as this type.
+	optional ChannelType channelType = 2 [default = INVITE_CHANNEL];
+
+	// Pagination details. Allows the client to request (page_size) items starting at shard index (from_index).
+	// Responses for all channels passed as a part of this request will be paginated with these parameters.
+	optional int32 fromIndex = 3 [default = 0];
+	optional int32 pageSize = 4 [default = 25]; // max page size is 25.
+}
+
+// Will return which chat channels a user is part of (ChatChannelsV1 e.g. 1:1 chats, group chats).
+// This will not include any world chat channels the player might be part of.
+message ChatChannelsRequestV1 {
+	// Flag to enable unread message count details in the response
+	optional bool includeUnreadMessageCount = 1;
+}
+
+message WorldChatConfigurationRequestV1 {
+}
+
+message WorldChatChannelsRequestV1 {
+	optional string worldName = 1;
+
+	// Pagination details. Allows the client to request (page_size) items starting at shard index (from_index)
+	optional int32 fromIndex = 2 [default = 0];
+	optional int32 pageSize = 3 [default = 10]; // max page size is 25.
+}
+
+message WorldChatAssignV1 {
+	optional string worldName = 1;
+	optional int32 shardIndex = 2 [default = -1];
+}
+
+message MuteUserV1{
+	optional string channelId = 1;
+	optional string personaId = 2 [deprecated=true];
+	optional Player player = 3;
+}
+
+message UnmuteUserV1{
+	optional string channelId = 1;
+	optional string personaId = 2 [deprecated=true];
+	optional Player player = 3;
+}
+
+message PromoteStickyMessageRequestV1 {
+	optional string channelId = 1;
+	optional string messageId = 2;
+	optional string timestamp = 3;
+	optional int32 index = 4 [default = 0];
+}
+
+message RemoveStickyMessageRequestV1 {
+	optional string channelId = 1;
+	optional int32 index = 2 [default = -1];
+}
+
+message FetchStickyMessagesRequestV1 {
+	optional string channelId = 1;
+}
+
+enum TypingEventType {
+	COMPOSING = 1;
+	CUSTOM_EVENT = 2;
+}
+
+message ChatTypingEventRequestV1 {
+	optional string channelId = 1;
+	optional TypingEventType event = 2;
+	optional string customTypingEvent = 3;
+}
+
+
+//Responses
+message ChatMembersV1 {
+	optional string channelId = 1 ;
+	repeated PersonaV1 users = 2 [deprecated=true];
+
+	// Required for pagination. Informs the client how many members exist in total.
+	optional int32 totalMemberCount = 3;
+	repeated PlayerInfo players = 4;
+}
+
+message ChatChannelsV1 {
+	repeated ChannelV1 channels = 1;
+	repeated ChannelMuteListV1 muteList = 2;
+	// Timestamp when the user was last online to infer offline messages
+	optional string lastOnlineTimestamp = 3;
+}
+
+// Response for WorldChatAssignV1 requests
+message WorldChatResponseV1 {
+	// Information about the current assignment
+	optional string channelId = 1;
+	optional int32 remainingDailyShardSwitchCount = 2;
+	optional int32 shardIndex = 3;
+	optional string worldName = 4;
+
+	// Information about the previous assignment
+	optional string previousChannelId = 5;
+	optional int32 previousShardIndex = 6;
+
+	// Information about muted users within this world name.
+	repeated ChannelMuteListV1 muteList = 7;
+
+	// For consistency this sends out the channel name as well.
+	optional string channelName = 8;
+}
+
+message WorldChatConfigurationResponseV1 {
+	optional int32 remainingDailyShardSwitchCount = 1;
+
+	optional int32 maxShards = 2;
+	optional int32 maxShardSize = 3;
+	optional int32 maxWorldNamesPerGame = 4;
+	optional int32 maxDailyShardSwitchCount = 5;
+}
+
+message WorldChatChannelsResponseV1 {
+	optional string worldName = 1;
+	repeated WorldChatShard shard = 2;
+
+	// Pagination details. Informs the client how many more shards it could request via the WorldChatChannelsRequestV1.
+	optional int32 totalShardCount = 3;
+}
+
+message WorldChatShard {
+	optional int32 index = 1;
+	optional int32 size  = 2;
+}
+
+message StickyMessageResponseV1 {
+	optional string channelId = 1;
+	repeated StickyMessageV1 message = 2;
+}
+
+//Channel Messages
+message ChatConnectedV1 {
+	optional PersonaV1 user = 1 [deprecated=true];
+	optional PlayerInfo players = 2;
+}
+
+message ChatDisconnectedV1 {
+	optional PersonaV1 user = 1 [deprecated=true];
+    optional PlayerInfo players = 2;
+}
+
+message ChatLeftV1 {
+	optional PersonaV1 user = 1 [deprecated=true];
+    optional PlayerInfo players = 2;
+}
+
+message ChatUserMutedV1{
+	optional PersonaV1 mutedUser = 1 [deprecated=true];
+	optional PersonaV1 mutedByUser = 2 [deprecated=true];
+	optional PlayerInfo mutedPlayer = 3;
+	optional PlayerInfo mutedByPlayer = 4;
+}
+
+message ChatUserUnmutedV1{
+	optional PersonaV1 unmutedUser = 1 [deprecated=true];
+	optional PersonaV1 unmutedByUser = 2 [deprecated= true];
+	optional PlayerInfo unmutedPlayer = 3;
+	optional PlayerInfo unmutedByPlayer = 4;
+}
+
+message ChannelMembershipChangeV1 {
+	optional ChannelMembershipChangeType type = 1;
+	repeated PersonaV1 users = 2 [deprecated=true];
+	repeated PlayerInfo players = 3;
+}
+
+enum ChannelMembershipChangeType {
+	ADDED = 1;
+	REMOVED = 2;
+}
+
+message StickyMessageChangedV1 {
+	optional StickyMessageChangeType stickyMessageChangeType = 1;
+	optional StickyMessageV1 stickyMessage = 2;
+	optional int32 index = 3;
+}
+
+enum StickyMessageChangeType {
+	STICKY_MESSAGE_ADDED = 1;
+	STICKY_MESSAGE_REMOVED = 2;
+}
+
+message ChatTypingEventV1 {
+	optional TypingEventType event = 1;
+	optional string customTypingEvent = 2;
+	optional Player fromPlayer = 3;
+	optional string fromDisplayName = 4;
+}

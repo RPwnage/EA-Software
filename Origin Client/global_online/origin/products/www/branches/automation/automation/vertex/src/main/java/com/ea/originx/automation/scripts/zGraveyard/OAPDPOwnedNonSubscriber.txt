@@ -1,0 +1,153 @@
+package com.ea.originx.automation.scripts.pdp;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessPage;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.PaymentInformationPage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Test PDP Hero for a non-subscriber viewing different editions than the one
+ * owned
+ *
+ * @author cbalea
+ */
+public class OAPDPOwnedNonSubscriber extends EAXVxTestTemplate {
+
+    public enum TEST_TYPE {
+        OWN_LOWER_EDITION_VIEW_HIGHER_EDITION,
+        OWN_VAULT_EDITION_VIEW_HIGHER_EDITION,
+        OWN_HIGHER_EDITION_VIEW_HIGHER_EDITION
+    }
+
+    public void testOAPDPOwnedNonSubscriber(ITestContext context, OAPDPOwnedNonSubscriber.TEST_TYPE type) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EntitlementInfo entitlementToView;
+        EntitlementId lowerEntitlementID = EntitlementId.DA_INQUISITION;
+        EntitlementId vaultEntitlementID = EntitlementId.DA_INQUISITION_DIGITAL_DELUXE;
+        EntitlementId higherEntitlementID = EntitlementId.DA_INQUISITION_GAME_OF_THE_YEAR;
+        EntitlementInfo entitlementInfo;
+        String entitlementToViewName = "";
+        String extraText = "";
+
+        switch (type) {
+            case OWN_LOWER_EDITION_VIEW_HIGHER_EDITION:
+                entitlementInfo = EntitlementInfoHelper.getEntitlementInfoForId(lowerEntitlementID);
+                entitlementToView = EntitlementInfoHelper.getEntitlementInfoForId(higherEntitlementID);
+                entitlementToViewName = entitlementToView.getName();
+                extraText = "a lower edition than a game";
+                break;
+            case OWN_HIGHER_EDITION_VIEW_HIGHER_EDITION:
+                entitlementInfo = EntitlementInfoHelper.getEntitlementInfoForId(higherEntitlementID);
+                entitlementToView = EntitlementInfoHelper.getEntitlementInfoForId(higherEntitlementID);
+                entitlementToViewName = entitlementToView.getName();
+                extraText = "a higher edition than a game";
+                break;
+            case OWN_VAULT_EDITION_VIEW_HIGHER_EDITION:
+                entitlementInfo = EntitlementInfoHelper.getEntitlementInfoForId(vaultEntitlementID);
+                entitlementToView = EntitlementInfoHelper.getEntitlementInfoForId(higherEntitlementID);
+                entitlementToViewName = entitlementToView.getName();
+                extraText = "an entitlement";
+                break;
+            default:
+                throw new RuntimeException("Unexpected test type " + type);
+        }
+
+        final UserAccount userAccount = AccountManager.getEntitledUserAccount(entitlementInfo);
+
+        logFlowPoint("Using an account which owns " + extraText + " offered in the Vault, log into Origin"); // 1
+        logFlowPoint("Navigate to the PDP of an edition of the game higher than the one owned"); // 2
+        logFlowPoint("Verify there is a message indicating that the user owns the lower edition"); // 3
+        logFlowPoint("Verify there is a hyperlink to the game library"); // 4
+        logFlowPoint("Verify the 'Buy'/'DirectAquisition' CTA"); // 5
+        logFlowPoint("Verify the CTA colour is 'orange'"); // 6
+        if (type != TEST_TYPE.OWN_HIGHER_EDITION_VIEW_HIGHER_EDITION) {
+            logFlowPoint("Verify clicking the CTA brings user to checkout flow"); // 7
+            logFlowPoint("Verify legal links are visible"); // 8
+        }
+        logFlowPoint("Verify information about vault edition being available is visible"); // 9
+        logFlowPoint("Verify information about how to become an Origin Access member is visible"); // 10
+        logFlowPoint("Verify there is a link to learn more about Origin Access"); // 11
+        logFlowPoint("Verify clicking 'Learn More' directs user to Origin Access landing page"); // 12
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        logPassFail(MacroLogin.startLogin(driver, userAccount), true);
+
+        // 2
+        logPassFail(MacroPDP.loadPdpPage(driver, entitlementToView), true);
+
+        // 3
+        PDPHeroActionDescriptors pdpHeroActionDescriptors = new PDPHeroActionDescriptors(driver);
+        new MainMenu(driver).selectRefresh(); // sometimes after accessing the PDP the owned product message is not displayed , this is fixed by reloading the page
+        pdpHeroActionDescriptors.waitForPdpHeroToLoad(); //waiting needed after page refresh
+        logPassFail(pdpHeroActionDescriptors.verifyOwnedProductStatusMessage(), false);
+
+        // 4
+        logPassFail(pdpHeroActionDescriptors.verifyOGDLinkVisible(), false);
+
+        // 5
+        PDPHeroActionCTA pdpHeroActionCTA = new PDPHeroActionCTA(driver);
+        boolean visibleCTA;
+        String textCTA = "";
+        if (type != TEST_TYPE.OWN_HIGHER_EDITION_VIEW_HIGHER_EDITION) {
+            visibleCTA = pdpHeroActionCTA.verifyBuyButtonVisible();
+            textCTA = pdpHeroActionCTA.getBuyButtonText();
+        } else {
+            visibleCTA = pdpHeroActionCTA.verifyDirectAcquisitionButtonVisible();
+            textCTA = pdpHeroActionCTA.getDirectAcquisitionButtonText();
+
+        }
+
+        logPassFail(visibleCTA, true);
+
+        // 6
+        boolean colorCTA = type != TEST_TYPE.OWN_HIGHER_EDITION_VIEW_HIGHER_EDITION ? pdpHeroActionCTA.verifyBuyButtonColor() : pdpHeroActionCTA.verifyDirectAcquisitionButtonColor();
+
+        logPassFail(colorCTA, false);
+
+        // 7
+        if (type != TEST_TYPE.OWN_HIGHER_EDITION_VIEW_HIGHER_EDITION) {
+            //7
+            pdpHeroActionCTA.clickBuyButton();
+            PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+            paymentInformationPage.waitForPaymentInfoPageToLoad();
+            logPassFail(paymentInformationPage.verifyPaymentInformationReached(), true);
+
+            //8
+            paymentInformationPage.clickCloseButton();
+            boolean EULALink = pdpHeroActionDescriptors.verifyEULALinkText();
+            boolean TOSLink = pdpHeroActionDescriptors.verifyTermsAndConditionsLinkText();
+            logPassFail(TOSLink && EULALink, true);
+        }
+
+        // 9
+        logPassFail(pdpHeroActionDescriptors.verifyProductPartOfOriginAccessVisible(), false);
+
+        // 10
+        logPassFail(pdpHeroActionDescriptors.verifyOriginAccessBriefDescription(), false);
+
+        // 11
+        logPassFail(pdpHeroActionDescriptors.verifyOriginAccessLearnMoreLinkVisible(), false);
+
+        // 12
+        pdpHeroActionDescriptors.clickOriginAccessLearnMoreLink();
+        logPassFail(new OriginAccessPage(driver).verifyPageReached(), true);
+
+        softAssertAll();
+    }
+}

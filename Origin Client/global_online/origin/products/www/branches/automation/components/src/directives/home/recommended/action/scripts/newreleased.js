@@ -1,0 +1,70 @@
+/**
+ * @file home/recommended/Newreleased.js
+ */
+(function() {
+    'use strict';
+    var CONTEXT_NAMESPACE = 'origin-home-recommended-action-newreleased';
+
+    function OriginHomeRecommendedActionNewreleasedCtrl($scope, $controller) {
+        //instantiate the shared controller, but pass in the specific CONTEXT_NAMESPACE and subtitle/description function (if needed)
+        $controller('OriginHomeRecommendedActionCtrl', {
+            $scope: $scope,
+            contextNamespace: CONTEXT_NAMESPACE,
+            customSubtitleAndDescriptionFunction: null
+        });
+    }
+
+    function originHomeRecommendedActionNewreleased(ComponentsConfigFactory) {
+        return {
+            restrict: 'E',
+            scope: {
+                offerId: '@offerid',
+                gamename: '@',
+                subtitleRaw: '@subtitle',
+                ocdPath: '@',
+                discoverTileImage: '@',
+                discoverTileColor: '@',
+                sectionTitle: '@',
+                sectionSubtitle: '@',
+                descriptionRaw: '@description'
+            },
+            controller: 'OriginHomeRecommendedActionNewreleasedCtrl',
+            templateUrl: ComponentsConfigFactory.getTemplatePath('home/recommended/action/views/tile.html')
+        };
+    }
+
+    /**
+     * @ngdoc directive
+     * @name origin-components.directives:originHomeRecommendedActionNewreleased
+     * @restrict E
+     * @element ANY
+     * @param {LocalizedString} gamename the name of the game, if not passed it will use the name from catalog
+     * @param {LocalizedString} subtitle the subtitle for the tile
+     * @param {string} offerid the offerid of the game you want to interact with
+     * @param {OcdPath} ocd-path the ocd path of the game you want to interact with
+     * @param {ImageUrl} discover-tile-image tile image 1000x250
+     * @param {string} discover-tile-color the background color
+     * @param {LocalizedString} section-title the text to show in the area title
+     * @param {LocalizedString} description the description string
+     * @param {LocalizedString} section-subtitle the text to show in the area subtitle
+     *
+     * @scope
+     *
+     *
+     * @description
+     *
+     * newly released recommended next action tile
+     *
+     *
+     * @example
+     * <example module="origin-components">
+     *     <file name="index.html">
+     *         <origin-home-recommended-action-newreleased image="https://qa.www.assets.cms.origin.com/content/dam/originx/web/app/home/actions/tile_masseffect3_long.png" offerid="OFB-EAST:57198"></origin-home-recommended-action-newreleased>
+     *     </file>
+     * </example>
+     *
+     */
+    angular.module('origin-components')
+        .controller('OriginHomeRecommendedActionNewreleasedCtrl', OriginHomeRecommendedActionNewreleasedCtrl)
+        .directive('originHomeRecommendedActionNewreleased', originHomeRecommendedActionNewreleased);
+}());

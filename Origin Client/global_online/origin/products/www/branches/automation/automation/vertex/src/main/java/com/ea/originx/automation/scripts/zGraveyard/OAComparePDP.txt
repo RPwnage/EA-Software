@@ -1,0 +1,423 @@
+package com.ea.originx.automation.scripts.tools;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.helpers.csv.OriginEntitlementHelper;
+import com.ea.originx.automation.lib.helpers.csv.OriginEntitlementReader;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.pageobjects.dialog.DisconnectOriginServiceDialog;
+import com.ea.originx.automation.lib.resources.AccountTags;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.net.helpers.CrsHelper;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroDescription;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroPackartRating;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroBackground;
+import com.ea.vx.originclient.resources.OSInfo;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+import java.util.List;
+
+/**
+ * To compare two PDP between two environments
+ *
+ * @author nvarthakavi
+ */
+public class OAComparePDP extends EAXVxTestTemplate {
+
+    public void testComparePDP(ITestContext context, boolean isSubscriber) throws Exception {
+
+        // Get the report id and the current test-result-id to get the index number to load the corresponding PDP
+        String reportID = CrsHelper.getReportId();
+        String testCaseName = "";
+
+        final OriginClient client1 = OriginClientFactory.create(context);
+        final OriginClient client2 = OriginClientFactory.create(context);
+
+        final UserAccount userAccount;
+
+        final String sandbox_address_1 = OSInfo.getXURL("SANDBOX_ADDRESS");
+        final String sandbox_address_2 = OSInfo.getXURL("SANDBOX_ADDRESS_2","/can/en-us","");
+
+        if (isSubscriber) {
+            userAccount = AccountManagerHelper.getTaggedUserAccount(AccountTags.TEST_PDP_SUBSCRIBER);
+            testCaseName = "com.ea.originx.automation.scripts.tools.parameterized.OAComparePDPSubscriber";
+        } else {
+            userAccount = AccountManagerHelper.getTaggedUserAccount(AccountTags.TEST_PDP_NON_SUBSCRIBER);
+            testCaseName = "com.ea.originx.automation.scripts.tools.parameterized.OAComparePDPNonSubscriber";
+        }
+
+        // Get the TestCase Id from the testcase Name
+        int testCaseID = CrsHelper.getTestCaseId(testCaseName);
+        int index = CrsHelper.getTestResultId(reportID,testCaseID,false) - CrsHelper.getTestResultId(reportID,testCaseID);
+        OriginEntitlementHelper entitlementInfo = OriginEntitlementReader.getEntitlementInfo(index);
+
+        // To get the corresponding row details from the csv file
+        String partialPDPUrl = entitlementInfo.getEntitlementPartialPDPUrl();
+        String entitlementName = entitlementInfo.getEntitlementName();
+        String offerId = entitlementInfo.getEntitlementOfferId();
+
+        final WebDriver driver1 = startClientObject(context, client1);
+        final WebDriver driver2 = startClientObject(context, client2);
+
+        driver1.get(sandbox_address_1);
+        driver2.get(sandbox_address_2);
+
+        logFlowPoint("Launch and login as " + userAccount.getUsername() + " in two browsers with " + sandbox_address_1 + " and " + sandbox_address_2); //1
+        logFlowPoint("Navigate to the " + entitlementName + " PDP page - " + partialPDPUrl + " in both urls");//2
+        logFlowPoint("Verify the entitlement names is displayed and matches"); //3
+        logFlowPoint("Verify the packArt is displayed and matches"); //4
+        logFlowPoint("Verify the description is displayed and text matches"); //5
+        logFlowPoint("Verify the 'Game Rating' is displayed and matches"); //6
+        logFlowPoint("Verify the edition list is displayed and the item texts matches"); //7
+        logFlowPoint("Verify the platform icons is displayed and the icon count matches"); //8
+        logFlowPoint("Verify the 'You Can Also Purchase' link is displayed and matches"); //9
+        logFlowPoint("Verify the 'Buy' button and price is displayed and matches"); //10
+        logFlowPoint("Verify the 'Purchase as a Gift' button is displayed and matches"); //11
+        logFlowPoint("Verify the 'Add to Game Library'/'Get it Free'/'Play on Origin'/'Install Origin & Play' button is displayed and matches"); //12
+        logFlowPoint("Verify the 'Play Now with access' button is displayed and matches"); //13
+        logFlowPoint("Verify the 'Get Trial' button is displayed and matches"); //14
+        logFlowPoint("Verify the 'Try Demo' button is displayed and matches"); //15
+        logFlowPoint("Verify the 'Origin Access Discount Applied' text is displayed and matches");// 16
+        logFlowPoint("Verify the ToC or EULA is displayed and matches"); //17
+        logFlowPoint("Verify the product status is displayed and matches"); //18
+        logFlowPoint("Verify the vault up sell status is displayed and matches"); //19
+        logFlowPoint("Verify the 'Play the Trial' button is displayed and matches"); //20
+        logFlowPoint("Verify the 'Download Trial' button is displayed and matches"); //21
+        logFlowPoint("Verify the 'is On Wishlist' message exists: "); //22		
+        logFlowPoint("Verify the Key Beat is displayed and matches"); //23
+        logFlowPoint("Verify the Background Image is displayed and the 'Video-Id' matches if exists"); //24
+
+        //1
+        boolean isLogin1 = MacroLogin.startLogin(driver1, userAccount);
+        boolean isLogin2 = MacroLogin.startLogin(driver2, userAccount);
+        if (isLogin1 && isLogin2) {
+            logPass("Logged in successfully as " + userAccount + " in " + sandbox_address_1 + " url and " + sandbox_address_2 + " url");
+        } else {
+            logFailExit("Could not login successfully in " + sandbox_address_1 + " url or " + sandbox_address_2 + " url");
+        }
+
+        //2
+        boolean loadPDP1 = MacroPDP.loadPdpPage(driver1, entitlementName, offerId, partialPDPUrl + "?");
+        boolean loadPDP2 = MacroPDP.loadPdpPage(driver2, entitlementName, offerId, partialPDPUrl + "?");
+        if (loadPDP1 && loadPDP2) {
+            logPass("Successfully navigated to the PDP page of " + entitlementName);
+        } else {
+            logFailExit("Could not navigate to the PDP page of " + entitlementName);
+        }
+
+        // As when we open two different browsers logged in with same user, the origin opens this dialog
+        // We need to close this dialog to continue the verification of PDPs
+        DisconnectOriginServiceDialog disconnectOriginServiceDialog1 = new DisconnectOriginServiceDialog(driver1);
+        DisconnectOriginServiceDialog disconnectOriginServiceDialog2 = new DisconnectOriginServiceDialog(driver2);
+        if (disconnectOriginServiceDialog1.waitIsVisible()) {
+            disconnectOriginServiceDialog1.clickCloseCircle();
+        }
+        if (disconnectOriginServiceDialog2.waitIsVisible()) {
+            disconnectOriginServiceDialog2.clickCloseCircle();
+        }
+
+        //3
+        PDPHeroDescription pdpHeroDescription1 = new PDPHeroDescription(driver1);
+        PDPHeroDescription pdpHeroDescription2 = new PDPHeroDescription(driver2);
+        boolean entitlementNameVisible1 = pdpHeroDescription1.verifyGameTitleVisible();
+        boolean entitlementNameVisible2 = pdpHeroDescription2.verifyGameTitleVisible();
+        boolean entitlementName1 = pdpHeroDescription1.verifyGameTitle(entitlementName);
+        boolean entitlementName2 = pdpHeroDescription2.verifyGameTitle(entitlementName);
+        boolean isEntitlementNameVisible = entitlementNameVisible1 == entitlementNameVisible2;
+        boolean isEntitlementName = entitlementName1 == entitlementName2;
+        if (isEntitlementName && isEntitlementNameVisible) {
+            logPass("The entitlement name is visible: " + isEntitlementNameVisible + " and the text matches: " + isEntitlementName);
+        } else {
+            logFail("Either the entitlement name is not visible: " + isEntitlementNameVisible + " or the text doesn't match:" + isEntitlementName);
+        }
+
+        //4
+        PDPHeroPackartRating pdpHeroPackartRating1 = new PDPHeroPackartRating(driver1);
+        PDPHeroPackartRating pdpHeroPackartRating2 = new PDPHeroPackartRating(driver2);
+        boolean isPackArtVisible1 = pdpHeroPackartRating1.verifyPackArtVisible();
+        boolean isPackArtVisible2 = pdpHeroPackartRating2.verifyPackArtVisible();
+        String packArtName1 = pdpHeroPackartRating1.getPDPHeroPackArtSrc();
+        String packArtName2 = pdpHeroPackartRating2.getPDPHeroPackArtSrc();
+        boolean isPackArtName = packArtName1.equals(packArtName2);
+        boolean isPackArtVisible = isPackArtVisible1 == isPackArtVisible2;
+        if (isPackArtVisible && isPackArtName) {
+            logPass("The packArt is visible: " + isPackArtVisible + " and matches: " + isPackArtName);
+        } else {
+            logFail("Either the packArt is not visible(" + isPackArtVisible + ") or the src link(" + isPackArtName + ") does not match");
+        }
+
+        //5
+        boolean isDescriptionVisible1 = pdpHeroDescription1.isDescriptionVisible();
+        boolean isDescriptionVisible2 = pdpHeroDescription2.isDescriptionVisible();
+        String description1 = pdpHeroDescription1.getDescription();
+        String description2 = pdpHeroDescription2.getDescription();
+        boolean isDescription = description1.equals(description2);
+        boolean isDescriptionVisible = isDescriptionVisible1 == isDescriptionVisible2;
+        if (isDescription && isDescriptionVisible) {
+            logPass("The description is visible: " + isDescriptionVisible + " and matches: " + isDescription);
+        } else {
+            logFail("Either the description is not visible(" + isDescriptionVisible + ") or the description text(" + isDescription + ") does not match");
+        }
+
+        //6
+        boolean isGameRatingVisible1 = pdpHeroPackartRating1.verifyPDPHeroGameRatingVisible();
+        boolean isGameRatingVisible2 = pdpHeroPackartRating2.verifyPDPHeroGameRatingVisible();
+        String gameRating1 = pdpHeroPackartRating1.getPDPHeroGameRating();
+        String gameRating2 = pdpHeroPackartRating2.getPDPHeroGameRating();
+        boolean isGameRating = gameRating1.equals(gameRating2);
+        boolean isGameRatingVisible = isGameRatingVisible1 == isGameRatingVisible2;
+        if (isGameRating && isGameRatingVisible) {
+            logPass("The 'Game Rating' is visible: " + isGameRatingVisible + " and matches: " + isGameRating);
+        } else {
+            logFail("Either the 'Game Rating' is not visible(" + isGameRatingVisible + ") or the 'Game Rating'(" + isGameRating + ") does not match");
+        }
+
+        //7
+        boolean isEditionVisible1 = pdpHeroDescription1.verifyEditionsVisible();
+        boolean isEditionVisible2 = pdpHeroDescription2.verifyEditionsVisible();
+        List<String> editions1 = pdpHeroDescription1.getEditionsTexts();
+        List<String> editions2 = pdpHeroDescription2.getEditionsTexts();
+        boolean isEdition = editions1.equals(editions2);
+        boolean isEditionVisible = isEditionVisible1 == isEditionVisible2;
+        if (isEdition && isEditionVisible) {
+            logPass("The edition list is visible: " + isEditionVisible + " and text matches: " + isEdition);
+        } else {
+            logFail("Either the edition list is not visible(" + isEditionVisible + ") or the edition list text(" + isEdition + ") does not match");
+        }
+
+        //8
+        boolean isPlatformVisible1 = pdpHeroDescription1.verifyPlatformIconVisible();
+        boolean isPlatformVisible2 = pdpHeroDescription2.verifyPlatformIconVisible();
+        int platformsCount1 = pdpHeroDescription1.getPlatformIconCount();
+        int platformsCount2 = pdpHeroDescription2.getPlatformIconCount();
+        boolean isPlatform = platformsCount1 == platformsCount2;
+        boolean isPlatformVisible = isPlatformVisible1 == isPlatformVisible2;
+        if (isPlatform && isPlatformVisible) {
+            logPass("The platform list is visible: " + isPlatformVisible + " and the icon counts matches: " + isPlatform);
+        } else {
+            logFail("Either the platform list is not visible(" + isPlatformVisible + ") or the platform icon counts(" + isPlatform + ") does not match");
+        }
+
+        //9
+        PDPHeroActionCTA pdpHeroActionCTA1 = new PDPHeroActionCTA(driver1);
+        PDPHeroActionCTA pdpHeroActionCTA2 = new PDPHeroActionCTA(driver2);
+        boolean isYouCanAlsoPurchaseLinkVisible1 = pdpHeroActionCTA1.verifyYouCanPurchaseLinkVisible();
+        boolean isYouCanAlsoPurchaseLinkVisible2 = pdpHeroActionCTA2.verifyYouCanPurchaseLinkVisible();
+        boolean isYouCanAlsoPurchaseLinkVisible = isYouCanAlsoPurchaseLinkVisible1 == isYouCanAlsoPurchaseLinkVisible2;
+        // Need to click the You can also purchase link to view the buy buttons for a subscriber
+        if (isYouCanAlsoPurchaseLinkVisible1) {
+            pdpHeroActionCTA1.clickYouCanPurchaseLink();
+        }
+        if (isYouCanAlsoPurchaseLinkVisible2) {
+            pdpHeroActionCTA2.clickYouCanPurchaseLink();
+        }
+        if (isYouCanAlsoPurchaseLinkVisible) {
+            logPass("The 'You Can Also Purchase' link is visible: " + isYouCanAlsoPurchaseLinkVisible);
+        } else {
+            logFail("The 'You Can Also Purchase' link is not visible(" + isYouCanAlsoPurchaseLinkVisible);
+        }
+
+        //10
+        boolean isBuyButtonVisible1 = pdpHeroActionCTA1.isBuyButtonVisible();
+        boolean isBuyButtonVisible2 = pdpHeroActionCTA2.isBuyButtonVisible();
+        String buyButtonText1 = pdpHeroActionCTA1.getBuyButtonText();
+        String buyButtonText2 = pdpHeroActionCTA2.getBuyButtonText();
+        boolean isBuyButtonText = buyButtonText1.equals(buyButtonText2);
+        boolean isBuyButtonVisible = isBuyButtonVisible1 == isBuyButtonVisible2;
+        if (isBuyButtonText && isPlatformVisible) {
+            logPass("The 'Buy' button is visible: " + isBuyButtonVisible + " and text matches: " + isBuyButtonText);
+        } else {
+            logFail("Either the 'Buy' button is not visible(" + isBuyButtonVisible + ") or the text(" + isBuyButtonText + ") does not match");
+        }
+
+        //11
+        boolean isPurchaseAsGiftButtonVisible1 = pdpHeroActionCTA1.verifyBuyAsGiftButtonVisible();
+        boolean isPurchaseAsGiftButtonVisible2 = pdpHeroActionCTA2.verifyBuyAsGiftButtonVisible();
+        String purchaseAsGift1 = pdpHeroActionCTA1.getBuyAsGiftButtonText();
+        String purchaseAsGift2 = pdpHeroActionCTA2.getBuyAsGiftButtonText();
+        boolean isPurchaseAsGift = purchaseAsGift1.equals(purchaseAsGift2);
+        boolean isPurchaseAsGiftButtonVisible = isPurchaseAsGiftButtonVisible1 == isPurchaseAsGiftButtonVisible2;
+        if (isPurchaseAsGift && isPurchaseAsGiftButtonVisible) {
+            logPass("The 'Purchase as Gift' button is visible: " + isPurchaseAsGiftButtonVisible + " and text matches: " + isPurchaseAsGift);
+        } else {
+            logFail("Either the 'Purchase as Gift' button is not visible(" + isPurchaseAsGiftButtonVisible + ") or text (" + isPurchaseAsGift + ") does not match");
+        }
+
+        //12
+        boolean isDirectAcquisitionButtonVisible1 = pdpHeroActionCTA1.verifyDirectAcquisitionButtonVisible();
+        boolean isDirectAcquisitionButtonVisible2 = pdpHeroActionCTA2.verifyDirectAcquisitionButtonVisible();
+        String directAcquisitionButton1 = pdpHeroActionCTA1.getDirectAcquisitionButtonText();
+        String directAcquisitionButton2 = pdpHeroActionCTA2.getDirectAcquisitionButtonText();
+        boolean isDirectAcquisitionButton = directAcquisitionButton1.equals(directAcquisitionButton2);
+        boolean isDirectAcquisitionButtonVisible = isDirectAcquisitionButtonVisible1 == isDirectAcquisitionButtonVisible2;
+        if (isDirectAcquisitionButton && isDirectAcquisitionButtonVisible) {
+            logPass("The direct acquisition button is visible: " + isDirectAcquisitionButtonVisible + " and text(" + directAcquisitionButton1 + ") matches: " + isDirectAcquisitionButton);
+        } else {
+            logFail("Either the direct acquisition button is not visible(" + isDirectAcquisitionButtonVisible + ") or text(text1:" + directAcquisitionButton1 + "="
+                    + "text2:" + directAcquisitionButton2 + "=" + isDirectAcquisitionButton + ") does not match");
+        }
+
+        //13
+        boolean isPlayNowAccessButtonVisible1 = pdpHeroActionCTA1.verifyPlayNowAccessVisible();
+        boolean isPlayNowAccessButtonVisible2 = pdpHeroActionCTA2.verifyPlayNowAccessVisible();
+        String playNowAccessButton1 = pdpHeroActionCTA1.getPlayNowAccessText();
+        String playNowAccessButton2 = pdpHeroActionCTA2.getPlayNowAccessText();
+        boolean isPlayNowAccessButton = playNowAccessButton1.equals(playNowAccessButton2);
+        boolean isPlayNowAccessButtonVisible = isPlayNowAccessButtonVisible1 == isPlayNowAccessButtonVisible2;
+        if (isPlayNowAccessButton && isPlayNowAccessButtonVisible) {
+            logPass("The 'Play Now with Access' button is visible: " + isPlayNowAccessButtonVisible + " and text matches: " + isPlayNowAccessButton);
+        } else {
+            logFail("Either the 'Play Now with Access' button is not visible(" + isPlayNowAccessButtonVisible + ") or text (" + isPlayNowAccessButton + ") does not match");
+        }
+
+        //14
+        boolean isGetTrialButtonVisible1 = pdpHeroActionCTA1.verifyGetTrialButtonVisible();
+        boolean isGetTrialButtonVisible2 = pdpHeroActionCTA2.verifyGetTrialButtonVisible();
+        boolean isGetTrialButtonVisible = isGetTrialButtonVisible1 == isGetTrialButtonVisible2;
+        if (isGetTrialButtonVisible) {
+            logPass("The 'Get Trial' button is visible: " + isGetTrialButtonVisible);
+        } else {
+            logFail("Either the 'Get Trial' button is not visible(" + isGetTrialButtonVisible + ")");
+        }
+
+        //15
+        boolean isTryDemoButtonVisible1 = pdpHeroActionCTA1.verifyTryDemoButtonVisible();
+        boolean isTryDemoButtonVisible2 = pdpHeroActionCTA2.verifyTryDemoButtonVisible();
+        boolean isTryDemoButtonVisible = isTryDemoButtonVisible1 == isTryDemoButtonVisible2;
+        if (isTryDemoButtonVisible) {
+            logPass("The 'Try Demo' button is visible: " + isTryDemoButtonVisible);
+        } else {
+            logFail("Either the 'Try Demo' button is not visible(" + isTryDemoButtonVisible + ")");
+        }
+
+        //16
+        PDPHeroActionDescriptors pdpHeroDescriptors1 = new PDPHeroActionDescriptors(driver1);
+        PDPHeroActionDescriptors pdpHeroDescriptors2 = new PDPHeroActionDescriptors(driver2);
+        boolean isAccessDiscountVisible1 = pdpHeroDescriptors1.verifyOriginAccessDiscountIsVisible();
+        boolean isAccessDiscountVisible2 = pdpHeroDescriptors2.verifyOriginAccessDiscountIsVisible();
+        boolean isAccessDiscountVisible = isAccessDiscountVisible1 == isAccessDiscountVisible2;
+        if (isAccessDiscountVisible) {
+            logPass("The 'Origin Access Discount Applied' button is visible: " + isAccessDiscountVisible);
+        } else {
+            logFail("Either the 'Origin Access Discount Applied' button is not visible: " + isAccessDiscountVisible);
+        }
+
+        //17
+        boolean isToCVisible1 = pdpHeroDescriptors1.verifyTermsAndConditionsLinkText();
+        boolean isToCVisible2 = pdpHeroDescriptors2.verifyTermsAndConditionsLinkText();
+        boolean isEULAVisible1 = pdpHeroDescriptors1.verifyEULALinkText();
+        boolean isEULAVisible2 = pdpHeroDescriptors2.verifyEULALinkText();
+        boolean isTOC = isToCVisible1 == isToCVisible2;
+        boolean isEULA = isEULAVisible1 == isEULAVisible2;
+        if (isTOC && isEULA) {
+            logPass("The 'ToC': " + isToCVisible1 + " and 'EULA' " + isEULAVisible1 + " links are visible");
+        } else {
+            logFail("Either the 'ToC' link is not visible(" + isTOC + ") or 'EULA' link (" + isEULA + ") is not visible");
+        }
+
+        //18
+        boolean isOGDLinkVisible1 = pdpHeroDescriptors1.verifyOGDLinkVisible();
+        boolean isOGDLinkVisible2 = pdpHeroDescriptors2.verifyOGDLinkVisible();
+        String isProductStatusMessage1 = pdpHeroDescriptors1.getProductStatusMessage();
+        String isProductStatusMessage2 = pdpHeroDescriptors2.getProductStatusMessage();
+        boolean isProductStatusMessage = isProductStatusMessage1.equals(isProductStatusMessage2);
+        boolean isOGDLinkVisible = isOGDLinkVisible1 == isOGDLinkVisible2;
+        if (isProductStatusMessage && isOGDLinkVisible) {
+            logPass("The product status message text matches: " + isProductStatusMessage + " and the OGD link is visible : " + isOGDLinkVisible);
+        } else {
+            logFail("Either the product status message text does not match: (" + isProductStatusMessage + ") or the OGD link is not visible: (" + isOGDLinkVisible + ")");
+        }
+
+        //19
+        boolean isUpSellHeader1 = pdpHeroDescriptors1.verifyProductPartOfOriginAccessVisible();
+        boolean isUpSellHeader2 = pdpHeroDescriptors2.verifyProductPartOfOriginAccessVisible();
+        boolean isUpSellDescription1 = pdpHeroDescriptors1.verifyProductDescriptionOfOriginAccessVisible();
+        boolean isUpSellDescription2 = pdpHeroDescriptors2.verifyProductDescriptionOfOriginAccessVisible();
+        boolean isLearnMoreLink1 = pdpHeroDescriptors1.verifyOriginAccessLearnMoreLinkVisible();
+        boolean isLearnMoreLink2 = pdpHeroDescriptors2.verifyOriginAccessLearnMoreLinkVisible();
+        boolean isUpgradeNowLink1 = pdpHeroDescriptors1.verifyOriginAccessUpgradeNowLinkVisible();
+        boolean isUpgradeNowLink2 = pdpHeroDescriptors2.verifyOriginAccessUpgradeNowLinkVisible();
+        boolean isGetItNowLink1 = pdpHeroDescriptors1.verifyOriginAccessGetItNowLinkVisible();
+        boolean isGetItNowLink2 = pdpHeroDescriptors2.verifyOriginAccessGetItNowLinkVisible();
+        boolean isUpSellHeader = isUpSellHeader1 == isUpSellHeader2;
+        boolean isUpSellDescription = isUpSellDescription1 == isUpSellDescription2;
+        boolean isLearnMoreLink = isLearnMoreLink1 == isLearnMoreLink2;
+        boolean isUpgradeNowLink = isUpgradeNowLink1 == isUpgradeNowLink2;
+        boolean isGetItNowLink = isGetItNowLink1 == isGetItNowLink2;
+        if (isUpSellHeader && isUpSellDescription && isLearnMoreLink && isUpgradeNowLink && isGetItNowLink) {
+            logPass("The vault up sell header(" + isUpSellHeader + "),description(" + isUpSellDescription + ") and links(" + isLearnMoreLink + "," + isUpgradeNowLink + "," + isGetItNowLink + ") are displayed");
+        } else {
+            logFail("Either the vault up sell header(" + isUpSellHeader + "),description(" + isUpSellDescription + ") or links(" + isLearnMoreLink + "," + isUpgradeNowLink + "," + isGetItNowLink + ") are not displayed");
+        }
+
+        //20
+        boolean isPlayTheTrialButtonVisible1 = pdpHeroActionCTA1.verifyPlayTheTrialButtonVisible();
+        boolean isPlayTheTrialButtonVisible2 = pdpHeroActionCTA2.verifyPlayTheTrialButtonVisible();
+        boolean isPlayTheTrialButtonVisible = isPlayTheTrialButtonVisible1 == isPlayTheTrialButtonVisible2;
+        if (isPlayTheTrialButtonVisible) {
+            logPass("The 'Play the Trial' button is visible: " + isPlayTheTrialButtonVisible);
+        } else {
+            logFail("Either the 'Play the Trial' button is not visible(" + isPlayTheTrialButtonVisible + ")");
+        }
+
+        //21
+        boolean isDownloadTrialButtonVisible1 = pdpHeroActionCTA1.verifyDownloadTrialButtonVisible();
+        boolean isDownloadTrialButtonVisible2 = pdpHeroActionCTA2.verifyDownloadTrialButtonVisible();
+        boolean isDownloadTrialButtonVisible = isDownloadTrialButtonVisible1 == isDownloadTrialButtonVisible2;
+        if (isPlayTheTrialButtonVisible) {
+            logPass("The 'Download Trial' button is visible: " + isDownloadTrialButtonVisible);
+        } else {
+            logFail("Either the 'Download Trial' button is not visible(" + isDownloadTrialButtonVisible + ")");
+        }
+
+        //22
+        boolean isOnWishlist1 = pdpHeroDescriptors1.isOnWishlist(entitlementName);
+        boolean isOnWishlist2 = pdpHeroDescriptors2.isOnWishlist(entitlementName);
+        boolean isOnWishlist = isOnWishlist1 == isOnWishlist2;
+        if (isOnWishlist) {
+            logPass("The 'is On Wishlist' message exists: " + isOnWishlist);
+        } else {
+            logFail("The 'is On Wishlist' message does not exist: " + isOnWishlist);
+        }
+
+        //23
+        boolean isKeyBeatsVisible1 = pdpHeroDescription1.verifyKeyBeatsMessageVisible();
+        boolean isKeyBeatsVisible2 = pdpHeroDescription2.verifyKeyBeatsMessageVisible();
+        String isKeyBeatsMatches1 = pdpHeroDescription1.getKeyBeatsMessage();
+        String isKeyBeatsMatches2 = pdpHeroDescription2.getKeyBeatsMessage();
+        boolean isKeyBeatsMatches = isKeyBeatsMatches1.equals(isKeyBeatsMatches2);
+        boolean isKeyBeatsVisible = isKeyBeatsVisible1 == isKeyBeatsVisible2;
+        if (isKeyBeatsMatches && isKeyBeatsVisible1) {
+            logPass("The key beat message text matches: " + isKeyBeatsMatches + " and the message is visible : " + isKeyBeatsVisible);
+        } else {
+            logFail("Either key beat message text does not match: (" + isKeyBeatsMatches + ") or the message is not visible: (" + isKeyBeatsVisible + ")");
+        }
+
+        //24
+        PDPHeroBackground pdpHeroBackground1 = new PDPHeroBackground(driver1);
+        PDPHeroBackground pdpHeroBackground2 = new PDPHeroBackground(driver2);
+        boolean isHeroBackgroundVisible1 = pdpHeroBackground1.verifyHeroBackgroundVisible();
+        boolean isHeroBackgroundVisible2 = pdpHeroBackground2.verifyHeroBackgroundVisible();
+        String isHeroBackgroundVideoIDMatches1 = pdpHeroBackground1.getVideoID();
+        String isHeroBackgroundVideoIDMatches2 = pdpHeroBackground2.getVideoID();
+        boolean isHeroBackgroundVisible = isHeroBackgroundVisible1 == isHeroBackgroundVisible2;
+        boolean isHeroBackgroundVideoIDMatches = isHeroBackgroundVideoIDMatches1.equals(isHeroBackgroundVideoIDMatches2);
+        if (isHeroBackgroundVisible && isHeroBackgroundVideoIDMatches) {
+            logPass("The hero background is visible: " + isHeroBackgroundVisible + " and the video id matches if exists: " + isHeroBackgroundVideoIDMatches);
+        } else {
+            logFail("Either hero background is not visible: (" + isHeroBackgroundVisible + ") or the video id doesn't match if exists: (" + isHeroBackgroundVideoIDMatches + ")");
+        }
+
+        driver1.close();
+        driver2.close();
+
+        softAssertAll();
+
+    }
+}

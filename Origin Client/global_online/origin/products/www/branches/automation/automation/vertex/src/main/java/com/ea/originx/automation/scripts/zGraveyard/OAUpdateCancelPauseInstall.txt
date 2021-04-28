@@ -1,0 +1,177 @@
+package com.ea.originx.automation.scripts.zGraveyard;
+
+import com.ea.originx.automation.lib.helpers.EACoreHelper;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.vx.originclient.utils.SystemUtilities;
+import com.ea.vx.originclient.resources.EACore;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.settings.AppSettings;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.utils.Waits;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests that an update installation cannot be canceled or paused
+ *
+ * @author lscholte
+ */
+public class OAUpdateCancelPauseInstall extends EAXVxTestTemplate {
+
+    @Test(groups = {"gamelibrary", "client_only", "full_regression", "int_only"})
+    public void testUpdateCancelPauseInstall(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.PI);
+        String entitlementName = entitlement.getName();
+        String entitlementOfferId = entitlement.getOfferId();
+
+        UserAccount user = AccountManager.getEntitledUserAccount(entitlement);
+        final String username = user.getUsername();
+
+        logFlowPoint("Add an EACore override to download an earlier version of " + entitlementName); //1
+        logFlowPoint("Log into Origin as " + username); //2
+        logFlowPoint("Navigate to the 'Game Library' page"); //3
+        logFlowPoint("Download and install " + entitlementName); //4
+        logFlowPoint("Navigate to the 'Application Settings' page"); //5
+        logFlowPoint("Disable the 'Automatic game updates' setting"); //6
+        logFlowPoint("Exit the Origin client"); //7
+        logFlowPoint("Remove the EACore override to download an earlier version of " + entitlementName); //8
+        logFlowPoint("Log back into Origin as " + username); //9
+        logFlowPoint("Navigate to the 'Game Library' page"); //10
+        logFlowPoint("Update " + entitlementName); //11
+        logFlowPoint("Wait for the update to start installing"); //12
+        logFlowPoint("Verify that the update installation cannot be paused or cancelled"); //13
+
+        //1
+        boolean eaCoreOverrideAdded = EACoreHelper.changeToBaseEntitlementPIOverride(client.getEACore());
+        if (eaCoreOverrideAdded) {
+            logPass("Successfully added the the EACore override for " + entitlementName);
+        } else {
+            logFailExit("Failed to add the EACore override for " + entitlementName);
+        }
+
+        //2
+        WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, user)) {
+            logPass("Successfully logged into Origin with the user.");
+        } else {
+            logFailExit("Could not log into Origin with the user.");
+        }
+
+        //3
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        GameLibrary gameLibrary = navBar.gotoGameLibrary();
+        if (gameLibrary.verifyGameLibraryPageReached()) {
+            logPass("Successfully navigated to the 'Game Library' page");
+        } else {
+            logFailExit("Failed to navigate to the 'Game Library' page");
+        }
+
+        //4
+        boolean downloaded = MacroGameLibrary.downloadFullEntitlement(driver, entitlementOfferId);
+        if (downloaded) {
+            logPass("Successfully downloaded and installed " + entitlementName);
+        } else {
+            logFailExit("Failed to download and/or install " + entitlementName);
+        }
+
+        //5
+        MainMenu mainMenu = new MainMenu(driver);
+        AppSettings appSettings = mainMenu.selectApplicationSettings();
+        if (appSettings.verifyAppSettingsReached()) {
+            logPass("Successfully navigated to the application settings page");
+        } else {
+            logFailExit("Failed to navigate to the application settings page");
+        }
+
+        //6
+        appSettings.setKeepGamesUpToDate(false);
+        boolean keepGamesUpToDate = Waits.pollingWait(() -> appSettings.verifyKeepGamesUpToDate(false));
+        if (keepGamesUpToDate) {
+            logPass("Successfully disabled the 'Automatic game updates' setting");
+        } else {
+            logFailExit("Failed to disable the 'Automatic game updates' setting");
+        }
+
+        //7
+        mainMenu.selectExit();
+        boolean clientExited = Waits.pollingWaitEx(() -> !ProcessUtil.isProcessRunning(client, "Origin.exe"));
+        if (clientExited) {
+            logPass("Successfully exited the Origin client");
+        } else {
+            logFailExit("Failed to exit the Origin client");
+        }
+
+        //8
+        boolean eaCoreModified = client.getEACore().deleteEACoreValue(EACore.EACORE_CONNECTION_SECTION,
+                EACore.EACORE_BUILD_IDENTIFIER_OVERRIDE + entitlementOfferId);
+        if (eaCoreModified) {
+            logPass("Successfully removed the the EACore override for " + entitlementName + " and added an update override");
+        } else {
+            logFailExit("Failed to remove the EACore override for " + entitlementName + " and add an update override");
+        }
+
+        //9
+        client.stop();
+        driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, user)) {
+            logPass("Successfully logged into Origin with the user.");
+        } else {
+            logFailExit("Could not log into Origin with the user.");
+        }
+
+        //10
+        navBar = new NavigationSidebar(driver);
+        gameLibrary = navBar.gotoGameLibrary();
+        if (gameLibrary.verifyGameLibraryPageReached()) {
+            logPass("Successfully navigated to the 'Game Library' page");
+        } else {
+            logFailExit("Failed to navigate to the 'Game Library' page");
+        }
+
+        //11
+        GameTile gameTile = new GameTile(driver, entitlementOfferId);
+        gameTile.updateGame();
+        boolean isUpdating = Waits.pollingWait(() -> gameTile.isUpdating());
+        if (isUpdating) {
+            logPass("The entitlement " + entitlementName + " has started updating");
+        } else {
+            logFailExit("The entitlement " + entitlementName + " failed to start updating");
+        }
+
+        //12
+        boolean isInstalling = Waits.pollingWait(() -> gameTile.isInstalling(),
+                300000, 2000, 0); //Wait up to 5 minutes for game to start installing
+        if (isInstalling) {
+            logPass("The update has started installing");
+        } else {
+            logFailExit("The update failed to start installing");
+        }
+
+        //13
+        boolean cancelInstallDisabled = gameTile.verifyCancelInstallDisabled();
+        boolean pauseInstallDisabled = gameTile.verifyPauseInstallDisabled();
+        if (cancelInstallDisabled && pauseInstallDisabled) {
+            logPass("Verified that the update installation cannot be cancelled or paused");
+        } else {
+            logFailExit("The update installation can be cancelled and/or paused");
+        }
+
+        softAssertAll();
+    }
+}

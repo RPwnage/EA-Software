@@ -1,0 +1,102 @@
+#!/bin/sh
+# chkconfig: 2345 90 10
+# description: Sonar VoiceEdge Server
+
+ulimit -c unlimited
+ulimit -n 999999
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+RETVAL=0
+SONARHOME=/usr/local/sonar
+prog="Sonar VoiceEdge Server"
+PID_FILE=/var/run/sonarvoiceedge.pid
+java_bin="java"
+
+function sonarpid ()
+{
+    pgrep -f 'java.*com.esn.sonar.voiceedge.VoiceEdgeServer.*'
+}
+
+function sonar_is_running ()
+{
+   sonarpid &>/dev/null
+}
+
+start() {
+       # Start daemons.
+
+       echo -n $"Starting $prog: "
+       if sonar_is_running; then
+           failure
+           echo
+           return 1
+       fi;
+
+       SONAROPTS="-Dsonar.config=/etc/sonar-voiceedge.conf -XX:+UseConcMarkSweepGC -XX:+ExplicitGCInvokesConcurrent -Xmx8G"
+       SONARJAR=$SONARHOME/bin/sonar-allinone-voiceedge.jar
+
+       daemon --user sonar "cd $SONARHOME; $java_bin $SONAROPTS -cp $SONARJAR com.esn.sonar.voiceedge.VoiceEdgeServer &>/var/log/sonar/sonarvoiceedge.log &"
+
+       usleep 1000000
+       if sonar_is_running; then
+           echo $(sonarpid) > $PID_FILE
+           success
+           echo
+           return 0
+       else
+           failure
+           echo
+           return 1
+       fi;
+}
+
+stop() {
+        echo -n $"Shutting down $prog: "
+        if sonar_is_running; then
+            echo -n "";
+        else
+            failure
+            echo
+            return 1
+        fi;
+
+        kill $(sonarpid) &>/dev/null
+        usleep 1000000
+
+        if sonar_is_running; then
+            failure
+            echo
+            return 1
+        else
+            echo "" > $PID_FILE
+            success
+            echo
+            return 0
+        fi;
+}
+
+# See how we were called.
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart)
+        stop
+        start
+        RETVAL=$?
+        ;;
+  status)
+        status -p $PID_FILE SonarVoiceEdge
+        RETVAL=$?
+        ;;
+  *)
+        echo $"Usage: $0 {start|stop|status}"
+        exit 1
+esac
+
+exit $RETVAL

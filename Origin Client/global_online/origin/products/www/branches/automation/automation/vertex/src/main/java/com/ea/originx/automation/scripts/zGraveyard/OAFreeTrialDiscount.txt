@@ -1,0 +1,254 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.*;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.OriginAccessService;
+import com.ea.vx.originclient.utils.Waits;
+import com.ea.originx.automation.lib.pageobjects.account.AccountSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.account.OrderHistoryLine;
+import com.ea.originx.automation.lib.pageobjects.account.OrderHistoryPage;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessPage;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.lib.pageobjects.store.ReviewOrderPage;
+import com.ea.originx.automation.lib.pageobjects.store.ThankYouPage;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.originx.automation.lib.helpers.EmailFetcher;
+import com.ea.originx.automation.lib.helpers.StringHelper;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionCTA;
+import com.ea.vx.originclient.webdrivers.BrowserType;
+
+import javax.mail.Message;
+
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the appearance of Origin Access discount appearance for
+ * subscribers/expired subscribers
+ *
+ * @author sbentley
+ */
+public class OAFreeTrialDiscount extends EAXVxTestTemplate {
+
+    public enum ORIGIN_ACCESS {
+        SUBSCRIBER,
+        NON_SUBSCRIBER
+    }
+
+    public void testFreeTrialDiscount(ITestContext context, ORIGIN_ACCESS membership) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        EntitlementInfo entitlementOne = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_PREMIUM);
+        EntitlementInfo entitlementTwo = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.THIS_WAR_OF_MINE);
+        EntitlementInfo entitlementThree = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.STAR_WARS_BATTLEFRONT);
+
+        UserAccount newUserAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+
+        String extraText = "";
+        String extraText2 = "";
+
+        switch (membership) {
+            case NON_SUBSCRIBER:
+                extraText = "is not";
+                extraText2 = "an expired Origin Access free trial";
+                break;
+            case SUBSCRIBER:
+                extraText = "is";
+                extraText2 = "an Origin Access free trail";
+        }
+
+        logFlowPoint(String.format("Launch Origin and login as user with %s", extraText2)); //1
+        logFlowPoint(String.format("Navigate to 3 PDPs of offers that include Origin Access discount and verify user %s presented with Origin Access discount labels", extraText)); //2
+        logFlowPoint(String.format("Purchase offer and verify Origin Access discount %s applied throughout checkout", extraText));  //3
+        logFlowPoint(String.format("Navigate to My Account Order History Page and verify the invoice %s applied with Origin Access discount for the purchase of a game", extraText));   //4
+        logFlowPoint(String.format("Open the email associated to the purchase of the game and Verify the Origin Access discount %s applied", extraText));   //5
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        MacroLogin.startLogin(driver, newUserAccount);
+
+        switch (membership) {
+            case NON_SUBSCRIBER:
+
+                MacroOriginAccess.purchaseOriginAccess(driver);
+
+                OriginAccessService.immediateCancelSubscription(newUserAccount);
+
+                //Have to re-login to update membership status
+                new MiniProfile(driver).selectSignOut();
+                MacroLogin.startLogin(driver, newUserAccount);
+                OriginAccessPage originAccessPage = new NavigationSidebar(driver).gotoOriginAccessPage();
+
+                //Expired subscribers should be redirected to Vault Page when trying to go to Origin Access page
+                if (Waits.pollingWait(() -> originAccessPage.verifyPageReached())) {
+                    logPass("Successfully logged in as a user with an expired Origin Access free trial");
+                } else {
+                    logFailExit("Could no log in as a user with an expired Origin Access free trial");
+                }
+
+                break;
+
+            case SUBSCRIBER:
+
+                if (MacroOriginAccess.purchaseOriginAccess(driver)) {
+                    logPass("Successfully logged in as a user with Origin Access free trial");
+                } else {
+                    logFail("Could not log in as a user with Origin Access free trial");
+                }
+
+                break;
+        }
+
+        //2
+        boolean pdpVerificationOne
+                = membership == ORIGIN_ACCESS.SUBSCRIBER
+                ? MacroOriginAccess.checkPDPForDiscount(driver, entitlementOne, true)
+                : !MacroOriginAccess.checkPDPForDiscount(driver, entitlementOne, false);
+        boolean pdpVerificationTwo
+                = membership == ORIGIN_ACCESS.SUBSCRIBER
+                ? MacroOriginAccess.checkPDPForDiscount(driver, entitlementTwo, true)
+                : !MacroOriginAccess.checkPDPForDiscount(driver, entitlementTwo, false);
+        boolean pdpVerificationThree
+                = membership == ORIGIN_ACCESS.SUBSCRIBER
+                ? MacroOriginAccess.checkPDPForDiscount(driver, entitlementThree, true)
+                : !MacroOriginAccess.checkPDPForDiscount(driver, entitlementThree, false);
+
+        if (pdpVerificationOne && pdpVerificationTwo && pdpVerificationThree) {
+            String verification
+                    = membership == ORIGIN_ACCESS.SUBSCRIBER
+                    ? "Successfully verified Origin Acccess discount on PDPs"
+                    : "Successfully verified Origin Access discount does not appear on PDPs";
+
+            logPass(verification);
+
+        } else {
+            String verification
+                    = membership == ORIGIN_ACCESS.SUBSCRIBER
+                    ? "Could not verify Origin Access discount on PDPs"
+                    : "Origin Access discount appearing on PDPs";
+
+            logFailExit(verification);
+        }
+
+        //3
+        PDPHeroActionCTA pdpHeroCTA = new PDPHeroActionCTA(driver);
+        double pdpPrice
+                = membership == ORIGIN_ACCESS.SUBSCRIBER
+                ? pdpHeroCTA.getDiscountAmount()
+                : StringHelper.extractNumberFromText(pdpHeroCTA.getPrice());
+
+        pdpHeroCTA.clickBuyButton();
+
+        //Not using full MacroPurchase so discount can be verified on certain parts in checkout process
+        MacroPurchase.handlePaymentInfoPage(driver);
+
+        ReviewOrderPage reviewOrder = new ReviewOrderPage(driver);
+        boolean verifyReviewOrderDiscount
+                = membership == ORIGIN_ACCESS.SUBSCRIBER
+                ? reviewOrder.verifyOriginAccessDiscountIsVisible()
+                : !reviewOrder.verifyOriginAccessDiscountIsVisible();
+
+        double reviewOrderPrice = StringHelper.extractNumberFromText(reviewOrder.getPrice());
+        boolean verifyReviewOrderPrice = false;
+
+        if (reviewOrder.verifyTaxIsDisplayed()) {
+            verifyReviewOrderPrice = ((pdpPrice + StringHelper.extractNumberFromText(reviewOrder.getTax())) == reviewOrderPrice);
+
+            //Update pdpPrice since tax is included, upcoming checks will be against total amount instead of PDP amount
+            pdpPrice = reviewOrderPrice;
+
+        } else {
+            verifyReviewOrderPrice = (pdpPrice == reviewOrderPrice);
+        }
+
+        reviewOrder.clickPayNow();
+
+        //Thank you page does not have field for Origin Access discount, have to verify using price
+        boolean verifyThankYouOrder = (new ThankYouPage(driver).getTotalAmount() == pdpPrice);
+
+        if (verifyReviewOrderDiscount && verifyReviewOrderPrice && verifyThankYouOrder) {
+            String verification
+                    = membership == ORIGIN_ACCESS.SUBSCRIBER
+                    ? "Successfully verified Origin Access discount in checkout and price is consistent"
+                    : "Successfully verified no Origin Access discount and price consistency throughout checkout";
+
+            logPass(verification);
+        } else {
+            String verification
+                    = membership == ORIGIN_ACCESS.SUBSCRIBER
+                    ? "Could not verify Origin Access discount throughout checkout"
+                    : "Could not verify price consistency throughout checkout";
+
+            logFail(verification);
+        }
+
+        //4
+        //Have to wait for order to show up on EADP side (Account Pages);
+        Waits.sleep(40000);
+
+        driver = client.getAnotherBrowserWebDriver(BrowserType.CHROME);
+        AccountSettingsPage accountSettingsPage = new AccountSettingsPage(driver);
+        MacroAccount.loginToAccountPage(driver, newUserAccount);
+        accountSettingsPage.gotoOrderHistorySection();
+        OrderHistoryLine order = new OrderHistoryPage(driver).getOrderHistoryLine(1);
+        double orderPrice = StringHelper.extractNumberFromText(order.getPrice());
+        if (orderPrice == pdpPrice) {
+            String verification
+                    = membership == ORIGIN_ACCESS.SUBSCRIBER
+                    ? "Verified discounted price in Order History"
+                    : "Verified price in Order History consistent with checkout";
+            logPass(verification);
+        } else {
+            String verification
+                    = membership == ORIGIN_ACCESS.SUBSCRIBER
+                    ? "Could not verify Origin Access discount price in Order History"
+                    : "Total price in Order History is inconsistent";
+            logFail(verification);
+        }
+
+        //5
+        EmailFetcher emailFetcher = new EmailFetcher(newUserAccount.getUsername());
+        boolean emailVerification = false;
+
+        //EADPs server is inconsistent when receiving e-mails, especially on Integration
+        //So this will check every minute up to 7 minutes to see if the correct e-mail
+        //has come in and will break early when found
+        for (int i = 0; i < 7; ++i) {
+            Waits.sleepMinutes(1);
+            Message orderConfirmation = emailFetcher.getLatestEmailWithMatchingSubject(EmailFetcher.EMAIL_SUBJECT_ORDER_CONFIRMATION);
+
+            if (orderConfirmation != null) {
+                String totalPrice = emailFetcher.getTotalPriceField(orderConfirmation);
+                emailVerification = StringHelper.extractNumberFromText(totalPrice) == pdpPrice;
+                break;
+            }
+        }
+
+        if (emailVerification) {
+            String verification
+                    = membership == ORIGIN_ACCESS.SUBSCRIBER
+                    ? "Verified Origin Access Discount in E-mail"
+                    : "Verified price in Order Confirmation E-mail consistent with checkout";
+            logPass(verification);
+        } else {
+            String verification
+                    = membership == ORIGIN_ACCESS.SUBSCRIBER
+                    ? "Could not verify Origin Access Discount in E-mail"
+                    : "Could not verify price in Order Confirmation E-mail is consistent with checkout";
+            logFail(verification);
+        }
+
+        emailFetcher.closeConnection();
+
+        softAssertAll();
+    }
+}

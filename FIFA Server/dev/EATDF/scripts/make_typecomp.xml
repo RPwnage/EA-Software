@@ -1,0 +1,112 @@
+<project>
+
+  <property name="package.EATDF.typecomp.output" value="${package.EATDF.builddir}/bin/typecomp.jar"/>
+  <property name="package.EATDF.typecomp.intdir" value="${package.EATDF.builddir}/bin/typecomp"/>
+  <property name="package.EATDF.typecomp.intdir" value="@{StrReplace(${package.EATDF.typecomp.intdir}, '\\', '/')}"/>
+  
+  <createtask name="package.EATDF.buildtools.task">
+    <parameters></parameters>
+    <code>
+        <choose>
+            <do if="@{PropertyExists('nant.framework3')}">
+                <!-- For framework3, ensure task runs at most once to avoid parallel builds stepping on the same files -->
+                <do.once key="package.EATDF.buildtools.task.inner" blocking="true">
+                    <task name="package.EATDF.buildtools.task.inner" />
+                </do.once>
+            </do>
+            <do>
+                <task name="package.EATDF.buildtools.task.inner" />
+            </do>
+        </choose>
+    </code>
+  </createtask>
+  
+  <createtask name="package.EATDF.buildtools.task.inner">
+    <parameters></parameters>
+    <code>
+    <mkdir dir="${package.EATDF.typecomp.intdir}"/>
+
+    <dependent name="antlr"/>
+
+    <!-- Copy antlr.jar to the packaeg build directory so we can relativize the path 
+             This is a workaround for classpath length problems -->
+    <do unless="@{FileExists('${package.EATDF.builddir}/bin/antlr.jar')}">
+      <echo message="Copying ${package.antlr.jar} to ${package.EATDF.builddir}/bin/antlr.jar"/>
+      <copy file="${package.antlr.jar}" tofile="${package.EATDF.builddir}/bin/antlr.jar"/>
+    </do>
+
+    <property name="java-output-disabled" value="true" local="true"/>
+    <property name="java-output-disabled" value="false" local="true" if="${nant.verbose??false}"/>
+
+    <!-- Run ANTLR to convert grammars to Java source code. -->
+    <exec program="${java.exe}" clearenv="true" workingdir="${package.EATDF.dir}" silent="${java-output-disabled}">
+        <args>
+            <arg value="-cp ${package.EATDF.builddir}/bin/antlr.jar org.antlr.Tool"/>
+            <arg value="-o ${package.EATDF.typecomp.intdir}"/>
+            <arg value="${exec.inputs.all}"/>
+        </args>
+        <inputs>
+            <includes name="${package.EATDF.dir}/tool/**.g"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.EATDF.typecomp.output}" asis="true"/>
+        </outputs>
+    </exec>
+
+    <!-- Compile the Java source code. -->
+    <exec program="${java.compiler}" clearenv="true" workingdir="${package.EATDF.dir}" silent="${java-output-disabled}">
+        <args>
+            <arg value="-cp ${package.EATDF.builddir}/bin/antlr.jar"/>
+            <arg value="-d ${package.EATDF.typecomp.intdir}"/>
+            <arg value="${exec.inputs.all}"/>
+        </args>
+        <inputs>
+            <includes name="${package.EATDF.dir}/tool/**.java"/>
+            <includes name="${package.EATDF.typecomp.intdir}/**.java"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.EATDF.typecomp.output}" asis="true"/>
+        </outputs>
+    </exec>
+
+    <!-- Get a list of all the class names (sans path information). -->
+    <property name="package.EATDF.typecomp.classes" value="@{DirectoryGetFiles('${package.EATDF.typecomp.intdir}', '*.class', ' ')}"/>
+    <property name="package.EATDF.typecomp.classes" value="@{StrReplace(${package.EATDF.typecomp.classes}, '\\', '/')}"/>
+    <property name="package.EATDF.typecomp.classes" value="@{StrReplace(${package.EATDF.typecomp.classes}, '${package.EATDF.typecomp.intdir}/', '')}"/>
+
+
+    <!-- Pack all the classes into a single Java executable archive. -->
+    <exec program="${java.archiver}" clearenv="true" workingdir="${package.EATDF.typecomp.intdir}" silent="${java-output-disabled}">
+        <args>
+            <arg value="cf"/>
+            <arg value="../typecomp.jar"/>
+            <arg value="-C ."/>
+            <arg value="TdfGrammar.tokens"/>
+            <arg value="${package.EATDF.typecomp.classes}"/>
+        </args>
+        <inputs>
+            <includes name="${package.EATDF.typecomp.intdir}/*.class"/>
+        </inputs>
+        <outputs>
+            <includes name="${package.EATDF.typecomp.output}" asis="true"/>
+        </outputs>
+    </exec>
+    </code>
+  </createtask>
+
+  <target name="buildtools">
+     <task name="package.EATDF.buildtools.task" />
+  </target>
+  
+  <target name="cleantools">
+    <echo message="Cleaning Typecomp..."/>
+    <delete failonmissing="false">
+      <fileset>
+        <includes name="${package.EATDF.typecomp.output}"/>
+        <includes name="${package.EATDF.typecomp.intdir}/*.class"/>
+        <includes name="${package.EATDF.builddir}/bin/antlr.jar"/>
+      </fileset>
+    </delete>
+  </target>
+  
+</project>

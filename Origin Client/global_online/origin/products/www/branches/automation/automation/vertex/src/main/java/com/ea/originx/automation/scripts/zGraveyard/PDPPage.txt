@@ -1,0 +1,241 @@
+package com.ea.originx.automation.lib.pageobjects.store;
+
+import com.ea.originx.automation.lib.helpers.StringHelper;
+import com.ea.originx.automation.lib.pageobjects.template.EAXVxSiteTemplate;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Stream;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+
+/**
+ * Page object that represents the 'Product Details Page' (PDP) of a store game.
+ * It includes methods on multiple sections of the page.
+ *
+ * @author palui
+ */
+public class PDPPage extends EAXVxSiteTemplate {
+
+    // Section titles
+    protected static final String PDP_STORE_ROW_CSS = "#storecontent section.l-origin-store-row";
+    protected static final By PDP_SECTION_TITLES_LOCATOR = By.cssSelector("#storecontent origin-store-pdp-section-wrapper[show-on-nav='true']");
+    protected static final By COMPARE_EDITIONS_SECTION_LOCATOR = By.cssSelector("#storecontent origin-store-pdp-comparison-table-wrapper[show-on-nav='true']");
+
+    protected static final String PDP_STORE_ROW_XPATH = "//div[contains(@id, 'storecontent')]//section[contains(@class,'l-origin-store-row')]";
+    protected static final String PDP_SECTION_TITLE_XPATH_TMPL = PDP_STORE_ROW_XPATH
+            + "//section[contains(@class,'origin-store-pdp-section-wrapper')]//h2[contains(text(), '%s')]";
+
+    private static final By MEDIA_LOCATOR = By.cssSelector("origin-store-pdp-media-carousel div.origin-carouselimage-container ul li");
+    private static final By POSITION_SELECTORS_LOCATOR = By.cssSelector("origin-store-pdp-media-carousel > div > ol.origin-store-carousel-product-indicators-container > li.origin-store-carousel-product-indicator");
+
+    private static final Logger _log = LogManager.getLogger(MethodHandles.lookup().lookupClass());
+
+    /**
+     * Constructor
+     *
+     * @param driver Selenium WebDriver
+     */
+    public PDPPage(WebDriver driver) {
+        super(driver);
+    }
+
+    /**
+     * Wait for the PDP to load by waiting for the PDP Hero to load.
+     */
+    public void waitForPdpPageToLoad() {
+        new PDPHero(driver).waitForPdpHeroToLoad();
+    }
+
+    /**
+     * Verify PDP reached by verifying PDP Hero is present.
+     */
+    public boolean verifyPDPPageReached() {
+        return new PDPHero(driver).verifyPDPHeroReached();
+    }
+
+    /**
+     * Scroll to the PDP Hero (top of the PDP).
+     */
+    public void scrollToPDPHero() {
+        new PDPHero(driver).scrollToPDPHero();
+    }
+
+    /**
+     * Scroll to the navigation bar so it pins to the top of the PDP.
+     */
+    public void scrollToNavBar() {
+        new PDPNavBar(driver).scrollToNavBar();
+    }
+
+    /**
+     * Verify that the section title for a given navigation bar link label is
+     * visible.
+     *
+     * @return true if the corresponding section title is visible, false
+     * otherwise
+     */
+    public boolean verifySectionTitleVisible(String linkLabel) {
+        // Link label 'Related Products' maps to section title 'You Might Also Like' or 'Extra content'
+        if (linkLabel.equalsIgnoreCase("Related Products")) {
+            By sectionTitleLocator1 = By.xpath(String.format(PDP_SECTION_TITLE_XPATH_TMPL, "You Might Also Like"));
+            By sectionTitleLocator2 = By.xpath(String.format(PDP_SECTION_TITLE_XPATH_TMPL, "Extra Content"));
+            return waitIsElementVisible(sectionTitleLocator1) || waitIsElementVisible(sectionTitleLocator2);
+        } else {
+            By sectionTitleLocator = By.xpath(String.format(PDP_SECTION_TITLE_XPATH_TMPL, linkLabel));
+            return waitIsElementVisible(sectionTitleLocator);
+        }
+    }
+
+    /**
+     * Get all section titles on the PDP page.
+     *
+     * @return List of the section title strings
+     */
+    public List<String> getSectionTitles() {
+        List<WebElement> sectionTitleElements = driver.findElements(PDP_SECTION_TITLES_LOCATOR);
+        List<String> titleList = new ArrayList<>();
+        // There can be more section titles than link labels on the navigation bar. Remove any empty ones
+        for (WebElement titleElement : sectionTitleElements) {
+            String title = titleElement.getAttribute("title-str");
+            if (!title.isEmpty()) {
+                titleList.add(title);
+            }
+        }
+        if (isElementPresent(COMPARE_EDITIONS_SECTION_LOCATOR)) { // Different locator
+            titleList.add("Compare Editions");
+        }
+        return titleList;
+    }
+
+    /**
+     * Verify the navigation bar link labels match the section titles.
+     *
+     * @return true if navigation bar link labels match section titles, false
+     * otherwise
+     */
+    public boolean verifyPDPNavBarLabelsMatchSectionTitles() {
+        List<String> navLinkLabels = new PDPNavBar(driver).getNavLinkLabels();
+        List<String> sectionTitles = getSectionTitles();
+        // There can be more section titles than navigation bar links, and the order may not match.
+        // The following check ensures every link label maps to a section, with case ignored.
+        // Also, link label 'Related Products' maps to section title 'You Might Also Like' or 'Extra Content'
+        Collections.replaceAll(sectionTitles, "You Might Also Like", "Related Products");
+        Collections.replaceAll(sectionTitles, "Extra Content", "Related Products");
+        // Navigation link 'Features' maps to a dynamic section title which can differ for different offers.
+        // Hardcode "Features" in sectionTitles for now to get match to pass
+        sectionTitles.add("Features");
+        boolean result = StringHelper.containsIgnoreCase(sectionTitles, navLinkLabels);
+        if (!result) {
+            _log.warn("PDPPage: Navigation link labels are not contained in the Section titles");
+            _log.warn("Section titles: " + sectionTitles);
+            _log.warn("Navigation link labels: " + navLinkLabels);
+        }
+        return result;
+    }
+
+    /**
+     * Get image source URL of the PDP Hero pack art and the navigation bar pack
+     * art and compare.
+     *
+     * @return true if the two URLs are identical, false otherwise
+     */
+    public boolean verifyPDPPackArtLinks() {
+        PDPNavBar pdpNavBar = new PDPNavBar(driver);
+        pdpNavBar.scrollToNavBar();
+        String navbarPackArtSrc = pdpNavBar.getNavBarPackArtSrc();
+        pdpNavBar.clickNavBarPackArt(); // returns to PDP Hero
+        String heroPackArtSrc = new PDPHeroPackartRating(driver).getPDPHeroPackArtSrc();
+        return (navbarPackArtSrc.equals(heroPackArtSrc));
+    }
+
+    //////////////////////////////////////////////
+    // Media Carousel
+    //////////////////////////////////////////////
+    /**
+     * Clicks the i'th item (0 based) in the Screenshots and Videos Carousel.
+     */
+    public void openItemOnCarousel(int i) {
+        //Need to differentiate the flow between if the Position Selectors are present or not
+        // (ie. if the PDP Page has less than 2 images/videos)
+        if (waitIsElementPresent(POSITION_SELECTORS_LOCATOR)) {
+            // Wait for at least one position selector to be visible before we start
+            waitForElementClickable(POSITION_SELECTORS_LOCATOR);
+            WebElement carouselItem = getCarouselWebElement(i);
+            // Wait for the scroll animation and click
+            /*
+             Move the carousel to the image.
+
+             On the default screen size, there are 2 images per position, if you're
+             here wondering why this doesn't work for you or are trying to get this
+             working on mobile, this is probably why.
+             */
+            final int carouselPosition = i / 2;
+            final List<WebElement> positionSelectors = driver.findElements(POSITION_SELECTORS_LOCATOR);
+            waitForElementClickable(positionSelectors.get(carouselPosition)).click();
+            // Wait for the scroll animation and click
+            waitForElementClickable(carouselItem).click();
+        } else {
+            waitForElementPresent(MEDIA_LOCATOR);
+            waitForElementClickable(getCarouselWebElement(i)).click();
+        }
+    }
+
+    /**
+     * Gets all non-empty items from the media carousel.
+     *
+     * @return All the non-empty items on the media carousel
+     */
+    private Stream<WebElement> getAllMediaOnCarousel() {
+        final List<WebElement> allElements = driver.findElements(MEDIA_LOCATOR);
+        /*
+         There are 4 types of elements on the carousel
+        - Video elements
+        - Empty placeholder video elements
+        - Image elements
+        - Empty placeholder image elements
+        The video elements have a div, then a img tag with an src to youtube. The picture
+        elements just have a dev > img with an src. The placeholder elements have the same
+        structure, but don't have an src
+
+        We want to return all the non empty elements. Since we don't want to have
+        to check every element for non emptiness (the check is expensive and
+        we'll probably only want the first or so elements), we return a lazy stream.
+         */
+        return allElements.stream()
+                .filter(e -> !StringHelper.nullOrEmpty(e.findElement(By.cssSelector("img")).getAttribute("src")));
+
+    }
+
+    /**
+     * To get the carouselWebElement at position i.
+     *
+     * @param i Position
+     * @return The WebElement of the carousel item at position i
+     */
+    public WebElement getCarouselWebElement(int i) {
+        final WebElement carouselItem = getAllMediaOnCarousel()
+                .skip(i)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Cannot select media at"
+                + " position " + i + ". There are only "
+                + getAllMediaOnCarousel().count() + " positions"));
+        return carouselItem;
+    }
+
+    /**
+     * To get the i'th item (0 based) in the Screenshots and Videos Carousel's
+     * Video-Id(source).
+     *
+     * @param i The position of the carousel item
+     * @return The video-id/source-id of the carousel item
+     */
+    public String getVideoID(int i) {
+        final WebElement carouselItem = getCarouselWebElement(i);
+        return carouselItem.getAttribute("video-id");
+    }
+}

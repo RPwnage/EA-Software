@@ -1,0 +1,97 @@
+<project>
+
+    <!-- convenience names -->
+    <property name="modulename"         value="T2Driver" />
+    <property name="module.src"         value="${package.DirtySDK.dir}/sample/common/tester2/project/${config-system}/driversource.txt"      />
+
+    <!-- add this module to the list of modules to build -->
+    <property name="runtime.buildmodules">
+        ${property.value}
+        ${modulename}
+    </property>
+
+    <property name="runtime.${modulename}.builddependencies">
+        VisualStudio
+    </property>
+
+    <!-- declare the type of module to build -->
+    <property name="runtime.${modulename}.buildtype" value="DSProgram" />
+
+    <!-- only add a build dependency on the DS lib if samples are not being linked against a prebuilt DS -->
+    <do unless="@{PropertyTrue('DirtySDK-skip-lib-generation')}">
+        <property name="runtime.${modulename}.runtime.moduledependencies">
+            ${dirtysock_modulename}
+        </property>
+    </do>
+
+    <!-- post build step for sln -->
+    <property name="runtime.${modulename}.vcproj.post-build-step" value="${nant.location}\nant.exe runtime.${modulename}.postbuildtarget -buildfile:${nant.project.buildfile} -buildroot:${nant.project.buildroot} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config}"/>
+
+
+  <!-- add this module's includes to the general includes -->
+    <property name="runtime.${modulename}.includedirs">
+        ${package.DirtySDK.includedirs}
+        ${package.DirtySDK.dir}/sample/common/include
+        ${package.DirtySDK.dir}/sample/common/tester2/source
+        ${package.DirtySDK.dir}/sample/common/tester2/source/${config-system}/resource
+        ${package.DirtySDK.dir}/sample/common/tester2/contrib/t2xbdm/include/xenon
+    </property>
+    
+    <!-- inherit warning suppression from dirtysock -->
+	<property name="runtime.${modulename}.warningsuppression">
+		${runtime.${dirtysock_modulename}.warningsuppression}
+        -wd4365
+	</property>    
+	
+    <!-- inherit defines from dirtysock -->
+    <property name="runtime.${modulename}.defines">
+        ${runtime.${dirtysock_modulename}.defines}
+    </property>
+
+    <!-- now bring in the list of files to build into this module -->
+    <fileset basedir="${package.DirtySDK.dir}" name="runtime.${modulename}.sourcefiles">
+        <includes fromfile="${module.src}" />
+    </fileset>
+
+    <!-- add in other libraries to link with -->
+    <fileset name="runtime.${modulename}.libs.pc" append="true">
+        <includes name="odbc32.lib" asis="true"  />
+        <includes name="odbccp32.lib" asis="true"  />
+        <includes name="tapi32.lib" asis="true"  />
+        <includes name="iphlpapi.lib" asis="true" />
+        <includes name="winmm.lib" asis="true"  />
+        <includes name="ws2_32.lib" asis="true"  />
+    </fileset>
+
+    <fileset name="runtime.${modulename}.libs" append="true">
+        <includes name="${package.configlibdir}/*${lib-suffix}"/>
+    </fileset>
+
+    <do if="${config-system} == pc">
+
+        <!-- HACK: I can't seem to get the property "package.Xdk.appdir" to work,
+            perhaps because this is a PC build.  Anyway, this is how we get the 
+            value in the first place (see Initialize.xml in the Xdk package. -->
+            <property name="package.Xdk.appdir.HACK" value="C:" />
+            <property if="@{RegistryValueExists('LocalMachine', 'SOFTWARE\Microsoft\XboxSDK', 'InstallPath')}" name="package.Xdk.appdir.HACK" value="@{RegistryGetValue('LocalMachine', 'SOFTWARE\Microsoft\XboxSDK', 'InstallPath')}" />
+
+        <!-- HACK: I can't seem to get the property "package.xenonsdk.appdir" to work,
+            perhaps because this is a PC build.  Anyway, this is how we get the 
+            value in the first place (see Initialize.xml in the Xdk package. -->
+        <property name="package.xenonsdk.appdir.HACK" value="C:" />
+        <property if="@{RegistryValueExists('LocalMachine', 'SOFTWARE\Microsoft\Xbox\2.0\SDK', 'InstallPath')}" name="package.xenonsdk.appdir.HACK" value="@{RegistryGetValue('LocalMachine', 'SOFTWARE\Microsoft\Xbox\2.0\SDK', 'InstallPath')}" />
+
+        <!-- HACK: after the build is done, copy the xbox and xenon dlls to the bin directory -->
+        <!-- I'm currently only copying over the xenon dll, as the xbox one seems to be building -->
+        <target name="runtime.T2Driver.postbuildtarget" hidden="true">
+            <copy file="${package.DirtySDK.dir}/sample/common/tester2/contrib/t2xbdm/bin/xbox/t2xbdmxbox.dll" todir="${package.configbindir}" />         
+            <copy file="${package.DirtySDK.dir}/sample/common/tester2/contrib/t2xbdm/bin/xenon/t2xbdmxenon.dll" todir="${package.configbindir}" />
+            <copy if="@{FileExists('${package.Xdk.appdir.HACK}/xbox/bin/xboxdbg.dll')}" file="${package.Xdk.appdir.HACK}/xbox/bin/xboxdbg.dll" todir="${package.configbindir}" />
+            <copy if="@{FileExists('${package.xenonsdk.appdir.HACK}/bin/win32/mspdb70.dll')}" file="${package.xenonsdk.appdir.HACK}/bin/win32/mspdb70.dll" todir="${package.configbindir}" />
+            <copy if="@{FileExists('${package.xenonsdk.appdir.HACK}/bin/win32/xbdm.dll')}" file="${package.xenonsdk.appdir.HACK}/bin/win32/xbdm.dll" todir="${package.configbindir}" />
+        </target>
+
+    </do>
+    
+        
+</project>

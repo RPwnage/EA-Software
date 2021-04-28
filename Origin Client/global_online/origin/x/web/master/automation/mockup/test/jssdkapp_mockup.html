@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+    <title>JSSDK App</title>
+    <head>
+
+    </head>
+    <body>
+        <script src="../../../jssdk/bower_components/promise-polyfill/Promise.js"></script>
+        <script src="../../../jssdk/bower_components/strophe/strophe.js"></script>
+        <script src="../../../jssdk/bower_components/stacktrace-js/stacktrace.js"></script>
+        <script src="../../../jssdk/dist/origin-jssdk.js"></script>
+
+        <script>
+            function printObject(data) {
+                var out = '';
+                for (var p in data) {
+                    out += '\n    ' + p + ': ' + data[p] + ',';
+                }
+                return out;
+            }
+
+            function printArray(data) {
+                var out = '[';
+                for (var p in data) {
+                    out += '\n  {' + printObject(data[p]) + '\n  },';
+                }
+                out += "\n]";
+                return out;
+            }
+
+            function getSelectedJID() {
+                return document.getElementById("friend").value + '@127.0.0.1';
+                //var e = document.getElementById("friendList");
+                //return e.options[e.selectedIndex].value;
+            }
+
+            function requestRoster() {
+                Origin.xmpp.requestRoster().then(function(result) {
+                    //console.log(result);
+                    console.log(printArray(result));
+                }, function(error) {
+                    console.log(error);
+                });
+            }
+
+            function sendMessage(msg) {
+                Origin.xmpp.sendMessage(getSelectedJID(), msg);
+            }
+
+            function friendRequestAccept() {
+                Origin.xmpp.friendRequestAccept(getSelectedJID());
+            }
+
+            function friendRequestReject() {
+                Origin.xmpp.friendRequestReject(getSelectedJID());
+            }
+
+            function friendRequestSend() {
+                Origin.xmpp.friendRequestSend(getSelectedJID());
+            }
+
+            function friendRequestRevoke() {
+                Origin.xmpp.friendRequestRevoke(getSelectedJID());
+            }
+
+            function friendRemove() {
+                Origin.xmpp.friendRemove(getSelectedJID());
+            }
+
+            function updatePresence() {
+                Origin.xmpp.updatePresence();
+            }
+
+            function testCall() {
+                Origin.atom.atomGameUsage('182555', '71654').then(function(result) {
+                    console.log(result);
+                    //console.log(printArray(result));
+                }, function(error) {
+                    console.log(error);
+                });
+
+                Origin.atom.atomReportUser('1000120382991', 'In Game', 'Cheating', 'Test Comment').then(function(result) {
+                    console.log(result);
+                }, function(error) {
+                    console.log(error);
+                });
+
+                Origin.atom.atomUserInfoByUserIds('1000120382991,12306939085').then(function(result) {
+                    console.log(result);
+                }, function(error) {
+                    console.log(error);
+                });
+
+                Origin.avatar.avatarInfoByUserIds('1000120382991;12306939085', 'AVATAR_SZ_SMALL').then(function(result) {
+                    console.log(result);
+                }, function(error) {
+                    console.log(error);
+                });
+
+                var endPoint = 'http://localhost:3412/';
+                var req = new XMLHttpRequest();
+                req.open('GET', endPoint, false);
+                req.send(null);
+
+            }
+
+        </script>
+
+        <button onclick="testCall()">
+            Test Call
+        </button>
+
+        <button onclick="requestRoster()">
+            Roster
+        </button>
+
+        <input type="text" id="friend">
+
+        <button onclick="sendMessage('this is a message')">
+            sendMessage
+        </button>
+
+        <button onclick="friendRequestAccept()">
+            friendRequestAccept
+        </button>
+
+        <button onclick="friendRequestReject()">
+            friendRequestReject
+        </button>
+
+        <button onclick="friendRequestSend()">
+            friendRequestSend
+        </button>
+
+        <button onclick="friendRequestRevoke()">
+            friendRequestRevoke
+        </button>
+
+        <button onclick="friendRemove()">
+            friendRemove
+        </button>
+
+        <button onclick="updatePresence()">
+            updatePresence
+        </button>
+
+        <script>
+            function socialConnectedCB() {
+                console.log('socialConnectedCB arguments.length: ' + arguments.length);
+                console.log(printArray(arguments));
+            }
+
+            function socialIncomingMsgCB() {
+                console.log('socialIncomingMsgCB arguments.length: ' + arguments.length);
+                console.log(printArray(arguments));
+            }
+
+            function socialPresenceChangedCB() {
+                console.log('socialPresenceChangedCB arguments.length: ' + arguments.length);
+                console.log(printArray(arguments));
+                console.log(printObject(arguments['gameActivity']));
+            }
+
+            function socialRosterChangedCB() {
+                console.log('socialRosterChangedCB arguments.length: ' + arguments.length);
+                console.log(printArray(arguments));
+            }
+
+            function socialUserConflictCB() {
+                console.log('socialUserConflictCB arguments.length: ' + arguments.length);
+                console.log(printArray(arguments));
+            }
+
+            var config = {
+                env : 'qa',
+                configUrlOverride : 'http://127.0.0.1:1400/data/minispadefault/configurloverride?',
+                overrideUrls : {
+                }
+            };
+
+            //var req = new XMLHttpRequest();
+            //req.onreadystatechange = function() {
+            //    if (req.readyState === 4 && req.status === 200) {
+            //        console.log(JSON.parse(req.response).urls);
+            //    }
+            //}
+            //req.open('GET', config.configUrlOverride, true);
+            //req.send();
+
+
+            Origin.init(config, 'en_US').then(function() {
+                console.log('initialized jssdk successfully');
+
+                Origin.events.on(Origin.events.AUTH_SUCCESS_LOGIN, function() {
+                    console.log('Origin.events.AUTH_SUCCESS_LOGIN');
+
+                    Origin.events.on(Origin.events.XMPP_CONNECTED, socialConnectedCB);
+                    Origin.events.on(Origin.events.XMPP_INCOMINGMSG, socialIncomingMsgCB);
+                    Origin.events.on(Origin.events.XMPP_PRESENCECHANGED, socialPresenceChangedCB);
+                    Origin.events.on(Origin.events.XMPP_ROSTERCHANGED, socialRosterChangedCB);
+                    Origin.events.on(Origin.events.XMPP_USERCONFLICT, socialUserConflictCB);
+
+                    Origin.xmpp.connect();
+                });
+
+                Origin.auth.login();
+            }, function(error) {
+                console.error('init failed ' + error);
+            }).catch(function(error) {
+                Origin.log.message('error', '[JSSDKAPP]')('jssdk - init', error);
+            });
+
+        </script>
+
+    </body>
+</html>

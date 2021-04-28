@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build"> 
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+	
+	<!-- ******************* -->
+	<!-- Package declaration -->
+	<!-- ******************* -->
+	<property name="package.uitoolkit.dir"  value="@{PathGetFullPath('.')}"/>
+	<property name="package.uitoolkit.version"  value="@{PathGetFileName('${package.uitoolkit.dir}')}"/>
+	<package name="uitoolkit" targetversion="${package.uitoolkit.version}"/>
+	
+	<!-- ******************** -->
+	<!-- Package dependencies -->
+	<!-- ******************** -->
+	<dependent name="OriginVersion" />
+	<dependent name="OriginConfig" />
+	<dependent name="Qt" />
+	
+	<!-- ***************************** -->
+	<!-- Build Configuration properties-->
+	<!-- ***************************** -->
+	
+	<!-- uitoolkit-specific build flags -->
+	<BuildType name="${package.name}.buildtype" from="OriginLibrary">
+		<option name="buildset.cc.defines">
+			${option.value}
+			QT_DLL
+			QT_THREAD_SUPPORT
+			QT_WEBKIT_LIB
+			QT_XML_LIB
+			QT_GUI_LIB
+			QT_NETWORK_LIB
+			QT_CORE_LIB
+		</option>
+    <option name="buildset.cc.options" if="${config-system} == pc">
+      ${option.value}
+      /FI ${package.uitoolkit.dir}/include/Qt/OriginCommon.h
+    </option>
+	</BuildType>
+	
+	<property name="runtime.buildtype" value="${package.name}.buildtype" />
+
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<target name="generate-code" depends="moc-compile ui-compile qt-rc-compile" />
+	<property name="runtime.prebuildtarget" value="generate-code" />
+	
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.vcproj.pre-build-step">
+		${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.prebuildtarget}
+	</property>
+
+	<property name="runtime.usedependencies">
+		OriginVersion
+		OriginConfig
+		Qt
+		EABase
+		EAIO
+		EATrace
+		EAStdC
+		EAThread
+	</property>
+	
+	<!-- EA Package build dependencies. Automatically gets include and link inclusion. -->
+	<property name="runtime.builddependencies">
+	</property>
+	
+	<property name="runtime.includedirs" >
+		${package.uitoolkit.dir}/include/Qt
+		${package.uitoolkit.dir}/source/Qt
+    ${ui.output.dir}
+	</property>
+
+  <!-- common source files -->
+  <fileset name="runtime.sourcefiles" basedir="${package.dir}">
+	<includes name="${package.uitoolkit.dir}/source/Qt/**/*.cpp" />
+      <includes name="${package.uitoolkit.dir}/source/Qt/**/*.mm" />
+  </fileset>
+  
+  <!-- strip out platform specific files --> 
+  <fileset name="runtime.sourcefiles" basedir="${package.dir}" append="true"> 
+    <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+    <excludes name="**/*osx.*" unless="${config-system} == 'osx'"/>
+    <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    <excludes name="**/*win.*" if="${config-system} == 'osx'"/>
+  </fileset> 
+
+  <fileset name="runtime.libs" >
+    <group if="${config-system} == 'pc'">
+      <includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Sql${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Xml${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Gui${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Network${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Core${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5Designer${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5DesignerComponents${debug-suffix}.lib"/>
+      <includes name="${package.Qt.libdir}/Qt5WebKit${debug-suffix}.lib"/>
+	  <includes name="${package.Qt.libdir}/Qt5Widgets${debug-suffix}.lib"/>
+    </group>
+  </fileset>
+
+  <target name="dumpsources">
+		<foreach property="fname" item="FileSet" in="runtime.sourcefiles">
+			<echo message="source ${fname}" />
+		</foreach>
+	</target>
+	
+  <fileset name="runtime.headerfiles" basedir="${package.dir}">
+    <includes name="${package.uitoolkit.dir}/**/*.h" />
+  </fileset>
+      
+	<property name="runtime.res.includedirs">
+		${package.uitoolkit.dir}/include
+	</property>
+
+	<fileset name="runtime.resourcefiles">
+	</fileset>
+
+	<!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+	<fileset name="runtime.qrc_sourcefiles" basedir="${package.uitoolkit.dir}/source" append="true">
+		<includes name="Qt/OriginCommonControls/Resources/origincommoncontrols.qrc" />
+	</fileset>
+	
+	<fileset name="runtime.ui_sourcefiles" basedir="${package.uitoolkit.dir}" append="true">
+		<includes name="source/Qt/OriginCommonControls/*.ui" />
+	</fileset>
+
+	<!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+	<fileset name="runtime.moc_sourcefiles" basedir="${package.uitoolkit.dir}" append="true">
+		<includes name="include/Qt/origincallout.h"/>
+        <includes name="include/Qt/origincallouticontemplate.h"/>
+		<includes name="include/Qt/originbanner.h"/>
+		<includes name="include/Qt/originbuttonbox.h"/>
+		<includes name="include/Qt/origincheckbutton.h"/>
+		<includes name="include/Qt/originclosebutton.h"/>
+        <includes name="include/Qt/origindivider.h"/>
+		<includes name="include/Qt/origincommandlink.h"/>
+		<includes name="include/Qt/origindialog.h"/>
+		<includes name="include/Qt/origindropdown.h"/>
+		<includes name="include/Qt/originframe.h"/>
+		<includes name="include/Qt/originiconbutton.h"/>
+		<includes name="include/Qt/originlabel.h"/>
+		<includes name="include/Qt/originmsgbox.h"/>
+		<includes name="include/Qt/originscrollablemsgbox.h"/>
+		<includes name="include/Qt/originmultilineedit.h"/>
+		<includes name="include/Qt/originmultilineeditcontrol.h"/>
+		<includes name="include/Qt/originnotificationdialog.h"/>
+		<includes name="include/Qt/originprogressbar.h"/>
+		<includes name="include/Qt/originpushbutton.h"/>
+		<includes name="include/Qt/originradiobutton.h"/>
+		<includes name="include/Qt/originsinglelineedit.h"/>
+		<includes name="include/Qt/originspinner.h"/>
+        <includes name="include/Qt/originslider.h"/>
+		<includes name="include/Qt/originsurveywidget.h"/>
+		<includes name="include/Qt/origintransferbar.h"/>		
+		<includes name="include/Qt/origintitlebarbase.h"/>
+		<includes name="include/Qt/origintitlebarosx.h" if="${config-system} == 'osx'"/>
+		<includes name="include/Qt/origintitlebarwin.h" if="${config-system} == 'pc'"/>
+        <includes name="include/Qt/origintooltip.h"/>
+		<includes name="include/Qt/originvalidationcontainer.h"/>
+		<includes name="include/Qt/originwebview.h"/>
+		<includes name="include/Qt/originwindow.h"/>
+		<includes name="include/Qt/originwindowmanager.h"/>
+		<includes name="include/Qt/originwindowtemplatebase.h"/>
+		<includes name="include/Qt/originwindowtemplatemsgbox.h"/>
+		<includes name="include/Qt/originwindowtemplatescrollable.h"/>
+        <includes name="include/Qt/origintabwidget.h"/>
+        <includes name="include/Qt/origintab.h"/>
+		<includes name="include/Qt/testbed.h"/>
+	</fileset>
+	
+	<!-- strip out platform specific files --> 
+  <fileset name="runtime.moc_sourcefiles" basedir="${package.uitoolkit.dir}" append="true"> 
+    <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+    <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+  </fileset> 
+
+	<!-- construct the paths to include the moc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+		<property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+	
+	<!-- construct the paths to include the qrc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.qrc_sourcefiles">
+		<property name="sourcefile" value="${rc.output.dir}/qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+	
+	<!-- get the options from the current config -->
+	<property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.buildtype}','cc.defines')}"/>
+	<property name="runtime.moc_includedirs" value="${runtime.includedirs}"/>
+	
+</project>

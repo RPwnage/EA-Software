@@ -1,0 +1,89 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.originaccess.VaultPage;
+import com.ea.originx.automation.lib.pageobjects.store.BrowseGamesPage;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+
+import java.util.List;
+
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests whether all vault games can be added for free during origin access free
+ * trial
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeTrialAddVaultGames extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 14209)
+    @Test(groups = {"originaccess", "full_regression", "int_only"})
+    public void testFreeTrialAddVaultGames(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+
+        logFlowPoint("Login as a newly registered user"); //1
+        logFlowPoint("Purchase 'Origin Access free Trial'"); //2
+        logFlowPoint("Navigate to the 'Vault' page to get the list of all vault entitlements"); //3
+        logFlowPoint("Entitle all the vault entitlements through origin access and verify the corresponding entitlements are added to the game library"); //4
+
+        //1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully registered and logged in with: " + username);
+        } else {
+            logFailExit("Could not register/log in a new user " + username);
+        }
+
+        // 2
+        if (MacroOriginAccess.purchaseOriginAccess(driver)) {
+            logPass("Successfully Purchased Origin Access.");
+        } else {
+            logFailExit("Could not Purchase Origin Access.");
+        }
+
+        //3
+        new NavigationSidebar(driver).clickVaultGamesLink();
+        BrowseGamesPage browseGamesPage = new BrowseGamesPage(driver);
+        List<List<String>> vaultGameTilesOfferIds = browseGamesPage.getAllNormalAndSpecialEntitlementOfferIds();
+        List<String> normalEntitlementOfferIds = vaultGameTilesOfferIds.get(0); // list of normal entitlements
+        List<String> specialEntitlementOfferIds = vaultGameTilesOfferIds.get(1); // list of special entitlements
+        // These are the offerIds of entitlements where on adding these entitlements the user either entitle a different entitlement or a collection of entitlements
+        if (!vaultGameTilesOfferIds.isEmpty()) {
+            logPass("Successfully got the list of vault entitlements");
+        } else {
+            logFailExit("Could not get the list of vault entitlements");
+        }
+
+        //4
+        VaultPage vaultPage = new VaultPage(driver);
+        vaultPage.addAllEntitlementsByOfferId(normalEntitlementOfferIds); // add all normal entitlements;
+        vaultPage.addAllEntitlementsByOfferId(specialEntitlementOfferIds); // add the special entitlements
+        new NavigationSidebar(driver).gotoGameLibrary();
+        GameLibrary gameLibrary = new GameLibrary(driver);
+        boolean isVaultEntitlements = gameLibrary.verifyGameLibraryContainsExpectedGames(normalEntitlementOfferIds);
+        boolean isExceptionEntitlements = gameLibrary.verifyGameLibraryContainsSpecialGames(specialEntitlementOfferIds);
+        if (isVaultEntitlements && isExceptionEntitlements) {
+            logPass("Successfully all the vault entitlements are added to the game library");
+        } else {
+            logFailExit("Could not add some of the entitlements to the game library");
+        }
+
+        softAssertAll();
+
+    }
+}

@@ -1,0 +1,42 @@
+@Library('docs') _
+
+pipeline {
+  agent {
+    node {
+      label 'www-builder'
+    }
+  }
+
+  options {
+    ansiColor('xterm')
+  }
+  
+  environment {
+	String docTar = ''
+	String dir = '/var/www/automation-javadocs'
+	String tempDir = '/var/src/automation-javadocs'
+	def docUtils = ''
+  }
+  stages {
+    stage('Create Docs') {
+      steps {
+        withMaven(jdk: 'jdk1.8.0_72', maven: 'maven') {
+    		sh "mvn javadoc:javadoc"
+        }
+        script{
+			docsUtils = new docs.utilities.utilities()
+			String docTar = docsUtils.createTar("target/site/apidocs/")
+			docsUtils.uploadDocs("${MAVEN_BASE_PATH}/com/ea/automation/docs/", docTar)
+		}
+      }
+    }
+	stage('Upload Docs') {
+		agent { label 'linuxdocs' }
+		steps {
+			script {
+				docsUtils.installDocs('automation/docs')
+			}
+		}
+	}
+  }
+}

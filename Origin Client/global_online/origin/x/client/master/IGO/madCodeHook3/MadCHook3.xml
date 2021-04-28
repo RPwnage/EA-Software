@@ -1,0 +1,124 @@
+<project>
+  <dependent name="IGO" />
+  
+  <property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+  <property name="MadCHook.module.name" value="MadCHook" />
+
+  <property name="runtime.buildmodules" value="${property.value} MadCHook" />
+  
+  <property name="runtime.${MadCHook.module.name}.outputdir" value="${package.IGO.lib}" />
+  <property name="runtime.${MadCHook.module.name}.outputname" value="${MadCHook.module.name}32${debug-suffix}" if="${config-system} == 'pc'"/>
+  <property name="runtime.${MadCHook.module.name}.outputname" value="${MadCHook.module.name}64${debug-suffix}" if="${config-system} == 'pc64'"/>
+	
+  <dependent name="OriginConfig" />
+  <dependent name="OriginVersion" />
+
+  <property name="runtime.${MadCHook.module.name}.builddependencies" >
+    EABase
+    EASTL
+  </property>
+
+  
+	<!-- Add special compiler options and create new buidtype -->
+	<BuildType name="${MadCHook.module.name}" from="OriginLibrary">
+       <option name="buildset.cc.defines">
+        ${option.value}
+        BUILDING_SYSTEMS
+      </option>
+	  <option name="buildset.cc.options">
+         ${option.value}
+	     /W4
+	  </option>
+	  <remove>
+		<cc.options>
+		/EHsc
+		</cc.options>
+	  </remove>
+	  <option name="exceptions"                     value="off" />
+	</BuildType>
+	
+
+  	<!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<target name="generate-code64" depends="asm-compile" if="${config-system} == 'pc64'"/>
+
+	<property name="runtime.MadCHook.prebuildtarget" value="generate-code64" if="${config-system} == 'pc64'" />
+
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.MadCHook.vcproj.pre-build-step" if="${config-system} == 'pc64'">
+		${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.MadCHook.prebuildtarget}
+	</property>
+
+	
+	<!-- ${MadCHook.module.name} build properties -->
+	<property name="runtime.${MadCHook.module.name}.buildtype" value="${MadCHook.module.name}" />
+
+	<property name="runtime.${MadCHook.module.name}.includedirs" >
+    ${property.value}
+    ${package.WindowsSDK.kitdir}\Include\${package.WindowsSDK.TargetPlatformVersion}\um
+    ${package.WindowsSDK.kitdir}\Include\${package.WindowsSDK.TargetPlatformVersion}\shared
+	</property>
+
+  <fileset name="runtime.${MadCHook.module.name}.libs" >
+  </fileset>
+  
+  <fileset name="runtime.${MadCHook.module.name}.sourcefiles" basedir="${module.${MadCHook.module.name}.dir}/Sources/C++">
+		<includes name="*.cpp" />
+  </fileset>
+
+  <fileset name="runtime.${MadCHook.module.name}.asmsourcefiles" basedir="${module.${MadCHook.module.name}.dir}/Sources/C++"  if="${config-system} == 'pc64'">
+		<includes name="*.asm" />
+  </fileset>
+
+  <fileset name="runtime.${MadCHook.module.name}.headerfiles" basedir="${module.${MadCHook.module.name}.dir}">
+    <includes name="Sources/C++/*.h" />
+    <includes name="header &amp; libs/*.h" />
+  </fileset>
+  
+
+	<!-- ASM x64 compiler properties -->
+	<property name="asm.compiler" value="${package.VisualStudio.appdir}\VC\bin\amd64\ml64.exe" />
+	<property name="asm.output.dir" value="${generatedfiles.output.dir}" />
+
+	<!-- Enable multi processor compiles -->
+	<property name="eaconfig.build-MP" value="" />
+	
+	<!-- Enable Xoreax Grid Engine -->
+	<property name="incredibuild.usexge" value="true" />
+	
+	<target name="asm-compile">
+		<do if="@{FileSetExists('runtime.asmsourcefiles')}">
+			<echo message="-- ASM x64 Compile Start --" />
+
+			<!-- Create output dir for ASM compiler. It won't create one-->
+			<mkdir dir="${asm.output.dir}" unless="@{DirectoryExists(${asm.output.dir})}" />
+
+			<foreach property="fname" item="FileSet" in="runtime.asmsourcefiles">
+				<exec program="${asm.compiler}" message="ASM Compile ${fname}" stdout="true">
+					<args>
+						<arg value="/c /Fl /Fo ${asm.output.dir}/@{PathGetFileNameWithoutExtension(${fname})}.obj ${fname}"/>
+					</args>
+					<inputs>
+						<includes name="${asm.compiler}"/>
+						<includes name="${fname}"/>
+					</inputs>
+					<outputs>
+						<includes name="${asm.output.dir}/@{PathGetFileNameWithoutExtension(${fname})}.obj"/>
+					</outputs>
+				</exec>
+			</foreach>
+			<echo message="-- ASM x64 Compile End --" />
+		</do>
+	</target>
+	
+  <target name="clean-madchook">
+    <delete>
+			<fileset basedir="${runtime.${MadCHook.module.name}.outputdir}">
+				<includes name="${runtime.${MadCHook.module.name}.outputname}.*"/>
+			</fileset>
+		</delete>
+  </target>
+</project>

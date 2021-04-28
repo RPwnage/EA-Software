@@ -1,0 +1,173 @@
+package com.ea.originx.automation.scripts.zGraveyard.oig;
+
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.Waits;
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroSocial;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.oig.OigNavigationPage;
+import com.ea.originx.automation.lib.pageobjects.social.SocialHub;
+import com.ea.originx.automation.lib.pageobjects.template.EAXVxSiteTemplate;
+import com.ea.originx.automation.lib.resources.games.OADipSmallGame;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+
+import static com.ea.vx.originclient.templates.OATestBase.sleep;
+
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test user friend presence inside Oig
+ *
+ * @author mkalaivanan
+ */
+public class OAOigFriendPresence extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 11145)
+    @Test(groups = {"oig", "client_only", "full_regression"})
+    public void testOigFriendPresence(ITestContext context) throws Exception {
+
+        final OriginClient clientA = OriginClientFactory.create(context);
+        final OriginClient clientB = OriginClientFactory.create(context);
+
+        OADipSmallGame entitlement = new OADipSmallGame();
+        final String entitlementOfferId = entitlement.getOfferId();
+
+        UserAccount userAccountA = AccountManager.getEntitledUserAccount(entitlement);
+        UserAccount userAccountB = AccountManager.getEntitledUserAccount(entitlement);
+
+        userAccountA.cleanFriends();
+        userAccountB.cleanFriends();
+        userAccountA.addFriend(userAccountB);
+        logFlowPoint("Log into Origin as User A:" + userAccountA.getUsername()); // 1
+        logFlowPoint("Navigate to Game Library"); // 2
+        logFlowPoint("Download DipSmall"); //3
+        logFlowPoint("Launch DipSmall and Verify OIG is open"); //4
+        logFlowPoint("Click on User A's Friends List"); //5
+        logFlowPoint("Verify User A's status is 'In-Game' by default"); //6
+        logFlowPoint("Change User A's status to 'Invisible'"); //7
+        logFlowPoint("Login into Origin as User B:" + userAccountB.getUsername()); //8
+        logFlowPoint("Verify User A's status appears as 'Offline' to friend - User B"); //9
+        logFlowPoint("Change User A's status to 'In-game'");//10
+        logFlowPoint("Verify User A's status appears as 'In-game' to friend - User B"); //11
+
+        //1
+        WebDriver driverA = startClientObject(context, clientA);
+        if (MacroLogin.startLogin(driverA, userAccountA)) {
+            logPass("Successfully logged into Origin with User A " + userAccountA.getUsername());
+        } else {
+            logFailExit("Could not log into Origin with User A " + userAccountA.getUsername());
+        }
+
+        // 2
+        new NavigationSidebar(driverA).gotoGameLibrary();
+        Thread.sleep(5000);
+        GameTile gameTile = new GameTile(driverA, entitlementOfferId);
+        if (gameTile.waitForDownloadable()) {
+            logPass("Navigated to Game Library.");
+        } else {
+            logFailExit("Could not navigate to Game Library.");
+        }
+
+        //3
+        boolean downloaded = MacroGameLibrary.downloadFullEntitlement(driverA, entitlementOfferId);
+        if (downloaded) {
+            logPass("Successfully downloaded DiP Small");
+        } else {
+            logFailExit("Download Small DiP unsuccessful");
+        }
+
+        //4
+        gameTile.play();
+        sleep(5000); // Wait for entitlement to launch
+        boolean isGameLaunched = new OADipSmallGame().waitForGameLaunch(clientA);
+        OigNavigationPage oigNavigationPage = new OigNavigationPage(driverA);
+        oigNavigationPage.switchToOIG();
+        boolean verifyOigVisible = oigNavigationPage.verifyOigNavigationVisible();
+        if (isGameLaunched && verifyOigVisible) {
+            logPass("Game launched and OIG opened successfully");
+        } else {
+            logFailExit("Verify Game launch and OIG open failed ");
+        }
+
+        //5
+        oigNavigationPage.switchToOIG();
+        oigNavigationPage.clickFriendsList();
+        SocialHub socialHub = new SocialHub(driverA);
+        socialHub.waitForPageToLoad();
+        if (socialHub.verifySocialHubVisible()) {
+            logPass("Social Hub launched successfully");
+        } else {
+            logFailExit("Social Hub Launch failed");
+        }
+
+        //6
+        if (socialHub.verifyUserInGame()) {
+            logPass("User A status is In-game by default ");
+        } else {
+            logFailExit("Verify User A status is In-game by default failed");
+        }
+
+        //7
+        socialHub.setUserStatusInvisible();
+        // Wait for presence to stablize
+        sleep(3000);
+        if (socialHub.verifyUserInvisible()) {
+            logPass("User A's status set to Invisible successfully");
+        } else {
+            logFailExit("Could not set User A'status to Invisible");
+        }
+
+        //8
+        WebDriver driverB = startClientObject(context, clientB);
+        if (MacroLogin.startLogin(driverB, userAccountB)) {
+            logPass("Successfully logged into Origin with User B " + userAccountB.getUsername());
+        } else {
+            logFailExit("Could not log into Origin with User B " + userAccountB.getUsername());
+
+        }
+
+        //9
+        MacroSocial.restoreAndExpandFriends(driverB);
+        SocialHub socialHub2 = new SocialHub(driverB);
+        socialHub2.waitForPageToLoad();
+        if (socialHub2.verifyFriendOffline(userAccountA.getUsername())) {
+            logPass("User A appears offline to User B");
+        } else {
+            logFailExit("User A does not appear offline to User B");
+        }
+
+        //10
+        // This clicking of friends list is needed as sometimes the social hub disappears as soon second instance of origin is opened
+        oigNavigationPage.switchToOIG();
+        oigNavigationPage.clickFriendsList();
+        // wait for the social hub to appear properly
+        sleep(2000);
+        socialHub.setUserStatusOnline();
+        // Wait for presence to stablize
+        sleep(2000);
+        if (socialHub.verifyUserInGame()) {
+            logPass("User A set to Online successfully");
+        } else {
+            logFailExit("Could not set User A's status to online");
+        }
+
+        //11
+        // sleep required to wait for the user status to change in the friends list
+        sleep(4000);
+        if (socialHub2.verifyFriendInGame(userAccountA.getUsername())) {
+            logPass("User A appears In game to User B");
+        } else {
+            logFailExit("User A does not appear In game to User B");
+        }
+        softAssertAll();
+    }
+
+}

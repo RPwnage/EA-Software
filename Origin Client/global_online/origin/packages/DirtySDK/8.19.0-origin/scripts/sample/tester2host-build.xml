@@ -1,0 +1,376 @@
+<project>
+
+    <!-- convenience names -->
+    <property name="modulename"         value="T2Host" />
+
+    <!-- Define platform source location: we can't use config-system directly because of pc64 and unix64 buildes -->
+    <do if="${config-system} != 'pc64' and ${config-system} != 'unix64'">
+        <property name="tester2-source" value="${config-system}"/>
+    </do>
+    <do if="${config-system} == 'pc64'">
+        <property name="tester2-source" value="pc"/>
+    </do>
+    <do if="${config-system} == 'unix64'">
+        <property name="tester2-source" value="unix"/>
+    </do>
+
+    <property name="module.src"         value="${package.DirtySDK.dir}/sample/common/tester2/project/${tester2-source}/source.txt"      />
+    <property name="modulecpp.src"      value="${package.DirtySDK.dir}/sample/common/tester2/project/${tester2-source}/sourcecpp.txt"      />
+
+    <!-- add this module to the list of modules to build -->
+    <property name="runtime.buildmodules">
+        ${property.value}
+        ${modulename}
+    </property>
+
+    <!-- declare the type of module to build -->
+    <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+        <property name="runtime.${modulename}.buildtype" value="UnixCProgram" />
+    </do>
+    <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+        <property name="runtime.${modulename}.buildtype" value="WindowsProgram" />
+    </do>
+    <do if="${config-system} != 'pc' and ${config-system} != 'pc64' and ${config-system} != 'unix' and ${config-system} != 'unix64'">
+        <property name="runtime.${modulename}.buildtype" value="DSProgram" />
+    </do>
+
+    <!-- only add a build dependency on the DS lib if samples are not being linked against a prebuilt DS -->
+    <do unless="@{PropertyTrue('DirtySDK-skip-lib-generation')}">
+        <property name="runtime.${modulename}.runtime.moduledependencies">
+            ${dirtysock_modulename}
+        </property>
+    </do>
+
+    <do if="${config-system} == 'xenon'">
+        <!-- xenon specific dependencies on other modules -->
+        <property name="runtime.${modulename}.runtime.moduledependencies">
+            ${property.value}
+            atgframework
+        </property>
+
+        <!-- xenon deploy for sln -->
+        <property name="runtime.${modulename}.vcproj.post-build-step" value="${nant.location}\nant.exe runtime.${modulename}.postbuildtarget -buildfile:${nant.project.buildfile} -buildroot:${nant.project.buildroot} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config}"/>
+        <do if="@{PropertyExists('Xenon-Dest-Dir')}">
+            <property name="runtime.${modulename}.vcproj.post-build-step" value="${property.value} -D:Xenon-Dest-Dir=${Xenon-Dest-Dir}"/>
+        </do>
+        <do if="@{PropertyExists('TargetXenon')}">
+            <property name="runtime.${modulename}.vcproj.post-build-step" value="${property.value} -D:TargetXenon=${TargetXenon}"/>
+        </do>
+    </do>
+
+    <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+      <!-- pc specific dependencies on other modules -->
+        <property name="runtime.${modulename}.runtime.moduledependencies">
+            ${property.value}
+            voipaux
+        </property>
+
+        <!-- pc prebuild for sln -->
+        <property name="runtime.${modulename}.vcproj.pre-build-step">
+            ${nant.location}\nant.exe runtime.${modulename}.prebuildtarget -buildfile:${nant.project.buildfile} -buildroot:${nant.project.buildroot} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config}
+        </property>
+    </do>
+
+  <!-- END FOR SLN Generation -->
+
+    <!-- define build dependencies for each platform -->
+
+    <!-- IOS build dependencies -->
+    <property name="${modulename}.builddependencies.iphone">
+    </property>
+
+    <!-- OSX build dependencies -->
+    <property name="${modulename}.builddependencies.osx">
+    </property>
+
+    <!-- PS3 build dependencies -->
+    <property name="${modulename}.builddependencies.ps3">
+    </property>
+
+    <!-- PS3 use dependencies (PlayStation3NPEx can't be a build dependency like how the others are setup or the sln generation wont get the libs)-->
+    <do if="${config-system} == 'ps3'">
+      <property name="runtime.${modulename}.usedependencies">
+        ${property.value}
+        PlayStation3NPEx
+      </property>
+    </do>
+
+    <!-- PC build dependencies -->
+    <property name="${modulename}.builddependencies.pc">
+        VisualStudio
+    </property>
+
+    <!-- PC64 build dependencies -->
+    <property name="${modulename}.builddependencies.pc64">
+        VisualStudio
+    </property>
+
+    <!-- PC use dependencies (Speex can't be a build dependency like how the others are setup or the sln generation wont get the libs)-->
+    <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+      <property name="runtime.${modulename}.usedependencies">
+            ${property.value}
+            Speex
+        </property>
+    </do>
+
+    <!-- UNIX build dependencies -->
+    <property name="${modulename}.builddependencies.unix">
+    </property>
+
+    <!-- UNIX64 build dependencies -->
+    <property name="${modulename}.builddependencies.unix64">
+    </property>
+
+    <!-- freebox build dependencies -->
+    <property name="${modulename}.builddependencies.freebox">
+    </property>
+
+    <!-- Xenon build dependencies -->
+    <property name="${modulename}.builddependencies.xenon">
+    </property>
+
+    <!-- include the build dependency for the platform we're buildling -->
+    <property name="runtime.${modulename}.builddependencies">
+        ${${modulename}.builddependencies.${config-system}}
+    </property>
+
+    <!-- add this module's includes to the general includes -->
+    <property name="runtime.${modulename}.includedirs">
+        ${package.DirtySDK.includedirs}
+        ${package.DirtySDK.dir}/sample/${config-system}
+        ${package.DirtySDK.dir}/sample/common/include
+        ${package.DirtySDK.dir}/sample/common/source/mp3
+        ${package.DirtySDK.dir}/sample/common/tester2/source
+        ${package.DirtySDK.dir}/sample/common/tester2/source/comm
+        ${package.DirtySDK.dir}/sample/common/tester2/source/modules
+        ${package.DirtySDK.dir}/sample/common/tester2/source/${config-system}
+    </property>
+
+    <!-- add pc-only includes -->
+    <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+        <property name="runtime.${modulename}.includedirs">
+            ${property.value}
+            ${package.DirtySDK.dir}/sample/common/tester2/source/pc/resource
+        </property>
+    </do>
+
+    <!-- add xenon-only includes -->
+    <do if="${config-system} == 'xenon'">
+        <property name="runtime.${modulename}.includedirs">
+            ${property.value}
+            ${package.DirtySDK.dir}/sample/${config-system}/xdksamples/atg
+        </property>
+        <property name="runtime.${modulename}.imgbld.options">
+            ${property.value}
+            -titleid:&quot;0x454107D5&quot;
+            -config:&quot;${package.DirtySDK.dir}\sample\xenon\xexconfig.xml&quot;
+            -section:"454107D5=${package.DirtySDK.dir}\sample\common\tester2\source\xenon\spa.bin,RW"
+        </property>
+    </do>
+
+    <!-- inherit warning suppression from dirtysock -->
+    <property name="runtime.${modulename}.warningsuppression">
+        ${runtime.${dirtysock_modulename}.warningsuppression}
+    </property>
+
+    <!-- add ps3-only warning suppression -->
+    <do if="${config-platform} == ps3-gcc">
+        <property name="runtime.${modulename}.warningsuppression">
+        <!-- override normal dirtysock settings as missing-prototypes and strict-prototypes cause massive compile warnings -->
+            -Wall
+            -Wno-multichar
+            -Wformat
+            -Wno-pointer-sign
+            -Wimplicit-int
+            -Wsign-compare
+            -Wshadow
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+        </property>
+    </do>
+    <do if="${config-platform} == 'ps3-sn'">
+        <property name="runtime.${modulename}.warningsuppression">
+        <!-- override normal dirtysock settings as missing-prototypes and strict-prototypes cause massive compile warnings -->
+            --diag_suppress=68
+            --diag_suppress=112
+            --diag_suppress=129
+            --diag_suppress=145
+            --diag_suppress=189
+            --diag_suppress=515
+            --diag_suppress=552
+            --diag_suppress=1421
+            --diag_suppress=1437
+            --diag_suppress=1628
+        </property>
+    </do>
+    <do if="${config-system} == 'iphone' or ${config-system} == 'iphonesim' or ${config-system} == 'osx'">
+        <property name="runtime.${modulename}.warningsuppression">
+        <!-- override normal dirtysock settings as missing-prototypes and strict-prototypes cause massive compile warnings -->
+            -Wall
+            -Wno-multichar
+            -Wformat
+            -Wno-pointer-sign
+            -Wimplicit-int
+            -Wsign-compare
+            -Wshadow
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+        </property>
+    </do>
+
+    <!-- add unix warning suppression -->
+    <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+        <property name="runtime.${modulename}.warningsuppression">
+            ${property.value}
+            -Werror
+            -Wall
+            -Wsign-compare
+            -Wstrict-prototypes
+            -Wmissing-prototypes
+            -Wno-multichar
+            -Wno-pointer-sign
+        </property>
+    </do>
+
+    <!-- add xenon-only warning suppression -->
+    <do if="${config-system} == xenon">
+        <property name="runtime.${modulename}.warningsuppression">
+            ${property.value}
+            -wd4293
+        </property>
+    </do>
+
+    <!-- inherit defines from dirtysock -->
+    <property name="runtime.${modulename}.defines">
+        ${runtime.${dirtysock_modulename}.defines}
+    </property>
+
+    <!-- now bring in the list of files to build into this module -->
+    <fileset basedir="${package.DirtySDK.dir}" name="runtime.${modulename}.sourcefiles">
+        <includes fromfile="${module.src}" />
+        <includes fromfile="${modulecpp.src}" optionset="DSCppProgram" if="@{FileExists('${modulecpp.src}')}"/>
+    </fileset>
+
+    <!-- add in platform-dependent network libs that are required for DirtySDK -->
+    <task name="AddDirtySDKLibsToModule" module="runtime.${modulename}"/>
+
+    <!-- add in other libraries to link with -->
+    <!-- pc/pc64 libs -->
+    <fileset name="runtime.${modulename}.libs.${config-system}" append="true" if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+        <includes name="tapi32.lib" asis="true"  />
+        <includes name="${package.configbuilddir}/${modulename}/T2Host.res" asis="true"/>
+    </fileset>
+
+    <!-- ps3 libs -->
+    <fileset name="runtime.${modulename}.libs.ps3" append="true" if="${config-system} == ps3">
+        <includes name="${package.DirtySDK.dir}/sample/common/tester2/lib/ps3/vpshader.ppu.o" asis="true"  />
+        <includes name="${package.DirtySDK.dir}/sample/common/tester2/lib/ps3/fpshader.ppu.o" asis="true"  />
+    </fileset>
+
+    <fileset name="runtime.${modulename}.libs" append="true">
+        <includes name="${package.configlibdir}/*${lib-suffix}"/>
+    </fileset>
+
+    <!-- prebuild targets -->
+
+    <!-- unix prebuild target
+         add a prebuild step to create the t2 bin directory if it does not exist
+         required to work around a bug with framework 2.15.14 and eaconfig 1.34.02
+         can be removed the day eatech fixes the issue -->
+    <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+        <target name="runtime.T2Host.prebuildtarget" hidden="true">
+            <do unless="@{DirectoryExists('${package.builddir}\${config}\bin')}">
+                <echo message="Work around for framework 2.15.14/eaconfig 1.34.02 bug --> explicitly creating ${package.builddir}\${config}\bin" />
+                <mkdir dir="${package.builddir}\${config}\bin" />
+            </do>
+        </target>
+    </do>
+
+    <!-- pc prebuild target -->
+    <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+        <!-- compile the .rc file into a .res file before linking. -->
+        <!-- *** It appears that prebuildtargets occur before the build.
+             Thus, ${modulename} will either have no value, or the value from
+             the last build that used this value.  I had to remove it from
+             the res.outputdir property as well, or it was using the previous
+             sample name rather than "chatter2" as I had hoped. *** -->
+        <target name="runtime.T2Host.prebuildtarget" hidden="true">
+            <property name="res.name" value="T2Host.res" />
+            <property name="res.resourcefile" value="${package.DirtySDK.dir}/sample/common/tester2/source/pc/resource/T2Host.rc" />
+            <!-- Need to put a directory on to the end of the output dir -->
+            <property name="res.outputdir" value="${package.configbuilddir}/T2Host" />
+            <fileset name="res.sourcefiles">
+                <includes name="${res.resourcefile}" />
+            </fileset>
+
+            <call target="build-res" force="true" />
+        </target>
+    </do>
+
+    <!-- xenon prebuild target -->
+    <do if="${config-system} == xenon">
+        <target name="runtime.T2Host.prebuildtarget" hidden="true">
+            <!-- define the builddir -->
+            <property name="T2HostSpaBinDir" value="${package.DirtySDK.dir}\sample\common\tester2\source\xenon" />
+
+            <!-- create the spa.bin file -->
+            <exec program="${package.xenonsdk.appdir}\bin\win32\spac.exe" workingdir="${T2HostSpaBinDir}">
+                <arg value="-o ${T2HostSpaBinDir}\spa.bin" />
+                <arg value="-h .\T2.spa.h" />
+                <arg value="${T2HostSpaBinDir}\T2.xlast" />
+            </exec>
+        </target>
+
+        <!-- add XEXSECTION to link step for Xenon - this is required for matchmaking to work correctly -->
+        <property name="link.template.commandline">
+            ${property.value}
+            /XEXCONFIG:${package.DirtySDK.dir}\sample\xenon\xexconfig.xml
+            /XEXSECTION:454107D5=${package.DirtySDK.dir}\sample\common\tester2\source\xenon\spa.bin
+        </property>
+    </do>
+
+    <!-- postbuild targets -->
+
+    <do if="${config-system} == xenon">
+        <target name="runtime.T2Host.postbuildtarget" hidden="true">
+            <echo message="RUNNING T2Host Xbox 360 postbuild target" />
+            <!-- copy the xex file to the xbox 360 -->
+            <!-- It's important to use back-slashes ("\") instead of forward slashes when calling xbcp. -->
+            <!-- setting "failonerror" to false means the build will continue with the target xbox 360 off -->
+            <choose>
+                <!-- Deploy to the targets -->
+                <do if="@{PropertyExists('TargetXenon')}">
+                    <foreach item="String" in="${TargetXenon}" property="DeployTarg">
+                        <exec program="${package.xenonsdk.appdir}\bin\win32\xbcp.exe" failonerror="false">
+                            <arg value="/y /t /f /r /s /X:${DeployTarg}"/>
+                            <arg value="${package.builddir}\${config}\bin\T2Host.xex"/>
+                            <arg value="xe:\${Xenon-Dest-Dir}"/>
+                        </exec>
+                    </foreach>
+                </do>
+                <!-- This is a build, or the Target List was empty. Only deploy to default. -->
+                <do>
+                    <choose>
+                        <!-- BuildStudio -->
+                        <do if="@{PropertyExists('Xenon-Dest-Dir')}">
+                            <exec program="${package.xenonsdk.appdir}\bin\win32\xbcp.exe" failonerror="false">
+                                <arg value="/y /t /f /r /s "/>
+                                <arg value="${package.builddir}\${config}\bin\T2Host.xex"/>
+                                <arg value="xe:\${Xenon-Dest-Dir}"/>
+                            </exec>
+                        </do>
+                        <!-- Continuous build -->
+                        <do>
+                            <exec program="${package.xenonsdk.appdir}\bin\win32\xbcp.exe" failonerror="false">
+                                <arg value="/y /t /f /r /s "/>
+                                <arg value="${package.builddir}\${config}\bin\T2Host.xex"/>
+                                <arg value="xe:\${package.name}"/>
+                            </exec>
+                        </do>
+                    </choose>
+                </do>
+            </choose>
+        </target>
+    </do>
+
+</project>

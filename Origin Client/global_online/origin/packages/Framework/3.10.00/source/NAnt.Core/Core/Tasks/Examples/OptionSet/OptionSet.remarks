@@ -1,0 +1,187 @@
+<remarks>
+  <para>
+    An optionset denotes a group of options or properties.
+    Optionsets can be specified in 2 ways:  named and unnamed.
+  </para>
+  <para></para>
+  A named optionset is created by the <c>&lt;optionset&gt;</c> task, and so are defined
+  at the project level.  They are a mechanism allowing multiple tasks to reference and modify the same group of options.
+  This is conceptually the same as the creation of project level properties by the <c>&lt;property&gt;</c> task.
+
+  <para></para>
+  An unnamed optionset, also known as an optionset "element", may exist for certain tasks
+  other than the <c>&lt;optionset&gt;</c> task
+  (e.g. "env" is an optionset element in the exec task).
+  But an unnamed optionset is accessible only to the task that owns it.  It can't
+  be accessed by an arbitrary task; a named optionset is needed for that.
+
+  <para></para>
+  Attributes/parameters differ between named (task) and unnamed (element) optionsets.
+
+  <h3>Table showing which attributes/parameters are supported</h3>
+  <code>
+    <![CDATA[
+Attribute   optionset Task (named)	optionset Element (unnamed)
+----------------------------------------------------------------------------
+name            Yes                       No
+append          Yes                       No
+failonerror     Yes                       No
+verbose         Yes                       No
+if              Yes                       No
+unless          Yes                       No
+                                           
+fromoptionset   Yes                       Yes
+
+]]>
+  </code>
+
+  <h3>Syntax for named optionsets</h3>
+  <code>
+    <![CDATA[
+<optionset
+  name=""
+  append=""
+  fromoptionset="" 
+  if=""
+  unless=""
+  failonerror=""
+  verbose=""
+  > 
+</optionset>
+]]>
+  </code>
+
+  <h3>Parameters for named optionsets</h3>
+  <para>
+    See <see taskref="optionset"/>
+  </para>
+
+
+  <h3>Syntax for unnamed optionset element:  exec task example</h3>
+  <code>
+    <![CDATA[
+<exec program="cmd.exe"
+
+  <!-- env is an optionset element of exec task -->
+  <env
+    fromoptionset="" 
+    > 
+  /env>
+</exec>
+]]>
+  </code>
+
+  <h3>Parameters for unnamed optionset element</h3>
+  <list type="table">
+    <listheader>
+      <term>Attribute</term>
+      <term>Description</term>
+      <term>Must Provide</term>
+    </listheader>
+    <item>
+      <term>fromoptionset</term>
+      <term>The name of an existing optionset to initialize from.  Default is null.</term>
+      <term>No</term>
+    </item>
+  </list>
+
+  <h3>Nested elements for both named and unnamed optionsets:</h3>
+
+  <h4>&lt;option&gt;</h4>
+  <para>Specifies an option in the optionset.</para>
+  <list type="table">
+    <listheader>
+      <term>Attribute</term>
+      <term>Description</term>
+      <term>Must Provide</term>
+    </listheader>
+    <item>
+      <term>if</term>
+      <term>If true then the option will be added; otherwise skipped. Default is "true".</term>
+      <term>No</term>
+    </item>
+    <item>
+      <term>unless</term>
+      <term>Opposite of if. If false then the option will be added; otherwise skipped.  Default is "false".</term>
+      <term>No</term>
+    </item>
+
+    <item>
+      <term>name</term>
+      <term>The name of the option.</term>
+      <term>Yes</term>
+    </item>
+    <item>
+      <term>value</term>
+      <term>
+        The value of the option.  You can specify the current option value using the special <c>${option.value}</c> property.  If the option has not been defined this property will expand to an empty string.
+      </term>
+      <term>Yes</term>
+    </item>
+  </list>
+
+  <h3>Examples of named optionsets:</h3>
+  <para>Specify an optionset with 2 options.</para>
+  <code>
+    <![CDATA[
+<project>
+    <optionset name="DefaultSettings">
+        <option name="foo" value="bar"/>
+        <option name="nant" value="rules"/>
+    </optionset>
+</project>
+]]>
+  </code>
+  <para>Specifies an optionset based on an exsting optionset and then changes the value of the second option.  Also shows how to get the value from an optionset using a function.</para>
+  <code>
+    <![CDATA[
+<project>
+    <optionset name="DefaultSettings">
+        <option name="foo" value="bar"/>
+        <option name="nant" value="rules"/>
+    </optionset>
+    <optionset name="Settings" fromoptionset="DefaultSettings">
+        <option name="nant" value="${option.value} the world"/>
+    </optionset>
+    <echo message="nant @{OptionSetGetValue('Settings', 'nant')}"/>
+</project>
+]]>
+  </code>
+  <code>
+    <![CDATA[
+<project>
+    <optionset name="settings">
+        <option name="clean" value="exclude" />
+    </optionset>
+
+    <optionset name="defaults">
+        <option name="build" value="include" />
+        <option name="buildall" value="include" />
+        <option name="clean" value="include" />
+    </optionset>
+
+    <echo message="settings (before):" />
+    <foreach item="OptionSet" in="settings" property="option">
+        <echo message="'${option.name} = '${option.value}'" />
+    </foreach>
+    <echo message="" />
+
+    <!-- <optionset> used ${option.value} internally, which conflicts with the option property in <foreach> -->
+    <foreach item="OptionSet" in="defaults" property="option">
+        <do unless="@{OptionSetOptionExists('settings', '${option.name}')}">
+            <echo message="   appending: '${option.name} = '${option.value}'" />
+            <optionset name="settings" append="true">
+                <option name="${option.name}" value="${option.value}" />
+            </optionset>
+        </do>
+    </foreach>
+    <echo message="" />
+
+    <echo message="settings (after):" />
+    <foreach item="OptionSet" in="settings" property="option">
+        <echo message="'${option.name} = '${option.value}'" />
+    </foreach>
+</project>
+]]>
+  </code>
+</remarks>

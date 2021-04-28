@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project default="build"> 
+	<!-- ************************* -->
+	<!-- EAConfig target overrides -->
+	<!-- ************************* -->
+	<optionset name="config.targetoverrides" >
+		<option name="clean" value="exclude"/>
+	</optionset>
+
+	<!-- ******************* -->
+	<!-- Package declaration -->
+	<!-- ******************* -->
+	<property name="package.webWidget.dir"  value="@{PathGetFullPath('.')}"/>
+	<property name="package.webWidget.version"  value="@{PathGetFileName('${package.webWidget.dir}')}"/>
+	<package name="webWidget" targetversion="${package.webWidget.version}"/>
+
+	<!-- ******************** -->
+	<!-- Package dependencies -->
+	<!-- ******************** -->
+	<dependent name="OriginVersion" />
+	<dependent name="OriginConfig" />
+	<dependent name="Qt" />
+	<dependent name="libarchive" />
+	<dependent name="openSSL" />
+
+	<!-- ***************************** -->
+	<!-- Build Configuration properties-->
+	<!-- ***************************** -->
+  <BuildType name="webWidget.buildtype" from="OriginLibrary">
+    <option name="buildset.cc.options" if="${config-system} == pc">
+      ${option.value}
+      /FI ${package.webWidget.dir}/source/OriginCommon.h
+    </option>
+  </BuildType>
+  <property name="runtime.buildtype" value="webWidget.buildtype" />
+  <target name="generate-code" depends="moc-compile" />
+
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<property name="runtime.prebuildtarget" value="generate-code" />
+
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.vcproj.pre-build-step">
+		${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.prebuildtarget}
+	</property>
+
+	<property name="runtime.usedependencies">
+    		EABase
+		OriginVersion
+		libarchive
+		openSSL
+	</property>
+
+	<!-- EA Package build dependencies. Automatically gets include and link inclusion. -->
+	<property name="runtime.builddependencies">
+		Qt
+	</property>
+
+	<property name="runtime.includedirs" >
+		${package.webWidget.dir}
+		${package.webWidget.dir}/source
+		${package.webWidget.dir}/include
+		${package.webWidget.dir}/include/WebWidget
+	</property>
+
+	<!-- common source files -->
+	<fileset name="runtime.sourcefiles" basedir="${package.dir}">
+		<includes name="${package.webWidget.dir}/source/**/*.cpp" />
+	</fileset>
+
+	<fileset name="runtime.libs" >
+		<includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}/Qt5Gui${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}/Qt5Network${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}/Qt5Core${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}/Qt5WebKit${debug-suffix}.lib"/>
+		<includes name="${package.Qt.libdir}/Qt5Widgets${debug-suffix}.lib"/>
+	</fileset>
+
+	<target name="dumpsources">
+		<foreach property="fname" item="FileSet" in="runtime.sourcefiles">
+			<echo message="source ${fname}" />
+		</foreach>
+	</target>
+
+	<fileset name="runtime.headerfiles" basedir="${package.dir}">
+		<includes name="${package.webWidget.dir}/**/source/*.h" />
+		<includes name="${package.webWidget.dir}/include/**/*.h" />
+	</fileset>
+
+	<property name="runtime.res.includedirs">
+		${package.webWidget.dir}/include
+	</property>
+
+	<fileset name="runtime.resourcefiles">
+	</fileset>
+
+	<!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+	<fileset name="runtime.moc_sourcefiles" basedir="${package.webWidget.dir}" append="true">
+		<includes name="include/WebWidget/RemoteUpdateWatcher.h" />
+		<includes name="include/WebWidget/UpdateCache.h" />
+		<includes name="include/WebWidget/UpdateInstallation.h" />
+		<includes name="include/WebWidget/WidgetRepository.h" />
+		<includes name="include/WebWidget/WidgetView.h" />
+		<includes name="include/WebWidget/WidgetPage.h" />
+		<includes name="include/WebWidget/SignedWidgetFileProvider.h" />
+		<includes name="source/NativeInterfaceInjector.h" />
+	</fileset>
+
+	<!-- construct the paths to include the moc files into the build after generating. -->
+	<foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+		<property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+		<fileset name="runtime.sourcefiles" append="true">
+			<includes name="${sourcefile}" asis="true"/>
+		</fileset>
+	</foreach>
+
+	<!-- get the options from the current config -->
+	<property name="runtime.moc_defines" value="@{OptionSetGetValue('${runtime.buildtype}','cc.defines')}"/>
+	<property name="runtime.moc_includedirs" value="${runtime.includedirs}"/>
+
+</project>

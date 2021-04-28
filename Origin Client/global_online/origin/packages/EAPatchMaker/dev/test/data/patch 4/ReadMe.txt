@@ -1,0 +1,1 @@
+This patch is like patch 2 and 3 except it used both white-listing and black-listing. See the .eaPatchImpl IgnoreFileArray and UsedFileArray fields.

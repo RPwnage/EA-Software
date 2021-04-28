@@ -1,0 +1,136 @@
+<project>
+    <!-- Define platform source location: use dirtyplat is a base and just override for the special cases -->
+    <property name="tester2-source" value="${dirtyplat}"/>
+    <property name="tester2-source" value="unix" if="${config-system} == 'iphone' or ${config-system} == 'osx'"/>
+
+    <property name="package.T2Host.titleid" value="4E2A4DAD"/>
+    <property name="package.T2Host.PrimaryServiceConfigId" value="609a0100-276a-4f4a-b180-8aa04e2a4dad"/>
+
+    <Program name="T2Host">
+        <frompartial value="DSProgram" unless="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+        <frompartial value="WinDSProgram" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+
+        <includedirs>
+            ${package.dir}/sample/tester2/source
+
+            <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                ${package.dir}/sample/tester2/source/pc/resource
+            </do>
+        </includedirs>
+
+        <sourcefiles basedir="${package.dir}">
+            <includes fromfile="${package.dir}/sample/tester2/project/${tester2-source}/source.txt" if="@{FileExists('${package.dir}/sample/tester2/project/${tester2-source}/source.txt')}"/>
+            <includes fromfile="${package.dir}/sample/tester2/project/source.txt"/>
+
+            <!-- Add a special optionset only in the case that it is needed -->
+            <includes fromfile="${package.dir}/sample/tester2/project/${tester2-source}/sourcecpp.txt" if="@{FileExists('${package.dir}/sample/tester2/project/${tester2-source}/sourcecpp.txt')}" optionset="Program"/>
+        </sourcefiles>
+
+        <resourcefiles>
+            <includes name="${package.dir}/sample/tester2/source/pc/resource/T2Host.rc" if="${config-system} == 'pc' or ${config-system} == 'pc64'"/>
+        </resourcefiles>
+
+        <dependencies>
+            <auto>
+                DirtySDK/dirtysock
+                DirtySDK/common
+
+                <do if="${config-system} == 'pc' or ${config-system} == 'pc64'">
+                    DirtySDK/voipaux
+                </do>
+
+                <do if="${config-system} == 'capilano' or ${config-system} == 'kettle'">
+                    coreallocator
+                    EAAssert
+                    EABase
+                    EAMessage
+                    EASTL
+                    EASystemEventMessageDispatcher
+                    EAThread
+                    IEAController
+                    IEASystemEventMessageDispatcher
+                    IEAUser
+                    EAControllerUserPairing
+                    PPMalloc
+                </do>
+            </auto>
+        </dependencies>
+
+        <config>
+            <defines>
+                <do if="${config-system} == capilano">
+                    _XM_AVX_INTRINSICS_
+                    MIN_EXPECTED_XDK_VER=9386
+                    MAX_EXPECTED_XDK_VER=9386
+                </do>
+            </defines>
+
+            <warningsuppression>
+                <do if="${config-compiler} == 'vc'">
+                    -wd4054 <!-- 'type cast' : from function pointer 'int32_t (__cdecl *)(void *)' to data pointer 'void *' -->
+                    -wd4310 <!-- cast truncates constant value -->
+                    -wd4774 <!-- format string expected in argument 2 is not a string literal -->
+                </do>
+
+                <do if="${config-system} == 'capilano'">
+                    -wd4371 <!-- layout of class may have changed from a previous version of the compiler due to better packing of member 'type::member' -->
+                </do>
+
+                <do if="${config-system} == 'winrt' or ${config-system} == 'winprt'">
+                    -wd4574 <!-- 'NULL' is defined to be '0': did you mean to use #if NULL' -->
+                </do>
+
+                <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+                    -Wno-unused-but-set-variable
+                    -Wno-missing-braces
+                </do>
+            </warningsuppression>
+        </config>
+
+        <sdkreferences if="${config-system} == 'capilano'">
+            Xbox Services API, Version=8.0
+        </sdkreferences>
+
+        <script order="before" if="${config-system} == 'capilano'">
+            <optionset name="config-options-appxmanifestoptions">
+                <option name="Xbox_Live_Config">
+                    <![CDATA[
+                    <mx:Extension Category="xbox.live">
+                        <mx:XboxLive TitleId="${package.T2Host.titleid}" PrimaryServiceConfigId="${package.T2Host.PrimaryServiceConfigId}"/>
+                    </mx:Extension>
+
+                    <mx:Extension Category="xbox.multiplayer">
+                        <mx:XboxMultiplayer CanSuppressPartyChat="true" />
+                    </mx:Extension>
+                    ]]>
+                </option>
+                <option name="extension_options">
+                    ${option.value}
+                    Xbox_Live_Config
+                </option>
+                <option name="capabilities">
+                    ${option.value}
+                    kinectAudio
+                    kinectGamechat
+                </option>
+            </optionset>
+        </script>
+
+        <copylocal value="true" if="${Dll??false} and ${config-compiler} == 'vc'"/>
+    </Program>
+
+    <do if="${config-system} == 'capilano'">
+        <!-- pull in dirtysdk networkmanifest and add our own -->
+        <echo message="setting T2Host network manifest files"/>
+        <property name="runtime.T2Host.networking-manifest-files">
+            ${package.DirtySDK.networking-manifest-files}
+            ${package.dir}/scripts/sample/t2host-networkmanifest.xml
+        </property>
+
+        <!-- Copy over Shaders for Rendering -->
+        <copy file="${package.dir}\sample\tester2\source\xboxone\Tutorial05_PS.hlsl"
+              tofile="${package.configbindir}\T2Host\Tutorial05_PS.hlsl"/>
+        <copy file="${package.dir}\sample\tester2\source\xboxone\Tutorial05_VS.hlsl"
+              tofile="${package.configbindir}\T2Host\Tutorial05_VS.hlsl"/>
+    </do>
+</project>

@@ -1,0 +1,301 @@
+package com.ea.originx.automation.scripts.checkout;
+
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroPDP;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.dialog.SelectOriginAccessPlanDialog;
+import com.ea.originx.automation.lib.pageobjects.login.LoginPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessOrderConfirmationPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageCheckoutModalHeader;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageHeader;
+import com.ea.originx.automation.lib.pageobjects.originaccess.ProductLandingPageRightHeader;
+import com.ea.originx.automation.lib.pageobjects.store.*;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.vx.originclient.utils.Waits;
+import java.util.ArrayList;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+
+/**
+ * Tests the chain check out flow of the 'Join and Save' page
+ *
+ * @author caleung
+ */
+public class OAJoinAndSaveCheckout extends EAXVxTestTemplate {
+
+    public enum TEST_TYPE {
+        NON_SUBSCRIBER,
+        ANONYMOUS_USER
+    }
+
+    public void testJoinAndSaveCheckout(ITestContext context, OAJoinAndSaveCheckout.TEST_TYPE type) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+        final UserAccount userAccount = AccountManager.getInstance().registerNewThrowAwayAccountThroughREST();
+
+        // update to a subscribe and save entitlement once the feature is live
+        final EntitlementInfo vaultEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.FIFA_18);
+        final String vaultEntitlementName = vaultEntitlement.getName();
+
+        if (type == TEST_TYPE.NON_SUBSCRIBER) {
+            logFlowPoint("Log into Origin with a non-subscriber account."); // 1
+        } else {
+            logFlowPoint("Navigate to the store."); // 1
+        }
+        logFlowPoint("Navigate to PDP of a game in pre-order state."); // 2
+        logFlowPoint("Click on 'Learn More' and verify that it navigates to the product landing page."); // 3
+        logFlowPoint("Click on the 'Join and Pre-order' CTA in the header and verify Origin Access plan selection"
+                + " dialog appears."); // 4
+        logFlowPoint("Verify a step and a header appears in the Origin Access plan selection dialog."); // 5
+        logFlowPoint("Verify the description text is visible and is correct."); // 6
+        logFlowPoint("Verify there are monthly and yearly plans configured."); // 7
+        logFlowPoint("Verify the monthly plan is selected by default."); // 8
+        logFlowPoint("Verify there is a 'Next' button."); // 9
+        if (type == TEST_TYPE.NON_SUBSCRIBER) {
+            logFlowPoint("Verify clicking on the 'Next' button triggers the checkout modal."); // 10
+        } else {
+            logFlowPoint("Verify clicking on the 'Next' button prompts the user to log in."); // 10a
+            logFlowPoint("Log in as a non-subscriber and verify that the checkout modal is displayed."); // 10b
+        }
+        logFlowPoint("Verify the modal header consists of three step headers and are displayed correctly."); // 11
+        logFlowPoint("Verify step 1 header is enabled while the other headers are disabled."); // 12
+        logFlowPoint("Verify a description appears above the payment information."); // 13
+        logFlowPoint("Enter payment details, click 'Next', verify that the headers, product, price, and tax information are correct."); // 14
+        logFlowPoint("Verify the price in the sub-text of step 2 changes to the checkout total."); // 15
+        logFlowPoint("Verify clicking on 'Start Membership' navigates to Origin Access order confirmation page."); // 16
+        logFlowPoint("Verify step 2 changes to a check mark and the sub-text is shown correctly."); // 17
+        logFlowPoint("Verify the order confirmation text below the Origin Access logo is displayed and is correct"); // 18
+        logFlowPoint("Verify the legal text is displayed and is correct."); // 19
+        logFlowPoint("Click on 'Next' CTA in the modal and verify the review order page appears."); // 20
+        logFlowPoint("Verify headers are displayed correctly."); // 21
+        logFlowPoint("Verify the packart, game name, price after discount, strike through pricing with Origin Access"
+                + " discount applied message, and the total price is displayed"); // 22
+        logFlowPoint("Click on 'Pay Now' CTA and verify that the game purchase thank you modal appears."); // 23
+
+        // 1
+        WebDriver driver = startClientObject(context, client);
+        if (type == TEST_TYPE.NON_SUBSCRIBER) {
+            if (MacroLogin.startLogin(driver, userAccount)) {
+                logPass("Successfully logged into Origin with " + userAccount.getUsername() + ".");
+            } else {
+                logFailExit("Could not log into Origin with " + userAccount.getUsername() + ".");
+            }
+        } else {
+            StorePage storePage = new StorePage(driver);
+            storePage.waitForStorePageToLoad();
+            if (storePage.verifyStorePageReached()) {
+                logPass("Successfully navigated to Origin X store as an anonymous user.");
+            } else {
+                logFailExit("Could not navigate to Origin X store as an anonymous user.");
+            }
+        }
+
+        // 2
+        MacroPDP.loadPdpPage(driver, vaultEntitlement);
+        PDPHero pdpHero = new PDPHero(driver);
+        if (pdpHero.verifyPDPHeroReached()) {
+            logPass("Successfully navigated to " + vaultEntitlementName + "'s PDP page.");
+        } else {
+            logFailExit("Failed to navigate to " + vaultEntitlementName + "'s PDP page.");
+        }
+
+        // 3
+        new PDPHeroActionDescriptors(driver).clickOriginAccessLearnMoreLink();
+        if (new ProductLandingPageHeader(driver).verifyProductLandingPageReached()) {
+            logPass("Successfully navigated to product landing page.");
+        } else {
+            logFailExit("Failed to navigate to the product landing page.");
+        }
+
+        // 4
+        new ProductLandingPageRightHeader(driver).clickOnCTA();
+        SelectOriginAccessPlanDialog selectOriginAccessPlanDialog = new SelectOriginAccessPlanDialog(driver);
+        if (selectOriginAccessPlanDialog.isDialogVisible()) {
+            logPass("Verified that clicking on the CTA  prompts the Origin Access Plan selection dialog.");
+        } else {
+            logFailExit("Failed to verify that clicking on the CTA prompts the Origin Access Plan selection dialog.");
+        }
+
+        // 5
+        if (selectOriginAccessPlanDialog.areHeaderElementsVisible() && selectOriginAccessPlanDialog.isHeaderElementTextCorrect()) {
+            logPass("Verified that a step and a title are shown in the header.");
+        } else {
+            logFail("Failed to verify that a step or a title are shown in the header.");
+        }
+
+        // 6
+        if (selectOriginAccessPlanDialog.isDescriptionVisible() && selectOriginAccessPlanDialog.isDescriptionCorrect(vaultEntitlementName)) {
+            logPass("Verified that the description is visible and is correct.");
+        } else {
+            logFail("Failed to verify that the description is visible or it is correct.");
+        }
+
+        // 7
+        if (selectOriginAccessPlanDialog.verifyMonthlyAndYearlyPlansVisible()) {
+            logPass("Verified that both monthly and yearly plans are visible.");
+        } else {
+            logFail("Failed to verify that both monthly and yearly plans are visible.");
+        }
+
+        // 8
+        if (selectOriginAccessPlanDialog.getSelectedPlanDuration().equals("Monthly")) {
+            logPass("Verified that the default selected plan is the 'Monthly' plan.");
+        } else {
+            logFail("Failed to verify that the default selected plan is the 'Monthly' plan.");
+        }
+
+        // 9
+        if (selectOriginAccessPlanDialog.isNextButtonVisible()) {
+            logPass("Verified that the 'Next' button is visible.");
+        } else {
+            logFailExit("Failed to verify that the 'Next' button is visible.");
+        }
+
+        selectOriginAccessPlanDialog.clickNext();
+        if (type == TEST_TYPE.ANONYMOUS_USER) {
+            // 10a
+            ArrayList<String> windows = new ArrayList<>(driver.getWindowHandles());
+            // switch to login window
+            driver.switchTo().window(windows.get(1));
+            final LoginPage loginPage = new LoginPage(driver);
+            loginPage.waitForPageToLoad();
+            if (loginPage.verifyTitleIs("Sign in with your EA Account")) {
+                logPass("Verified that clicking on 'Next' prompts the user to log in.");
+            } else {
+                logFailExit("Failed to verify that clicking on 'Next' prompts the user to log in.");
+            }
+            loginPage.enterInformation(userAccount.getEmail(), userAccount.getPassword());
+            // switch back to parent window
+            driver.switchTo().window(windows.get(0));
+        }
+
+        // 10 and 10b
+        PaymentInformationPage paymentInformationPage = new PaymentInformationPage(driver);
+        paymentInformationPage.waitForPaymentInfoPageToLoad();
+        if (paymentInformationPage.verifyPaymentInformationReached()) {
+            logPass("Verified that the standard checkout flow is initiated.");
+        } else {
+            logFail("Failed to verify the standard checkout flow is initiated.");
+        }
+
+        // 11
+        ProductLandingPageCheckoutModalHeader productLandingPageCheckoutModalHeader = new ProductLandingPageCheckoutModalHeader(driver);
+        if (productLandingPageCheckoutModalHeader.verifyCheckoutModalHeaderVisible() && productLandingPageCheckoutModalHeader.verifyStepsTextCorrect(vaultEntitlementName)
+                && productLandingPageCheckoutModalHeader.verifyStepsSubTextCorrect(false)) {
+            logPass("Verified that the modal header is visible and step text are correct.");
+        } else {
+            logFail("Failed to verify that the modal header is visible or the step text are correct.");
+        }
+
+        // 12
+        if (productLandingPageCheckoutModalHeader.verifyStepOneActive() && productLandingPageCheckoutModalHeader.verifyStepTwoDisabled()
+                && productLandingPageCheckoutModalHeader.verifyStepThreeDisabled()) {
+            logPass("Verified that the active step and disabled steps are correct.");
+        } else {
+            logFail("Failed to verify that the active step and disabled steps are correct.");
+        }
+
+        // 13
+        if (paymentInformationPage.verifyDescriptionCorrect()) {
+            logPass("Verified that the description text is displayed and is correct.");
+        } else {
+            logFail("Failed to verify that the description text is displayed and is correct.");
+        }
+
+        // 14
+        driver.switchTo().defaultContent(); // switching to default frame because handlePaymentInfoPage handles the switching to iframe
+        MacroPurchase.handlePaymentInfoPageSubAndSave(driver);
+        ReviewOrderPage reviewOrderPage = new ReviewOrderPage(driver);
+        if (new ReviewOrderPage(driver).verifyReviewOrderPageReached()) {
+            boolean stepTwoActive = Waits.pollingWait(() -> productLandingPageCheckoutModalHeader.verifyStepTwoActive()); // need pollingWait to ensure it is updated
+            boolean stepOneCompleted = productLandingPageCheckoutModalHeader.verifyStepOneCompleted();
+            boolean stepThreeDisabled = productLandingPageCheckoutModalHeader.verifyStepThreeDisabled();
+            // check if tax, price, plan type correct here
+            if (stepTwoActive && stepOneCompleted && stepThreeDisabled && reviewOrderPage.checkJoinAndSaveOAReview("monthly")) {
+                logPass("Verified step 1 is complete, step 2 is active, step 3 is incomplete, and the product displayed "
+                        + "is Origin Access monthly plan with appropriate price and tax information.");
+            } else {
+                logFail("Failed to verify step 1 is complete, step 2 is active, step 3 is incomplete, and the product displayed "
+                        + "is Origin Access monthly plan with appropriate price and tax information.");
+            }
+        }
+
+        // 15
+        if (productLandingPageCheckoutModalHeader.verifyStepsSubTextCorrect(true)) {
+            logPass("Verified the price in the sub-header in step 2 changes to the checkout total.");
+        } else {
+            logFail("Failed to verify the price in the sub-header in step 2 changes to the checkout total.");
+        }
+
+        // 16
+        reviewOrderPage.clickStartMembershipButton();
+        OriginAccessOrderConfirmationPage originAccessOrderConfirmationPage = new OriginAccessOrderConfirmationPage(driver);
+        if (originAccessOrderConfirmationPage.verifyOAOrderConfirmationPageReached()) {
+            logPass("Verified clicking 'Start Membership' navigates to Origin Access confirmation dialog.");
+        } else {
+            logFail("Failed to verify clicking 'Start Membership' navigates to Origin Access confirmation dialog.");
+        }
+
+        // 17
+        if (Waits.pollingWait(() -> productLandingPageCheckoutModalHeader.verifyStepTwoSubheaderAfterOAPurchaseCorrect())) {
+            logPass("Verified step 2 sub-header text changed to 'Your membership has started.'.");
+        } else {
+            logFail("Failed to verify step 2 sub-header text changed to 'Your membership has started.'.");
+        }
+
+        // 18
+        if (originAccessOrderConfirmationPage.verifyDescriptionCorrect(vaultEntitlementName)) {
+            logPass("Verified description is correct.");
+        } else {
+            logFail("Failed to verify description is correct.");
+        }
+
+        // 19
+        if (originAccessOrderConfirmationPage.verifyLegalTextDisplayed()) {
+            logPass("Verified legal text is displayed.");
+        } else {
+            logFail("Failed to verify legal text is displayed.");
+        }
+
+        // 20
+        originAccessOrderConfirmationPage.clickNextBtn();
+        if (reviewOrderPage.verifyReviewOrderPageReached()) {
+            logPass("Verified that clicking 'Next' brings user to review order page.");
+        } else {
+            logFailExit("Failed to verify that clicking 'Next' brings user to review order page.");
+        }
+
+        // 21
+        if (productLandingPageCheckoutModalHeader.verifyHeadersCorrectDuringStepThree()) {
+            logPass("Verified the header is correct.");
+        } else {
+            logFail("Failed to verify the header is correct.");
+        }
+
+        // 22
+        if (reviewOrderPage.checkJoinAndSaveReview(vaultEntitlementName)) {
+            logPass("Verified packart, game name, price after discount, strike through pricing with Origin Access"
+                    + " Discount applied message, and total price are displayed.");
+        } else {
+            logFail("Failed to verify packart, game name, price after discount, strike through pricing with Origin Access "
+                    + "Discount applied message, and total price are displayed.");
+        }
+
+        // 23
+        reviewOrderPage.clickPayNow();
+        if (new ThankYouPage(driver).verifyThankYouPageReached()) {
+            logPass("Verified that clicking on 'Pay Now' brings the user to the game purchase thank you modal.");
+        } else {
+            logFail("Failed to verify that clicking on 'Pay Now' brings the user to the game purchase thank you modal.");
+        }
+
+        softAssertAll();
+    }
+}

@@ -1,0 +1,182 @@
+<project>
+    <!-- Define the dirtysock platform names used for source locations -->
+    <!-- remove when EATech Gen4 packages are released -->
+    <property name="dirtyplat" value="${config-system}"/>
+    <property name="dirtyplat" value="xboxone" if="${config-system} == 'capilano'"/>
+    <property name="dirtyplat" value="pc" if="${config-system} == 'pc64'"/>
+    <property name="dirtyplat" value="unix" if="${config-system} == 'unix' or ${config-system} == 'unix64'"/>
+    <property name="dirtyplat" value="ps4" if="${config-system} == 'kettle'"/>
+
+    <!-- set config-vs-version on platforms we use VS with, currently the only one that it doesn't get
+         set for by default is PS4. different customers might always set this
+         so we should do the same so we can validate the same changes  -->
+    <set-config-vs-version if="${config-system} == 'kettle'"/>
+
+    <!-- Defines custom build types for DirtySDK modules.
+         This is the correct way to set custom compiler, linker, and librarian flags in Framework3.
+         The buildtype is based upon if we are building DLL or not (see Initialize.xml)
+    -->
+    <PartialModule name="DSLibrary" buildtype="${dirtysdk-buildtype}">
+        <config>
+            <defines if="${Dll??false}">
+                DIRTYCODE_API=__declspec(dllexport)
+            </defines>
+
+            <warningsuppression>
+                <do if="${config-compiler} == 'vc'">
+                    -wd4242 <!-- 'identifier' : conversion from 'type1' to 'type2', possible loss of data -->
+                    -wd4244 <!-- 'conversion' conversion from 'type1' to 'type2', possible loss of data -->
+                </do>
+
+                <!-- These warnings are already suppressed on most of the capilano configurations, they are just missing for WinRTRuntimeComponent -->
+                <do if="${config-system} == 'capilano'">
+                    -wd4365 <!-- conversion from 'long' to 'unsigned long', signed/unsigned mismatch -->
+                    -wd4946 <!-- reinterpret_cast used between related classes: 'class 1' and 'class 2' -->
+                </do>
+
+                <!-- VS2015 suppressions that we cannot fix without our code -->
+                <do if="${config-vs-version??} == '14.0'">
+                    <do if="${config-compiler} == 'vc'">
+                        -wd5031 <!-- mismatched #pragma(push) from windows.h-->
+                        -wd5032 <!-- mismatched #pragma(pop) from windows.h -->
+                    </do>
+
+                    <do if="${config-system} == 'capilano'">
+                        -wd4472 <!-- 'T' is a native enum: add an access specifier (private/public) to declare a WinRT enum -->
+                        -wd5026 <!-- move constructor was implicitly defined as deleted because a base class move constructor is inaccessible or deleted -->
+                        -wd5027 <!-- move constructor was implicitly defined as deleted because a base class move constructor is inaccessible or deleted -->
+                        -wd4628 <!-- digraphs not supported for -Ze. Character sequence '<:' not interpreted as alternate token for '[' -->
+                    </do>
+
+                </do>
+
+                <do if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    -Wno-multichar
+                </do>
+            </warningsuppression>
+
+            <buildoptions>
+                <option name="buildset.cc.options" if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    ${option.value}
+                    -Wextra
+                    -Wformat=2
+                    -Winit-self
+                    -Wmissing-declarations
+                    -Wmissing-field-initializers
+                    -Wold-style-definition
+                    -Wpointer-arith
+                    -Wsign-compare
+                    -Wstrict-aliasing
+                    -Wstrict-prototypes
+                    -Wuninitialized
+                    -Wwrite-strings
+                    -fno-omit-frame-pointer
+                </option>
+
+                <!-- Only fails on android-arm-clang builds -->
+                <option name="buildset.cc.options" if="(${config-compiler} == 'gcc' or ${config-compiler} == 'clang') and ${config-platform} != 'android-arm-clang'">
+                    ${option.value}
+                    -Wunreachable-code
+                </option>
+                <!-- Only fails on android-arm-gcc builds -->
+                <option name="buildset.cc.options" if="(${config-compiler} == 'gcc' or ${config-compiler} == 'clang') and ${config-platform} != 'android-arm-gcc'">
+                    ${option.value}
+                    -Wshadow
+                </option>
+
+                <option name="buildset.link.options" if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    ${option.value}
+                    -rdynamic
+                </option>
+
+                <!-- Setting the option here, since we are using optionsets to trigger the C++ options this flag doesn't come in with the WinRTCppLibrary -->
+                <option name="buildset.lib.options" if="${config-system} == 'capilano'">
+                    ${option.value}
+                    -IGNORE:4264
+                </option>
+            </buildoptions>
+        </config>
+    </PartialModule>
+
+    <PartialModule name="DSProgram" buildtype="CProgram">
+        <config>
+            <warningsuppression>
+                <do if="${config-compiler} == 'vc'">
+                    -wd4242 <!-- 'identifier' : conversion from 'type1' to 'type2', possible loss of data -->
+                    -wd4244 <!-- 'conversion' conversion from 'type1' to 'type2', possible loss of data -->
+                </do>
+
+                <do if="${config-vs-version??} == '14.0'">
+                    <do if="${config-compiler} == 'vc'">
+                        -wd5031 <!-- mismatched #pragma(push) from windows.h-->
+                        -wd5032 <!-- mismatched #pragma(pop) from windows.h -->
+                    </do>
+
+                    <do if="${config-system} == 'capilano'">
+                        -wd4472 <!-- 'T' is a native enum: add an access specifier (private/public) to declare a WinRT enum -->
+                        -wd5027 <!-- move constructor was implicitly defined as deleted because a base class move constructor is inaccessible or deleted -->
+                        -wd5029 <!-- nonstandard extension used: alignment attributes in C++ apply to variables, data members and tag types only -->
+                    </do>
+                </do>
+
+                <do if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    -Wno-multichar
+                    -Wno-missing-braces
+                </do>
+            </warningsuppression>
+
+            <buildoptions>
+                <option name="buildset.cc.options" if="${config-compiler} == 'gcc' or ${config-compiler} == 'clang'">
+                    ${option.value}
+                    -Wsign-compare
+                    -Wstrict-prototypes
+                    -Wmissing-prototypes
+                </option>
+
+                <option name="buildset.cc.options" if="${config-system} == 'kettle'">
+                    ${option.value}
+                    -Wmissing-field-initializers
+                </option>
+
+                <option name="buildset.cc.options" if="${config-system} == 'iphone' or ${config-system} == 'iphonesim' or ${config-system} == 'osx'">
+                    ${option.value}
+                    -Wformat
+                    -Wimplicit-int
+                    -Wshadow
+                </option>
+            </buildoptions>
+        </config>
+
+        <libraries>
+            <!-- build needs this to avoid this link error: "LNK2038: mismatch detected for 'vccorlib_lib_should_be_specified_before_msvcrt_lib_to_linker': value '1' doesn't match value '0' in MSVCRTD.lib(appinit.obj)" -->
+            <includes name="vccorlib.lib" asis="true" if="${config-system} == 'capilano' and ${config-name} == 'dev-opt'"/>
+            <includes name="vccorlibd.lib" asis="true" if="${config-system} == 'capilano' and ${config-name} != 'dev-opt'"/>
+
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAudioOut_stub_weak.a" asis="true" if="${config-system} == 'kettle'"/>
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceErrorDialog_stub_weak.a" asis="true" if="${config-system} == 'kettle'"/>
+            <includes name="${package.kettlesdk.libdir}/${lib-prefix}SceAppContent_stub_weak.a" asis="true" if="${config-system} == 'kettle'"/>
+        </libraries>
+    </PartialModule>
+
+    <PartialModule name="WinDSProgram" buildtype="WindowsProgram">
+        <config>
+            <warningsuppression>
+                -wd4242 <!-- 'identifier' : conversion from 'type1' to 'type2', possible loss of data -->
+                -wd4244 <!-- 'conversion' conversion from 'type1' to 'type2', possible loss of data -->
+                -wd4201 <!-- nonstandard extension used : nameless struct/union (caused by richedit.h) -->
+            </warningsuppression>
+        </config>
+
+        <libraries>
+            <includes name="ws2_32.lib" asis="true"/>
+        </libraries>
+    </PartialModule>
+
+    <!-- optimized build type for certain files -->
+    <BuildType name="DSOptimized" from="${dirtysdk-buildtype}">
+        <option name="optimization"                     value="on"/>
+        <option name="iteratorboundschecking"           value="off"/>
+        <option name="runtimeerrorchecking"             value="off"/>
+        <option name="disable_reference_optimization"   value="off"/>
+    </BuildType>
+</project>

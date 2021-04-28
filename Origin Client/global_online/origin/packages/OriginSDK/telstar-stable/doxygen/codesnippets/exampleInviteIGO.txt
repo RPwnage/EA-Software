@@ -1,0 +1,40 @@
+void exampleInviteIGO()
+{
+   // 1. Find friends.
+   OriginHandleT handle;
+   uint32_t TotalCount;
+
+   // Call the function to retrieve a handle that allows the friends to be retrieved.
+   // Data associated with this query is only valid for as long as the handle exists.
+   OriginErrorT err = OriginQueryFriendsSync(OriginGetDefaultUser(), &TotalCount, 10000, &handle);
+
+   if (err == ORIGIN_SUCCESS)
+   {
+       uint32_t total, available;
+       // Check that there is data available.
+       err = OriginGetEnumerateStatus(handle, &total, &available);
+
+       if ((err == ORIGIN_SUCCESS) && total)
+       {
+           // This is the list of friends we can send invites to.
+           OriginFriendT * Friends = new OriginFriendT[total];
+           uint32_t count;
+           // Read data from the enumerator using the handle.
+           err = OriginReadEnumeration(handle, Friends, total * sizeof(OriginFriendT), 0, ORIGIN_READ_ALL_DATA, &count);
+           if ((err == ORIGIN_SUCCESS) && count)
+           {
+               OriginUserT * inviteList = new OriginUserT[count];
+               for (uint32_t i=0; i<count; i++)
+                   inviteList[i] = Friends[i].UserId;
+
+               // 2. Send an invite to each friend.
+               // Use this function to show the In-Game Overlay Invite dialog.
+               OriginErrorT err = OriginShowInviteUI(OriginGetDefaultUser(), inviteList, count, "Invite a friend");
+               delete[] inviteList;
+           }
+           delete[] Friends;
+       }
+   }
+   // By destroying the handle, the data associated with it becomes invalid.
+   err = OriginDestroyHandle(handle);
+}

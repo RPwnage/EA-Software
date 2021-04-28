@@ -1,0 +1,150 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.*;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.utils.OriginAccessService;
+import com.ea.vx.originclient.utils.ProcessUtil;
+import com.ea.originx.automation.lib.pageobjects.account.AccountSettingsPage;
+import com.ea.originx.automation.lib.pageobjects.account.OrderHistoryLine;
+import com.ea.originx.automation.lib.pageobjects.account.OrderHistoryPage;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessPage;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileHeader;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileWishlistTab;
+import com.ea.originx.automation.lib.pageobjects.profile.WishlistTile;
+import com.ea.originx.automation.lib.pageobjects.store.PDPHeroActionDescriptors;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.helpers.ContextHelper;
+
+import java.util.concurrent.TimeUnit;
+
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Test Free Subscription Trial after expiring the trial
+ *
+ * @author nvarthakavi
+ */
+public class OAFreeTrialExpired extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 39943)
+    @Test(groups = {"originaccess", "full_regression", "int_only"})
+    public void testFreeTrialExpired(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final String username = userAccount.getUsername();
+        final boolean isClient = ContextHelper.isOriginClientTesing(context);
+        EntitlementInfo entitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_PREMIUM);
+
+        logFlowPoint("Login as a expired user for Origin Access Free-Trial"); //1
+        logFlowPoint("Navigate to a unowned vault entitlement's PDP Page to verify there are no origin access discounts for the user"); //2
+        logFlowPoint("Navigate to the Wishlist Tab and verify there are no origin access discounts for an expired user"); //3
+        if (isClient) {
+            logFlowPoint("Navigate to the Origin Access Home Page and verify there is only 'Join Access' Button"); //4
+        } else { //Browser
+            logFlowPoint("Log out and navigate to the Origin Access Page and verify there is only 'Start Your Trial' Button when no user logged in"); //4
+            logFlowPoint("Login back and verify there is only 'Join Access' Button in the Origin Access Page, when logged into a free trial expired user"); //5
+        }
+        logFlowPoint("Purchase Origin access and Navigate to My Account-Order History and verify the order history for subscription in the page"); //5-Client and 6-Browser
+
+        // Initial Setup to buy subscription and cancel it
+        WebDriver driver = startClientObject(context, client);
+        MacroLogin.startLogin(driver, userAccount);
+        MacroOriginAccess.purchaseOriginAccess(driver);
+        TimeUnit.MINUTES.sleep(1); // This sleep is required as in between purchase and cancellation there should be a time gap to get the cancellation done
+        OriginAccessService.immediateCancelSubscription(userAccount);
+        TimeUnit.MINUTES.sleep(1); // This sleep is added to wait for a while to get the cancellation updated
+        new MiniProfile(driver).selectSignOut();
+
+        //1
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully logged in with: " + username + "(a 7-day trial expired user)");
+        } else {
+            logFailExit("Could not log in with: " + username + "(a 7-day trial expired user)");
+        }
+
+        //2
+        MacroWishlist.addToWishlist(driver, entitlement);
+        PDPHeroActionDescriptors pdpHeroDescriptors = new PDPHeroActionDescriptors(driver);
+        boolean isDiscountsPDP = pdpHeroDescriptors.verifyOriginAccessDiscountIsVisible();
+        if (!isDiscountsPDP) {
+            logPass("Verified there are no origin access discounts visible in the PDP Page of " + entitlement.getName());
+        } else {
+            logFailExit("Failed:there are origin access discounts visible, which should not be");
+        }
+
+        //3
+        pdpHeroDescriptors.clickViewWishlistLink();
+        new ProfileHeader(driver).waitForWishlistTabToLoad();
+        WishlistTile wishlistTile = new ProfileWishlistTab(driver).getWishlistTile(entitlement.getOfferId());
+        boolean isDiscountWishlist = wishlistTile.verifyOriginAccessDiscountIsVisible();
+        if (!isDiscountWishlist) {
+            logPass("Verified there are no origin access discounts visible in the Wishlist Page for " + entitlement.getName());
+        } else {
+            logFailExit("Failed:there are origin access discounts visible, which should not be");
+        }
+
+        //4
+        client.stop();
+        ProcessUtil.killOriginProcess(client);
+        driver = startClientObject(context, client);
+        MacroLogin.startLogin(driver, userAccount);
+        new NavigationSidebar(driver).clickOriginAccessLink();
+        new OriginAccessPage(driver).refreshPageForJoinButton(); // Try with reloads to wait for the change to happen
+        if (isClient) {
+            boolean isClientJoinNow = new OriginAccessPage(driver).verifyJoinAccessHeroButtonExists();
+            if (isClientJoinNow) {
+                logPass("Verified there is only 'Join Access' Button");
+            } else {
+                logFailExit("Failed:There is no 'Join Access' Button");
+            }
+        } else {
+            new MiniProfile(driver).selectSignOut();
+            new NavigationSidebar(driver).gotoOriginAccessPage();
+            boolean isFreeTrialLogoutBrowser = new OriginAccessPage(driver).verifyFreeTrialHeroButtonExists();
+            if (isFreeTrialLogoutBrowser) {
+                logPass("Verified there is only 'Start Your Trial' Button when no user is logged in");
+            } else {
+                logFailExit("Failed:There is no 'Start Your Trial' Button when no user is logged in");
+            }
+
+            //5 - Browser
+            MacroLogin.startLogin(driver, userAccount);
+            boolean isJoinNowLoginBrowser = new OriginAccessPage(driver).verifyJoinAccessHeroButtonExists();
+            if (isJoinNowLoginBrowser) {
+                logPass("Verified there is only 'Join Access' Button when logged into a free trial expired user");
+            } else {
+                logFailExit("Failed:There is no 'Join Access' Button when logged into a free trial expired user");
+            }
+        }
+
+        //5-Client and 6-Browser
+        MacroOriginAccess.purchaseOriginAccess(driver);
+        AccountSettingsPage accountSettingsPage = new AccountSettingsPage(driver);
+        accountSettingsPage.navigateToIndexPage();
+        accountSettingsPage.gotoOrderHistorySection();
+        OrderHistoryLine orderOriginAccess = new OrderHistoryPage(driver).getOrderHistoryLine(1);
+        OrderHistoryLine orderFreeTrial = new OrderHistoryPage(driver).getOrderHistoryLine(2);
+        boolean isOrdersExists = orderFreeTrial.verifyOriginAccessFreeTrialText() && orderOriginAccess.verifyOriginAccessText();
+        if (isOrdersExists) {
+            logPass("Verified there are two orders for origin access free and normal subscription in MyAccount-Order History Page");
+        } else {
+            logFailExit("Failed:There are no orders for origin access free and normal subscription in MyAccount-Order History Page");
+        }
+
+        softAssertAll();
+
+    }
+}

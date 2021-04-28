@@ -1,0 +1,28 @@
+var structVoipCommonRefT =
+[
+    [ "_pad", "d9/d06/structVoipCommonRefT.html#af553b135b3efe65c498f73c4996f1ec9", null ],
+    [ "bApplyChannelConfig", "d9/d06/structVoipCommonRefT.html#aaf4acc59c763f4af925d0bc25c97e9d2", null ],
+    [ "bPrivileged", "d9/d06/structVoipCommonRefT.html#aa435d599dd205b477eb2b23671453137", null ],
+    [ "bUseDefaultSharedChannelConfig", "d9/d06/structVoipCommonRefT.html#a26d4c3e47a5d52afb315afb7ac69558e", null ],
+    [ "Connectionlist", "d9/d06/structVoipCommonRefT.html#a51f9e7c1f10f8059e8de3840ed0260d7", null ],
+    [ "iCustomSharedChannels", "d9/d06/structVoipCommonRefT.html#ab246e841750a450680bc9c50c27d74b5", null ],
+    [ "iDefaultSharedChannels", "d9/d06/structVoipCommonRefT.html#ac65bb0345de55910bc8ef650855d664b", null ],
+    [ "iLocalChannels", "d9/d06/structVoipCommonRefT.html#a28b84123003a77e71f185bea752c5a3b", null ],
+    [ "pCallback", "d9/d06/structVoipCommonRefT.html#ac3ce07e494ef76eb76e4c252a45a3718", null ],
+    [ "pHeadset", "d9/d06/structVoipCommonRefT.html#ace0e20789bd7a69c6d086b39ef258a3a", null ],
+    [ "pUserData", "d9/d06/structVoipCommonRefT.html#a4d247f63cbec2b8e1f24c1ecc53c249e", null ],
+    [ "ThreadCrit", "d9/d06/structVoipCommonRefT.html#a6fe91ea0a5be3f78cd3b180c4ca45759", null ],
+    [ "uChanRecvMask", "d9/d06/structVoipCommonRefT.html#a303657c0abc48886ae209209d755098d", null ],
+    [ "uChanSendMask", "d9/d06/structVoipCommonRefT.html#a955ff42b365b3def88c65d58ba7253df", null ],
+    [ "uCustomSharedModes", "d9/d06/structVoipCommonRefT.html#acbbed6670969e30acf99f2a962c09c4c", null ],
+    [ "uDefaultSharedModes", "d9/d06/structVoipCommonRefT.html#aff49984b1a0f9e6bea5942378140f6c0", null ],
+    [ "uLastFrom", "d9/d06/structVoipCommonRefT.html#a439a14c2fa048c46490aabd516a4025e", null ],
+    [ "uLastHsetStatus", "d9/d06/structVoipCommonRefT.html#a3b81c281c82b31f86f1f31273c6016da", null ],
+    [ "uLastLocalStatus", "d9/d06/structVoipCommonRefT.html#a18a95da6e33818e34512e8910bf3b29c", null ],
+    [ "uLocalChannelSelection", "d9/d06/structVoipCommonRefT.html#ae965ef95b5773691a52b214c86398e09", null ],
+    [ "uLocalModes", "d9/d06/structVoipCommonRefT.html#a89f574f55a44f5a99ef83d88786eea28", null ],
+    [ "uPortHeadsetStatus", "d9/d06/structVoipCommonRefT.html#a3300e8a1d81b4e681f64da9c1175eb93", null ],
+    [ "uRemoteChannelSelection", "d9/d06/structVoipCommonRefT.html#a5d3ca6684e01bd6b0b07462a60ecc03a", null ],
+    [ "uUserMicrValue", "d9/d06/structVoipCommonRefT.html#acf8488c96148d30b2b2ddb46ef70188b", null ],
+    [ "uUserSpkrValue", "d9/d06/structVoipCommonRefT.html#aef91508c93f5e4f43c780209da704980", null ]
+];

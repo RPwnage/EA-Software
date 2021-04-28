@@ -1,0 +1,568 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="OriginDeveloperTool" default="build">
+    <!-- ************************* -->
+    <!-- EAConfig target overrides -->
+    <!-- ************************* -->
+    <optionset name="config.targetoverrides" >
+        <option name="clean" value="exclude"/>
+    </optionset>
+
+    <property name="package.OriginDeveloperTool.dir"  value="@{PathGetFullPath('.')}"/>
+    <property name="package.OriginDeveloperTool.version"  value="@{PathGetFileName('${package.OriginDeveloperTool.dir}')}"/>
+    <property name="package.OriginDeveloperTool.lang.res.dir" value="${package.OriginDeveloperTool.dir}/resources/lang" />
+    <package name="OriginDeveloperTool" targetversion="${package.OriginDeveloperTool.version}"/>
+    <property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+
+    <!-- ******************** -->
+    <!-- Package dependencies -->
+    <!-- ******************** -->
+    <dependent name="ActivePython" />
+    <dependent name="libarchive" />
+    <dependent name="originClient" />
+    <dependent name="OriginConfig" />
+    <dependent name="OriginLegacyApp" />
+    <dependent name="OriginUtils" />
+    <dependent name="OriginVersion" />
+    <dependent name="Qt" unless="${noqt}"/>
+    <dependent name="openSSL" />
+    <dependent name="engine" />
+    <dependent name="services" />
+    <dependent name="TelemetryAPI" />
+    <dependent name="uitoolkit" />
+    <dependent name="webWidget" />
+
+    <!-- ******************* -->
+    <!-- Package declaration -->
+    <!-- ******************* -->
+    <property name="runtime.buildmodules" value="OriginDeveloperTool"/>
+
+    <property name="config-xcode-type" value="Debug" if="${config-type} == 'debug'" />
+    <property name="config-xcode-type" value="Release" if="${config-type} == 'opt'" />
+
+    <property name="runtime.OriginDeveloperTool.outputdir" value="${package.originClient.dir}/runtime/plugins/OriginDeveloperTool" if="${config-system} == pc" />
+    <property name="runtime.OriginDeveloperTool.outputdir" value="${nant.project.buildroot}/OriginBootstrap/dev-mac/SubProjects/OriginDeveloperTool/dev/OriginDeveloperTool/build/${config-xcode-type}/OriginDeveloperTool.plugin" if="${config-system} == 'osx'" />
+    <property name="runtime.OriginDeveloperTool.eaigameprojdir" value="${runtime.OriginDeveloperTool.outputdir}" if="${config-system} == 'pc'" />
+    <property name="runtime.OriginDeveloperTool.eaigameprojdir" value="${nant.project.buildroot}/../../../../OriginBootstrap/dev-mac/build/OriginBootstrap/dev-mac/SubProjects/OriginDeveloperTool/dev/OriginDeveloperTool/build/${config-xcode-type}/OriginDeveloperTool.plugin" if="${config-system} == 'osx'" />
+    <property name="runtime.OriginDeveloperTool.xcode-osx-template-dir" value="${package.OriginDeveloperTool.dir}/XCodeTemplate/OriginDeveloperTool-xcode.template" />
+    <property name="runtime.OriginDeveloperTool.plist.template" value="${runtime.OriginDeveloperTool.xcode-osx-template-dir}/Info.plist.template" />
+    <property name="runtime.OriginDeveloperTool.plist" value="${runtime.OriginDeveloperTool.xcode-osx-template-dir}/Info.plist" />
+    <property name="runtime.OriginDeveloperTool.osx-extra-link-options" value="-sectcreate __TEXT __info_plist ${runtime.OriginDeveloperTool.plist} -ObjC -stdlib=libc++ -undefined dynamic_lookup" />
+    <property name="runtime.OriginDeveloperTool.outputname" value="OriginDeveloperTool" />
+    <property name="runtime.OriginDeveloperTool.outputfile" value="${runtime.OriginDeveloperTool.outputname}.dll" if="${config-system} == 'pc'" />
+    <property name="runtime.OriginDeveloperTool.outputfile" value="${runtime.OriginDeveloperTool.outputname}.dylib" if="${config-system} == 'osx'" />
+    <property name="package.OriginDeveloperTool.tempdir" value="${package.OriginDeveloperTool.dir}/temp" />
+    <property name="package.OriginDeveloperTool.targetdir" value="${package.OriginDeveloperTool.dir}/target" />
+    <property name="sign.basedir" value="${runtime.OriginDeveloperTool.outputdir}" if="${config-system} == 'osx'" />
+    <property name="dip.output.dir" value="${package.OriginDeveloperTool.targetdir}/IMAGE/DIP"/>
+    <property name="dirtysdk-samples" value="false" />
+    <!-- ************************** -->
+    <!-- Additional Include scripts -->
+    <!-- ************************** -->
+    <include file="${package.OriginDeveloperTool.dir}/scripts/targets/webwidget.xml" />
+
+    <!-- ***************************** -->
+    <!-- Build Configuration properties-->
+    <!-- ***************************** -->
+    <BuildType name="OriginDeveloperTool.buildtype" from="OriginDLL">
+      <option name="buildset.cc.defines">
+          ${option.value}
+          ORIGIN_PLUGIN
+      </option>
+      <option name="buildset.cc.defines" if="${config-system} == pc">
+          ${option.value}
+          NOMINMAX
+      </option>
+      <option name="buildset.cc.options" if="${config-system} == 'pc'">
+        ${option.value}
+        /FI ${package.OriginDeveloperTool.dir}/source/OriginCommon.h
+      </option>
+    </BuildType>
+
+    <!-- Remove unneeded default frameworks -->
+    <property name="runtime.OriginDeveloperTool.remove.defines" if="${config-system} == 'pc'">
+      EA_DLL
+    </property>
+
+    <property name="runtime.OriginDeveloperTool.remove.link.options" if="${config-system} == 'osx'">
+      -framework CoreServices
+      -framework AudioToolBox
+      -framework CoreServices
+    </property>    
+
+    <property name="runtime.OriginDeveloperTool.buildtype" value="OriginDeveloperTool.buildtype" />
+
+    <!-- ********************* -->
+    <!-- Runtime configuration -->
+    <!-- ********************* -->
+    <property name="python.exe" value="python" if="${config-system} != 'pc'" />
+    <!-- Windows needs ActivePython -->
+    <property name="python.exe" value="${package.ActivePython.exe}" if="${config-system} == 'pc'" />
+
+    <!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+    <property name="generate.code.targets" value="setup-generate-code moc-compile ui-compile webwidget-compile-all"/>
+    <property name="generate.code.targets" value="${property.value} qt-rc-compile" unless="${noqt}"/>
+    <target name="generate-code" depends="${generate.code.targets}" />
+    <property name="runtime.OriginDeveloperTool.prebuildtarget" value="generate-code" />
+
+    <!-- VS Prebuild target. Will set this to execute in the VS project. -->
+    <property name="runtime.OriginDeveloperTool.vcproj.pre-build-step">
+        ${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.OriginDeveloperTool.prebuildtarget}
+    </property>
+
+    <property name="runtime.OriginDeveloperTool.builddependencies">
+        EABase
+        EAStdC
+        EATrace
+        EACallstack
+        zlib
+        coreallocator
+        EAIO
+        EATrace
+        EASTL
+        DirtySDK
+        PPMalloc
+        openSSL
+        LSXWrapper
+        libarchive
+    </property>
+
+    <property name="runtime.OriginDeveloperTool.builddependencies" if="${config-system} == pc">
+        ${property.value}
+        originClient
+    </property>
+    
+    <property name="runtime.OriginDeveloperTool.buildonlydependencies" if="${config-system} == 'osx'">
+        originClient
+    </property>
+
+    <property name="runtime.OriginDeveloperTool.usedependencies">
+        OriginConfig
+        OriginVersion
+    </property>
+    
+    <property name="runtime.OriginDeveloperTool.usedependencies" unless="${noqt}">
+        ${property.value}
+        Qt
+    </property>
+
+    <property name="sign.filelist" >
+      Contents/MacOS/${runtime.OriginDeveloperTool.outputfile}
+    </property>
+
+    <property name="sign.dirlist" >
+    </property>
+
+    <property name="runtime.OriginDeveloperTool.includedirs" >
+        ${package.OriginDeveloperTool.dir}/include
+        ${package.OriginDeveloperTool.dir}/jsinterface
+        ${package.OriginDeveloperTool.dir}/widgets
+        ${package.OriginDeveloperTool.dir}/views/source
+        ${package.engine.includedirs}
+        ${package.engine.dir}/model/source
+        ${package.originClient.dir}
+        ${package.originClient.includedirs}
+        ${package.originClient.dir}/common/source
+        ${package.originClient.dir}/websupport/source
+        ${package.originClient.dir}/widgets/logoutExit/source
+        ${package.OriginLegacyApp.dir}/source/ui
+        ${package.TelemetryAPI.dir}/include
+        ${package.services.includedirs}
+        ${package.uitoolkit.includedirs}
+        ${package.webWidget.includedirs}
+        ${moc.output.dir}
+        ${ui.output.dir}
+    </property>
+
+    <!-- common source files -->
+    <fileset name="runtime.OriginDeveloperTool.sourcefiles" basedir="${package.OriginDeveloperTool.dir}">
+        <includes name="jsinterface/*.cpp" />
+        <includes name="source/*.cpp" />
+        <includes name="views/*.cpp" />
+        <includes name="widgets/*.cpp" />
+        <includes name="views/source/*.cpp" />
+    </fileset>
+
+    <!-- strip out platform specific files -->
+    <fileset name="runtime.OriginDeveloperTool.sourcefiles" basedir="${package.OriginDeveloperTool.dir}" append="true">
+        <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+        <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    </fileset>
+
+    <fileset name="runtime.OriginDeveloperTool.libs">
+        <group if="${config-system} == 'pc'" unless="${noqt}">
+            <includes name="${package.openSSL.libdir}/libeay32${debug-suffix}.lib"/>
+            <includes name="${package.openSSL.libdir}/ssleay32${debug-suffix}.lib"/>
+            
+            <includes name="${package.Qt.libdir}/qtmain${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Xml${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5XmlPatterns${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Gui${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Network${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Core${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5WebKit${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5WebKitwidgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Widgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Test${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5PrintSupport${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Multimedia${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5MultimediaWidgets${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/Qt5Sql${debug-suffix}.lib"/>
+            <includes name="${package.Qt.libdir}/../plugins/platforms/qwindows${debug-suffix}.lib"/>
+            
+            <includes name="${package.libarchive.dir}/Lib/archive_static.Lib"/> 
+            
+            <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/Ole32.Lib" />
+        </group>
+        <group if="${config-system} == 'osx'" >
+        </group>
+    </fileset>
+
+    <fileset name="runtime.OriginDeveloperTool.headerfiles" basedir="${package.OriginDeveloperTool.dir}">
+        <includes name="**/*.h" />
+    </fileset>
+
+    <property name="runtime.OriginDeveloperTool.res.includedirs">
+        ${package.OriginDeveloperTool.dir}/include
+        ${package.OriginVersion.dir}/include
+    </property>
+
+    <do if="${config-system} == 'pc'">      
+        <fileset name="runtime.OriginDeveloperTool.resourcefiles">
+            <includes name="${package.OriginDeveloperTool.dir}/resources/pc/OriginDeveloperTool.rc" />
+        </fileset>
+    </do>
+
+    <fileset name="runtime.ui_sourcefiles" basedir="${package.OriginDeveloperTool.dir}" append="true">
+        <includes name="views/source/*.ui" />
+    </fileset>
+
+    <!-- these are the moc source files that generate the mocfiles that need to be included in the build. -->
+    <fileset name="runtime.moc_sourcefiles" basedir="${package.OriginDeveloperTool.dir}" append="true">
+        <includes name="include/OriginDeveloperTool/*.h" />
+        <includes name="jsinterface/*.h" />
+        <includes name="views/*.h" />
+        <includes name="widgets/*.h" />
+        <includes name="views/source/*.h" />
+    </fileset>
+
+    <!-- strip out platform specific files -->
+    <fileset name="runtime.moc_sourcefiles" basedir="${package.OriginDeveloperTool.dir}" append="true">
+        <excludes name="include/OriginDeveloperTool/Plugin.h"/>
+        <excludes name="**/*OSX.*" unless="${config-system} == 'osx'"/>
+        <excludes name="**/*Win.*" if="${config-system} == 'osx'"/>
+    </fileset>
+
+    <!-- construct the paths to include the moc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+        <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.OriginDeveloperTool.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+    
+    <foreach property="fname" item="FileSet" in="runtime.moc_sourcefiles">
+        <property name="sourcefile" value="${moc.output.dir}/moc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+
+    <!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+    <fileset name="runtime.qrc_sourcefiles" basedir="${package.OriginDeveloperTool.dir}">
+    </fileset>
+
+    <!-- these are the Qt rc source files will be run through the Qt rc compiler  -->
+    <foreach property="widget" item="String" in="${widget.list}" >
+        <fileset name="runtime.qrc_sourcefiles" fromfileset="runtime.qrc_sourcefiles">
+            <includes name="${webwidgets.outputdir}/${widget}/${widget}.qrc" asis="true" />
+        </fileset>
+    </foreach>
+
+    <!-- construct the paths to include the qrc files into the build after generating. -->
+    <foreach property="fname" item="FileSet" in="runtime.qrc_sourcefiles">
+        <property name="sourcefile" value="${rc.output.dir}/qrc_@{PathGetFileNameWithoutExtension(${fname})}.cpp" />
+        <fileset name="runtime.OriginDeveloperTool.sourcefiles" append="true">
+            <includes name="${sourcefile}" asis="true"/>
+        </fileset>
+    </foreach>
+
+    <target name="setup-generate-code">
+        <!-- get the options from the current config -->
+        <property name="runtime.OriginDeveloperTool.moc_defines" value="@{OptionSetGetValue('${runtime.OriginDeveloperTool.buildtype}','cc.defines')}"/>
+        <property name="runtime.OriginDeveloperTool.moc_includedirs" value="${runtime.OriginDeveloperTool.includedirs}"/>
+    </target>
+
+    <!-- ************************** -->
+    <!-- Prebuild property targets -->
+    <!-- ************************** -->
+    <property name="runtime.OriginDeveloperTool.preprocess" value="update-plist" if="${config-system} == 'osx'"/>
+
+    <target name="update-plist" >
+      <echo message="Updating versions in plist files"/>
+      <!-- Get the current version -->
+      <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+        <property name="config" value="${config}" />
+      </nant>
+      <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+      <!-- Get the current plugin version -->
+      <nant buildfile="${package.OriginVersion.dir}/version.build" target="getpluginversion" >
+        <property name="config" value="${config}" />
+      </nant>
+      <property name="plugin.version" fromfile="${package.OriginVersion.plugin.version.file}" />
+      
+      <!-- Update the plist with the new version number -->
+      <property name="plist" value="" />
+      <property name="version.nextline" value="false" />
+      <property name="plugin.version.nextline" value="false" />
+      
+      <foreach property="line" item="Line" in="${runtime.OriginDeveloperTool.plist.template}">
+        <!-- Check for OriginClientVersion in line and put the version in the next line -->
+        <do if="${version.nextline}" >
+          <property name="line" value="&lt;string&gt;${version}&lt;/string&gt;" />
+          <property name="version.nextline" value="false" />
+        </do>
+
+        <!-- Check for CFBundleVersion in line and put the version in the next line -->
+        <do if="${plugin.version.nextline}" >
+          <property name="line" value="&lt;string&gt;${plugin.version}&lt;/string&gt;" />
+          <property name="plugin.version.nextline" value="false" />
+        </do>
+
+        <do if="@{StrIndexOf(${line},'CFBundleVersion')} != -1 || @{StrIndexOf(${line},'CFBundleShortVersionString')} != -1">
+          <property name="plugin.version.nextline" value="true" />
+        </do>
+        <do if="@{StrIndexOf(${line},'OriginClientVersion')} != -1">
+          <property name="version.nextline" value="true" />
+        </do>
+        
+        <property name="plist" value="${property.value}&#10;${line}" />
+      </foreach>
+      <delete file="${runtime.OriginDeveloperTool.plist}" />
+      <echo message="${plist}" file="${runtime.OriginDeveloperTool.plist}" />
+    </target>
+    
+    <!-- ************************** -->
+    <!-- Postbuild property targets -->
+    <!-- ************************** -->
+    
+    <!-- NANT Postbuild target. Will execute this after compiling happens. -->
+	<property name="runtime.OriginDeveloperTool.postbuildtarget" value="OriginDeveloperTool-post-build-tasks" />
+    
+    <!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+	<property name="runtime.OriginDeveloperTool.vcproj.post-build-step">
+      ${nant.location}/nant.exe -buildfile:${nant.project.buildfile} -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:codesign.timestamp=${codesign.timestamp} ${runtime.OriginDeveloperTool.postbuildtarget}
+	</property>
+    
+    <target name="OriginDeveloperTool-post-build-tasks">
+      <call target="obfuscate-strings-odt" />
+      <do if="(${config-system} == 'pc') AND (${config-type} == 'opt')">
+        <call target="sign-exe" />
+      </do>
+      <do if="${config-system} == 'osx'">
+        <call target="copy-to-bundle" />
+        <call target="codesign" />
+      </do>
+    </target>
+
+    <target name="obfuscate-strings-odt">
+      <dependent name="ObfuscateStrings" />
+
+      <property name="input.file" value="${runtime.OriginDeveloperTool.outputfile}" />
+      <property name="working.dir" value="${runtime.OriginDeveloperTool.outputdir}" if="${config-system} == 'pc'"/>
+      <property name="working.dir" value="${runtime.OriginDeveloperTool.outputdir}/Contents/MacOS" if="${config-system} == 'osx'"/>
+
+      <echo message="Obfuscating strings in OriginDeveloperTool.  Input file = ${input.file}.  Working dir = ${working.dir}"/>
+      <call target="obfuscate-strings" />
+    </target>
+
+    <target name="sign-exe">
+      <echo message="Signing OriginDeveloperTool DLL"/>
+      <fileset name="signing.files" basedir="${runtime.OriginDeveloperTool.outputdir}">
+        <includes name="${runtime.OriginDeveloperTool.outputfile}" />
+      </fileset>
+
+      <foreach property="signfile" item="FileSet" in="signing.files">
+        <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="@{PathGetFileNameWithoutExtension('${signfile}')}" in="${signfile}" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+        <sleep seconds="2" />
+      </foreach>
+    </target>
+
+    <target name="codesign" >
+      <echo message="Signing OriginDeveloperTool plugin bundle"/>
+      <fail unless="@{PropertyExists('sign.basedir')}" message="You must specify a basedir to sign" />
+      <fail message="Property sign.filelist or sign.dirlist is not defined. You must define one of these properties for osx to tell us what to sign"
+        unless="@{PropertyExists('sign.filelist')} || @{PropertyExists('sign.dirlist')}" />
+
+      <property name="cert.name" value="OriginDev" />
+      <property name="cert.name" value="Developer ID Application: Electronic Arts Inc." if="@{PropertyExists('jenkins')}"/>
+
+      <foreach property="signfile" item="String" in="${sign.filelist}" if="@{PropertyExists('sign.filelist')}" >
+        <task name="codesign.exec" in="${sign.basedir}/${signfile}" public.cert="@{PropertyExists('jenkins')}" />
+      </foreach>
+
+      <foreach property="signdir" item="String" in="${sign.dirlist}" if="@{PropertyExists('sign.dirlist')}" >
+        <task name="codesign.exec" in="${sign.basedir}/${signdir}" public.cert="@{PropertyExists('jenkins')}" if="@{DirectoryExists('${sign.basedir}/${signdir}')}==true" />
+      </foreach>
+
+      <task name="codesign.exec" in="${sign.basedir}" public.cert="@{PropertyExists('jenkins')}" if="@{DirectoryExists('${sign.basedir}')}==true" />
+    </target>
+
+    <target name="copy-to-bundle" >
+      <echo message="Copying resources to OriginDeveloperTool plugin bundle"/>
+      <copy todir="${runtime.OriginDeveloperTool.outputdir}/Contents/Resources" flatten="true">
+        <fileset>
+          <includes name="${package.OriginDeveloperTool.dir}/resources/mac/Resources/*.*" />
+          <includes name="${package.OriginDeveloperTool.dir}/resources/mac/Resources/**/*.*" />
+        </fileset>
+      </copy>
+    </target>
+
+    <target name="OriginDeveloperTool-dip">
+      <property name="game.source.path" value="${runtime.OriginDeveloperTool.outputdir}"/>
+      <property name="game.source.path" value="@{PathGetDirectoryName(${plugin.path})}" if="@{PropertyExists('plugin.path')}"/>
+
+      <echo message="game.source.path is ${game.source.path}" />
+      
+      <choose>
+        <do if="(${plugin.version??''} != '') AND (${client.version??''} != '')">
+          <property name="version" value="${client.version}"/>
+          <property name="plugin.version" value="${plugin.version}"/>
+        </do>
+        <do>
+          <!-- get the current version of plugin and client -->
+          <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+            <property name="config" value="${config}" />
+          </nant>
+          <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+          <!-- Get the current plugin version -->
+          <nant buildfile="${package.OriginVersion.dir}/version.build" target="getpluginversion" >
+            <property name="config" value="${config}" />
+          </nant>
+          <property name="plugin.version" fromfile="${package.OriginVersion.plugin.version.file}" />
+        </do>
+      </choose>
+      <do unless="${config-system} == 'osx'">
+        <dependent name="EAInstaller"/>
+        <dependent name="SignTool"/>
+
+        <property name="dip.yaml.file" value="${package.OriginDeveloperTool.dir}\OriginDeveloperTool.yaml"/>
+        <property name="dip.childyaml.file" value="${package.OriginDeveloperTool.dir}\OriginDeveloperTool.yaml"/>
+        <property name="dip.yaml.template" value="${package.OriginDeveloperTool.dir}\OriginDeveloperTool_tmp.yaml"/>
+        <property name="gameproject.dir" value="${package.OriginDeveloperTool.dir}\resources\pc"/>
+              
+        <!-- create the yaml file for EAI with the correct versions -->
+        <property name="dip.yaml.text" fromfile="${dip.yaml.template}"/>        
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__PLUGIN_VERSION__',${plugin.version})}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__ZIPNAME__','OriginDeveloperTool_PC_${plugin.version}')}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__CLIENT_VERSION__',${version})}"/>
+
+        <property name="cert.args" value="/f ${package.SignTool.datadir}\ea_cert.pfx /p origin" unless="@{PropertyExists('jenkins')}"/>
+        <property name="cert.args" value="/sha1 ${cert.sha1}" if="@{PropertyExists('jenkins')}"/>
+        
+        <delete file="${dip.yaml.file}" />
+        <echo message="${dip.yaml.text}" file="${dip.yaml.file}"/>
+        
+        <!-- failonerror="false" because EAI 4.01.00 reports failure due to a python exception even though it succeeds -->
+        <exec program="${InstallerBuilder.exe}" workingdir="${package.OriginDeveloperTool.dir}" failonerror="false">
+            <args>
+                <arg value="-EAIPath ${package.EAInstaller.dir}"/>
+                <arg value="-YAMLFile ${dip.yaml.file}"/>
+                <arg value="-ChildYAML ${dip.childyaml.file}"/>
+                <arg value="-ProjectPath ${gameproject.dir}"/>
+                <arg value="-GameSourcePath ${game.source.path}"/>
+                <arg value="-OutputPath ${package.OriginDeveloperTool.dir}/target"/>
+                <arg value="-c &quot;${cert.args}&quot;"/>
+            </args>
+        </exec>
+      </do>
+        
+      <do if="${config-system} == 'osx'">
+        <dependent name="EAInstallerMac"/>
+
+        <property name="dip.yaml.file" value="${package.OriginDeveloperTool.dir}/OriginDeveloperTool_Mac.yaml"/>
+        <property name="dip.childyaml.file" value="${package.OriginDeveloperTool.dir}/OriginDeveloperTool_Mac.yaml"/>
+        <property name="dip.yaml.template" value="${package.OriginDeveloperTool.dir}/OriginDeveloperTool_Mac_tmp.yaml"/>
+        <property name="gameproject.dir" value="${runtime.OriginDeveloperTool.eaigameprojdir}"/>
+        <property name="gameproject.dir" value="${plugin.path}" if="@{PropertyExists('plugin.path')}"/>
+        
+        <property name="dip.yaml.text" fromfile="${dip.yaml.template}"/>        
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__PLUGIN_VERSION__',${plugin.version})}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__ZIPNAME__','OriginDeveloperTool_Mac_${plugin.version}')}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__CLIENT_VERSION__',${version})}"/>        
+        
+        <delete file="${dip.yaml.file}" />
+        <echo message="${dip.yaml.text}" file="${dip.yaml.file}"/>
+
+        <task name="EAInstallerMac.BuildInstaller" 
+            ProjectFile="${dip.yaml.file}" 
+            ChildFile="${dip.childyaml.file}" 
+            ProjectThirdPartyFolder="${gameproject.dir}" 
+            RainbowGameDistributionFolder="${gameproject.dir}" 
+            BuildOutputFolder="${package.OriginDeveloperTool.dir}/target"
+            ExtraArgs="-b"
+            />
+      </do>
+      
+      <copy todir="${package.originClient.dir}/target">
+          <fileset basedir="${dip.output.dir}">
+              <includes name="OriginDeveloperTool*.zip"/>
+          </fileset>
+      </copy>
+    </target>
+        
+    <target name="OriginDeveloperTool-submit">
+      <dependent name="OriginUtils"/>
+        
+      
+      <property name="odt.platform" value="PC" unless="@{PropertyExists(odt.platform)}"/>
+      
+      // We don't know the actual name of the DiP file but we know it will be the only one in the directory.
+      <foreach property="file" item="File" in="${dip.output.dir}\OriginDeveloperTool*.zip" >
+        <property name="filename" value="@{PathGetFileName(${file})}"/>
+      </foreach>
+      
+      <property name="odt.template" value="${package.OriginDeveloperTool.dir}\odt\Origin_Developer_Tool-${odt.platform}.properties" />
+      <property name="odt.user" value="originautomation@eac.ad.ea.com" />
+      <property name="odt.password" value="Origin@11" />
+      <property name="odt.source" value="\\eac.ad.ea.com\sports\ebisu\ODTSubmissions\${filename}" />
+      
+      //copy the build to a network drive.
+      <copy file="${dip.output.dir}/${filename}" todir="@{PathGetDirectoryName(${odt.source})}" />
+      
+      <task name="odt-submit" 
+        template="${odt.template}"
+        source="${odt.source}"
+        user="${odt.user}"
+        password="${odt.password}"
+            />
+    </target>
+    
+    <target name="odt-test">
+        <property name="dip.yaml.file" value="${package.OriginDeveloperTool.dir}\OriginDeveloperTool.yaml"/>
+        <property name="dip.yaml.template" value="${package.OriginDeveloperTool.dir}\OriginDeveloperTool_tmp.yaml"/>
+        <property name="gameproject.dir" value="${package.OriginDeveloperTool.dir}\resources\pc"/>
+        
+        <nant buildfile="${package.OriginVersion.dir}/version.build" target="getversion" >
+          <property name="config" value="${config}" />
+        </nant>
+        <property name="version" fromfile="${package.OriginVersion.version.file}" />
+
+        <!-- Get the current plugin version -->
+        <nant buildfile="${package.OriginVersion.dir}/version.build" target="getpluginversion" >
+          <property name="config" value="${config}" />
+        </nant>
+        <property name="plugin.version" fromfile="${package.OriginVersion.plugin.version.file}" />
+      
+        <!-- create the yaml file for EAI with the correct versions -->
+        <property name="dip.yaml.text" fromfile="${dip.yaml.template}"/>        
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__PLUGIN_VERSION__',${plugin.version})}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__ZIPNAME__','OriginDeveloperTool_PC_${plugin.version}')}"/>
+        <property name="dip.yaml.text" value="@{StrReplace(${property.value},'__CLIENT_VERSION__',${version})}"/>
+        
+        <delete file="${dip.yaml.file}" />
+        <echo message="${dip.yaml.text}" file="${dip.yaml.file}"/>
+        
+    </target>
+</project>

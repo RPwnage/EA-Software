@@ -1,0 +1,123 @@
+From 2a64e722e896429898008c68c3974a8014b8e7d0 Mon Sep 17 00:00:00 2001
+From: Bela Kiss <bkiss@ea.com>
+Date: Tue, 12 Feb 2013 14:45:34 -0800
+Subject: [PATCH] Added UUID logging, added -w to vmmap for full paths, and
+ change vmmap scanning to read full path when it contains a
+ space
+
+
+diff --git a/include/EACallstack/Apple/EACallstackApple.h b/include/EACallstack/Apple/EACallstackApple.h
+index 355acc4..37e4bce 100644
+--- a/include/EACallstack/Apple/EACallstackApple.h
++++ b/include/EACallstack/Apple/EACallstackApple.h
+@@ -26,6 +26,7 @@ namespace Callstack
+     {
+         char mType[32];             // The type field (e.g. __TEXT) from the vmmap output.
+         char mPermissions[16];      // The permissions "r--/rwx" kind of string from the vmmap output.
++        char mUuid[40];             // The module's UUID, if any
+     };
+     
+     typedef eastl::fixed_vector<ModuleInfoApple, 128, true> ModuleInfoAppleArray;
+diff --git a/source/Apple/GetModuleInfoApple.cpp b/source/Apple/GetModuleInfoApple.cpp
+index 82cd4b6..1a2f16e 100644
+--- a/source/Apple/GetModuleInfoApple.cpp
++++ b/source/Apple/GetModuleInfoApple.cpp
+@@ -11,12 +11,67 @@
+ #include <EAStdC/EAString.h>
+ #include <EAStdC/EAScanf.h>
+ #include <EAIO/PathString.h>
+-
++#include <EASTL/string.h>
+ 
+ namespace EA
+ {
+ namespace Callstack
+ {
++// GetModuleInfoApple
++//
++// This function determines the UUID of a given module and 
++void GetModuleUuid(eastl::string& modulePath, eastl::string& moduleUuid)
++{
++    moduleUuid.clear();
++    
++    char command[PATH_MAX];
++    sprintf(command, "otool -l %s | grep uuid", modulePath.data());
++    FILE*  pFile = popen(command, "r");
++    if (pFile)
++    {
++        char line[512];
++        
++        while(fgets(line, EAArrayCount(line), pFile))
++        {
++            char cmd[16];
++            char uuid[64];
++            int fieldCount = EA::StdC::Sscanf(line, "%16s %64s", cmd, uuid);
++            if (fieldCount == 2 && strcmp(cmd, "uuid") == 0)
++            {
++                moduleUuid.assign(uuid);
++            }
++        }
++        
++        pclose(pFile);
++    }
++}
++
++void GetAllModuleInfoAppleUUIDs(ModuleInfoAppleArray& moduleInfos)
++{
++    typedef eastl::map<eastl::string, eastl::string> UuidMap;
++    UuidMap uuids;
++    
++    ModuleInfoAppleArray::iterator end(moduleInfos.end());
++    for(ModuleInfoAppleArray::iterator i(moduleInfos.begin()); i != end; ++i)
++    {
++        eastl::string path(&(i->mPath[0]));
++        UuidMap::iterator where = uuids.find(path);
++        if (where != uuids.end())
++        {
++            strncpy(i->mUuid, where->second.c_str(), sizeof(i->mUuid));
++        }
++        else
++        {
++            eastl::string uuid;
++            GetModuleUuid(path, uuid);
++            if (!uuid.empty())
++            {
++                uuids[path] = uuid;
++                strncpy(i->mUuid, uuid.c_str(), sizeof(i->mUuid));
++            }
++        }
++    }
++}
+ 
+ 
+ // GetModuleInfoApple
+@@ -63,7 +118,7 @@ size_t GetModuleInfoApple(ModuleInfoAppleArray& moduleInfoAppleArray, const char
+     {
+         char   command[32];
+         pid_t  pid = getpid();
+-        sprintf(command, "vmmap %lld", (int64_t)pid);
++        sprintf(command, "vmmap -w %lld", (int64_t)pid);
+         FILE*  pFile = popen(command, "r");
+ 
+         if(pFile)
+@@ -113,7 +168,7 @@ size_t GetModuleInfoApple(ModuleInfoAppleArray& moduleInfoAppleArray, const char
+ 
+                     uint64_t addressEnd;
+                     char     modulePath[512];
+-                    int      fieldCount = EA::StdC::Sscanf(line, "%32s %I64x-%I64x [ %*s %16s %*s %512s", info.mType, &info.mBaseAddress, &addressEnd, info.mPermissions, modulePath);
++                    int      fieldCount = EA::StdC::Sscanf(line, "%32s %I64x-%I64x [ %*s %16s %*s %[^\n]", info.mType, &info.mBaseAddress, &addressEnd, info.mPermissions, modulePath);
+                     
+                     if((fieldCount == 5) && (!pTypeFilter || strstr(info.mType, pTypeFilter)))
+                     {
+@@ -128,6 +183,8 @@ size_t GetModuleInfoApple(ModuleInfoAppleArray& moduleInfoAppleArray, const char
+             
+             pclose(pFile);
+         }
++        
++        GetAllModuleInfoAppleUUIDs(moduleInfoAppleArray);
+     }
+     
+     return (size_t)moduleInfoAppleArray.size();
+-- 
+1.7.10.2 (Apple Git-33)
+

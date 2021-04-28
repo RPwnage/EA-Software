@@ -1,0 +1,256 @@
+[headername="framework/tdf/vault_server.h"]
+#include "framework/gen/vault_server.tdf"
+
+namespace Blaze
+{
+
+const uint32_t MAX_HTTP_RESPONSE_SIZE = 5242880; // 5 MB by default
+
+[description="Configuration for fiber settings."]
+class FiberConfig
+{
+    [description="Defines the total number of fibers that will be pooled for reuse by size."]
+    class PoolSizes
+    {
+        [tag="sml", description="Reuse count for small fibers.", default=1000, advanced=true]
+        uint32_t small;
+        
+        [tag="med", description="Reuse count for medium fibers.", default=1000, advanced=true]
+        uint32_t medium;
+        
+        [tag="lrg", description="Reuse count for large fibers.", default=100, advanced=true]
+        uint32_t large;
+                
+        [tag="huge", description="Reuse count for huge fibers.", default=10, advanced=true]
+        uint32_t huge;
+    };
+    
+    [tag="maxu", description="Max number of times a given fiber can be used before it is destroyed.", default=100,
+     details = "Periodic destruction of fibers helps keep paged-in memory in check in cases where the majority of fiber users only use a small amount of stack space but the occasional one uses a large amount.  By destroying fibers periodically any stack space that has been paged in will be released helping to keep the fiber stack usage in virtual memory rather than in resident memory.", advanced=true]
+    uint32_t maxFiberUseCount;
+    
+    [tag="pool", description="Specifications for fiber reuse.", 
+     details = "Note that these fields do not limit the total number of fibers allowed but rather controls the total amount of permantent memory that can be allocated for them.  After the max pool size for a given fiber has been reached, the fiber will not be reused, but simply allocated once and discarded immediately.", advanced=true] 
+    PoolSizes poolSizes;
+
+    [tag="tmcl", default=true, description="If set to true, the timings returned by getFiberTimings() RPC will only include fibers since the server became active.", advanced=true]
+    bool timeOnlyActiveServerFibers;
+
+    [tag="rpcf", default=3000, reconfigurable="yes", description="Controls max number of fibers for RPC processing.", advanced=true]
+    uint32_t maxCommandFiberCount;
+    
+    [tag="cpui", default="5s", description="Controls the frequency of cpu budget check whose results are surfaced via logging and getFiberTimings() RPC.", advanced=true]
+    TimeValue cpuBudgetCheckInterval;
+    
+    [tag="cpur", default=10, description="Controls number of fiber tasks included in the cpu budget report surfaced via logging.", advanced=true]
+    uint32_t cpuBudgetTaskReportSize;
+    
+    [tag="cpbi", default="0m", description="Controls frequency of info logs periodically output by the cpu budget monitor. 0m == disabled", advanced=true]
+    TimeValue cpuBudgetInfoLogPeriod;
+    
+    [tag="cpbw", default="3s", description="Controls frequency of warn logs output by the cpu budget monitor when cpuBudgetWarnLogCpuPct is reached.", advanced=true]
+    TimeValue cpuBudgetWarnLogPeriod;
+    
+    [tag="cpbp", default=90, description="Controls the cpu % which when exceeded will generate a warn cpu budget log.", advanced=true]
+    uint32_t cpuBudgetWarnLogCpuPct;
+
+    [tag="mpro", default=false, description="Sets whether or not fibers should be forced to use memory protection on their stacks.", details="Enabling this will set a r/w protect on stack guard pages.  This can cause OOM errors in linux due to reaching the mmap segment limit at high PSU.", advanced=true]
+    bool forceStackMemoryProtection;
+};
+
+class SelectorConfig
+{
+    [tag="mjpt", default="200ms"]
+    TimeValue maxJobQueueProcessingTime;
+
+    [tag="mnpt", default="400ms"]
+    TimeValue maxNetworkProcessingTime;
+
+    [tag="mppt", default="200ms"]
+    TimeValue maxPriorityNetworkProcessingTime;
+
+    [tag="mqpt", default="200ms"]
+    TimeValue maxTimerQueueProcessingTime;
+
+    [tag="mrpt", default="1s"]
+    TimeValue maxRunLoopProcessingTime; 
+
+    [tag="mcpt", default="0ms", description="Intentionally set to zero to ensure no channel can monopolize selector processing time."]
+    TimeValue maxConnectionProcessingTime;
+
+    [tag="mfds", default=0]
+    uint32_t mMaxFds;
+
+    [tag="epev", default=256]
+    uint32_t mEpollEvents;
+
+};
+
+typedef map<string(512), uint64_t, ignorecase> DbQueryErrorCountMap;
+typedef map<string(512), uint64_t, ignorecase> DbQueryFiberCallCountMap;
+
+class DbQueryAccountingInfo
+{
+    [tag="clc", description="The number of times this query has been called."]
+    uint64_t mTotalCount;
+    [tag="scc", description="The number of times this query has succeeded."]
+    uint64_t mSuccessCount;
+    [tag="sqc", description="The number of times this query has exceeded the default max query time."]
+    uint64_t mSlowQueryCount;
+    [tag="flc", description="The number of times this query has failed."]
+    uint64_t mFailCount;
+    [tag="ttm", description="The total amount of time (micro seconds) spent executing this query."]
+    uint64_t mTotalTime;
+    [tag="erc", description="A map of query failures with counts."]
+    DbQueryErrorCountMap mErrorCounts;
+    [tag="fcc", description="The different fiber contexts that called this query, and the count for each."]
+    DbQueryFiberCallCountMap mFiberCallCounts;
+};
+
+typedef map<string(512), uint64_t, ignorecase> DbQueryCountMap;
+
+class FiberAccountingEntry
+{
+    [tag="time", description="Fiber task time metric."]
+    uint64_t mFiberTimeMicroSecs;
+    [tag="cnt", description="Fiber task call count."]
+    uint64_t mCount;
+    [tag="qct", description="The different queries made on the fiber, and the call count for each."]
+    DbQueryCountMap mDbQueryCounts;
+};
+
+class FiberAccountingInfo
+{
+    [tag="time", description="Fiber total time"]
+    uint64_t mTotalTime;
+    [tag="tcnt", description="Fiber total count"]
+    uint64_t mTotalCount;
+    [tag="ptme", description="Fiber period time"]
+    uint64_t mPeriodTime;
+    [tag="pcnt", description="Fiber period count"]
+    uint64_t mPeriodCount;
+    [tag="qct", description="The different queries made on the fiber, and the call count for each."]
+    DbQueryCountMap mDbQueryCounts;
+};
+
+typedef list<string(16)> HttpStatusCodeRangeList;
+typedef list<string(64)> ComponentNameList;
+class HttpServiceConnection
+{
+    [description="Options for loading SSL client cert and key are local disk, or from Vault."]
+    enum SSLPathType
+    {
+        LOCAL_DISK,
+        VAULT
+    };
+
+    [tag="url", description="The url to establish the connection to."]
+    string(256) mUrl;
+    
+    [tag="num", description="The number of outstanding connections to keep to the multiplayer service."]
+    uint32_t mNumPooledConnections;
+    
+    [tag="enc", description="The encoding type to send HTTP requests as."]
+    string(64) mEncodingType;
+
+    [tag="ptyp", default=LOCAL_DISK, description="When set to VAULT client ssl cert and key are loaded from Vault, default treats them as local disk paths.",
+                 details="NOTE: the optional ssl key password and obfuscator are used only when reading from local disk."]
+    SSLPathType mPathType;
+    
+    [tag="cert", default="", description="Client SSL cert to use when making the request."]
+    string(-1) mSslCert;
+    
+    [tag="skey", default="", description="Client SSL key to use when making the request."]
+    string(-1) mSslKey;
+
+    [tag="pass", default="", description="Client SSL key passwd to use when making the request (optional)."]
+    string(64) mSslKeyPasswd;
+
+    [tag="oftr", description="The obfuscator string used to decode ssl key passwords (optional)."]
+    string(256) mSslKeyPasswdObfuscator;
+
+    [tag="vpth", default="", description="The VaultLookup to the entry in Vault where overrides for 'secret' config values are stored (optional; ignored if Vault is disabled)."]
+    VaultLookup mVaultPath;
+
+    [tag="thre", default="2s", description="OutboundMetricsManager threshold response time value that will trigger a WARN log entry to be logged when exceeded"]
+    TimeValue mOutboundMetricsThreshold;
+    
+    [tag="tout", default="10s", description="Timeout value to set on http requests sent from this service."]
+    TimeValue mRequestTimeout;
+
+    [tag="rqpc", default=true, description="Whether a proxy component is defined for this service."]
+    bool mHasProxyComponent;
+    
+    [tag="cerr", description="A list of HTTP status codes and ranges that will generate a ERR log entry (instead of TRACE)."]
+    HttpStatusCodeRangeList logErrForHttpCodes;
+
+    [tag="msiz", default=10000000, description="Max memory usage limit for the http cache in bytes."]
+    uint32_t maxHttpCacheMemorySizeinBytes;
+
+    [tag="rloc", description="A list of components which indicates that this service should only be registered if the component is local. An empty list is equivalent to specifying all components."]
+    ComponentNameList registerOnlyForLocalComponents;
+
+    [tag="mrsz", default=MAX_HTTP_RESPONSE_SIZE, description="Max response size (after decompression if applicable) in bytes."]
+    uint32_t maxHttpResponseSizeInBytes;
+};
+
+typedef string(64) HttpServiceName;
+typedef map<HttpServiceName, HttpServiceConnection, ignorecase> HttpServiceConnectionMap;
+
+class GrpcServiceConnectionInfo
+{
+    [description="Options for loading SSL client cert and key are local disk, or from Vault."]
+    enum SSLPathType
+    {
+        LOCAL_DISK,
+        VAULT
+    };
+
+    [tag="host", description="The hostname/IP and port to establish the connection to. Both IPv4 and IPv6 addresses are supported."]
+    string(256) mServiceAddress;
+
+    [tag="tout", default="10s", description="Timeout value to set on gRPC requests sent from this service."]
+    TimeValue mRequestTimeout;
+
+    [tag="ptyp", default=LOCAL_DISK, description="When set to VAULT client ssl cert and key are loaded from Vault, default treats them as local disk paths.",
+                 details="NOTE: the optional ssl key password and obfuscator are used only when reading from local disk."]
+    SSLPathType mPathType;
+    
+    [tag="cert", default="", description="Client SSL cert to use when making the request."]
+    string(-1) mSslCert;
+    
+    [tag="skey", default="", description="Client SSL key to use when making the request."]
+    string(-1) mSslKey;
+
+    [tag="vpth", default="", description="The VaultLookup to the entry in Vault where overrides for 'secret' config values are stored (optional; ignored if Vault is disabled)."]
+    VaultLookup mVaultPath;
+
+    [tag="ctxt", default="", description="The SSL context to associate with this connection."]
+    string(64) mSslContext;
+
+    [tag="keep", reconfigurable="yes", default=true, description="Keep the channel alive without any rpc calls.", details="GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS argument in grpc." ]
+    bool keepAlive;
+
+    [tag="kati", reconfigurable="yes", default="5m", description="Keep Alive send interval", details="GRPC_ARG_KEEPALIVE_TIME_MS argument in grpc." ]
+    TimeValue keepAliveSendInterval;
+
+    [tag="kato", reconfigurable="yes", default="20s", description="Keep Alive timeout.", details="GRPC_ARG_KEEPALIVE_TIMEOUT_MS argument in grpc." ]
+    TimeValue keepAliveTimeout;
+
+    [tag="lbpn", reconfigurable="yes", default="pick_first", description="The client-side load balancing policy name.  Valid values are 'round_robin', 'pick_first' (default), or 'grpclb'.", details="See https://github.com/grpc/grpc/blob/master/doc/load-balancing.md for detailed explanation. WARNING: Using 'round_robin' currently causes a known memory growth issue(GOS-32882) that affects all GRPC v1.10.* versions, consult with GS-Blaze before changing default." ]
+    string(64) lbPolicyName;
+};
+
+typedef string(64) GrpcServiceName;
+typedef map<GrpcServiceName, GrpcServiceConnectionInfo> OutboundGrpcServiceConnectionMap;
+
+enum RegexType
+{ 
+   REGEX_NONE, 
+   REGEX_NORMAL, 
+   REGEX_EXTENDED 
+};
+
+} // namespace Blaze
+
+

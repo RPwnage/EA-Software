@@ -1,0 +1,140 @@
+// GENERATED CODE (Source: social_protocol.proto) - DO NOT EDIT DIRECTLY.
+// Copyright(C) 2016-2019 Electronic Arts, Inc. All rights reserved.
+
+#pragma once
+
+#include <eadp/foundation/Allocator.h>
+#include <eadp/foundation/Service.h>
+#include <eadp/foundation/internal/ProtobufMessage.h>
+#include <com/ea/eadp/antelope/protocol/GroupMembershipChangeType.h>
+#include <com/ea/eadp/antelope/protocol/Player.h>
+
+namespace com { namespace ea { namespace eadp { namespace antelope { namespace protocol { class Player;  } } } } }
+
+namespace com
+{
+
+namespace ea
+{
+
+namespace eadp
+{
+
+namespace antelope
+{
+
+namespace protocol
+{
+
+class EADPGENERATED_API GroupMembershipChange : public ::eadp::foundation::Internal::ProtobufMessage
+{
+public:
+
+    /*!
+     * Constructs an empty message. Memory allocated by the message will use the provided allocator.
+     */
+    explicit GroupMembershipChange(const ::eadp::foundation::Allocator& allocator);
+
+    /*!
+     * Clear a message, so that all fields are reset to their default values.
+     */
+    void clear();
+
+    /**@{
+     */
+    EADP_FOUNDATION_PROTOBUF_DEPRECATED_ATTR const ::eadp::foundation::String& getTargetPersonaId() const;
+    EADP_FOUNDATION_PROTOBUF_DEPRECATED_ATTR void setTargetPersonaId(const ::eadp::foundation::String& value);
+    EADP_FOUNDATION_PROTOBUF_DEPRECATED_ATTR void setTargetPersonaId(const char8_t* value);
+    /**@}*/
+
+    /**@{
+     */
+    const ::eadp::foundation::String& getTargetDisplayName() const;
+    void setTargetDisplayName(const ::eadp::foundation::String& value);
+    void setTargetDisplayName(const char8_t* value);
+    /**@}*/
+
+    /**@{
+     */
+    EADP_FOUNDATION_PROTOBUF_DEPRECATED_ATTR const ::eadp::foundation::String& getInitiatorPersonaId() const;
+    EADP_FOUNDATION_PROTOBUF_DEPRECATED_ATTR void setInitiatorPersonaId(const ::eadp::foundation::String& value);
+    EADP_FOUNDATION_PROTOBUF_DEPRECATED_ATTR void setInitiatorPersonaId(const char8_t* value);
+    /**@}*/
+
+    /**@{
+     */
+    const ::eadp::foundation::String& getInitiatorDisplayName() const;
+    void setInitiatorDisplayName(const ::eadp::foundation::String& value);
+    void setInitiatorDisplayName(const char8_t* value);
+    /**@}*/
+
+    /**@{
+     */
+    com::ea::eadp::antelope::protocol::GroupMembershipChangeType getType() const;
+    void setType(com::ea::eadp::antelope::protocol::GroupMembershipChangeType value);
+    /**@}*/
+
+    /**@{
+     */
+    ::eadp::foundation::SharedPtr<com::ea::eadp::antelope::protocol::Player> getTargetPlayer();
+    void setTargetPlayer(::eadp::foundation::SharedPtr<com::ea::eadp::antelope::protocol::Player>);
+    bool hasTargetPlayer();
+    void releaseTargetPlayer();
+    /**@}*/
+
+    /**@{
+     */
+    ::eadp::foundation::SharedPtr<com::ea::eadp::antelope::protocol::Player> getInitiatingPLayer();
+    void setInitiatingPLayer(::eadp::foundation::SharedPtr<com::ea::eadp::antelope::protocol::Player>);
+    bool hasInitiatingPLayer();
+    void releaseInitiatingPLayer();
+    /**@}*/
+
+    /*!
+     * Serializes the message contents into a buffer.
+    Called by serialize.
+     */
+    uint8_t* onSerialize(uint8_t* target) const override;
+
+    /*!
+     * Deserializes the message contents from an input stream.
+    Called by deserialize.
+     */
+    bool onDeserialize(::eadp::foundation::Internal::ProtobufInputStream* input) override;
+
+    /*!
+     * Returns a previously calculated serialized size of the message in protobuf wire format.
+     */
+    size_t getCachedSize() const override
+    {
+        return m_cachedByteSize_;
+    }
+
+    /*!
+     * Calculates and returns the serialized size of the message in protobuf wire format.
+     */
+    size_t getByteSize() override;
+
+    /*!
+     * Returns a string representing the contents of the message for debugging and logging.
+     */
+    ::eadp::foundation::String toString(const ::eadp::foundation::String& indent) const override;
+
+private:
+    ::eadp::foundation::Allocator m_allocator_;
+    size_t m_cachedByteSize_;
+    ::eadp::foundation::String m_targetPersonaId;
+    ::eadp::foundation::String m_targetDisplayName;
+    ::eadp::foundation::String m_initiatorPersonaId;
+    ::eadp::foundation::String m_initiatorDisplayName;
+    int m_type;
+    ::eadp::foundation::SharedPtr<com::ea::eadp::antelope::protocol::Player> m_targetPlayer;
+    ::eadp::foundation::SharedPtr<com::ea::eadp::antelope::protocol::Player> m_initiatingPLayer;
+
+};
+
+}
+}
+}
+}
+}

@@ -1,0 +1,625 @@
+package com.ea.originx.automation.lib.pageobjects.store;
+
+import com.ea.originx.automation.lib.helpers.StringHelper;
+import com.ea.originx.automation.lib.pageobjects.common.ContextMenu;
+import com.ea.originx.automation.lib.resources.OriginClientData;
+import static com.ea.originx.automation.lib.resources.OriginClientData.BUY_BUTTON_TRANSPARENT_COLOUR;
+import static com.ea.originx.automation.lib.resources.OriginClientData.PRIMARY_CTA_BUTTON_COLOUR;
+import com.ea.vx.originclient.client.OriginClient;
+import org.openqa.selenium.By;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.Color;
+
+/**
+ * A page representing the PDP Hero CTAs. Encapsulates all of the CTAs in the
+ * action section of the PDP Hero, as well as anything required to show or open
+ * the CTAs, and the price (which is found on the CTA).
+ *
+ * @author glivingstone
+ */
+public class PDPHeroActionCTA extends PDPHero {
+
+    // Purchase
+    protected static final By BUY_BUTTON_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-cta-purchase .otkbtn-primary");
+    protected static final By PURCHASE_INFO_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-cta-purchase .otkbtn-primary > span");
+    protected static final By DOWNLOAD_INSTALL_PLAY_BUTTON_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-cta-downloadinstallplay .otkbtn-primary");
+    protected static final By BUY_BUTTON_OWNED_AS_GIFT_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-store-pdp-cta .otkbtn-primary-btn.origin-tealium-otkbtn-primary-btn"); //button when the entitlement is already owned by current user
+    // Encapsulates the 'Get It Free'/'Add To Game Library'/'Play on Origin'/'Install Origin & Play' buttons
+    protected static final By DIRECT_ACQUISITION_CTA_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-cta-primary.origin-telemetry-cta-primary");
+    protected static final By DIRECT_ACQUISITION_CTA_COLOR_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-pdp-hero-main-collapse-target origin-cta-primary .otkbtn");
+
+    // The alternate 'Buy' button when the game is available through Access
+    protected static final By ACCESS_BUY_BUTTON_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-store-pdp-cta origin-cta-purchase");
+    protected static final By PLAY_NOW_ACCESS_BUTTON_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-telemetry-oa-cta");
+    protected static final By OR_SEPARATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " .origin-pdp-cta-divider .otktitle-5");
+    protected static final By PRICE_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-store-pdp-cta .otkbtn-primary > span");
+    protected static final By SUBSCRIBER_BUY_BUTTON_PRICE_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-store-pdp-cta .otkbtn-transparent");
+    protected static final By YOU_CAN_PURCHASE_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " div p.origin-pdp-hero-main-collapse-trigger");
+
+    // 'Buy' dropdown
+    protected static final By BUY_BUTTON_DROPDOWN_ARROW_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-cta-purchase origin-store-contextmenu .otkbtn.otkbtn-dropdown-btn > .otkicon-downarrow");
+    private final ContextMenu buyDropdownMenu;
+
+    // 'Buy as a Gift'
+    protected static final By BUY_AS_GIFT_BUTTON_LOCATOR = By.cssSelector("origin-cta-gift > div.origin-gifting-cta > button");
+
+    // 'Trial/demo'
+    protected static final By ALL_ELEMENTS_IN_DEMO_BUTTONS_AREA_LOCATOR = By.cssSelector(PDP_HERO_ACTION_CSS + " origin-store-pdp-entitlementarea *");
+    protected static final String TRIAL_DEMO_BUTTON_TMPL = PDP_HERO_ACTION_CSS + " origin-cta-directacquisition[offer-id='%s'] .origin-cta-secondary a";
+    protected static final By GET_TRIAL_BUTTON_LOCATOR = By.cssSelector(String.format(TRIAL_DEMO_BUTTON_TMPL, OriginClientData.GET_TRIAL_BUTTON_OFFER_ID));
+    protected static final By TRY_DEMO_BUTTON_LOCATOR = By.cssSelector(String.format(TRIAL_DEMO_BUTTON_TMPL, OriginClientData.TRY_DEMO_BUTTON_OFFER_ID));
+    protected static final By DOWNLOAD_TRIAL_BUTTON_LOCATOR = By.cssSelector(String.format(TRIAL_DEMO_BUTTON_TMPL, OriginClientData.DOWNLOAD_TRIAL_BUTTON_OFFER_ID));
+    protected static final By PLAY_THE_TRIAL_BUTTON_LOCATOR = By.cssSelector(String.format(TRIAL_DEMO_BUTTON_TMPL, OriginClientData.PLAY_THE_TRIAL_BUTTON_OFFER_ID));
+
+    /**
+     * Constructor
+     *
+     * @param driver Selenium WebDriver
+     */
+    public PDPHeroActionCTA(WebDriver driver) {
+        super(driver);
+        buyDropdownMenu = new ContextMenu(driver, BUY_BUTTON_DROPDOWN_ARROW_LOCATOR, true); // left click
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // PRIMARY CTA
+    // The is the main orange button to click. This button changes to many
+    // different types of buttons depending on the situation.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * To get the discounted amount for an entitlement for an Origin Access
+     * user.
+     *
+     * @return The discounted amount
+     */
+    public double getDiscountAmount() {
+        return StringHelper.extractNumberFromText(waitForAnyElementVisible(BUY_BUTTON_LOCATOR, ACCESS_BUY_BUTTON_LOCATOR).getText());
+    }
+
+    /**
+     * Get the 'Play Now Access' button text.
+     *
+     * @return The text of the 'Play Now Access' button, else null
+     */
+    public String getPlayNowAccessText() {
+        try {
+            return waitForElementVisible(PLAY_NOW_ACCESS_BUTTON_LOCATOR, 1).getText();
+        } catch (TimeoutException e) {
+            return "";
+        }
+    }
+
+    /**
+     * Clicks the 'Play Now Access' button
+     *
+     */
+    public void clickPlayNowAccessButton() {
+        waitForElementClickable(PLAY_NOW_ACCESS_BUTTON_LOCATOR).click();
+    }
+
+    /**
+     * Verify the 'Play now Access' button color is orange
+     *
+     * @return true if button color is orange, false otherwise
+     */
+    public boolean verifyPlayNowAccessColour() {
+        try {
+            return Color.fromString(waitForElementVisible(PLAY_NOW_ACCESS_BUTTON_LOCATOR).getCssValue("background-color")).asHex().equals(PRIMARY_CTA_BUTTON_COLOUR);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify the 'Play Now Access' button is visible.
+     *
+     * @return true if the button is displayed, false otherwise
+     */
+    public boolean verifyPlayNowAccessVisible() {
+        try {
+            return waitIsElementVisible(PLAY_NOW_ACCESS_BUTTON_LOCATOR, 1);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify the OR separator is visible between 'Play Now Access' button and
+     * 'Buy' button is visible
+     *
+     * @return true if the OR separator is displayed, false otherwise
+     */
+    public boolean verifySeparatorVisible() {
+        try {
+            return waitIsElementVisible(OR_SEPARATOR, 1);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Click the 'Subscriber Buy' button
+     *
+     */
+    public void clickSubscriberBuyButton() {
+        waitForElementClickable(SUBSCRIBER_BUY_BUTTON_PRICE_LOCATOR).click();
+    }
+
+    /**
+     * Verify the Subscriber Buy Button is visible
+     *
+     * @return true if the button is displayed, false otherwise
+     */
+    public boolean verifySubscriberBuyButtonVisible() {
+        try {
+            return waitIsElementVisible(SUBSCRIBER_BUY_BUTTON_PRICE_LOCATOR, 1);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify the 'Subscriber Buy' Button color is transparent
+     *
+     * @return true if button color is transparent, false otherwise
+     */
+    public boolean verifySubscriberBuyButtonColor() {
+        try {
+            return Color.fromString(waitForElementVisible(SUBSCRIBER_BUY_BUTTON_PRICE_LOCATOR).getCssValue("background-color")).asHex().equals(BUY_BUTTON_TRANSPARENT_COLOUR);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Returns the price of the game.
+     *
+     * @return String containing the price of the game
+     */
+    public String getPrice() {
+        return StringHelper.normalizeNumberString(waitForAnyElementVisible(PRICE_LOCATOR, SUBSCRIBER_BUY_BUTTON_PRICE_LOCATOR).getText());
+    }
+
+    /**
+     * Verify price on the 'Browse Games' page is same as price on PDP Page.
+     *
+     * @param expectedPrice The expected price on the page
+     * @return true if matches, false otherwise
+     */
+    public boolean isPrice(float expectedPrice) {
+        return Float.parseFloat(getPrice()) == expectedPrice;
+    }
+
+    /**
+     * Get the purchase information from the PDP page.
+     *
+     * @return The text of the purchase button
+     */
+    public String getPurchaseInfo() {
+        return waitForElementVisible(PURCHASE_INFO_LOCATOR).getText();
+    }
+
+    /**
+     * Verify that the current purchase information matches the given
+     * information.
+     *
+     * @param text The text to check against
+     * @return true if the text matches the PDP purchase information, false
+     * otherwise
+     */
+    public boolean verifyPurchaseInfoIs(String text) {
+        return getPurchaseInfo().equals(text);
+    }
+
+    /**
+     * Verify that the 'Download' button is visible or 'Get It With Origin' if
+     * on a web browser.
+     *
+     * @return true if the 'Download' or 'Play on Origin' button is visible,
+     * false otherwise
+     */
+    public boolean verifyDownloadButtonVisible() {
+        String buttonText = waitForElementVisible(DOWNLOAD_INSTALL_PLAY_BUTTON_LOCATOR).getText();
+        if (OriginClient.getInstance(driver).isQtClient(driver)) {
+            return buttonText.equalsIgnoreCase("Download");
+        }
+        return buttonText.equalsIgnoreCase("Play on Origin");
+    }
+
+    /**
+     * Verify that the 'Buy' button is visible.
+     *
+     * @return true if the 'Buy' button is visible, false otherwise
+     */
+    public boolean verifyBuyButtonVisible() {
+        try {
+            waitForBuyButtons();
+        } catch (TimeoutException ex) {
+            return false;
+        }
+        return isBuyButtonVisible();
+    }
+
+    /**
+     * Verify that the 'Buy' button is visible (This function is used when the
+     * PDP Page is completely loaded and needed use a wait).
+     *
+     * @return true if the 'Buy' button is visible, false otherwise
+     */
+    public boolean isBuyButtonVisible() {
+        try {
+            String buttonText = waitForAnyElementVisible(pageWait(5), BUY_BUTTON_LOCATOR, ACCESS_BUY_BUTTON_LOCATOR).getText();
+            return buttonText.contains("Buy");
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get the 'Buy' button text.
+     *
+     * @return The 'Buy' button text with price
+     */
+    public String getBuyButtonText() {
+        try {
+            return waitForAnyElementVisible(pageWait(2), BUY_BUTTON_LOCATOR, ACCESS_BUY_BUTTON_LOCATOR).getText();
+        } catch (TimeoutException e) {
+            return "";
+        } catch (StaleElementReferenceException e) {
+            return waitForAnyElementVisible(BUY_BUTTON_LOCATOR, ACCESS_BUY_BUTTON_LOCATOR).getText();
+        }
+    }
+
+    /**
+     * Verify 'Buy' button color is orange
+     *
+     * @return true if button color is orange, false otherwise
+     */
+    public boolean verifyBuyButtonColor() {
+        try {
+            return Color.fromString(waitForElementVisible(BUY_BUTTON_LOCATOR).getCssValue("background-color")).asHex().equals(PRIMARY_CTA_BUTTON_COLOUR);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify 'Buy' button is enabled.
+     *
+     * @return true if enabled, false otherwise
+     */
+    public boolean verifyBuyButtonEnabled() {
+        return waitForElementVisible(BUY_BUTTON_LOCATOR).isEnabled();
+    }
+
+    /**
+     * Wait for the 'Buy' button to be visible and is stabilized.
+     */
+    private void waitForBuyButtons() {
+        waitForAnyElementVisible(pageWait(10), BUY_BUTTON_LOCATOR, BUY_BUTTON_OWNED_AS_GIFT_LOCATOR, ACCESS_BUY_BUTTON_LOCATOR);
+
+        boolean buyButton = isElementPresent(BUY_BUTTON_LOCATOR);
+        boolean buyButtonOwned = isElementPresent(BUY_BUTTON_OWNED_AS_GIFT_LOCATOR);
+
+        if (buyButton) {
+            waitForAnimationComplete(BUY_BUTTON_LOCATOR, 10);
+        } else if (buyButtonOwned) {
+            waitForAnimationComplete(BUY_BUTTON_OWNED_AS_GIFT_LOCATOR, 10);
+        } else {
+            waitForAnimationComplete(ACCESS_BUY_BUTTON_LOCATOR, 10);
+        }
+    }
+
+    /**
+     * Click on the primary CTA button.
+     */
+    public void clickBuyButton() {
+        try {
+            waitForBuyButtons();
+            WebElement button = waitForElementClickable(waitForAnyElementVisible(BUY_BUTTON_LOCATOR, BUY_BUTTON_OWNED_AS_GIFT_LOCATOR, ACCESS_BUY_BUTTON_LOCATOR));
+            scrollElementToCentre(button);
+            button.click();
+        } catch (StaleElementReferenceException e) {
+            WebElement button = waitForElementClickable(waitForAnyElementVisible(BUY_BUTTON_LOCATOR, BUY_BUTTON_OWNED_AS_GIFT_LOCATOR, ACCESS_BUY_BUTTON_LOCATOR));
+            scrollElementToCentre(button);
+            button.click();
+        }
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // DIRECT ACQUISITION BUTTON
+    // The direct acquisition button that replaces the primary cta buy button
+    // if you are an Origin Access subscriber. Coves a few different button
+    // text situations depending on the entitlement and application.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Click the 'Get It Free'/'Add to Game Library'/'Play on Origin'/'Install
+     * Origin & Play' button.
+     */
+    public void clickDirectAcquisitionButton() {
+        waitForElementClickable(DIRECT_ACQUISITION_CTA_LOCATOR).click();
+    }
+
+    /**
+     * Get the 'Get It Free'/'Add to Game Library'/'Play on Origin'/'Install
+     * Origin & Play' button text.
+     *
+     * @return The text of the button, empty String otherwise
+     */
+    public String getDirectAcquisitionButtonText() {
+        try {
+            return waitForElementVisible(DIRECT_ACQUISITION_CTA_LOCATOR, 2).getText();
+        } catch (TimeoutException e) {
+            return "";
+        }
+    }
+
+    /**
+     * Verify 'Direct Acquisition' button color is orange
+     *
+     * @return true if the color is orange, false otherwise
+     */
+    public boolean verifyDirectAcquisitionButtonColor() {
+        try {
+            return Color.fromString(waitForElementVisible(DIRECT_ACQUISITION_CTA_COLOR_LOCATOR).getCssValue("background-color")).asHex().equals(PRIMARY_CTA_BUTTON_COLOUR);
+        } catch (TimeoutException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify the 'Get It Free'/'Add to Game Library'/'Play on Origin'/'Install
+     * Origin & Play' button is visible.
+     *
+     * @return true if the any of the buttons are visible, false otherwise
+     */
+    public boolean verifyDirectAcquisitionButtonVisible() {
+        return waitIsElementVisible(DIRECT_ACQUISITION_CTA_LOCATOR, 1);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // PRIMARY CTA DROPDOWN
+    // The dropdown list on the CTA button. Contains options to purchase as a
+    // gift, add to wishlist, or buy for myself. The items in this list depend
+    // on the type of entitlement.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify the 'Buy' dropdown arrow is visible.
+     *
+     * @return true if the 'Buy' dropdown arrow is visible, false otherwise
+     */
+    public boolean verifyBuyDropdownArrowVisible() {
+        return buyDropdownMenu.verifyContextMenuLocatorVisible();
+    }
+
+    /**
+     * Verify the 'Buy' dropdown 'Purchase as a Gift' menu item is visible.
+     *
+     * @return true if 'Purchase as a Gift' menu item is available, false
+     * otherwise
+     */
+    public boolean verifyBuyDropdownPurchaseAsGiftItemAvailable() {
+        return verifyBuyDropdownArrowVisible() && buyDropdownMenu.isItemPresentContainingIgnoreCase("Purchase as a gift");
+    }
+
+    /**
+     * Verify the 'Buy' dropdown 'Add to Wishlist' menu item is visible.
+     *
+     * @return true if 'Add to Wishlist' menu item is available, false otherwise
+     */
+    public boolean verifyBuyDropdownAddToWishlistItemAvailable() {
+        return verifyBuyDropdownArrowVisible() && buyDropdownMenu.isItemPresentContainingIgnoreCase("Add to wishlist");
+    }
+
+    /**
+     * Select the 'Buy' dropdown 'Add to Wishlist' menu item.
+     */
+    public void selectBuyDropdownAddToWishlist() {
+        buyDropdownMenu.selectItemContainingIgnoreCase("Add to wishlist");
+    }
+
+    /**
+     * Select the 'Buy' dropdown 'Remove From Wishlist' menu item.
+     */
+    public void selectBuyDropdownRemoveFromWishlist() {
+        buyDropdownMenu.selectItemContainingIgnoreCase("Remove from wishlist");
+    }
+
+    /**
+     * Select the 'Buy' dropdown 'Purchase as Gift' menu item.
+     */
+    public void selectBuyDropdownPurchaseAsGift() {
+        buyDropdownMenu.selectItemContainingIgnoreCase("Purchase as a gift");
+    }
+
+    /**
+     * Select the 'Buy' dropdown 'Buy Game For Self' menu item.
+     */
+    public void selectBuyDropdownBuyForSelf() {
+        buyDropdownMenu.selectItemContainingIgnoreCase("Buy for myself");
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // Purchase AS A GIFT BUTTON
+    // The button to purchase this as a gift. This button appears when you
+    // already own an entitlement.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify the 'Purchase as Gift' button is visible.
+     *
+     * @return true if visible, false otherwise
+     */
+    public boolean verifyBuyAsGiftButtonVisible() {
+        return waitIsElementVisible(BUY_AS_GIFT_BUTTON_LOCATOR, 2);
+    }
+
+    /**
+     * Get the 'Purchase as Gift' button text.
+     *
+     * @return The 'Purchase as Gift' button text with price
+     */
+    public String getBuyAsGiftButtonText() {
+        try {
+            return waitForElementVisible(BUY_AS_GIFT_BUTTON_LOCATOR, 2).getText();
+        } catch (TimeoutException e) {
+            return "";
+        }
+    }
+
+    /**
+     * Get the 'Purchase as Gift' price
+     *
+     * @return the price listed in the button
+     */
+    public double getBuyAsGiftButtonPrice() {
+        return StringHelper.extractNumberFromText(waitForElementVisible(BUY_AS_GIFT_BUTTON_LOCATOR).getText());
+
+    }
+
+    /**
+     * Click the 'Purchase as Gift' button which appears only for an owned
+     * entitlement.
+     */
+    public void clickBuyAsGiftButton() {
+        waitForElementClickable(BUY_AS_GIFT_BUTTON_LOCATOR).click();
+    }
+
+    /**
+     * Click either the 'Purchase as Gift' button, or the 'Buy' dropdown menu
+     * item to purchase game as a gift.
+     */
+    public void giftThisGame() {
+        if (verifyBuyAsGiftButtonVisible()) {
+            clickBuyAsGiftButton();
+        } else if (verifyBuyDropdownPurchaseAsGiftItemAvailable()) {
+            selectBuyDropdownPurchaseAsGift();
+        } else {
+            throw new RuntimeException("Cannot gift this game from the PDP");
+        }
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // PURCHASE SEPARATELY
+    // The button for purchasing a game separately. This button appears if the
+    // user has an active Origin Access subscription. The button is hidden,
+    // and the user needs to click a button to reveal it.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Click 'You Can Purchase' link (available to an Origin Access subscriber
+     * when opening the PDP of a subscription game).
+     */
+    public void clickYouCanPurchaseLink() {
+        waitForElementClickable(YOU_CAN_PURCHASE_LOCATOR, 2).click();
+    }
+
+    /**
+     * Verify 'You Can Purchase' link (available to an Origin Access subscriber
+     * when opening the PDP of a subscription game is visible).
+     *
+     * @return true if the 'You Can Purchase' link is visible on the page, false
+     * otherwise
+     */
+    public boolean verifyYouCanPurchaseLinkVisible() {
+        return waitIsElementVisible(YOU_CAN_PURCHASE_LOCATOR, 2);
+    }
+
+    /**
+     * Verify 'You Can Purchase' link is visible and click on it
+     */
+    public void clickYouCanPurchaseLinkIfVisible() {
+        if (verifyYouCanPurchaseLinkVisible()) {
+            clickYouCanPurchaseLink();
+        }
+    }
+
+    /**
+     * Click 'You Can Purchase' link to unhide the 'Buy' button (with retries).
+     */
+    public void unhideBuyButtonViaYouCanPurchaseLink() {
+
+        for (int i = 1; i <= 3; i++) {
+            try {
+                clickYouCanPurchaseLink();
+                if (verifyBuyDropdownArrowVisible()) {
+                    return;
+                }
+            } catch (Exception e) {
+                sleep(2000); //Sometimes the You Can Also Purchase link takes a while to stabalize
+                // and another element gets the click so whenever an exception is thrown
+                // we catch the exception and sleep until it is stabilized and do a retry
+            }
+        }
+
+        throw new RuntimeException("Cannot un-hide Buy button by clicking 'You Can Purchase' link");
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // TRIAL AND DEMO BUTTONS
+    // These are the buttons that appear near the bottom. The user can acquire
+    // the ability play a demo or a trial of the entitlement.
+    //////////////////////////////////////////////////////////////////////////
+    /**
+     * Verify the 'Get Trial' button is visible.
+     *
+     * @return true if the button is visible, false otherwise
+     */
+    public boolean verifyGetTrialButtonVisible() {
+        return waitIsElementVisible(GET_TRIAL_BUTTON_LOCATOR, 1);
+    }
+
+    /**
+     * Click on the 'Get Trial' button.
+     */
+    public void clickGetTrialButton() {
+        waitForElementClickable(waitForAnyElementVisible(GET_TRIAL_BUTTON_LOCATOR)).click();
+    }
+
+    /**
+     * Verify the 'Try Demo' button is visible.
+     *
+     * @return true if the button is visible, false otherwise
+     */
+    public boolean verifyTryDemoButtonVisible() {
+        return waitIsElementVisible(TRY_DEMO_BUTTON_LOCATOR, 1);
+    }
+
+    /**
+     * Verify the 'Download Trial' button is visible.
+     *
+     * @return true if the button is visible, false otherwise
+     */
+    public boolean verifyDownloadTrialButtonVisible() {
+        return waitIsElementVisible(DOWNLOAD_TRIAL_BUTTON_LOCATOR, 1);
+    }
+
+    /**
+     * Verify the 'Play the Trial' button is visible.
+     *
+     * @return true if the button is visible, false otherwise
+     */
+    public boolean verifyPlayTheTrialButtonVisible() {
+        return waitIsElementVisible(PLAY_THE_TRIAL_BUTTON_LOCATOR, 1);
+    }
+
+    /**
+     * Clicks on the 'Buy' CTA drop down arrow
+     */
+    public void clickBuyButtonArrow() {
+        if (verifyYouCanPurchaseLinkVisible()) {
+            clickYouCanPurchaseLink();
+        }
+        waitForElementClickable(BUY_BUTTON_DROPDOWN_ARROW_LOCATOR).click();
+    }
+
+    /**
+     * Verifies if the 'Buy' CTA drop down arrow context menu is open
+     *
+     * @return True if the context menu is open, false otherwise.
+     */
+    public boolean verifyBuyButtonDropDownOpen() {
+        return buyDropdownMenu.verifyDropdownOpen();
+    }
+}

@@ -1,0 +1,179 @@
+package com.ea.originx.automation.scripts.originaccess;
+
+import com.ea.originx.automation.lib.macroaction.MacroGameLibrary;
+import com.ea.originx.automation.lib.macroaction.MacroLogin;
+import com.ea.originx.automation.lib.macroaction.MacroOriginAccess;
+import com.ea.originx.automation.lib.macroaction.MacroPurchase;
+import com.ea.originx.automation.lib.pageobjects.common.MainMenu;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.CheckoutConfirmation;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameSlideout;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameTile;
+import com.ea.originx.automation.lib.pageobjects.originaccess.OriginAccessPage;
+import com.ea.originx.automation.lib.pageobjects.originaccess.VaultPage;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.lib.pageobjects.settings.AppSettings;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import com.ea.vx.originclient.account.AccountManager;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.vx.originclient.utils.OriginAccessService;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Test games are deactivated after canceling a subscription
+ *
+ * @author cvanichsarn
+ */
+public class OAFreeTrialGamesDeactivated extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 14211)
+    @Test(groups = {"originaccess", "full_regression", "int_only"})
+    public void testFreeTrialDeactivated(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount userAccount = AccountManager.getInstance().createNewThrowAwayAccount();
+        final EntitlementInfo standardEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_STANDARD);
+        final EntitlementInfo premiumEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_PREMIUM);
+        final EntitlementInfo vaultEntitlement1 = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.UNRAVEL);
+        final EntitlementInfo vaultEntitlement2 = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.THIS_WAR_OF_MINE);
+
+        logFlowPoint("Login to Origin with a new throwaway account"); //1
+        logFlowPoint("Purchase the standard edition of any game that can be upgraded"); //2
+        logFlowPoint("Purchase the Origin Access trial"); //3
+        logFlowPoint("Navigate to the game library and update the entitlement you just purchased"); //4
+        logFlowPoint("Download the game"); //5
+        logFlowPoint("Add two vault entitlements to the game library"); //6
+        logFlowPoint("Cancel your subscription then logout and back in"); //7
+        logFlowPoint("Navigate to the Game Library to verify that entitlements gained by Origin Access have been disabled");//8
+        logFlowPoint("Navigate to the Origin Access page and purchase the full origin access subscription"); //9
+        logFlowPoint("Navigate to the game library to verify the Origin Access gained entitlements have been reactivated"); //10
+
+        //1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Successfully created and logged into new throwaway user account");
+        } else {
+            logFailExit("Failed to create and log into new throwaway user account");
+        }
+
+        //2
+        //Disabling keeping games up to date to avoid the DLC auto-downloading during the test
+        new MainMenu(driver).selectApplicationSettings();
+        new AppSettings(driver).toggleKeepGamesUpToDate();
+        if (MacroPurchase.purchaseEntitlement(driver, standardEntitlement)) {
+            logPass("Successfully purchased standard edition of Battlefield 4");
+        } else {
+            logFailExit("Failed to purchase a standard edition of Battlefield 4");
+        }
+
+        //3
+        if (MacroOriginAccess.purchaseOriginAccess(driver)) {
+            logPass("Successfully purchased the Origin Access Trial");
+        } else {
+            logFailExit("Failed to purchased into the Origin Acces Trial");
+        }
+
+        //4
+        MacroGameLibrary.verifyGameInLibrary(driver, standardEntitlement.getName());
+        GameTile gameTile = new GameTile(driver, standardEntitlement.getOfferId());
+        GameSlideout gameSlideout = gameTile.getGameSlideout();
+        gameSlideout.upgradeEntitlement();
+        CheckoutConfirmation vaultConfirmationDialog = new CheckoutConfirmation(driver);
+        if (vaultConfirmationDialog.isDialogVisible()) {
+            logPass("Successfully upgraded the standard edition to a higher edition that was available through Origin Access");
+        } else {
+            logFailExit("Failed to upgrade from the standard edition to a higher edition that was available through Origin Access");
+        }
+
+        //5
+        vaultConfirmationDialog.clickCloseCircle();
+        if (MacroGameLibrary.downloadFullEntitlement(driver, premiumEntitlement.getOfferId())) {
+            logPass("Successfully downloaded the full game");
+        } else {
+            logFailExit("Failed to download the full game");
+        }
+
+        //6
+        NavigationSidebar navBar = new NavigationSidebar(driver);
+        VaultPage vaultPage = navBar.gotoVaultGamesPage();
+        vaultPage.addEntitlementByOfferID(vaultEntitlement1.getOfferId());
+        vaultConfirmationDialog.isDialogVisible();
+        vaultConfirmationDialog.clickCloseCircle();
+        vaultPage.addEntitlementByOfferID(vaultEntitlement2.getOfferId());
+        vaultConfirmationDialog.isDialogVisible();
+        vaultConfirmationDialog.clickCloseCircle();
+        GameLibrary gameLibrary = navBar.gotoGameLibrary();
+        if (gameLibrary.isGameTileVisibleByName(vaultEntitlement1.getName()) && gameLibrary.isGameTileVisibleByName(vaultEntitlement2.getName())) {
+            logPass("Succesfully entitled 2 vault offers");
+        } else {
+            logFailExit("Failed to entitle 2 vault offers");
+        }
+
+        //7
+        new MiniProfile(driver).selectSignOut();
+        TimeUnit.MINUTES.sleep(1); // delay to keep the trial start time and the cancellation time different
+        OriginAccessService.immediateCancelSubscription(userAccount);
+        TimeUnit.MINUTES.sleep(1);
+        if (MacroLogin.startLogin(driver, userAccount)) {
+            logPass("Cancelled subscription and logged out and back into the client");
+        } else {
+            logFailExit("Failed to cancel subscription or log out and back into the client");
+        }
+
+        //8
+        boolean isStandardPresent = MacroGameLibrary.verifyGameInLibrary(driver, standardEntitlement.getName());
+        GameTile premiumGameTile = new GameTile(driver, premiumEntitlement.getOfferId());
+        GameTile vault1GameTile = new GameTile(driver, vaultEntitlement1.getOfferId());
+        GameTile vault2GameTile = new GameTile(driver, vaultEntitlement2.getOfferId());
+        boolean isPremiumExpired = premiumGameTile.verifyViolatorStatingMembershipIsExpired();
+        boolean isVault1Expired = vault1GameTile.verifyViolatorStatingMembershipIsExpired();
+        boolean isVault2Expired = vault2GameTile.verifyViolatorStatingMembershipIsExpired();
+
+        if (isStandardPresent && isPremiumExpired && isVault1Expired && isVault2Expired) {
+            logPass("Verified the upgraded entitlement has been reverted and the vault entitlements are no longer available");
+        } else {
+            logFailExit("Failed to verify that the upgraded entitlement has been reverted and the vault entitlements are no longer available");
+        }
+
+        //9
+        navBar.clickOriginAccessLink();
+        OriginAccessPage oaPage = new OriginAccessPage(driver);
+        oaPage.verifyPageReached();
+        oaPage.refreshPageForJoinButton(); // refresh page until cancallation properly propagates to the user
+        boolean isTrialOver = oaPage.verifyJoinAccessHeroButtonExists() && !oaPage.verifyFreeTrialTextExists();
+        boolean originAccessPurchased = MacroOriginAccess.purchaseOriginAccess(driver);
+
+        if (isTrialOver && originAccessPurchased) {
+            logPass("Verified there are no references to a trial period on the Origin Access page and completed the purchase of an Origin Access subscription successfully");
+        } else {
+            logFailExit("Failed to verify the lack of trial content on the Origin Access page and did not complete the purchase of an Origin Access subscription");
+        }
+
+        //10
+        new MainMenu(driver).selectRefresh(); // sometimes the dialog doesn't close and prevents game library access
+        navBar.gotoGameLibrary();
+        isStandardPresent = gameLibrary.verifyGameLibraryLacksDesignatedGame(standardEntitlement.getOfferId());
+        boolean isPremiumPlayable = gameLibrary.isGameTileVisibleByName(premiumEntitlement.getName()) && premiumGameTile.isReadyToPlay();
+        boolean isVault1Downloadable = gameLibrary.isGameTileVisibleByName(vaultEntitlement1.getName()) && vault1GameTile.isDownloadable();
+        boolean isVault2Downloadable = gameLibrary.isGameTileVisibleByName(vaultEntitlement2.getName()) && vault2GameTile.isDownloadable();
+
+        if (isStandardPresent && isPremiumPlayable && isVault1Downloadable && isVault2Downloadable) {
+            logPass("Verified the vault entitlements have been reactivated and that the standard edition of the game has been replaced by the premium");
+        } else {
+            logFailExit("Failed to verify the vault entitlements have been reactivated and that the standard edition of the game has been replaced by the premium");
+        }
+
+        softAssertAll();
+    }
+}

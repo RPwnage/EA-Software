@@ -1,0 +1,111 @@
+<!-- 
+     (c) Electronic Arts. All Rights Reserved.
+-->
+<project>
+  
+  <include file="pc-vc-common.xml" />
+  
+  <fail message="WinRT configurations require at least Visual Studio 11.  Detected VS version ${config-vs-version}." unless="${package.eaconfig.isusingvc11??false}"/>
+
+  <property name="package.eaconfig.winapifamily" value="WINAPI_FAMILY_APP" if="${config-system} == winrt" />
+  <property name="package.eaconfig.winapifamily" value="WINAPI_FAMILY_PHONE_APP" if="${config-system} == winprt" />
+
+  <optionset name="config-options-common">
+      <option name="preprocess"/>
+      <option name="postprocess">
+        winrt-vc-postprocess
+        all-platforms-postprocess
+      </option>
+    <option name="exceptions" value="on" />
+    <option name="multithreadeddynamiclib"  value="on" />
+    <option name="windowsruntime" value="on" if="${config-system} == winprt"/>
+    <!-- winrt libs and winrt programs need this.  so anything they link with need this too. -->
+    <option name="buildset.cc.defines">
+      ${option.value}
+      WIN32
+      _CRT_SECURE_NO_DEPRECATE
+      _CRT_USE_WINAPI_PARTITION_APP
+      WINAPI_FAMILY=${package.eaconfig.winapifamily}
+      _UNICODE
+      UNICODE
+      WIN32_LEAN_AND_MEAN
+      NOMINMAX
+    </option>
+    <option name="buildset.cc.defines" if="${config-system} == winprt">
+      ${option.value}
+      EA_PLATFORM_WINDOWS_PHONE
+    </option>
+    <option name="buildset.cc.includedirs">
+      ${option.value}
+      ${eaconfig.PlatformSDK.dir}\Include\winrt
+    </option>
+    <option name="buildset.cc.usingdirs">
+      ${option.value}
+      ${eaconfig.PlatformSDK.dir}Windows MetaData
+      ${eaconfig.PlatformSDK.dir}\References\CommonConfiguration\Neutral
+    </option>
+
+    <option name="buildset.as.includedirs">
+      ${option.value}
+      ${eaconfig.PlatformSDK.dir}\Include\winrt
+    </option>
+  </optionset>
+
+  <optionset name="config-options-program">
+    <option name="pcconsole" value="off" />
+    <option name="exceptions" value="on" />
+    <option name="windowsruntime" value="on" />
+    <option name="buildset.tasks" value="asm cc link" />
+    <option name="buildset.cc.defines" value="_WINDOWS" />
+    <!-- Disable these warnings as vccorlib.h currently triggers them and it is automatically included when -ZW is set -->
+    <option name="buildset.cc.options">
+      -wd4365
+      -wd4628
+      -wd4263
+      -wd4264
+      -wd4702
+      -wd4946
+    </option>
+    <option name="linkoutputname" value="%outputdir%/%outputname%${exe-suffix}" />
+    <option name="buildset.link.options">
+      -manifestfile:"%intermediatedir%\%outputname%${exe-suffix}.manifest"
+    </option>
+    <option name="link.postlink.commandline" >
+      -nologo
+      -manifest "%intermediatedir%\%outputname%${exe-suffix}.manifest"
+      -outputresource:"%outputdir%\%outputname%${exe-suffix};1"
+    </option>
+    <option name="buildset.link.options" if="${config-system} == winprt">
+      -winrt
+      -nodefaultlib:ole32.lib
+    </option>
+  </optionset>
+
+  <optionset name="config-options-winrtcppprogram" fromoptionset="config-options-program">
+    <option name="buildset.name" value="WinRTCppProgram" />
+  </optionset>
+
+  <optionset name="config-options-winrtcpplibrary">
+    <option name="exceptions" value="on" />
+    <option name="windowsruntime" value="on" />
+    <option name="buildset.name" value="WinRTCppLibrary" />
+    <option name="buildset.tasks" value="cc lib" />
+    <option name="liboutputname" value="%outputdir%/${lib-prefix}%outputname%${lib-suffix}" />
+    <option name="buildset.lib.options">
+      -IGNORE:4264
+    </option>
+    <option name="buildset.cc.defines" value="_WINDOWS" />
+    <!-- Disable these warnings as vccorlib.h currently triggers them and it is automatically included when -ZW is set -->
+    <option name="buildset.cc.options">
+      -wd4365
+      -wd4628
+      -wd4263
+      -wd4264
+      -wd4702
+      -wd4946
+    </option>
+  </optionset>
+
+  <include file="options/load-vc-options.xml"/>
+
+</project>

@@ -1,0 +1,219 @@
+<?js
+var data = obj;
+var self = this;
+
+var moddedName = data.longname.replace('event:', '');
+
+?>
+<dt>
+    <div class="nameContainer<?js if (data.inherited) { ?> inherited<?js } ?>">
+        <h4 class="name" id="<?js= id ?>">
+            <?js if (data.inherited || data.inherits) { ?>
+                <span class="inherited"><?js= this.linkto(data.inherits, 'inherited') ?></span>
+            <?js } ?>
+            <?js= data.attribs + (kind === 'class' ? 'new ' : '') + (data.scope === 'static' ? moddedName : name) + (kind !== 'event' ? data.signature : '') ?>
+        </h4>
+    
+        <?js if (data.meta) {?>
+        <div class="tag-source">
+            <?js= self.linkto(meta.filename) ?>, <?js= self.linkto(meta.filename, 'line ' + meta.lineno, null, 'line' + meta.lineno) ?>
+        </div>
+        <?js } ?>
+    </div>
+
+    <?js if (data.summary) { ?>
+    <p class="summary"><?js= summary ?></p>
+    <?js } ?>
+</dt>
+<dd>
+    
+    <?js if (data.description) { ?>
+    <div class="description">
+        <?js= data.description ?>
+    </div>
+    <?js } ?>
+
+    <?js if (kind === 'event' && data.type && data.type.names) {?>
+        <h5>Type:</h5>
+        <ul>
+            <li>
+                <?js= self.partial('type.tmpl', data.type.names) ?>
+            </li>
+        </ul>
+    <?js } ?>
+    
+    <?js if (data['this']) { ?>
+        <h5>This:</h5>
+        <ul><li><?js= this.linkto(data['this'], data['this']) ?></li></ul>
+    <?js } ?>
+
+    <?js if (data.params && params.length) { if (kind !== 'event') { params.showTest = true;}params.base=data.name?>
+        <?js= this.partial('params.tmpl', params) ?>
+    <?js } ?>
+    
+    <?js= this.partial('details.tmpl', data) ?>
+    
+    <?js if (data.fires && fires.length) { ?>
+    <h5>Fires:</h5>
+    <ul><?js fires.forEach(function(f) { ?>
+        <li><?js= self.linkto(f) ?></li>
+    <?js }); ?></ul>
+    <?js } ?>
+
+    <?js if (data.listens && listens.length) { ?>
+    <h5>Listens to Events:</h5>
+    <ul><?js listens.forEach(function(f) { ?>
+        <li><?js= self.linkto(f) ?></li>
+    <?js }); ?></ul>
+    <?js } ?>
+
+    <?js if (data.listeners && listeners.length) { ?>
+    <h5>Listeners of This Event:</h5>
+    <ul><?js listeners.forEach(function(f) { ?>
+        <li><?js= self.linkto(f) ?></li>
+    <?js }); ?></ul>
+    <?js } ?>
+    
+    <?js if (data.exceptions && exceptions.length) { ?>
+    <h5>Throws:</h5>
+    <?js if (exceptions.length > 1) { ?><ul><?js
+        exceptions.forEach(function(r) { ?>
+            <li><?js= self.partial('exceptions.tmpl', r) ?></li>
+        <?js });
+    ?></ul><?js } else {
+        exceptions.forEach(function(r) { ?>
+            <?js= self.partial('exceptions.tmpl', r) ?>
+        <?js });
+    } } ?>
+    
+    <?js if (data.returns && returns.length) { ?>
+    <?js if (returns.length > 1) { ?><h5>Returns:</h5><?js } ?>
+    <?js= self.partial('returns.tmpl', data.returns) ?>
+    <?js } ?>
+    
+    <?js if (data.examples && examples.length) { ?>
+        <h5>Example<?js= examples.length > 1? 's':'' ?></h5>
+        <?js= this.partial('examples.tmpl', examples) ?>
+    <?js } ?>
+     <script>
+        function click<?js= data.name?>Done(){
+            var funcParams = [];
+            <?js if (data.params && params.length) { ?>
+                <?js params.forEach(function(param, i) { if(!param) return;?>
+                    var newParam;
+                    <?js if (param.type && param.type.names && param.type.names[0] === 'boolean') {?>
+                        var e = document.getElementById("<?js= params.base?><?js= param.name ?>bool"); 
+                        if(e.options[e.selectedIndex].value === 'true') {
+                            newParam = true;
+                        }
+                        else {  
+                            newParam = false;
+                        };
+                    <?js } else { ?>
+                        var paramVal = document.getElementById("<?js= params.base?><?js= param.name ?>").value;
+                        try {
+                          newParam = JSON.parse(paramVal);
+                        } catch (exception) {
+                          newParam = paramVal;
+                        }
+
+                    <?js } ?>
+                    funcParams.push(newParam);   
+                <?js }); ?>
+            <?js } ?>
+            var baseStr = ' <br><br><h6><b>Sample call</b></h6><pre style="overflow:auto; overflow-x: hidden; height:100"><?js= moddedName?>(';
+                for(var i = 0; i < funcParams.length; i++) {
+                    baseStr  = baseStr + funcParams[i] 
+                    if(i != funcParams.length - 1) {
+                        baseStr += ',';
+                    }
+                }
+                baseStr =  baseStr +')'
+            <?js if (data.returns && returns.length) { ?>
+                <?js    if(returns[0].type.names[0] === 'promise') {?>
+                    +'.then(function(){}, function(error){})</pre>'
+                <?js } ?>
+            <?js    if(returns[0].type.names[0].indexOf('promise<') > -1)  {?>
+                +'.then(function(response){}, function(error){})</pre>'
+            <?js } ?>
+        <?js } ?>; 
+        document.getElementById('<?js= data.name?>sample').innerHTML =  baseStr;
+
+        <?js if (data.returns && returns.length) { ?>
+            console.log('<?js= returns[0].type.names[0] ?>');
+            <?js    if(returns[0].type.names[0] === 'promise') {?>
+                <?js= moddedName?>.apply(this,funcParams).then(function(response) {
+                    document.getElementById('<?js= data.name?>results').innerHTML = ' <br><br><h6><b>Results</b></h6><pre style="overflow:auto; overflow-x: hidden; height:400px">'+'SUCCESS (no parameters in the resolve of the promise)'+'</pre>';   
+                }, function(error) {});
+                <?js } ?>
+
+                <?js    if(returns[0].type.names[0].indexOf('promise<') > -1) {?>
+                    <?js= moddedName?>.apply(this,funcParams).then(function(response) {
+                    document.getElementById('<?js= data.name?>results').innerHTML = ' <br><br><h6><b>Results</b></h6><pre style="overflow:auto; overflow-x: hidden; height:400px">'+JSON.stringify(response, null, '\t')+'</pre>';   
+                    }, function(error) {});
+                <?js } ?>
+                <?js    if((returns[0].type.names[0] === 'string')  || (returns[0].type.names[0] === 'boolean') ||  (returns[0].type.names[0] === 'number')) {?>
+                    document.getElementById('<?js= data.name?>results').innerHTML = ' <br><br><h6><b>Results</b></h6><pre style="overflow:auto; overflow-x: hidden; height:400px">'+JSON.stringify(<?js= moddedName?>.apply(this,funcParams), null, '\t')+'</pre>';   
+                 <?js } ?>
+
+                <?js    if(returns[0].type.names[0] === 'void') {?>
+                    <?js= moddedName?>.apply(this,funcParams);
+                    document.getElementById('<?js= data.name?>results').innerHTML = ' <br><br><h6><b>Results</b></h6><pre style="overflow:auto; overflow-x: hidden; height:400px">'+'function executed - no return value'+'</pre>';   
+                     <?js } ?>
+                <?js } ?>
+                <?js if (!data.returns || !returns.length) {  ?> 
+                    <?js= moddedName?>.apply(this,funcParams);
+                    document.getElementById('<?js= data.name?>results').innerHTML = ' <br><br><h6><b>Results</b></h6><pre style="overflow:auto; overflow-x: hidden; height:400px">'+'function executed - no return value'+'</pre>';   
+                <?js } ?>
+
+     } 
+     </script>
+
+
+    <?js if (kind !== 'event') {?>
+        <button id = "tryme<?js= data.name?>" type="button" onclick="click<?js= data.name?>Done()">Try Me!</button>  
+        <div  id='<?js= data.name?>sample'></div>    
+        <div  id='<?js= data.name?>results'></div>   
+            <script>
+           var tryMeBtn = document.getElementById("tryme<?js= data.name?>");
+           if(!window.parent.originSocialConnected) {
+            tryMeBtn.style.display = 'none';
+           }
+           else {
+            tryMeBtn.style.display = '';
+           }
+    </script>
+    <?js } ?>
+ 
+    <?js if (kind === 'event') {?>
+        <div id = "<?js= data.name?>Container">
+        <br><br><h6><b>Events</b></h6><pre style="overflow:auto; overflow-x: hidden; height:400px">    <div  id='<?js= data.name?>Events'>  </div></pre>    
+        </div>
+        <script>       
+        if(window.parent.originSocialConnected) {
+            Origin._tmp.<?js= data.name?>.update = function (result) {
+                var currentTime = new Date();
+                var description = '\n\n' + currentTime + '\n<?js= data.name?> event occurred.\n';
+
+                if(result) {
+                    description += JSON.stringify(result, null, '\t');
+                }
+                   document.getElementById('<?js= data.name?>Events').appendChild(document.createTextNode(description));
+            }
+            for(var i = 0; i < Origin._tmp.<?js= data.name?>.responses.length; i++) {
+                Origin._tmp.<?js= data.name?>.update(Origin._tmp.<?js= data.name?>.responses[i]);
+            }
+        }
+           var eventContainer = document.getElementById("<?js= data.name?>Container");
+           if(!window.parent.originSocialConnected) {
+            eventContainer.style.display = 'none';
+           }
+           else {
+            eventContainer.style.display = '';
+           }            
+        </script>
+    <?js } ?>
+
+
+  
+</dd>

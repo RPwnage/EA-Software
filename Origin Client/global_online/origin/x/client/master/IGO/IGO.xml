@@ -1,0 +1,565 @@
+<project> 
+  <property name="IGO.module.name" value="IGO" />
+
+  <property name="package.WindowsSDK.TargetPlatformVersion" value="win8" />
+  <property name="runtime.buildmodules" value="${property.value} IGO" />
+
+  <property name="runtime.${IGO.module.name}.outputdir" value="${package.IGO.bin}" />
+  <property name="runtime.${IGO.module.name}.outputname" value="${IGO.module.name}32${debug-suffix}" if="${config-system} == 'pc'" />
+  <property name="runtime.${IGO.module.name}.outputname" value="${IGO.module.name}64${debug-suffix}" if="${config-system} == 'pc64'" />
+  <property name="${IGO.module.name}.manifest.filename" value="${package.configbuilddir}/IGO/${runtime.${IGO.module.name}.outputname}.dll.intermediate.manifest" />
+  <property name="${IGO.module.name}.manifest.filename" value="${package.builddir}/${config}/${runtime.${IGO.module.name}.outputname}.dll.intermediate.manifest" if="${nant.version} lt 3" />
+  <!--property name="runtime.${IGO.module.name}.defines.winver" value="0x0502" /-->
+  
+  <dependent name="OriginConfig" />
+  <dependent name="OriginVersion" />
+  <dependent name="WindowsSDK" />
+  <dependent name="DirectX" />
+  <dependent name="twitch" />
+  <dependent name="Mantle" />
+  
+  <property name="runtime.${IGO.module.name}.builddependencies" >
+    EABase
+    EAIO
+    EASTL
+    EAThread
+    OriginVersion
+    Origin_h264_encoder
+  </property>
+  <property name="runtime.${IGO.module.name}.Origin_h264_encoder.runtime.buildmodules"><!-- Ignore the encoder TestBed -->
+    Origin_h264_encoder
+  </property>
+	<!-- Add special compiler options and create new buidtype -->
+	<BuildType name="${IGO.module.name}" from="OriginDLL">
+    <option name="buildset.cc.defines" if="${config-system} == 'pc'">
+      @{StrReplace('${option.value}','EA_DLL','')}
+      _USE_IGO_LOGGER_
+      _M_IX86_X64
+      _M_IX86
+      _CRT_SECURE_NO_WARNINGS
+      _WINDLL
+    </option>
+    <option name="buildset.cc.defines" if="${config-system} == 'pc64'">
+      @{StrReplace('${option.value}','EA_DLL','')}
+      _USE_IGO_LOGGER_
+      _M_IX86_X64
+      _M_X64
+      _CRT_SECURE_NO_WARNINGS
+      _WINDLL
+    </option>
+    <option name="buildset.cc.options" >
+      ${option.value}
+      /wd"4127"
+      /wd"4389"
+      /wd"4100"
+      /wd"4505"
+      /FI ${package.IGO.dir}/../OriginCommon.h
+    </option>
+    <option name="buildset.link.options" if="${config-system} == 'pc'">
+      ${option.value}
+      /MANIFEST 
+      /ALLOWISOLATION 
+      /MANIFESTUAC:"level='asInvoker' uiAccess='false'"
+      /LIBPATH:"${module.IGO.dir}/madCodeHook3/Header &amp; Libs"
+      /LIBPATH:"${package.DirectX.appdir}/Lib/x86"
+      /LIBPATH:"${package.Mantle.dir}/../../DirectX/8.1/lib"
+	  -ignore:4039 <!-- LINK : warning LNK4039: section '.DX7IGOSHARED' specified with /SECTION option does not exist -->
+    </option>
+    <option name="buildset.link.options" if="${config-system} == 'pc64'">
+      ${option.value}
+      /MANIFEST 
+      /ALLOWISOLATION 
+      /MANIFESTUAC:"level='asInvoker' uiAccess='false'"
+      /LIBPATH:"${module.IGO.dir}/madCodeHook3/Header &amp; Libs"
+      /LIBPATH:"${package.DirectX.appdir}/Lib/x64"
+    </option>
+
+    <option name="multithreadeddynamiclib"        value="on" />
+    <option name="pcconsole"                      value="off" />
+	</BuildType>
+	
+  	<!-- ************************* -->
+	<!-- Prebuild property targets -->
+	<!-- ************************* -->
+	
+	<!-- NANT Prebuild target. Will execute this first before any compiling happens. -->
+	<target name="generate-fx-code" depends="compile-fx"/>
+
+	<property name="runtime.IGO.prebuildtarget" value="generate-fx-code" />
+
+	<!-- VS Prebuild target. Will set this to execute in the VS project. -->
+	<property name="runtime.IGO.vcproj.pre-build-step">
+		${nant.location}/nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} ${runtime.IGO.prebuildtarget}
+	</property>
+
+  <!-- ${IGO.module.name} build properties -->
+	<property name="runtime.${IGO.module.name}.buildtype" value="${IGO.module.name}" />
+
+  <property name="runtime.${IGO.module.name}.runtime.moduledependencies" value="IGOIPC MadCHook twitch" />
+
+  <property name="runtime.${IGO.module.name}.includedirs" >
+    ${property.value}
+    ${module.IGO.dir}/..
+    ${module.IGO.dir}/../IGOIPC
+    ${module.IGO.dir}/../engine/dev/include/engine/igo
+    ${module.IGO.dir}/madCodeHook3/Header &amp; Libs    
+    ${module.IGO.dir}/MantleHelpers    
+    ${package.DirectX.appdir}/Include
+    ${package.Mantle.dir}/Inc
+    ${package.Mantle.dir}/ilc/Inc
+    ${package.Mantle.dir}/ilc/generator
+    ${package.Mantle.dir}/ilc/external
+    ${package.Mantle.dir}/ilc/IL
+    ${package.Mantle.dir}/ilc/converter
+	${package.WindowsSDK.kitdir}/include/${package.WindowsSDK.TargetPlatformVersion}/shared
+	${package.WindowsSDK.kitdir}/include/${package.WindowsSDK.TargetPlatformVersion}/um
+    ${package.twitch.includedir}
+    ${package.twitch.includedir}/../twitchcore/include
+   </property>
+  
+  <fileset name="runtime.${IGO.module.name}.libs" if="${config-system} == 'pc'">
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\kernel32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86/user32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\gdi32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\winspool.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\comdlg32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\advapi32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\shell32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\ole32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\oleaut32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\uuid.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\odbc32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\odbccp32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x86\Comctl32.lib" />
+  </fileset>
+  
+  <fileset name="runtime.${IGO.module.name}.libs" if="${config-system} == 'pc64'">
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\kernel32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\user32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\gdi32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\winspool.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\comdlg32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\advapi32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\shell32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\ole32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\oleaut32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\uuid.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\odbc32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\odbccp32.lib" />
+    <includes name="${package.WindowsSDK.kitdir}\Lib\${package.WindowsSDK.TargetPlatformVersion}\um\x64\Comctl32.lib" />
+  </fileset>
+  
+  <fileset name="runtime.${IGO.module.name}.headerfiles" basedir="${module.${IGO.module.name}.dir}" >
+    <includes name="**/*.h" />
+	<includes name="../IGOProxy/md5.h" />
+	<includes name="../IGOProxy/IGOAPIInfo.h" />
+  </fileset>
+
+  <fileset name="runtime.Mantle.sourcefiles" basedir="${package.Mantle.dir}">
+    <includes name="ilc/*.cpp" />
+    <includes name="ilc/generator/*.cpp" />
+    <includes name="ilc/converter/*.cpp" />
+    <includes name="ilc/IL/*.cpp" />
+  </fileset>
+
+  <fileset name="runtime.${IGO.module.name}.sourcefiles" basedir="${module.${IGO.module.name}.dir}">
+      <includes fromfileset="runtime.Mantle.sourcefiles" asis="true" />
+	
+		<includes name="MantleHelpers/MantleObjects/*.cpp" />
+		<includes name="DllMain.cpp" />
+		<includes name="Helpers.cpp" />
+		<includes name="DX10Hook.cpp" />
+		<includes name="DX10Surface.cpp" />
+		<includes name="DX11Hook.cpp" />
+		<includes name="DX11Surface.cpp" />
+		<includes name="DXGIHook.cpp" />
+		<includes name="DX12Hook.cpp" />
+		<includes name="DX12Surface.cpp" />
+		<includes name="DX12ResourceProvider.cpp" />
+		<includes name="MantleHook.cpp" />
+		<includes name="MantleSurface.cpp" />
+		<includes name="MantleShader.cpp" />
+		<includes name="DX8Hook.cpp" />
+		<includes name="DX8Surface.cpp" />
+		<includes name="DX9Hook.cpp" />
+		<includes name="DX9Hook.cpp" />
+		<includes name="DX9Surface.cpp" />
+	<group if="${config-system} == 'pc' || ${config-system} == 'pc64'">
+		<includes name="ScreenCopyDx9.cpp" />		
+		<includes name="ScreenCopyDx10.cpp" />		
+		<includes name="ScreenCopyDx11.cpp" />
+		<includes name="ScreenCopyDx12.cpp" />		
+		<includes name="ScreenCopyMantle.cpp" />		
+		<includes name="ScreenCopyGL.cpp" />		
+		<includes name="TwitchManager.cpp" />		
+	</group>
+		<includes name="HookAPI.cpp" />
+		<includes name="IGO.cpp" />
+		<includes name="IGOApplication.cpp" />
+		<includes name="IGOInfoDisplay.cpp" />
+		<includes name="IGOLogger.cpp" />
+		<includes name="IGOTelemetry.cpp" />
+        <includes name="IGOWindowGovernor.cpp" />
+		<includes name="IGOSurface.cpp" />
+		<includes name="IGOWindow.cpp" />
+		<includes name="InjectHook.cpp" />
+		<includes name="InputHook.cpp" />
+		<includes name="OGLHook.cpp" />
+		<includes name="OGLSurface.cpp" />
+		<includes name="Disasm/cpu.c" />
+		<includes name="Disasm/disasm.c" />
+		<includes name="Disasm/disasm_x86.c" />
+		<includes name="Disasm/misc.c" />
+		<includes name="MHook/mhook.cpp" />
+		<includes name="../IGOProxy/md5.cpp"/>
+		<includes name="DXGIHook.cpp"/>
+  </fileset>
+
+	<property name="runtime.${IGO.module.name}.res.includedirs">
+		${package.OriginVersion.dir}/include
+	</property>
+    
+  <fileset name="runtime.${IGO.module.name}.resourcefiles">
+          <includes name="${module.IGO.dir}/IGO.rc" />
+  </fileset>
+  
+  <target name="clean-fx" >
+    <delete>
+      <fileset basedir="${module.IGO.dir}" >
+        <includes name="*.fxo" />
+      </fileset>
+    </delete>
+  </target>
+  
+  <target name="compile-fx" >
+    <property name="igo.fx" value="${module.IGO.dir}/igo.fx" />
+    <property name="igodx9.fx" value="${module.IGO.dir}/igodx9.fx" />
+    <property name="fxc.exe" value="${module.IGO.dir}/fxc.exe" />
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igo.fxo" />
+      </outputs>
+      <args>
+        <arg value="/T fx_4_0" />
+        <arg value="/Vn igo" />
+        <arg value="/Fo igo.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igodx9.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igodx9.fxo" />
+      </outputs>
+      <args>
+        <arg value="/T fx_2_0" />
+        <arg value="/Vn igodx9" />
+        <arg value="/Fo igodx9.fxo" />
+        <arg value="${igodx9.fx}" />
+      </args>
+    </exec>
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igovs.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E VS" />
+        <arg value="/T vs_4_0" />
+        <arg value="/Vn igovs" />
+        <arg value="/Fo igovs.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igobackgroundvs.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E VS_Background" />
+        <arg value="/T vs_4_0" />
+        <arg value="/Vn igobackgroundvs" />
+        <arg value="/Fo igobackgroundvs.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igops.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E PS" />
+        <arg value="/T ps_4_0" />
+        <arg value="/Vn igops" />
+        <arg value="/Fo igops.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igobackgroundps.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E PS_Background" />
+        <arg value="/T ps_4_0" />
+        <arg value="/Vn igobackgroundps" />
+        <arg value="/Fo igobackgroundps.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igoquadvs.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E VS_Quad" />
+        <arg value="/T vs_4_0" />
+        <arg value="/Vn igoquadvs" />
+        <arg value="/Fo igoquadvs.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igoquadps.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E PS_Quad" />
+        <arg value="/T ps_4_0" />
+        <arg value="/Vn igoquadps" />
+        <arg value="/Fo igoquadps.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+    <exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igoYUVquadps.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E PS_Quad_YUV" />
+        <arg value="/T ps_4_0" />
+        <arg value="/Vn igoYUVquadps" />
+        <arg value="/Fo igoYUVquadps.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+	<exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igodx12vs.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E DX12VS" />
+        <arg value="/T vs_4_0" />
+        <arg value="/Vn igodx12vs" />
+        <arg value="/Fo igodx12vs.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+	<exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igodx12ps.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E DX12PS" />
+        <arg value="/T ps_4_0" />
+        <arg value="/Vn igodx12ps" />
+        <arg value="/Fo igodx12ps.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+	<exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igodx12backgroundvs.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E DX12VS_Background" />
+        <arg value="/T vs_4_0" />
+        <arg value="/Vn igodx12backgroundvs" />
+        <arg value="/Fo igodx12backgroundvs.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+	<exec program="${fxc.exe}" workingdir="${module.IGO.dir}" >
+      <inputs>
+        <includes name="${igo.fx}" />
+      </inputs>
+      <outputs>
+        <includes name="igodx12backgroundps.fxo" />
+      </outputs>
+      <args>
+        <arg value="/E DX12PS_Background" />
+        <arg value="/T ps_4_0" />
+        <arg value="/Vn igodx12backgroundps" />
+        <arg value="/Fo igodx12backgroundps.fxo" />
+        <arg value="${igo.fx}" />
+      </args>
+    </exec>
+  </target>
+  
+  <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+
+	<property name="IGO.postbuild.target.list" if="${config-system} == 'pc'">
+		${property.value}
+		IGO32.sign-all-exe
+		${IGO.module.name}-copy
+		${IGO.module.name}-copy-twitch-to-runtime-pc		
+	</property>
+
+	<property name="IGO.postbuild.target.list" if="${config-system} == 'pc64'">
+		${property.value}
+		IGO64.sign-all-exe
+		IGO64.copy-to-runtime-pc
+	</property>
+	
+	
+	<target name="IGO-post-build-tasks">
+		<foreach property="runtarget" item="String" in="${${IGO.module.name}.postbuild.target.list}">
+			<call target="${runtarget}" />
+		</foreach>
+	</target>
+	
+  <target name="IGO-copy">
+    <copy todir="${package.IGO.lib}">
+      <fileset basedir="${runtime.${IGO.module.name}.outputdir}" >
+        <includes name="${runtime.IGO.outputname}.lib" />
+      </fileset>
+    </copy>
+  </target>
+  
+   <!-- ************************** -->
+  <!-- Postbuild property targets -->
+  <!-- ************************** -->
+    <target name="IGO64.sign-all-exe">
+        <fileset name="signing.files" basedir="${runtime.${IGO.module.name}.outputdir}">
+            <includes name="IGO64${debug-suffix}.dll" />
+            <includes name="IGOProxy64${debug-suffix}.exe" />
+        </fileset>
+        
+        <foreach property="signfile" item="FileSet" in="signing.files">
+          <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="@{PathGetFileNameWithoutExtension('${signfile}')}" in="${signfile}" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+            <sleep seconds="2" />
+        </foreach>
+    </target>
+
+    <target name="IGO32.sign-all-exe">
+        <fileset name="signing.files" basedir="${runtime.${IGO.module.name}.outputdir}">
+            <includes name="IGO32${debug-suffix}.dll" />
+            <includes name="IGOProxy${debug-suffix}.exe" />
+        </fileset>
+        
+        <foreach property="signfile" item="FileSet" in="signing.files">
+          <task name="sign" public.cert="@{PropertyExists('jenkins')}" desc="@{PathGetFileNameWithoutExtension('${signfile}')}" in="${signfile}" retries="${signing.retries.default}" timestamp="${codesign.timestamp}" />
+            <sleep seconds="2" />
+        </foreach>
+    </target>
+
+    
+    <target name="IGO-copy-twitch-to-runtime-pc">
+                  
+          <copy todir="${runtime.${IGO.module.name}.outputdir}/../../originClient/dev/runtime" flatten="true" overwrite="true">
+              <fileset>
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_32_debug.dll" if="${debug-suffix} == 'd'"/>
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_32_release.dll" if="${debug-suffix} == ''"/>
+                  <includes name="${package.twitch.bin}\win32\avutil-ttv-51.dll"/>
+                  <includes name="${package.twitch.bin}\win32\libmfxsw32.dll"/>
+                  <includes name="${package.twitch.bin}\win32\libmp3lame-ttv.dll"/>
+                  <includes name="${package.twitch.bin}\win32\swresample-ttv-0.dll"/>
+        
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_32_debug.pdb"  if="${debug-suffix} == 'd'"/>
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_32_release.pdb"  if="${debug-suffix} == ''"/>
+          </fileset>
+          </copy>  
+      
+    </target>	  
+
+    <target name="IGO64.copy-to-runtime-pc">
+          <copy todir="${runtime.${IGO.module.name}.outputdir}/../../originClient/dev/runtime" flatten="true" overwrite="true">
+              <fileset>
+                  <includes name="${package.IGO.bin}\IGO64${debug-suffix}.dll"/>
+                  <includes name="${package.IGO.bin}\IGO64${debug-suffix}.pdb"/>
+                  <includes name="${package.IGO.bin}\IGOProxy64${debug-suffix}.exe"/>
+                  <includes name="${package.IGO.bin}\IGOProxy64${debug-suffix}.pdb"/>
+          </fileset>
+          </copy>  
+                   
+          <copy todir="${runtime.${IGO.module.name}.outputdir}/../../originClient/dev/runtime/x64" flatten="true" overwrite="true">
+              <fileset>
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_64_debug.dll" if="${debug-suffix} == 'd'"/>
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_64_release.dll" if="${debug-suffix} == ''"/>
+                  <includes name="${package.twitch.bin}\x64\avutil-ttv-51.dll"/>
+                  <includes name="${package.twitch.bin}\x64\libmfxsw64.dll"/>
+                  <includes name="${package.twitch.bin}\x64\libmp3lame-ttv.dll"/>
+                  <includes name="${package.twitch.bin}\x64\swresample-ttv-0.dll"/>
+        
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_64_debug.pdb"  if="${debug-suffix} == 'd'"/>
+                  <includes name="${package.twitch.bin}\..\lib\twitchsdk_64_release.pdb"  if="${debug-suffix} == ''"/>
+          </fileset>
+          </copy>  
+      
+    </target>	  
+  	
+	
+	
+	<!-- NANT Postbuild target. Will execute this after compiling happens. -->
+	<property name="${IGO.module.name}.runtime.postbuildtarget" value="${IGO.module.name}-post-build-tasks" />
+  
+	<!-- VS POSTBUILD target. Will set this to execute in the VS project. -->
+	<property name="jenkins.flag" value="" />
+	<property name="jenkins.flag" value="-D:jenkins=true" if="@{PropertyExists('jenkins')}" />
+	<property name="runtime.${IGO.module.name}.vcproj.post-build-step">
+		${nant.location}\nant.exe -buildfile:${nant.project.buildfile}  -masterconfigfile:${nant.project.masterconfigfile} -D:config=${config} -D:codesign.timestamp=${codesign.timestamp} ${jenkins.flag} ${${IGO.module.name}.runtime.postbuildtarget}
+	</property>	
+  
+	<target name="clean-igo" depends="clean-fx">
+		<delete dir="${package.IGO.lib}" />
+		<delete dir="${package.IGO.bin}" />
+    <delete>
+			<fileset basedir="${runtime.${IGO.module.name}.outputdir}">
+				<includes name="${runtime.${IGO.module.name}.outputname}.*"/>
+			</fileset>
+		</delete>
+  </target>
+
+  <target name="IGOtest">
+    <echo message="${cert.args}" />
+  </target>
+
+   
+  
+</project>

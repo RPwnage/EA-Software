@@ -1,0 +1,72 @@
+<project default="build">
+    <package name="DirtySDK" targetversion="13.3.1.0.0" />  <!-- replaced by release script target-change-version.xml -->
+  
+    <do unless="@{PropertyExists('dirtysdk-samples')}">
+        <property name="dirtysdk-samples" value="true"/>
+    </do>
+
+    <!-- flag whether DirtySDK lib is assumed to be dealt with as a prebuilt lib or not                   -->
+    <!--     * presence of the directory /source/game is used to take that decision                  -->
+    <!--     * /source can't be used because some samples use some dirtysdk lib source file directly -->
+    <!--     * example: tester2client uses:                                                               -->
+    <!--                       core\source\dirtysock\dirtylib.c                                           -->
+    <!--                       core\source\dirtysock\pc\dirtylibwin.c                                     -->
+    <property name="DirtySDK-skip-lib-generation" value="false" />
+    <do unless="@{DirectoryExists('${package.dir}/source/game')}">
+        <property name="DirtySDK-skip-lib-generation" value="true" />
+        <echo message="WARNING -- DirtySDK lib source directory is missing! The build process is going to assume that it was intentionally removed by the code stripper: the DirtySDK lib build will be skipped, and the lib is assumed to already exist in the build directory." />
+    </do>
+
+    <!-- FIXME: this is required to link a unix sample against DirtySDK, but this
+         is a horribly inelegant way to do it.  This needs to be fixed to be cleaner -->
+    <do if="${config-system} == 'unix' or ${config-system} == 'unix64'">
+        <!-- define dependent libs; this must come before build-types inclusion -->
+        <property name="runtime.internal.libs.ordered">
+            ${property.value}
+            ${package.DirtySDK.builddir}/${config}/lib/${lib-prefix}dirtysock${lib-suffix}
+        </property>
+        <!-- pull in the build type we are going to use -->
+        <include file="${package.dir}/scripts/build-types.xml"/>
+    </do>
+
+    <!-- bring in the init and build files for dirtysock -->
+    <include file="scripts/dirtysock-buildtypes.xml"/>
+    <include file="scripts/dirtysock-initialize.xml" />
+    <include file="scripts/dirtysock-build.xml" />
+
+    <!-- determine which contribs to use/build -->
+    <include file="scripts/select-contribs.xml" />
+
+    <!-- determine which samples to use/build -->
+    <include file="scripts/select-samples.xml" />
+
+    <!-- define targets for DirtySDK packages -->
+    <include file="scripts/package-targets.xml" />
+
+    <!-- define release targets for DirtySDK -->
+    <do if="@{FileExists('scripts/release-targets.xml')}" >
+        <include file="scripts/release-targets.xml" />
+    </do>
+
+    <do if="@{PropertyTrue('dirtysdk-samples')}">
+        <!-- bring in DirtySDK.warningsuppression & AddDirtySDKLibsToModule -->
+        <include file="scripts/dirtysock-external.xml" />
+        <!-- bring in the build files for the contribs -->
+        <foreach item="String" property="package.DirtySDK.forloop.contrib" in="${package.DirtySDK.contribs.selected}">
+            <include file="scripts/contrib/${package.DirtySDK.forloop.contrib}-build.xml" />
+        </foreach>
+
+        <!-- bring in the build files for the samples -->
+        <foreach item="String" property="package.DirtySDK.forloop.sample" in="${package.DirtySDK.samples.selected}">
+            <include file="scripts/sample/${package.DirtySDK.forloop.sample}-build.xml" />
+        </foreach>
+    </do>
+
+    <!-- define the headerfile fileset -->
+    <foreach item="String" in="${runtime.dirtysock.includedirs}" delim="&#10;" property="thisdir">
+        <fileset name="runtime.dirtysock.headerfiles" append="true">
+            <includes name="${thisdir}/**/*.h"/>
+        </fileset>
+    </foreach>
+
+</project>

@@ -1,0 +1,467 @@
+#!/usr/bin/python
+
+import argparse
+import os
+import subprocess
+import time
+
+
+def main():
+    description = 'Origin Web Developer Setup Tool'
+    script_name = 'Origin Web Developer Setup Tool'
+    version = '1.0'
+
+    parser = argparse.ArgumentParser(description=description, add_help=False)
+    parser.add_argument("-c", "--clean", help="Clean all previously used installation caches (node_modules, bower_components, etc.)", action="store_true")
+    parser.add_argument("-h", "--help", help="Show this help message and exit", action="store_true")
+    parser.add_argument("-v", "--ver", help=argparse.SUPPRESS, action="version", version="%s %s" % (script_name, version))
+    parser.add_argument("-j", "--jenkins", help="Build only for Jenkins", action="store_true")
+    parser.add_argument("-r", "--release", help="Build release version", action="store_true")
+
+    args = parser.parse_args()
+
+    if args.help is True:
+        print_help(parser)
+        exit()
+    else:
+        # get project paths
+        tools_path = os.path.dirname(os.path.realpath(__file__))
+        npm_packages_path = os.path.realpath("%s/npm" % (tools_path))
+        bower_packages_path = os.path.realpath("%s/bower" % (tools_path))
+        jssdk_path = os.path.realpath("%s/../jssdk" % (tools_path))
+        experimentsdk_path = os.path.realpath("%s/../experimentsdk" % (tools_path))
+        i18n_path = os.path.realpath("%s/../i18n" % (tools_path))
+        components_path = os.path.realpath("%s/../components" % (tools_path))
+        eaxexperiments_path = os.path.realpath("%s/../eaxexperiments" % (tools_path))
+        app_path = os.path.realpath("%s/../app" % (tools_path))
+        minispa_path = os.path.realpath("%s/../automation/minispa" % (tools_path))
+
+        # clean dependency caches
+        if args.clean is True:
+            print
+            print "Cleaning Bower Links and NPM caches..."
+            print
+            command("sudo rm -rf ~/.local/share/bower")
+            command("sudo rm -rf ~/.npm")
+
+        # run the setup targets in the following order
+        if args.jenkins is not True:
+            stop_daemons()
+            setup_npm_tools(npm_packages_path, args)
+            setup_bower_tools(bower_packages_path, args)
+        setup_jssdk(jssdk_path, args)
+        setup_experimentsdk(experimentsdk_path, args)
+        setup_i18n(i18n_path, args)
+        setup_eaxexperiments(eaxexperiments_path, args)
+        setup_components(components_path, args)
+        setup_app(app_path, args)
+        if args.jenkins is not True:
+            setup_minispa(minispa_path, args)
+            setup_apache_conf(app_path, jssdk_path, minispa_path, tools_path)
+            setup_watcher(jssdk_path, "jssdk-watcher")
+            setup_watcher(experimentsdk_path, 'experimentsdk-watcher')
+            setup_watcher(i18n_path, "i18n-watcher")
+            setup_watcher(components_path, "components-watcher")
+            setup_watcher(eaxexperiments_path, "eaxexperiments-watcher")
+            setup_watcher(app_path, "app-watcher")
+            setup_watcher(minispa_path, "minispa-watcher")
+
+
+def setup_jssdk(dir, args):
+    os.chdir(dir)
+    print
+    print "Initializing the JSSDK"
+    print
+    if args.clean is True:
+        print
+        print "Cleaning JSSDK folder..."
+        print
+        command("sudo rm -rf bower_components")
+        command("sudo rm -rf node_modules")
+        command("sudo rm -rf dist")
+        command("sudo rm -rf docs_gen")
+    command("npm install")
+    command("bower install")
+    if args.release is True:
+        command("grunt build")
+    else:
+        command("grunt setup-vm")
+    command("grunt docs")
+    command("bower link")
+
+def setup_experimentsdk(dir, args):
+    os.chdir(dir)
+    print
+    print "Initializing the ExperimentSDK"
+    print
+    if args.clean is True:
+        print
+        print "Cleaning ExperimentSDK folder..."
+        print
+        command("sudo rm -rf bower_components")
+        command("sudo rm -rf node_modules")
+        command("sudo rm -rf dist")
+        command("sudo rm -rf docs_gen")
+    command("npm install")
+    command("bower install")
+    if args.release is True:
+        command("grunt build")
+    else:
+        command("grunt setup-vm")
+    command("grunt docs")
+    command("bower link")
+
+def setup_i18n(dir, args):
+    os.chdir(dir)
+    print
+    print "Initializing Origin i18n"
+    print
+    if args.clean is True:
+        print
+        print "Cleaning Origin i18n folder..."
+        print
+        command("sudo rm -rf bower_components")
+        command("sudo rm -rf dist/bower_components")
+        command("sudo rm -rf src/bower_components")
+        command("sudo rm -rf node_modules")
+        command("sudo rm -rf dist")
+    command("npm install")
+    command("bower install")
+    if args.release is True:
+        command("grunt build")
+    else:
+        command("grunt setup-vm")
+    command("bower link")
+
+def setup_npm_tools(npm_dir, args):
+    print
+    print "Setting up Origin provided npm tools..."
+    print
+    if args.clean is True:
+        os.chdir(npm_dir + '/origin-grunt-component-packager')
+        command("sudo rm -rf node_modules")
+        os.chdir(npm_dir + '/origin-grunt-component-packager-dev-tools')
+        command("sudo rm -rf node_modules")
+
+
+    os.chdir(npm_dir + '/origin-grunt-component-packager')
+    command("npm install")
+    command("sudo npm link")
+    os.chdir(npm_dir + '/origin-grunt-component-packager-dev-tools')
+    command("npm install")
+    command("sudo npm link")
+
+def setup_bower_tools(bower_dir, args):
+    print
+    print "Setting up Origin provided bower tools..."
+    print
+    if args.clean is True:
+        os.chdir(bower_dir + '/origin-locale')
+        command("sudo rm -rf node_modules")
+        command("sudo rm -rf bower_components")
+
+    os.chdir(bower_dir + '/origin-locale')
+    command("npm install")
+    command("bower install")
+    command("grunt")
+    command("bower link")
+
+
+def setup_components(dir, args):
+    os.chdir(dir)
+    print
+    print "Initializing Origin Components"
+    print
+    if args.clean is True:
+        print
+        print "Cleaning Origin Components folder..."
+        print
+        command("sudo rm -rf bower_components")
+        command("sudo rm -rf dist/bower_components")
+        command("sudo rm -rf src/bower_components")
+        command("sudo rm -rf node_modules")
+        command("sudo rm -rf dist")
+
+    command("npm link origin-grunt-component-packager")
+    command("npm link origin-grunt-component-packager-dev-tools")
+    command("npm install")
+
+    command("bower link origin-jssdk")
+    command("bower link origin-ui-toolkit")
+    command("bower link origin-i18n")
+    command("bower install")
+    if args.release is True:
+        command("grunt build")
+    else:
+        command("grunt setup-vm")
+    command("bower link")
+
+def setup_eaxexperiments(dir, args):
+    os.chdir(dir)
+    print
+    print "Initializing EAX Experiments Components"
+    print
+    if args.clean is True:
+        print
+        print "Cleaning EAX Experiments folder..."
+        print
+        command("sudo rm -rf bower_components")
+        command("sudo rm -rf dist/bower_components")
+        command("sudo rm -rf src/bower_components")
+        command("sudo rm -rf node_modules")
+        command("sudo rm -rf dist")
+
+#    command("npm link origin-grunt-component-packager")
+#    command("npm link origin-grunt-component-packager-dev-tools")
+    command("npm install")
+
+    command("bower link origin-jssdk")
+    command("bower link eax-experimentsdk")
+#    command("bower link origin-ui-toolkit")
+#    command("bower link origin-i18n")
+    command("bower install")
+    if args.release is True:
+        command("grunt build")
+    else:
+        command("grunt setup-vm")
+    command("bower link")
+
+def setup_app(dir, args):
+    os.chdir(dir)
+    print
+    print "Initializing Origin Single Page App"
+    print
+    if args.clean is True:
+        print
+        print "Cleaning Origin Single Page App folder..."
+        print
+        command("sudo rm -rf bower_components")
+        command("sudo rm -rf dist/bower_components")
+        command("sudo rm -rf src/bower_components")
+        command("sudo rm -rf node_modules")
+        command("sudo rm -rf dist")
+
+    command("npm install")
+
+    command("bower link origin-locale")
+    command("bower link origin-i18n")
+    command("bower link origin-ui-toolkit")
+    command("bower link origin-jssdk")
+    command("bower link origin-components")
+    command("bower link eax-experiments")
+    command("bower link eax-experimentsdk")
+    command("bower install -F")
+
+    if args.release is True:
+        command("grunt build")
+    else:
+        command("grunt setup-vm")
+
+
+def setup_minispa(dir, args):
+    os.chdir(dir)
+    print
+    print "Initializing Origin Automation minispa"
+    print
+    if args.clean is True:
+        print
+        print "Cleaning Origin Automation minispa..."
+        print
+        command("sudo rm -rf dist/bower_components")
+        command("sudo rm -rf node_modules")
+        command("sudo rm -rf dist")
+    command("npm install")
+    command("bower link origin-i18n")
+    command("bower link origin-jssdk")
+    command("bower link origin-components")
+    command("bower install")
+    command("grunt --gruntfile Gruntfile-vm.js --force")
+
+
+def setup_apache_conf(app_path, jssdk_path, minispa_path, tools_path):
+    print
+    print "Creating and staging new Apache conf file"
+    print
+    conf = ("""\
+# Apache default configuration for Origin Web Properties.
+# This file is generated by setup tools located in:
+# %(tools_path)s
+
+<IfModule mod_ssl.c>
+    # Virtual host for local.app.origin.com (non-SSL)
+    <VirtualHost *:80>
+        ServerName local.app.origin.com
+        DocumentRoot "%(app_path)s/dist"
+        AliasMatch "^/[a-z]{2}-[a-z]{2}+[/]?(.*)" "%(app_path)s/dist/$1"
+        DirectoryIndex index.html
+
+        SSLEngine on
+        SSLCertificateFile    /etc/apache2/ssl/app.crt
+        SSLCertificateKeyFile /etc/apache2/ssl/app.key
+
+        <Directory "%(app_path)s/dist">
+            RewriteEngine on
+
+            AllowOverride All
+            Allow from All
+
+            RewriteCond %%{REQUEST_FILENAME} -f [OR]
+            RewriteCond %%{REQUEST_FILENAME} -d
+            RewriteRule ^ - [L]
+
+            RewriteRule ^ index.html [L]
+        </Directory>
+    </VirtualHost>
+
+    # Virtual host for local.app.origin.com (SSL)
+    <VirtualHost *:443>
+        ServerName local.app.origin.com
+        DocumentRoot "%(app_path)s/dist"
+        # https://regex101.com/r/aZ5rI3/2
+        AliasMatch "^/[a-z]{2}-[a-z]{2}(?:-[a-z]{3})?[/]?(.*)" "%(app_path)s/dist/$1"
+        DirectoryIndex index.html
+
+        SSLEngine on
+        SSLCertificateFile    /etc/apache2/ssl/app.crt
+        SSLCertificateKeyFile /etc/apache2/ssl/app.key
+
+        <Directory "%(app_path)s/dist">
+            RewriteEngine on
+
+            AllowOverride All
+            Allow from All
+
+            RewriteCond %%{REQUEST_FILENAME} -f [OR]
+            RewriteCond %%{REQUEST_FILENAME} -d
+            RewriteRule ^ - [L]
+
+            RewriteRule ^ index.html [L]
+        </Directory>
+    </VirtualHost>
+
+    # Virtual host for local.jssdk.origin.com
+    <VirtualHost *:443>
+        ServerName local.jssdk.origin.com
+        DocumentRoot "%(jssdk_path)s/docs_gen"
+        DirectoryIndex index.html
+
+        SSLEngine on
+        SSLCertificateFile    /etc/apache2/ssl/jssdk.crt
+        SSLCertificateKeyFile /etc/apache2/ssl/jssdk.key
+
+        <Directory "%(jssdk_path)s/docs_gen">
+            AllowOverride All
+            Allow from All
+        </Directory>
+    </VirtualHost>
+
+    # Virtual host for local.minispa.origin.com
+    <VirtualHost *:443>
+        ServerName local.minispa.origin.com
+        DocumentRoot "%(minispa_path)s/dist"
+        DirectoryIndex minispa.html
+
+        SSLEngine on
+        SSLCertificateFile    /etc/apache2/ssl/minispa.crt
+        SSLCertificateKeyFile /etc/apache2/ssl/minispa.key
+
+        <Directory "%(app_path)s/dist">
+            AllowOverride All
+            Allow from All
+        </Directory>
+    </VirtualHost>
+</IfModule>
+    """ % locals()).strip()
+
+    f = open("/tmp/default-ssl", 'w')
+    f.seek(0)
+    f.write(conf)
+    f.close()
+
+    command("sudo mv /tmp/default-ssl /etc/apache2/sites-enabled/default-ssl")
+    time.sleep(1)
+    command("sudo apache2ctl start")
+
+
+def stop_daemons():
+    print
+    print "Stopping all background tasks for setup"
+    print
+    command("sudo stop app-watcher")
+    command("sudo stop jssdk-watcher")
+    command("sudo stop components-watcher")
+    command("sudo stop i18n-watcher")
+    command("sudo stop minispa-watcher")
+    command("sudo apache2ctl stop")
+
+
+def setup_watcher(path, upstart_handle):
+    print
+    print "Setting up auto watcher task: " + upstart_handle
+    print
+
+    conf = conf = ("""\
+#
+# This Upstart script starts and stops the grunt watch
+# process for the avascript development environment
+#
+description     "start/stop %(upstart_handle)s"
+author          "Richard Hoar <rhoar@ea.com>"
+
+start on (net-device-up
+          and local-filesystems
+          and runlevel [2345])
+
+stop on runlevel [016]
+respawn
+respawn limit 5 30
+console output
+
+chdir %(path)s
+exec sudo -u vagrant grunt watch:vm > .grunt.log
+    """ % locals()).strip()
+
+    filename = upstart_handle + ".conf"
+
+    f = open("/tmp/" + filename, 'w')
+    f.seek(0)
+    f.write(conf)
+    f.close()
+
+    command("sudo mv /tmp/" + filename + " /etc/init/" + filename)
+    command("sudo chmod a+x /etc/init/" + filename)
+    command("sudo start " + upstart_handle)
+
+
+def label(text):
+    print '\033[32;40m%s\033[0m' % text
+
+
+def command(cmd):
+    label(cmd)
+    os.system(cmd)
+    print
+
+
+def capture_command(cmd):
+    label(cmd)
+    proc = subprocess.Popen([cmd, ''], stdout=subprocess.PIPE, shell=True)
+    (out, err) = proc.communicate()
+    return out
+
+
+def print_help(parser):
+    parser.print_help()
+    print
+    print "This setup script will change all of the build paths"
+    print "to point to projects relative to this working directory"
+    print "Use this script whenever changing P4 working paths or moving from"
+    print "sandbox to sandbox"
+    print
+    print "Usage:"
+    print "./setup"
+    print
+
+# Initializer
+if __name__ == '__main__':
+    main()

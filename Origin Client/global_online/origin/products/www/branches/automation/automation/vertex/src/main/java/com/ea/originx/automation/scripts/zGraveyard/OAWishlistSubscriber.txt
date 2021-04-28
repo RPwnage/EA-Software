@@ -1,0 +1,186 @@
+package com.ea.originx.automation.scripts.feature.wishlist;
+
+import com.ea.originx.automation.lib.helpers.AccountManagerHelper;
+import com.ea.originx.automation.lib.macroaction.*;
+import com.ea.vx.originclient.account.UserAccount;
+import com.ea.vx.originclient.client.OriginClient;
+import com.ea.vx.originclient.client.OriginClientFactory;
+import com.ea.originx.automation.lib.pageobjects.common.NavigationSidebar;
+import com.ea.originx.automation.lib.pageobjects.dialog.CheckoutConfirmation;
+import com.ea.originx.automation.lib.pageobjects.gamelibrary.GameLibrary;
+import com.ea.originx.automation.lib.pageobjects.profile.MiniProfile;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileHeader;
+import com.ea.originx.automation.lib.pageobjects.profile.ProfileWishlistTab;
+import com.ea.originx.automation.lib.resources.games.EntitlementId;
+import com.ea.originx.automation.lib.resources.games.EntitlementInfoHelper;
+import com.ea.vx.originclient.resources.games.EntitlementInfo;
+import com.ea.vx.originclient.resources.OriginClientConstants;
+import com.ea.originx.automation.scripts.EAXVxTestTemplate;
+import com.ea.vx.annotations.TestRail;
+import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
+import org.testng.annotations.Test;
+
+/**
+ * Tests the wishlist for a Origin Access User
+ *
+ * @author nvarthakavi
+ */
+public class OAWishlistSubscriber extends EAXVxTestTemplate {
+
+    @TestRail(caseId = 11702)
+    @Test(groups = {"wishlist", "wishlist_smoke", "int_only", "allfeaturesmoke", "full_regression"})
+    public void testWishlistSubscriber(ITestContext context) throws Exception {
+
+        final OriginClient client = OriginClientFactory.create(context);
+
+        final UserAccount wishlistAccount = AccountManagerHelper.createNewThrowAwayAccount(OriginClientConstants.COUNTRY_CANADA);
+        final UserAccount senderAccount = AccountManagerHelper.getUnentitledUserAccountWithCountry(OriginClientConstants.COUNTRY_CANADA);
+        final String wishlistAccountName = wishlistAccount.getUsername();
+        final String senderAccountName = senderAccount.getUsername();
+        EntitlementInfo vaultTitle = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BF4_PREMIUM);
+        final String vaultTitleName = vaultTitle.getName();
+        final EntitlementInfo thirdPartyGame = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.THIS_WAR_OF_MINE);
+        final String thirdPartyGameName = thirdPartyGame.getName();
+        final EntitlementInfo battlefrontGame = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.STAR_WARS_BATTLEFRONT);
+        final String battlefrontGameName = battlefrontGame.getName();
+        final EntitlementInfo bigMoneyEntitlement = EntitlementInfoHelper.getEntitlementInfoForId(EntitlementId.BIG_MONEY);
+        final String bigMoneyEntitlementName = bigMoneyEntitlement.getName();
+
+        logFlowPoint(String.format("Launch Origin and login as user '%s'", wishlistAccountName)); // 1
+        logFlowPoint(String.format("Purchase Origin Access for the user '%s' ", wishlistAccountName)); // 2
+        logFlowPoint(String.format("Add '%s', '%s', '%s' and '%s' to wishlist from their corresponding PDP Page and "
+                + "Navigate to '%s' Wishlist Page in MyProfile", vaultTitleName, thirdPartyGameName, battlefrontGameName, bigMoneyEntitlementName, wishlistAccountName)); // 3
+        logFlowPoint(String.format("Verify '%s', '%s','%s' and '%s' are added to their wishlist tile", vaultTitleName, thirdPartyGameName, bigMoneyEntitlementName, battlefrontGameName)); // 4
+        logFlowPoint(String.format("Remove '%s' from the wishlist by clicking the Remove from Wishlist link and"
+                + " verify the '%s' is removed successfully", bigMoneyEntitlementName, bigMoneyEntitlementName)); // 5
+        logFlowPoint(String.format("Click on the play access button for the entitlement '%s' and verify the game's Buy and Play Access button has been removed from the wishlist", thirdPartyGameName)); // 6
+        logFlowPoint(String.format("Purchase the '%s' entitlement from the wishlist page and verify the game '%s' and '%s' are added to the game library", vaultTitleName, vaultTitleName, thirdPartyGameName)); // 7
+        logFlowPoint(String.format("Navigate to the wishlist profile and verify the game '%s' has removed from the wishlist", vaultTitleName)); // 8
+        logFlowPoint(String.format("Logout from '%s' and login to '%s'", wishlistAccountName, senderAccountName)); // 9
+        logFlowPoint(String.format("Navigate to the '%s''s profile page", wishlistAccountName)); // 10
+        logFlowPoint(String.format("Navigate to the '%s''s Wishlist Tab ", wishlistAccountName)); // 11
+        logFlowPoint(String.format("Verify in the other user's Wishlist '%s' has the purchase as a gift CTA in '%s' tile", wishlistAccountName, battlefrontGameName)); // 12
+
+        //1
+        final WebDriver driver = startClientObject(context, client);
+        if (MacroLogin.startLogin(driver, wishlistAccount)) {
+            logPass("Verified login successful to user account: " + wishlistAccountName);
+        } else {
+            logFailExit("Failed: Cannot login to user account: " + wishlistAccountName);
+        }
+
+        // clean and both accounts as friends
+        senderAccount.cleanFriends();
+        senderAccount.addFriend(wishlistAccount);
+
+        //2
+        if (MacroOriginAccess.purchaseOriginAccess(driver)) {
+            logPass("Successfully purchased origin access for the user  " + wishlistAccountName);
+        } else {
+            logFailExit("Failed: Cannot purchase origin access for the user " + wishlistAccountName);
+        }
+
+        //3
+        MacroWishlist.addToWishlist(driver, vaultTitle);
+        MacroWishlist.addToWishlist(driver, thirdPartyGame);
+        MacroWishlist.addToWishlist(driver, battlefrontGame);
+        MacroWishlist.addToWishlist(driver, bigMoneyEntitlement); // As it is not a vault game
+        new MiniProfile(driver).selectViewMyProfile();
+        ProfileHeader profileHeader = new ProfileHeader(driver);
+        profileHeader.openWishlistTab();
+        if (profileHeader.verifyWishlistActive()) {
+            logPass("Successfully opened the Wishlist Tab for the user " + wishlistAccountName);
+        } else {
+            logFailExit("Failed To open the Wishlist Tab for the user " + wishlistAccountName);
+        }
+
+        //4
+        profileHeader.waitForWishlistTabToLoad();
+        ProfileWishlistTab profileWishlistTab = new ProfileWishlistTab(driver);
+        if (profileWishlistTab.verifyTilesExist(vaultTitle.getOfferId(), thirdPartyGame.getOfferId(), battlefrontGame.getOfferId(), bigMoneyEntitlement.getOfferId())) {
+            logPass("Verified that" + vaultTitleName + "," + battlefrontGameName + "," + bigMoneyEntitlementName + " and " + thirdPartyGameName + " are added to the wishlist");
+        } else {
+            logFailExit("Failed: " + vaultTitleName + "," + battlefrontGameName + "," + bigMoneyEntitlementName + " and " + thirdPartyGameName + " are not added to the wishlist");
+        }
+
+        //5
+        profileWishlistTab.getWishlistTile(bigMoneyEntitlement).clickRemoveFromWishlistLink();
+        if (!profileWishlistTab.verifyTilesExist(bigMoneyEntitlement.getOfferId())) {
+            logPass("Verified that " + bigMoneyEntitlementName + " removed from the wishlist successfully");
+        } else {
+            logFailExit("Failed: " + bigMoneyEntitlementName + " was not remove from the wishlist");
+        }
+
+        //6
+        profileWishlistTab.getWishlistTile(thirdPartyGame).clickPlayAccessButton();
+        new CheckoutConfirmation(driver).close();
+        boolean buyButton = !profileWishlistTab.verifyBuyButtonsExist(thirdPartyGame);
+        boolean accessButton = !profileWishlistTab.verifyPlayAccessButtonsExist(thirdPartyGame);
+        if (buyButton && accessButton) {
+            logPass("Verified that for " + thirdPartyGameName + " Buy and Play Access button has been removed from the wishlist");
+        } else {
+            logFailExit("Failed: For " + thirdPartyGameName + " Buy and Play Access button has not been removed from the wishlist");
+        }
+
+        //7
+        profileWishlistTab.getWishlistTile(vaultTitle).clickBuyButton();
+        MacroPurchase.completePurchaseAndCloseThankYouPage(driver);
+        new NavigationSidebar(driver).gotoGameLibrary();
+        GameLibrary gameLibrary = new GameLibrary(driver);
+        boolean isEntitlementsInGameLibrary = gameLibrary.isGameTileVisibleByOfferID(vaultTitle.getOfferId()) && gameLibrary.isGameTileVisibleByOfferID(thirdPartyGame.getOfferId());
+        if (isEntitlementsInGameLibrary) {
+            logPass("Verified that" + vaultTitleName + " and " + thirdPartyGameName + " exists in the game library tile");
+        } else {
+            logFailExit("Failed: " + vaultTitleName + " and " + thirdPartyGameName + "does not exist in the game library tile");
+        }
+
+        //8
+        new MiniProfile(driver).selectViewMyProfile();
+        profileHeader.waitForAchievementsTabToLoad();
+        profileHeader.openWishlistTab();
+        profileHeader.waitForWishlistTabToLoad();
+        if (!profileWishlistTab.verifyTilesExist(vaultTitle.getOfferId())) {
+            logPass("Verified that " + vaultTitleName + " removed from the wishlist successfully");
+        } else {
+            logFailExit("Failed: " + vaultTitleName + " was not remove from the wishlist");
+        }
+
+        //9
+        new MiniProfile(driver).selectSignOut();
+        if (MacroLogin.startLogin(driver, senderAccount)) {
+            logPass("Verified login successful to user account: " + senderAccountName);
+        } else {
+            logFailExit("Failed: Cannot login to user account: " + senderAccountName);
+        }
+
+        //10
+        MacroProfile.navigateToFriendProfile(driver, wishlistAccountName);
+        ProfileHeader wishlistProfile = new ProfileHeader(driver);
+        if (wishlistProfile.verifyAchievementsTabActive()) {
+            logPass("Successfully opened the profile page for the user " + wishlistAccountName);
+        } else {
+            logFailExit("Failed To open the profile page for the user " + wishlistAccountName);
+        }
+
+        //11
+        wishlistProfile.openWishlistTab();
+        if (wishlistProfile.verifyWishlistActive()) {
+            logPass("Successfully opened the Wishlist Tab for the user " + wishlistAccountName);
+        } else {
+            logFailExit("Failed To open the Wishlist Tab for the user " + wishlistAccountName);
+        }
+
+        //12
+        wishlistProfile.waitForWishlistTabToLoad();
+        ProfileWishlistTab otherUserWishlistTab = new ProfileWishlistTab(driver);
+        if (otherUserWishlistTab.verifyPurchaseAsAGiftButtonsExist(battlefrontGame)) {
+            logPass("Verified that " + battlefrontGameName + " have a purchase as a gift button in their tile");
+        } else {
+            logFailExit("Failed: " + battlefrontGameName + " does not have a purchase as a gift button in their tile");
+        }
+
+        softAssertAll();
+
+    }
+}
